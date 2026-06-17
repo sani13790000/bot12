@@ -1,7 +1,7 @@
 """
-هندلرهای تحلیل بازار
+ÙÙØ¯ÙØ±ÙØ§Û ØªØ­ÙÛÙ Ø¨Ø§Ø²Ø§Ø±
 
-نویسنده: MT5 Trading Team
+ÙÙÛØ³ÙØ¯Ù: MT5 Trading Team
 """
 
 from aiogram import Dispatcher, types, F
@@ -16,41 +16,45 @@ from ..keyboards import (
 from ..utils import format_analysis_result
 from ....core.logger import get_logger
 from ....core.config import settings
+import os
+
+# آدرس API از متغیر محیطی (برای Docker: http://api:8000، برای dev: http://localhost:8000)
+_API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 logger = get_logger("telegram.handlers.analysis")
 
 
 class AnalysisState(StatesGroup):
-    """وضعیت‌های تحلیل"""
+    """ÙØ¶Ø¹ÛØªâÙØ§Û ØªØ­ÙÛÙ"""
     waiting_symbol = State()
     waiting_timeframe = State()
     in_progress = State()
 
 
 def register_analysis_handlers(dp: Dispatcher):
-    """ثبت هندلرهای تحلیل"""
+    """Ø«Ø¨Øª ÙÙØ¯ÙØ±ÙØ§Û ØªØ­ÙÛÙ"""
 
-    @dp.message(F.text == "📊 تحلیل بازار")
+    @dp.message(F.text == "ð ØªØ­ÙÛÙ Ø¨Ø§Ø²Ø§Ø±")
     async def menu_analysis(message: types.Message, state: FSMContext):
-        """نمایش منوی تحلیل"""
+        """ÙÙØ§ÛØ´ ÙÙÙÛ ØªØ­ÙÛÙ"""
         await state.set_state(AnalysisState.waiting_symbol)
         await message.answer(
-            "📊 <b>انتخاب نماد</b>\n\n"
-            "نماد مورد نظر را انتخاب کنید:",
+            "ð <b>Ø§ÙØªØ®Ø§Ø¨ ÙÙØ§Ø¯</b>\n\n"
+            "ÙÙØ§Ø¯ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_analysis_keyboard(),
             parse_mode="HTML"
         )
 
     @dp.callback_query(F.data.startswith("analyze_"))
     async def analyze_symbol(callback: types.CallbackQuery, state: FSMContext):
-        """تحلیل نماد انتخاب شده"""
+        """ØªØ­ÙÛÙ ÙÙØ§Ø¯ Ø§ÙØªØ®Ø§Ø¨ Ø´Ø¯Ù"""
         symbol = callback.data.split("_")[1]
         await state.update_data(symbol=symbol)
         await state.set_state(AnalysisState.waiting_timeframe)
 
         await callback.message.edit_text(
-            f"📊 نماد: <b>{symbol}</b>\n\n"
-            "⏰ تایم‌فریم را انتخاب کنید:",
+            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\n"
+            "â° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_timeframe_keyboard(),
             parse_mode="HTML"
         )
@@ -58,25 +62,25 @@ def register_analysis_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "custom_symbol")
     async def custom_symbol(callback: types.CallbackQuery, state: FSMContext):
-        """درخواست نماد سفارشی"""
+        """Ø¯Ø±Ø®ÙØ§Ø³Øª ÙÙØ§Ø¯ Ø³ÙØ§Ø±Ø´Û"""
         await state.set_state(AnalysisState.waiting_symbol)
         await callback.message.edit_text(
-            "🔍 <b>نماد سفارشی</b>\n\n"
-            "نماد مورد نظر را وارد کنید:\n"
-            "مثال: EURUSD, GBPUSD, XAUUSD",
+            "ð <b>ÙÙØ§Ø¯ Ø³ÙØ§Ø±Ø´Û</b>\n\n"
+            "ÙÙØ§Ø¯ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ ÙØ§Ø±Ø¯ Ú©ÙÛØ¯:\n"
+            "ÙØ«Ø§Ù: EURUSD, GBPUSD, XAUUSD",
             parse_mode="HTML"
         )
         await callback.answer()
 
     @dp.message(AnalysisState.waiting_symbol)
     async def process_custom_symbol(message: types.Message, state: FSMContext):
-        """پردازش نماد سفارشی"""
+        """Ù¾Ø±Ø¯Ø§Ø²Ø´ ÙÙØ§Ø¯ Ø³ÙØ§Ø±Ø´Û"""
         symbol = message.text.upper().strip()
         await state.update_data(symbol=symbol)
 
         await message.answer(
-            f"📊 نماد: <b>{symbol}</b>\n\n"
-            "⏰ تایم‌فریم را انتخاب کنید:",
+            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\n"
+            "â° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_timeframe_keyboard(),
             parse_mode="HTML"
         )
@@ -84,23 +88,23 @@ def register_analysis_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data.startswith("tf_"), AnalysisState.waiting_timeframe)
     async def process_timeframe(callback: types.CallbackQuery, state: FSMContext):
-        """پردازش تایم‌فریم و شروع تحلیل"""
+        """Ù¾Ø±Ø¯Ø§Ø²Ø´ ØªØ§ÛÙâÙØ±ÛÙ Ù Ø´Ø±ÙØ¹ ØªØ­ÙÛÙ"""
         timeframe = callback.data.split("_")[1]
         data = await state.get_data()
         symbol = data.get("symbol")
 
         await callback.message.edit_text(
-            f"📊 <b>در حال تحلیل...</b>\n\n"
-            f"نماد: {symbol}\n"
-            f"تایم‌فریم: {timeframe}",
+            f"ð <b>Ø¯Ø± Ø­Ø§Ù ØªØ­ÙÛÙ...</b>\n\n"
+            f"ÙÙØ§Ø¯: {symbol}\n"
+            f"ØªØ§ÛÙâÙØ±ÛÙ: {timeframe}",
             parse_mode="HTML"
         )
 
         try:
-            # فراخوانی API تحلیل
+            # ÙØ±Ø§Ø®ÙØ§ÙÛ API ØªØ­ÙÛÙ
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"http://localhost:8000/api/analysis/full",
+                    f"{settings.API_BASE_URL}/api/analysis/full",
                     params={
                         "symbol": symbol,
                         "timeframe": timeframe
@@ -117,16 +121,16 @@ def register_analysis_handlers(dp: Dispatcher):
                 )
             else:
                 await callback.message.edit_text(
-                    "❌ <b>خطا در تحلیل</b>\n\n"
-                    "لطفاً دوباره تلاش کنید.",
+                    "â <b>Ø®Ø·Ø§ Ø¯Ø± ØªØ­ÙÛÙ</b>\n\n"
+                    "ÙØ·ÙØ§Ù Ø¯ÙØ¨Ø§Ø±Ù ØªÙØ§Ø´ Ú©ÙÛØ¯.",
                     parse_mode="HTML"
                 )
 
         except Exception as e:
-            logger.error(f"خطا در تحلیل: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± ØªØ­ÙÛÙ: {e}")
             await callback.message.edit_text(
-                "❌ <b>خطا در ارتباط با سرور</b>\n\n"
-                "لطفاً دوباره تلاش کنید.",
+                "â <b>Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø±ÙØ±</b>\n\n"
+                "ÙØ·ÙØ§Ù Ø¯ÙØ¨Ø§Ø±Ù ØªÙØ§Ø´ Ú©ÙÛØ¯.",
                 parse_mode="HTML"
             )
 
