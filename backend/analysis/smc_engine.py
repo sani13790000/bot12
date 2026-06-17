@@ -2553,6 +2553,97 @@ class SessionAnalyzer:
 # موتور اصلی SMC
 # =====================================================
 
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Kill Zone Detector — تشخیص Kill Zone های ICT مستقیم در SMC Engine
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class KillZoneInfo:
+    """اطلاعات یک Kill Zone فعال در ICT"""
+    name: str
+    session: str
+    start_hour: int
+    end_hour: int
+    is_active: bool
+    bias: str                   # BULLISH / BEARISH / NEUTRAL
+    score_multiplier: float     # ضریب امتیاز 1.0 تا 2.0
+
+
+class KillZoneDetector:
+    """
+    تشخیص Kill Zone های ICT داخل SMC Engine
+
+    Kill Zone ها بهترین زمان ورود معاملاتی هستند.
+    در این زمان‌ها نقدینگی جمع می‌شود و قیمت حرکت شدید می‌کند.
+
+    - Asian Kill Zone        00:00–03:00 UTC  ضریب ۱.۳
+    - London Open Kill Zone  07:00–09:00 UTC  ضریب ۱.۸
+    - New York Open KZ       12:00–14:00 UTC  ضریب ۱.۹ (بهترین)
+    - London Close KZ        15:00–17:00 UTC  ضریب ۱.۵
+    - Power Hour KZ          19:00–20:00 UTC  ضریب ۱.۴
+    """
+
+    _ZONES: List[Dict[str, Any]] = [
+        {"name": "Asian KZ",         "session": "asian",    "start": 0,  "end": 3,  "bias": "NEUTRAL", "mult": 1.3},
+        {"name": "London Open KZ",   "session": "london",   "start": 7,  "end": 9,  "bias": "BULLISH", "mult": 1.8},
+        {"name": "New York Open KZ", "session": "new_york", "start": 12, "end": 14, "bias": "BULLISH", "mult": 1.9},
+        {"name": "London Close KZ",  "session": "london",   "start": 15, "end": 17, "bias": "BEARISH", "mult": 1.5},
+        {"name": "Power Hour KZ",    "session": "new_york", "start": 19, "end": 20, "bias": "BEARISH", "mult": 1.4},
+    ]
+
+    def get_active(self, dt: datetime) -> Optional["KillZoneInfo"]:
+        """Kill Zone فعال در زمان dt — None اگر خارج از Kill Zone باشیم"""
+        try:
+            h = dt.hour
+            for z in self._ZONES:
+                if z["start"] <= h < z["end"]:
+                    return KillZoneInfo(
+                        name=z["name"], session=z["session"],
+                        start_hour=z["start"], end_hour=z["end"],
+                        is_active=True, bias=z["bias"],
+                        score_multiplier=z["mult"],
+                    )
+            return None
+        except Exception as e:
+            logger.error(f"خطا در KillZoneDetector.get_active: {e}")
+            return None
+
+    def is_active(self, dt: datetime) -> bool:
+        """آیا الان در Kill Zone هستیم؟"""
+        try:
+            return self.get_active(dt) is not None
+        except Exception:
+            return False
+
+    def score_bonus(self, dt: datetime) -> float:
+        """بونوس امتیاز بر اساس Kill Zone فعال (0.0 تا 1.0)"""
+        try:
+            kz = self.get_active(dt)
+            return min(kz.score_multiplier - 1.0, 1.0) if kz else 0.0
+        except Exception:
+            return 0.0
+
+    def all_status(self, dt: datetime) -> List["KillZoneInfo"]:
+        """وضعیت همه Kill Zone ها در زمان dt"""
+        try:
+            h = dt.hour
+            return [
+                KillZoneInfo(
+                    name=z["name"], session=z["session"],
+                    start_hour=z["start"], end_hour=z["end"],
+                    is_active=z["start"] <= h < z["end"],
+                    bias=z["bias"],
+                    score_multiplier=z["mult"] if z["start"] <= h < z["end"] else 1.0,
+                )
+                for z in self._ZONES
+            ]
+        except Exception as e:
+            logger.error(f"خطا در KillZoneDetector.all_status: {e}")
+            return []
+
+
 class SMCEngine:
     """
     موتور اصلی Smart Money Concept
@@ -2570,6 +2661,60 @@ class SMCEngine:
     خروجی:
     - SMCResult با تمام اطلاعات لازم برای تصمیم‌گیری
     """
+
+
+    def _safe_execute(self, func, *args, func_name: str = "unknown", default=None, **kwargs):
+        """
+        اجرای امن با try/except — برای جلوگیری از crash کل موتور
+        هر داده بد فقط این تابع را متوقف می‌کند نه کل سیستم
+        """
+        try:
+            return func(*args, **kwargs)
+        except (IndexError, KeyError, TypeError, ValueError) as e:
+            logger.warning(f"خطای داده در {func_name}: {e}")
+            return default
+        except Exception as e:
+            logger.error(f"خطای غیرمنتظره در {func_name}: {e}", exc_info=True)
+            return default
+
+    @staticmethod
+    def _validate_candles(candles: list, min_count: int = 10) -> Tuple[bool, str]:
+        """
+        اعتبارسنجی کندل‌های ورودی قبل از هر تحلیل
+
+        Returns:
+            (True, "") اگر معتبر | (False, پیام خطا) اگر نامعتبر
+        """
+        if not candles:
+            return False, "لیست کندل‌ها خالی است"
+        if not isinstance(candles, (list, tuple)):
+            return False, f"نوع داده نامعتبر: {type(candles)}"
+        if len(candles) < min_count:
+            return False, f"تعداد کندل ({len(candles)}) < حداقل ({min_count})"
+        first = candles[0]
+        if isinstance(first, dict):
+            required = {"high", "low", "open", "close"}
+            missing = required - set(first.keys())
+            if missing:
+                return False, f"فیلدهای گم: {missing}"
+            for field_name in required:
+                val = first.get(field_name)
+                if val is None or not isinstance(val, (int, float)) or val <= 0:
+                    return False, f"مقدار نامعتبر {field_name}: {val}"
+        return True, ""
+
+    def _safe_analyze_component(self, analyzer, candles: list, component_name: str) -> Optional[Any]:
+        """
+        اجرای امن یک تحلیلگر فرعی
+        اگر یک تحلیلگر fail کرد، بقیه ادامه می‌دهند
+        """
+        try:
+            result = analyzer.analyze(candles)
+            return result
+        except Exception as e:
+            logger.error(f"خطا در {component_name}: {e}", exc_info=True)
+            return None
+
 
     def __init__(self, config: Optional[Dict] = None):
         """
