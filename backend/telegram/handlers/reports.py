@@ -1,414 +1,361 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-هندلرهای گزارش‌ها
-
-با Authorization و Rate Limiting.
-
-نویسنده: MT5 Trading Team
+فایل: backend/telegram/handlers/reports.py
+توضیح: سیستم گزارش‌دهی کامل تلگرام
+شامل: گزارش روزانه، هفتگی، ماهانه، وین‌ریت، سود/ضرر، تاریخچه معاملات
+تمام پیام‌ها به فارسی
 """
 
-from aiogram import Dispatcher, types, F
-import httpx
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
+from aiogram.filters import Command
+from aiogram.utils.markdown import hbold, hcode
+from datetime import datetime, timedelta
+from typing import Optional
+import logging
 
-from ..keyboards import get_reports_keyboard
-from ..utils import format_report_summary
-from ..auth import rate_limit, require_permission, Permission
-from ..rbac_service import rbac_service
-from ....core.logger import get_logger
-from ....core.config import settings
+from ..rbac import require_permission, Permission
+from ...database.connection import get_db
+from ...services.trade_service import TradeService
+from ...core.logger import get_logger
 
-logger = get_logger("telegram.handlers.reports")
-
-API_BASE = f"http://localhost:{settings.API_PORT}{settings.API_PREFIX}"
+logger = get_logger(__name__)
+router = Router(name="reports")
 
 
-def register_report_handlers(dp: Dispatcher):
-    """ثبت هندلرهای گزارش‌ها"""
+def _format_number(value: float, decimals: int = 2) -> str:
+    """فرمت‌بندی عدد با جداکننده هزارگان"""
+    return f"{value:,.{decimals}f}"
 
-    @dp.message(F.text == "📋 گزارش‌ها")
-    @rate_limit("command")
-    async def menu_reports(message: types.Message):
-        """نمایش منوی گزارش‌ها"""
-        user = await rbac_service.get_user_by_telegram_id(message.from_user.id)
 
-        if not user:
-            await message.answer(
-                "⚠️ برای مشاهده گزارش‌ها باید ثبت‌نام کنید.\n\n"
-                "در داشبورد ثبت‌نام کنید و تلگرام خود را متصل کنید.",
-                parse_mode="HTML"
+def _format_pnl(value: float) -> str:
+    """فرمت‌بندی سود/ضرر با رنگ (ایموجی)"""
+    if value > 0:
+        return f"✅ +{_format_number(value)}"
+    elif value < 0:
+        return f"❌ {_format_number(value)}"
+    return f"➖ {_format_number(value)}"
+
+
+def _format_trade_row(trade: dict) -> str:
+    """فرمت‌بندی یک ردیف معامله"""
+    direction = "📈 خرید" if trade.get("direction") == "buy" else "📉 فروش"
+    result    = _format_pnl(trade.get("profit", 0))
+    symbol    = trade.get("symbol", "---")
+    open_time = trade.get("open_time", "")
+    if isinstance(open_time, datetime):
+        open_time = open_time.strftime("%m/%d %H:%M")
+    return f"  {direction} {symbol} | {result} | {open_time}"
+
+
+async def _get_report_data(db, start_date: datetime, end_date: datetime) -> dict:
+    """دریافت داده‌های گزارش از دیتابیس"""
+    try:
+        service = TradeService(db)
+        trades = await service.get_trades_in_range(start_date, end_date)
+
+        total_trades  = len(trades)
+        wins          = [t for t in trades if t.get("profit", 0) > 0]
+        losses        = [t for t in trades if t.get("profit", 0) < 0]
+        breakeven     = [t for t in trades if t.get("profit", 0) == 0]
+        total_profit  = sum(t.get("profit", 0) for t in wins)
+        total_loss    = abs(sum(t.get("profit", 0) for t in losses))
+        net_profit    = total_profit - total_loss
+        win_rate      = (len(wins) / total_trades * 100) if total_trades > 0 else 0
+        avg_win       = (total_profit / len(wins)) if wins else 0
+        avg_loss      = (total_loss   / len(losses)) if losses else 0
+        profit_factor = (total_profit / total_loss) if total_loss > 0 else float("inf")
+        best_trade    = max(trades, key=lambda t: t.get("profit", 0), default={})
+        worst_trade   = min(trades, key=lambda t: t.get("profit", 0), default={})
+
+        return {
+            "total_trades":  total_trades,
+            "wins":          len(wins),
+            "losses":        len(losses),
+            "breakeven":     len(breakeven),
+            "win_rate":      win_rate,
+            "total_profit":  total_profit,
+            "total_loss":    total_loss,
+            "net_profit":    net_profit,
+            "avg_win":       avg_win,
+            "avg_loss":      avg_loss,
+            "profit_factor": profit_factor,
+            "best_trade":    best_trade.get("profit", 0),
+            "worst_trade":   worst_trade.get("profit", 0),
+            "trades":        trades,
+        }
+    except Exception as e:
+        logger.error(f"خطا در دریافت داده گزارش: {e}")
+        return {}
+
+
+def _build_report_message(data: dict, title: str, period: str) -> str:
+    """ساخت پیام گزارش"""
+    if not data:
+        return f"❌ خطا در دریافت اطلاعات گزارش {title}"
+
+    pf_str = (f"{data['profit_factor']:.2f}"
+              if data["profit_factor"] != float("inf") else "∞")
+
+    # رنگ امتیاز وین‌ریت
+    wr = data["win_rate"]
+    wr_emoji = "🟢" if wr >= 60 else ("🟡" if wr >= 50 else "🔴")
+
+    msg = (
+        f"📊 {hbold(title)}
+"
+        f"📅 دوره: {period}
+"
+        f"{'─'*30}
+"
+        f"📈 {hbold('خلاصه معاملات')}
+"
+        f"  کل معاملات:   {data['total_trades']}
+"
+        f"  برنده:         ✅ {data['wins']}
+"
+        f"  بازنده:        ❌ {data['losses']}
+"
+        f"  سربه‌سر:       ➖ {data['breakeven']}
+"
+        f"  {wr_emoji} وین‌ریت:       {wr:.1f}%
+"
+        f"{'─'*30}
+"
+        f"💰 {hbold('نتایج مالی')}
+"
+        f"  سود کل:        {_format_pnl(data['total_profit'])}
+"
+        f"  ضرر کل:        ❌ -{_format_number(data['total_loss'])}
+"
+        f"  سود/ضرر خالص: {_format_pnl(data['net_profit'])}
+"
+        f"{'─'*30}
+"
+        f"📉 {hbold('آمار پیشرفته')}
+"
+        f"  میانگین برد:  +{_format_number(data['avg_win'])}
+"
+        f"  میانگین باخت: -{_format_number(data['avg_loss'])}
+"
+        f"  Profit Factor: {pf_str}
+"
+        f"  بهترین معامله: {_format_pnl(data['best_trade'])}
+"
+        f"  بدترین معامله: {_format_pnl(data['worst_trade'])}
+"
+    )
+    return msg
+
+
+# ===== دستورات گزارش =====
+
+@router.message(Command("report_daily"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_daily_report(message: Message):
+    """گزارش روزانه"""
+    await message.answer("⏳ در حال آماده‌سازی گزارش روزانه...")
+    try:
+        async with get_db() as db:
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            data  = await _get_report_data(db, today, datetime.now())
+            period = today.strftime("%Y/%m/%d")
+            msg   = _build_report_message(data, "گزارش روزانه", period)
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش روزانه: {e}")
+        await message.answer("❌ خطا در دریافت گزارش روزانه")
+
+
+@router.message(Command("report_weekly"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_weekly_report(message: Message):
+    """گزارش هفتگی"""
+    await message.answer("⏳ در حال آماده‌سازی گزارش هفتگی...")
+    try:
+        async with get_db() as db:
+            end   = datetime.now()
+            start = end - timedelta(days=7)
+            data  = await _get_report_data(db, start, end)
+            period = f"{start.strftime('%Y/%m/%d')} تا {end.strftime('%Y/%m/%d')}"
+            msg   = _build_report_message(data, "گزارش هفتگی", period)
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش هفتگی: {e}")
+        await message.answer("❌ خطا در دریافت گزارش هفتگی")
+
+
+@router.message(Command("report_monthly"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_monthly_report(message: Message):
+    """گزارش ماهانه"""
+    await message.answer("⏳ در حال آماده‌سازی گزارش ماهانه...")
+    try:
+        async with get_db() as db:
+            end   = datetime.now()
+            start = end - timedelta(days=30)
+            data  = await _get_report_data(db, start, end)
+            period = f"{start.strftime('%Y/%m/%d')} تا {end.strftime('%Y/%m/%d')}"
+            msg   = _build_report_message(data, "گزارش ماهانه", period)
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش ماهانه: {e}")
+        await message.answer("❌ خطا در دریافت گزارش ماهانه")
+
+
+@router.message(Command("report_winrate"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_winrate_report(message: Message):
+    """گزارش وین‌ریت"""
+    try:
+        async with get_db() as db:
+            # مقایسه دوره‌های مختلف
+            now    = datetime.now()
+            today  = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week   = now - timedelta(days=7)
+            month  = now - timedelta(days=30)
+
+            d_day   = await _get_report_data(db, today, now)
+            d_week  = await _get_report_data(db, week,  now)
+            d_month = await _get_report_data(db, month, now)
+
+            msg = (
+                f"🎯 {hbold('گزارش وین‌ریت')}
+"
+                f"{'─'*30}
+"
+                f"📅 امروز:       {d_day.get('win_rate', 0):.1f}% "
+                f"({d_day.get('wins', 0)}/{d_day.get('total_trades', 0)})
+"
+                f"📅 این هفته:   {d_week.get('win_rate', 0):.1f}% "
+                f"({d_week.get('wins', 0)}/{d_week.get('total_trades', 0)})
+"
+                f"📅 این ماه:    {d_month.get('win_rate', 0):.1f}% "
+                f"({d_month.get('wins', 0)}/{d_month.get('total_trades', 0)})
+"
+                f"{'─'*30}
+"
+                f"💰 سود خالص این ماه: {_format_pnl(d_month.get('net_profit', 0))}
+"
+                f"📊 Profit Factor:     "
+                f"{d_month.get('profit_factor', 0):.2f}"
             )
-            return
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش وین‌ریت: {e}")
+        await message.answer("❌ خطا در دریافت گزارش وین‌ریت")
 
-        await message.answer(
-            "📋 <b>گزارش‌ها</b>\n\n"
-            "نوع گزارش را انتخاب کنید:",
-            reply_markup=get_reports_keyboard(),
-            parse_mode="HTML"
-        )
 
-    @dp.callback_query(F.data == "report_daily")
-    @rate_limit("command")
-    async def show_daily_report(callback: types.CallbackQuery):
-        """گزارش روزانه"""
-        user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
+@router.message(Command("report_profit"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_profit_report(message: Message):
+    """گزارش سود"""
+    try:
+        async with get_db() as db:
+            now   = datetime.now()
+            month = now - timedelta(days=30)
+            data  = await _get_report_data(db, month, now)
+            winning_trades = [t for t in data.get("trades", []) if t.get("profit", 0) > 0]
+            top5 = sorted(winning_trades, key=lambda t: t.get("profit", 0), reverse=True)[:5]
 
-        if not user:
-            await callback.message.edit_text(
-                "⚠️ ثبت نشده",
-                parse_mode="HTML"
+            msg = (
+                f"✅ {hbold('گزارش سود (۳۰ روز اخیر)')}
+"
+                f"{'─'*30}
+"
+                f"سود کل:       +{_format_number(data.get('total_profit', 0))}
+"
+                f"تعداد معاملات: {data.get('wins', 0)}
+"
+                f"میانگین سود:  +{_format_number(data.get('avg_win', 0))}
+"
+                f"بهترین معامله: +{_format_number(data.get('best_trade', 0))}
+"
+                f"{'─'*30}
+"
+                f"🏆 {hbold('۵ معامله برتر')}
+"
             )
-            await callback.answer()
-            return
+            for t in top5:
+                msg += _format_trade_row(t) + "
+"
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش سود: {e}")
+        await message.answer("❌ خطا در دریافت گزارش سود")
 
-        # بررسی دسترسی
-        check = await rbac_service.check_permission(
-            callback.from_user.id,
-            Permission.VIEW_DAILY_REPORT
-        )
 
-        if not check.get("allowed"):
-            await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
+@router.message(Command("report_loss"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_loss_report(message: Message):
+    """گزارش ضرر"""
+    try:
+        async with get_db() as db:
+            now   = datetime.now()
+            month = now - timedelta(days=30)
+            data  = await _get_report_data(db, month, now)
+            losing_trades = [t for t in data.get("trades", []) if t.get("profit", 0) < 0]
+            worst5 = sorted(losing_trades, key=lambda t: t.get("profit", 0))[:5]
+
+            msg = (
+                f"❌ {hbold('گزارش ضرر (۳۰ روز اخیر)')}
+"
+                f"{'─'*30}
+"
+                f"ضرر کل:        -{_format_number(data.get('total_loss', 0))}
+"
+                f"تعداد معاملات: {data.get('losses', 0)}
+"
+                f"میانگین ضرر:   -{_format_number(data.get('avg_loss', 0))}
+"
+                f"بدترین معامله: {_format_pnl(data.get('worst_trade', 0))}
+"
+                f"{'─'*30}
+"
+                f"⚠️ {hbold('۵ بدترین معامله')}
+"
             )
-            await callback.answer()
-            return
+            for t in worst5:
+                msg += _format_trade_row(t) + "
+"
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش ضرر: {e}")
+        await message.answer("❌ خطا در دریافت گزارش ضرر")
 
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{API_BASE}/reports/daily",
-                    headers={"Authorization": f"Bearer {user.get('id')}"},
-                    timeout=10.0
-                )
 
-            if response.status_code == 200:
-                result = response.json()
-                data = result.get("data", {})
-                summary = data.get("summary", {})
+@router.message(Command("report_trades"))
+@require_permission(Permission.VIEW_REPORTS)
+async def cmd_trades_report(message: Message):
+    """گزارش معاملات (۲۴ ساعت اخیر)"""
+    try:
+        async with get_db() as db:
+            start = datetime.now() - timedelta(hours=24)
+            data  = await _get_report_data(db, start, datetime.now())
+            trades = data.get("trades", [])[:10]
 
-                total = summary.get("total_trades", 0)
-                winning = summary.get("winning_trades", 0)
-                losing = summary.get("losing_trades", 0)
-                win_rate = summary.get("win_rate", 0)
-                net_profit = summary.get("net_profit", 0)
-                gross_profit = summary.get("gross_profit", 0)
-                gross_loss = summary.get("gross_loss", 0)
-
-                text = f"""
-📅 <b>گزارش روزانه</b>
-تاریخ: {data.get('date', '---')}</b>
-
-📊 <b>خلاصه:</b>
-• تعداد معاملات: {total}
-• برنده: {winning} 🟢
-• بازنده: {losing} 🔴
-• وین ریت: {win_rate:.1f}%
-
-💰 <b>مالی:</b>
-• سود ناخالص: ${gross_profit:.2f}
-• ضرر ناخالص: ${abs(gross_loss):.2f}
-• سود/ضرر خالص: ${net_profit:.2f}
-
-{'✅' if net_profit >= 0 else '📉'} <b>نتیجه:</b> {'سودده' if net_profit >= 0 else 'زیان‌ده'}
-"""
-                await callback.message.edit_text(text, parse_mode="HTML")
+            msg = (
+                f"📋 {hbold('معاملات ۲۴ ساعت اخیر')}
+"
+                f"{'─'*30}
+"
+                f"تعداد: {data.get('total_trades', 0)} | "
+                f"وین‌ریت: {data.get('win_rate', 0):.1f}%
+"
+                f"سود/ضرر: {_format_pnl(data.get('net_profit', 0))}
+"
+                f"{'─'*30}
+"
+            )
+            if not trades:
+                msg += "هیچ معامله‌ای در این بازه ثبت نشده است.
+"
             else:
-                await callback.message.edit_text(
-                    "❌ خطا در دریافت گزارش",
-                    parse_mode="HTML"
-                )
-
-        except Exception as e:
-            logger.error(f"خطا در دریافت گزارش روزانه: {e}")
-            await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
-                parse_mode="HTML"
-            )
-
-        await callback.answer()
-
-    @dp.callback_query(F.data == "report_weekly")
-    @rate_limit("command")
-    async def show_weekly_report(callback: types.CallbackQuery):
-        """گزارش هفتگی"""
-        user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
-
-        if not user:
-            await callback.message.edit_text("⚠️ ثبت نشده", parse_mode="HTML")
-            await callback.answer()
-            return
-
-        # بررسی دسترسی
-        check = await rbac_service.check_permission(
-            callback.from_user.id,
-            Permission.VIEW_WEEKLY_REPORT
-        )
-
-        if not check.get("allowed"):
-            await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            await callback.answer()
-            return
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{API_BASE}/reports/weekly",
-                    headers={"Authorization": f"Bearer {user.get('id')}"},
-                    timeout=10.0
-                )
-
-            if response.status_code == 200:
-                result = response.json()
-                data = result.get("data", {})
-                summary = data.get("summary", {})
-                breakdown = data.get("daily_breakdown", [])
-
-                text = f"""
-📆 <b>گزارش هفتگی</b>
-از {data.get('week_start', '---')} تا {data.get('week_end', '---')}
-
-📊 <b>خلاصه:</b>
-• تعداد معاملات: {summary.get('total_trades', 0)}
-• سود/ضرر کل: ${summary.get('total_profit', 0):.2f}
-• وین ریت: {summary.get('win_rate', 0):.1f}%
-
-📈 <b>تفکیک روزانه:</b>
-"""
-                for day in breakdown:
-                    profit_emoji = "🟢" if day.get("profit", 0) >= 0 else "🔴"
-                    text += f"\n{profit_emoji} {day.get('date', '---')}: {day.get('trades', 0)} معامله | ${day.get('profit', 0):.2f}"
-
-                await callback.message.edit_text(text, parse_mode="HTML")
-            else:
-                await callback.message.edit_text(
-                    "❌ خطا در دریافت گزارش",
-                    parse_mode="HTML"
-                )
-
-        except Exception as e:
-            logger.error(f"خطا در دریافت گزارش هفتگی: {e}")
-            await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
-                parse_mode="HTML"
-            )
-
-        await callback.answer()
-
-    @dp.callback_query(F.data == "report_monthly")
-    @rate_limit("command")
-    async def show_monthly_report(callback: types.CallbackQuery):
-        """گزارش ماهانه"""
-        user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
-
-        if not user:
-            await callback.message.edit_text("⚠️ ثبت نشده", parse_mode="HTML")
-            await callback.answer()
-            return
-
-        # بررسی دسترسی
-        check = await rbac_service.check_permission(
-            callback.from_user.id,
-            Permission.VIEW_MONTHLY_REPORT
-        )
-
-        if not check.get("allowed"):
-            await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            await callback.answer()
-            return
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{API_BASE}/reports/monthly",
-                    headers={"Authorization": f"Bearer {user.get('id')}"},
-                    timeout=10.0
-                )
-
-            if response.status_code == 200:
-                result = response.json()
-                data = result.get("data", {})
-                summary = data.get("summary", {})
-
-                text = f"""
-🗓 <b>گزارش ماهانه</b>
-ماه: {data.get('month', '---')}
-
-📊 <b>خلاصه:</b>
-• تعداد معاملات: {summary.get('total_trades', 0)}
-• برنده: {summary.get('winning_trades', 0)} 🟢
-• بازنده: {summary.get('losing_trades', 0)} 🔴
-• وین ریت: {summary.get('win_rate', 0):.1f}%
-
-💰 <b>سود/ضرر خالص:</b> ${summary.get('net_profit', 0):.2f}
-"""
-                await callback.message.edit_text(text, parse_mode="HTML")
-            else:
-                await callback.message.edit_text(
-                    "❌ خطا در دریافت گزارش",
-                    parse_mode="HTML"
-                )
-
-        except Exception as e:
-            logger.error(f"خطا در دریافت گزارش ماهانه: {e}")
-            await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
-                parse_mode="HTML"
-            )
-
-        await callback.answer()
-
-    @dp.callback_query(F.data == "report_performance")
-    @rate_limit("command")
-    async def show_performance(callback: types.CallbackQuery):
-        """عملکرد کلی"""
-        user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
-
-        if not user:
-            await callback.message.edit_text("⚠️ ثبت نشده", parse_mode="HTML")
-            await callback.answer()
-            return
-
-        # بررسی دسترسی
-        check = await rbac_service.check_permission(
-            callback.from_user.id,
-            Permission.VIEW_OWN_REPORTS
-        )
-
-        if not check.get("allowed"):
-            await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            await callback.answer()
-            return
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{API_BASE}/reports/performance",
-                    params={"period": "all"},
-                    headers={"Authorization": f"Bearer {user.get('id')}"},
-                    timeout=10.0
-                )
-
-            if response.status_code == 200:
-                result = response.json()
-                data = result.get("data", {})
-                metrics = data.get("metrics", {})
-
-                profit_factor = metrics.get("profit_factor", 0)
-                pf_status = "عالی" if profit_factor > 2 else "خوب" if profit_factor > 1.5 else "نیاز به بهبود"
-
-                text = f"""
-📊 <b>عملکرد کلی</b>
-
-📈 <b>معیارهای عملکرد:</b>
-• تعداد کل معاملات: {metrics.get('total_trades', 0)}
-• برنده: {metrics.get('winning_trades', 0)} 🟢
-• بازنده: {metrics.get('losing_trades', 0)} 🔴
-
-🎯 <b>نرخ موفقیت:</b>
-• وین ریت: {metrics.get('win_rate', 0):.1f}%
-• فاکتور سود: {profit_factor:.2f} ({pf_status})
-
-💰 <b>سود و ضرر:</b>
-• سود ناخالص: ${metrics.get('gross_profit', 0):.2f}
-• ضرر ناخالص: ${metrics.get('gross_loss', 0):.2f}
-• سود خالص: ${metrics.get('net_profit', 0):.2f}
-• میانگین هر معامله: ${metrics.get('avg_trade', 0):.2f}
-"""
-                await callback.message.edit_text(text, parse_mode="HTML")
-            else:
-                await callback.message.edit_text(
-                    "❌ خطا در دریافت عملکرد",
-                    parse_mode="HTML"
-                )
-
-        except Exception as e:
-            logger.error(f"خطا در دریافت عملکرد: {e}")
-            await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
-                parse_mode="HTML"
-            )
-
-        await callback.answer()
-
-    # دستورات متنی
-    @dp.message(F.text.regexp(r"^/daily$"))
-    @rate_limit("command")
-    async def cmd_daily(message: types.Message):
-        """دستور /daily"""
-        user = await rbac_service.get_user_by_telegram_id(message.from_user.id)
-        if not user:
-            await message.answer(
-                "⚠️ برای استفاده از این دستور ثبت‌نام کنید.",
-                parse_mode="HTML"
-            )
-            return
-
-        # براس دسترسی
-        check = await rbac_service.check_permission(
-            message.from_user.id,
-            Permission.VIEW_DAILY_REPORT
-        )
-
-        if not check.get("allowed"):
-            await message.answer(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            return
-
-        await message.answer("📊 گزارش روزانه در حال دریافت...", parse_mode="HTML")
-
-    @dp.message(F.text.regexp(r"^/weekly$"))
-    @rate_limit("command")
-    async def cmd_weekly(message: types.Message):
-        """دستور /weekly"""
-        user = await rbac_service.get_user_by_telegram_id(message.from_user.id)
-        if not user:
-            await message.answer("⚠️ ثبت‌نام کنید.", parse_mode="HTML")
-            return
-
-        check = await rbac_service.check_permission(
-            message.from_user.id,
-            Permission.VIEW_WEEKLY_REPORT
-        )
-
-        if not check.get("allowed"):
-            await message.answer(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            return
-
-        await message.answer("📊 گزارش هفتگی...", parse_mode="HTML")
-
-    @dp.message(F.text.regexp(r"^/monthly$"))
-    @rate_limit("command")
-    async def cmd_monthly(message: types.Message):
-        """دستور /monthly"""
-        user = await rbac_service.get_user_by_telegram_id(message.from_user.id)
-        if not user:
-            await message.answer("⚠️ ثبت‌نام کنید.", parse_mode="HTML")
-            return
-
-        check = await rbac_service.check_permission(
-            message.from_user.id,
-            Permission.VIEW_MONTHLY_REPORT
-        )
-
-        if not check.get("allowed"):
-            await message.answer(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
-                parse_mode="HTML"
-            )
-            return
-
-        await message.answer("📊 گزارش ماهانه...", parse_mode="HTML")
+                for t in trades:
+                    msg += _format_trade_row(t) + "
+"
+            await message.answer(msg, parse_mode="HTML")
+    except Exception as e:
+        logger.error(f"خطا در گزارش معاملات: {e}")
+        await message.answer("❌ خطا در دریافت معاملات")
