@@ -1,9 +1,9 @@
 """
-هندلرهای معاملات
+ÙÙØ¯ÙØ±ÙØ§Û ÙØ¹Ø§ÙÙØ§Øª
 
-با Authorization و Rate Limiting.
+Ø¨Ø§ Authorization Ù Rate Limiting.
 
-نویسنده: MT5 Trading Team
+ÙÙÛØ³ÙØ¯Ù: MT5 Trading Team
 """
 
 from aiogram import Dispatcher, types, F
@@ -24,60 +24,61 @@ from ....services.audit_service import audit_service, AuditAction
 logger = get_logger("telegram.handlers.trades")
 
 
-# API endpoint پایه
-API_BASE = f"http://localhost:{settings.API_PORT}{settings.API_PREFIX}"
+# API endpoint Ù¾Ø§ÛÙ
+import os as _os
+API_BASE = _os.environ.get("API_BASE_URL", f"http://localhost:{settings.API_PORT}") + settings.API_PREFIX
 
 
 def register_trade_handlers(dp: Dispatcher):
-    """ثبت هندلرهای معاملات"""
+    """Ø«Ø¨Øª ÙÙØ¯ÙØ±ÙØ§Û ÙØ¹Ø§ÙÙØ§Øª"""
 
     # --------------------------------------------------
-    # منوی معاملات
+    # ÙÙÙÛ ÙØ¹Ø§ÙÙØ§Øª
     # --------------------------------------------------
 
-    @dp.message(F.text == "📈 معاملات من")
+    @dp.message(F.text == "ð ÙØ¹Ø§ÙÙØ§Øª ÙÙ")
     async def menu_trades(message: types.Message):
-        """نمایش منوی معاملات"""
-        # بررسی ثبت کاربر
+        """ÙÙØ§ÛØ´ ÙÙÙÛ ÙØ¹Ø§ÙÙØ§Øª"""
+        # Ø¨Ø±Ø±Ø³Û Ø«Ø¨Øª Ú©Ø§Ø±Ø¨Ø±
         user = await rbac_service.get_user_by_telegram_id(message.from_user.id)
         if not user:
             await message.answer(
-                "⚠️ برای دسترسی به معاملات باید ثبت‌نام کنید.",
+                "â ï¸ Ø¨Ø±Ø§Û Ø¯Ø³ØªØ±Ø³Û Ø¨Ù ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§ÛØ¯ Ø«Ø¨ØªâÙØ§Ù Ú©ÙÛØ¯.",
                 parse_mode="HTML"
             )
             return
 
-        # منوی مناسب برای نقش
+        # ÙÙÙÛ ÙÙØ§Ø³Ø¨ Ø¨Ø±Ø§Û ÙÙØ´
         role = await rbac_service.get_user_role(message.from_user.id)
 
         if role and role.value in ["trader", "admin", "super_admin"]:
             await message.answer(
-                "📈 <b>مدیریت معاملات</b>\n\n"
-                "گزینه مورد نظر را انتخاب کنید:",
+                "ð <b>ÙØ¯ÛØ±ÛØª ÙØ¹Ø§ÙÙØ§Øª</b>\n\n"
+                "Ú¯Ø²ÛÙÙ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
                 reply_markup=get_trades_keyboard(full=True),
                 parse_mode="HTML"
             )
         else:
-            # فقط مشاهده برای user
+            # ÙÙØ· ÙØ´Ø§ÙØ¯Ù Ø¨Ø±Ø§Û user
             await message.answer(
-                "📈 <b>مشاهده معاملات</b>\n\n"
-                "شما فقط می‌توانید معاملات را مشاهده کنید.\n"
-                "برای معامله به نقش trader ارتقا یابید.",
+                "ð <b>ÙØ´Ø§ÙØ¯Ù ÙØ¹Ø§ÙÙØ§Øª</b>\n\n"
+                "Ø´ÙØ§ ÙÙØ· ÙÛâØªÙØ§ÙÛØ¯ ÙØ¹Ø§ÙÙØ§Øª Ø±Ø§ ÙØ´Ø§ÙØ¯Ù Ú©ÙÛØ¯.\n"
+                "Ø¨Ø±Ø§Û ÙØ¹Ø§ÙÙÙ Ø¨Ù ÙÙØ´ trader Ø§Ø±ØªÙØ§ ÛØ§Ø¨ÛØ¯.",
                 reply_markup=get_trades_keyboard(full=False),
                 parse_mode="HTML"
             )
 
     # --------------------------------------------------
-    # مشاهده معاملات باز
+    # ÙØ´Ø§ÙØ¯Ù ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø²
     # --------------------------------------------------
 
     @dp.callback_query(F.data == "trades_open")
     async def show_open_trades(callback: types.CallbackQuery):
-        """نمایش معاملات باز"""
+        """ÙÙØ§ÛØ´ ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø²"""
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
         if not user:
             await callback.message.edit_text(
-                "⚠️ ثبت نشده",
+                "â ï¸ Ø«Ø¨Øª ÙØ´Ø¯Ù",
                 parse_mode="HTML"
             )
             await callback.answer()
@@ -97,12 +98,12 @@ def register_trade_handlers(dp: Dispatcher):
 
                 if not trades:
                     await callback.message.edit_text(
-                        "📭 <b>معاملات باز</b>\n\n"
-                        "هیچ معامله‌ای باز نیست.",
+                        "ð­ <b>ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø²</b>\n\n"
+                        "ÙÛÚ ÙØ¹Ø§ÙÙÙâØ§Û Ø¨Ø§Ø² ÙÛØ³Øª.",
                         parse_mode="HTML"
                     )
                 else:
-                    text = format_trade_list(trades, "معاملات باز")
+                    text = format_trade_list(trades, "ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø²")
                     await callback.message.edit_text(
                         text,
                         parse_mode="HTML"
@@ -114,7 +115,7 @@ def register_trade_handlers(dp: Dispatcher):
                 )
 
         except Exception as e:
-            logger.error(f"خطا در دریافت معاملات: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª ÙØ¹Ø§ÙÙØ§Øª: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -123,16 +124,16 @@ def register_trade_handlers(dp: Dispatcher):
         await callback.answer()
 
     # --------------------------------------------------
-    # تاریخچه معاملات
+    # ØªØ§Ø±ÛØ®ÚÙ ÙØ¹Ø§ÙÙØ§Øª
     # --------------------------------------------------
 
     @dp.callback_query(F.data == "trades_history")
     async def show_trade_history(callback: types.CallbackQuery):
-        """نمایش تاریخچه معاملات"""
+        """ÙÙØ§ÛØ´ ØªØ§Ø±ÛØ®ÚÙ ÙØ¹Ø§ÙÙØ§Øª"""
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
         if not user:
             await callback.message.edit_text(
-                "⚠️ ثبت نشده",
+                "â ï¸ Ø«Ø¨Øª ÙØ´Ø¯Ù",
                 parse_mode="HTML"
             )
             await callback.answer()
@@ -153,12 +154,12 @@ def register_trade_handlers(dp: Dispatcher):
 
                 if not trades:
                     await callback.message.edit_text(
-                        "📭 <b>تاریخچه معاملات</b>\n\n"
-                        "هیچ معامله‌ای ثبت نشده.",
+                        "ð­ <b>ØªØ§Ø±ÛØ®ÚÙ ÙØ¹Ø§ÙÙØ§Øª</b>\n\n"
+                        "ÙÛÚ ÙØ¹Ø§ÙÙÙâØ§Û Ø«Ø¨Øª ÙØ´Ø¯Ù.",
                         parse_mode="HTML"
                     )
                 else:
-                    text = format_trade_list(trades, "تاریخچه معاملات")
+                    text = format_trade_list(trades, "ØªØ§Ø±ÛØ®ÚÙ ÙØ¹Ø§ÙÙØ§Øª")
                     await callback.message.edit_text(
                         text,
                         parse_mode="HTML"
@@ -170,7 +171,7 @@ def register_trade_handlers(dp: Dispatcher):
                 )
 
         except Exception as e:
-            logger.error(f"خطا در دریافت تاریخچه: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª ØªØ§Ø±ÛØ®ÚÙ: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -179,13 +180,13 @@ def register_trade_handlers(dp: Dispatcher):
         await callback.answer()
 
     # --------------------------------------------------
-    # بستن همه معاملات (حساس - نیاز به permission)
+    # Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª (Ø­Ø³Ø§Ø³ - ÙÛØ§Ø² Ø¨Ù permission)
     # --------------------------------------------------
 
     @dp.callback_query(F.data == "trades_close_all")
     async def confirm_close_all(callback: types.CallbackQuery):
-        """تأیید بستن همه معاملات"""
-        # بررسی دسترسی
+        """ØªØ£ÛÛØ¯ Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª"""
+        # Ø¨Ø±Ø±Ø³Û Ø¯Ø³ØªØ±Ø³Û
         check = await rbac_service.check_permission(
             callback.from_user.id,
             Permission.CLOSE_ALL_TRADES
@@ -193,17 +194,17 @@ def register_trade_handlers(dp: Dispatcher):
 
         if not check.get("allowed"):
             await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
+                check.get("message", "ð« Ø¯Ø³ØªØ±Ø³Û ØºÛØ±ÙØ¬Ø§Ø²"),
                 parse_mode="HTML"
             )
             await callback.answer()
             return
 
         await callback.message.edit_text(
-            "⚠️ <b>هشدار!</b>\n\n"
-            "آیا مطمئن هستید که می‌خواهید\n"
-            "همه معاملات باز را ببندید؟\n\n"
-            "این عملیات قابل بازگشت نیست!",
+            "â ï¸ <b>ÙØ´Ø¯Ø§Ø±!</b>\n\n"
+            "Ø¢ÛØ§ ÙØ·ÙØ¦Ù ÙØ³ØªÛØ¯ Ú©Ù ÙÛâØ®ÙØ§ÙÛØ¯\n"
+            "ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø² Ø±Ø§ Ø¨Ø¨ÙØ¯ÛØ¯Ø\n\n"
+            "Ø§ÛÙ Ø¹ÙÙÛØ§Øª ÙØ§Ø¨Ù Ø¨Ø§Ø²Ú¯Ø´Øª ÙÛØ³Øª!",
             reply_markup=get_confirm_keyboard("close_all"),
             parse_mode="HTML"
         )
@@ -211,17 +212,17 @@ def register_trade_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "confirm_close_all")
     async def execute_close_all(callback: types.CallbackQuery):
-        """بستن همه معاملات"""
+        """Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª"""
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
         if not user:
             await callback.message.edit_text(
-                "⚠️ خطا در احراز هویت",
+                "â ï¸ Ø®Ø·Ø§ Ø¯Ø± Ø§Ø­Ø±Ø§Ø² ÙÙÛØª",
                 parse_mode="HTML"
             )
             await callback.answer()
             return
 
-        # ثبت audit log
+        # Ø«Ø¨Øª audit log
         await audit_service.log_trade(
             user_id=user.get("id"),
             trade_id="all",
@@ -246,14 +247,14 @@ def register_trade_handlers(dp: Dispatcher):
                 total_profit = data.get("total_profit", 0)
 
                 await callback.message.edit_text(
-                    f"✅ <b>معاملات بسته شدند</b>\n\n"
-                    f"📊 تعداد: {closed_count}\n"
-                    f"💰 سود/ضرر: ${total_profit:.2f}",
+                    f"â <b>ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø³ØªÙ Ø´Ø¯ÙØ¯</b>\n\n"
+                    f"ð ØªØ¹Ø¯Ø§Ø¯: {closed_count}\n"
+                    f"ð° Ø³ÙØ¯/Ø¶Ø±Ø±: ${total_profit:.2f}",
                     parse_mode="HTML"
                 )
 
                 logger.info(
-                    f"{closed_count} معامله توسط {user.get('id')} بسته شد"
+                    f"{closed_count} ÙØ¹Ø§ÙÙÙ ØªÙØ³Ø· {user.get('id')} Ø¨Ø³ØªÙ Ø´Ø¯"
                 )
             else:
                 await callback.message.edit_text(
@@ -262,7 +263,7 @@ def register_trade_handlers(dp: Dispatcher):
                 )
 
         except Exception as e:
-            logger.error(f"خطا در بستن معاملات: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -272,20 +273,20 @@ def register_trade_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "cancel_close_all")
     async def cancel_close_all(callback: types.CallbackQuery):
-        """لغو بستن معاملات"""
+        """ÙØºÙ Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª"""
         await callback.message.edit_text(
-            "❌ عملیات لغو شد.",
+            "â Ø¹ÙÙÛØ§Øª ÙØºÙ Ø´Ø¯.",
             parse_mode="HTML"
         )
         await callback.answer()
 
     # --------------------------------------------------
-    # بستن معاملات خرید
+    # Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø®Ø±ÛØ¯
     # --------------------------------------------------
 
     @dp.callback_query(F.data == "trades_close_buy")
     async def confirm_close_buy(callback: types.CallbackQuery):
-        """تأیید بستن معاملات خرید"""
+        """ØªØ£ÛÛØ¯ Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø®Ø±ÛØ¯"""
         check = await rbac_service.check_permission(
             callback.from_user.id,
             Permission.CLOSE_BUY_TRADES
@@ -293,15 +294,15 @@ def register_trade_handlers(dp: Dispatcher):
 
         if not check.get("allowed"):
             await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
+                check.get("message", "ð« Ø¯Ø³ØªØ±Ø³Û ØºÛØ±ÙØ¬Ø§Ø²"),
                 parse_mode="HTML"
             )
             await callback.answer()
             return
 
         await callback.message.edit_text(
-            "⚠️ <b>بستن معاملات خرید</b>\n\n"
-            "آیا مطمئن هستید؟",
+            "â ï¸ <b>Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø®Ø±ÛØ¯</b>\n\n"
+            "Ø¢ÛØ§ ÙØ·ÙØ¦Ù ÙØ³ØªÛØ¯Ø",
             reply_markup=get_confirm_keyboard("close_buy"),
             parse_mode="HTML"
         )
@@ -309,10 +310,10 @@ def register_trade_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "confirm_close_buy")
     async def execute_close_buy(callback: types.CallbackQuery):
-        """بستن معاملات خرید"""
+        """Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø®Ø±ÛØ¯"""
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
         if not user:
-            await callback.message.edit_text("⚠️ خطا", parse_mode="HTML")
+            await callback.message.edit_text("â ï¸ Ø®Ø·Ø§", parse_mode="HTML")
             await callback.answer()
             return
 
@@ -330,9 +331,9 @@ def register_trade_handlers(dp: Dispatcher):
                 data = result.get("data", {})
 
                 await callback.message.edit_text(
-                    f"✅ <b>معاملات خرید بسته شدند</b>\n\n"
-                    f"📊 تعداد: {data.get('closed_count', 0)}\n"
-                    f"💰 سود/ضرر: ${data.get('total_profit', 0):.2f}",
+                    f"â <b>ÙØ¹Ø§ÙÙØ§Øª Ø®Ø±ÛØ¯ Ø¨Ø³ØªÙ Ø´Ø¯ÙØ¯</b>\n\n"
+                    f"ð ØªØ¹Ø¯Ø§Ø¯: {data.get('closed_count', 0)}\n"
+                    f"ð° Ø³ÙØ¯/Ø¶Ø±Ø±: ${data.get('total_profit', 0):.2f}",
                     parse_mode="HTML"
                 )
             else:
@@ -342,7 +343,7 @@ def register_trade_handlers(dp: Dispatcher):
                 )
 
         except Exception as e:
-            logger.error(f"خطا در بستن خریدها: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø³ØªÙ Ø®Ø±ÛØ¯ÙØ§: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -351,12 +352,12 @@ def register_trade_handlers(dp: Dispatcher):
         await callback.answer()
 
     # --------------------------------------------------
-    # بستن معاملات فروش
+    # Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª ÙØ±ÙØ´
     # --------------------------------------------------
 
     @dp.callback_query(F.data == "trades_close_sell")
     async def confirm_close_sell(callback: types.CallbackQuery):
-        """تأیید بستن معاملات فروش"""
+        """ØªØ£ÛÛØ¯ Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª ÙØ±ÙØ´"""
         check = await rbac_service.check_permission(
             callback.from_user.id,
             Permission.CLOSE_SELL_TRADES
@@ -364,15 +365,15 @@ def register_trade_handlers(dp: Dispatcher):
 
         if not check.get("allowed"):
             await callback.message.edit_text(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
+                check.get("message", "ð« Ø¯Ø³ØªØ±Ø³Û ØºÛØ±ÙØ¬Ø§Ø²"),
                 parse_mode="HTML"
             )
             await callback.answer()
             return
 
         await callback.message.edit_text(
-            "⚠️ <b>بستن معاملات فروش</b>\n\n"
-            "آیا مطمئن هستید؟",
+            "â ï¸ <b>Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª ÙØ±ÙØ´</b>\n\n"
+            "Ø¢ÛØ§ ÙØ·ÙØ¦Ù ÙØ³ØªÛØ¯Ø",
             reply_markup=get_confirm_keyboard("close_sell"),
             parse_mode="HTML"
         )
@@ -380,10 +381,10 @@ def register_trade_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "confirm_close_sell")
     async def execute_close_sell(callback: types.CallbackQuery):
-        """بستن معاملات فروش"""
+        """Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª ÙØ±ÙØ´"""
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
         if not user:
-            await callback.message.edit_text("⚠️ خطا", parse_mode="HTML")
+            await callback.message.edit_text("â ï¸ Ø®Ø·Ø§", parse_mode="HTML")
             await callback.answer()
             return
 
@@ -401,9 +402,9 @@ def register_trade_handlers(dp: Dispatcher):
                 data = result.get("data", {})
 
                 await callback.message.edit_text(
-                    f"✅ <b>معاملات فروش بسته شدند</b>\n\n"
-                    f"📊 تعداد: {data.get('closed_count', 0)}\n"
-                    f"💰 سود/ضرر: ${data.get('total_profit', 0):.2f}",
+                    f"â <b>ÙØ¹Ø§ÙÙØ§Øª ÙØ±ÙØ´ Ø¨Ø³ØªÙ Ø´Ø¯ÙØ¯</b>\n\n"
+                    f"ð ØªØ¹Ø¯Ø§Ø¯: {data.get('closed_count', 0)}\n"
+                    f"ð° Ø³ÙØ¯/Ø¶Ø±Ø±: ${data.get('total_profit', 0):.2f}",
                     parse_mode="HTML"
                 )
             else:
@@ -413,7 +414,7 @@ def register_trade_handlers(dp: Dispatcher):
                 )
 
         except Exception as e:
-            logger.error(f"خطا در بستن فروش‌ها: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø³ØªÙ ÙØ±ÙØ´âÙØ§: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -422,17 +423,17 @@ def register_trade_handlers(dp: Dispatcher):
         await callback.answer()
 
     # --------------------------------------------------
-    # جزئیات معامله
+    # Ø¬Ø²Ø¦ÛØ§Øª ÙØ¹Ø§ÙÙÙ
     # --------------------------------------------------
 
     @dp.callback_query(F.data.startswith("trade_"))
     async def show_trade_detail(callback: types.CallbackQuery):
-        """جزئیات معامله"""
+        """Ø¬Ø²Ø¦ÛØ§Øª ÙØ¹Ø§ÙÙÙ"""
         trade_id = callback.data.split("_")[1]
         user = await rbac_service.get_user_by_telegram_id(callback.from_user.id)
 
         if not user:
-            await callback.message.edit_text("⚠️ خطا", parse_mode="HTML")
+            await callback.message.edit_text("â ï¸ Ø®Ø·Ø§", parse_mode="HTML")
             await callback.answer()
             return
 
@@ -455,12 +456,12 @@ def register_trade_handlers(dp: Dispatcher):
                 )
             else:
                 await callback.message.edit_text(
-                    "❌ معامله یافت نشد",
+                    "â ÙØ¹Ø§ÙÙÙ ÛØ§ÙØª ÙØ´Ø¯",
                     parse_mode="HTML"
                 )
 
         except Exception as e:
-            logger.error(f"خطا در دریافت جزئیات: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª Ø¬Ø²Ø¦ÛØ§Øª: {e}")
             await callback.message.edit_text(
                 format_error_message("server"),
                 parse_mode="HTML"
@@ -469,12 +470,12 @@ def register_trade_handlers(dp: Dispatcher):
         await callback.answer()
 
     # --------------------------------------------------
-    # دستورات متنی
+    # Ø¯Ø³ØªÙØ±Ø§Øª ÙØªÙÛ
     # --------------------------------------------------
 
     @dp.message(F.text.regexp(r"^/close_all"))
     async def cmd_close_all(message: types.Message):
-        """دستور بستن همه معاملات"""
+        """Ø¯Ø³ØªÙØ± Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª"""
         check = await rbac_service.check_permission(
             message.from_user.id,
             Permission.CLOSE_ALL_TRADES
@@ -482,15 +483,15 @@ def register_trade_handlers(dp: Dispatcher):
 
         if not check.get("allowed"):
             await message.answer(
-                check.get("message", "🚫 دسترسی غیرمجاز"),
+                check.get("message", "ð« Ø¯Ø³ØªØ±Ø³Û ØºÛØ±ÙØ¬Ø§Ø²"),
                 parse_mode="HTML"
             )
             return
 
-        # نمایش تأیید
+        # ÙÙØ§ÛØ´ ØªØ£ÛÛØ¯
         await message.answer(
-            "⚠️ <b>هشدار!</b>\n\n"
-            "آیا مطمئن هستید که می‌خواهید همه معاملات را ببندید؟\n\n"
-            "برای تأیید /yes را بفرستید.",
+            "â ï¸ <b>ÙØ´Ø¯Ø§Ø±!</b>\n\n"
+            "Ø¢ÛØ§ ÙØ·ÙØ¦Ù ÙØ³ØªÛØ¯ Ú©Ù ÙÛâØ®ÙØ§ÙÛØ¯ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª Ø±Ø§ Ø¨Ø¨ÙØ¯ÛØ¯Ø\n\n"
+            "Ø¨Ø±Ø§Û ØªØ£ÛÛØ¯ /yes Ø±Ø§ Ø¨ÙØ±Ø³ØªÛØ¯.",
             parse_mode="HTML"
         )
