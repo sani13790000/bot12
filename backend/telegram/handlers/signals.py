@@ -1,7 +1,7 @@
 """
-هندلرهای سیگنال‌ها
+ÙÙØ¯ÙØ±ÙØ§Û Ø³ÛÚ¯ÙØ§ÙâÙØ§
 
-نویسنده: MT5 Trading Team
+ÙÙÛØ³ÙØ¯Ù: MT5 Trading Team
 """
 
 from aiogram import Dispatcher, types, F
@@ -9,31 +9,34 @@ import httpx
 
 from ..keyboards import get_signals_keyboard, get_signal_action_keyboard
 from ..utils import format_signal_card
+import os as _os
 from ....core.logger import get_logger
+
+_API_BASE_URL = _os.environ.get("API_BASE_URL", "http://localhost:8000")
 
 logger = get_logger("telegram.handlers.signals")
 
 
 def register_signal_handlers(dp: Dispatcher):
-    """ثبت هندلرهای سیگنال‌ها"""
+    """Ø«Ø¨Øª ÙÙØ¯ÙØ±ÙØ§Û Ø³ÛÚ¯ÙØ§ÙâÙØ§"""
 
-    @dp.message(F.text == "🔔 سیگنال‌ها")
+    @dp.message(F.text == "ð Ø³ÛÚ¯ÙØ§ÙâÙØ§")
     async def menu_signals(message: types.Message):
-        """نمایش منوی سیگنال‌ها"""
+        """ÙÙØ§ÛØ´ ÙÙÙÛ Ø³ÛÚ¯ÙØ§ÙâÙØ§"""
         await message.answer(
-            "🔔 <b>مدیریت سیگنال‌ها</b>\n\n"
-            "گزینه مورد نظر را انتخاب کنید:",
+            "ð <b>ÙØ¯ÛØ±ÛØª Ø³ÛÚ¯ÙØ§ÙâÙØ§</b>\n\n"
+            "Ú¯Ø²ÛÙÙ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_signals_keyboard(),
             parse_mode="HTML"
         )
 
     @dp.callback_query(F.data == "signals_active")
     async def show_active_signals(callback: types.CallbackQuery):
-        """نمایش سیگنال‌های فعال"""
+        """ÙÙØ§ÛØ´ Ø³ÛÚ¯ÙØ§ÙâÙØ§Û ÙØ¹Ø§Ù"""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    "http://localhost:8000/api/signals/active",
+                    f"{_API_BASE_URL}/api/signals/active",
                     timeout=10.0
                 )
 
@@ -43,12 +46,12 @@ def register_signal_handlers(dp: Dispatcher):
 
                 if not signals:
                     await callback.message.edit_text(
-                        "📭 <b>سیگنال‌های فعال</b>\n\n"
-                        "در حال حاضر سیگنال فعالی وجود ندارد.",
+                        "ð­ <b>Ø³ÛÚ¯ÙØ§ÙâÙØ§Û ÙØ¹Ø§Ù</b>\n\n"
+                        "Ø¯Ø± Ø­Ø§Ù Ø­Ø§Ø¶Ø± Ø³ÛÚ¯ÙØ§Ù ÙØ¹Ø§ÙÛ ÙØ¬ÙØ¯ ÙØ¯Ø§Ø±Ø¯.",
                         parse_mode="HTML"
                     )
                 else:
-                    for signal in signals[:3]:  # حداکثر 3 سیگنال
+                    for signal in signals[:3]:  # Ø­Ø¯Ø§Ú©Ø«Ø± 3 Ø³ÛÚ¯ÙØ§Ù
                         text = format_signal_card(signal)
                         await callback.message.answer(
                             text,
@@ -58,14 +61,14 @@ def register_signal_handlers(dp: Dispatcher):
                     await callback.message.delete()
             else:
                 await callback.message.edit_text(
-                    "❌ خطا در دریافت سیگنال‌ها",
+                    "â Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª Ø³ÛÚ¯ÙØ§ÙâÙØ§",
                     parse_mode="HTML"
                 )
 
         except Exception as e:
-            logger.error(f"خطا در دریافت سیگنال‌ها: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª Ø³ÛÚ¯ÙØ§ÙâÙØ§: {e}")
             await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
+                "â Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø±ÙØ±",
                 parse_mode="HTML"
             )
 
@@ -73,11 +76,11 @@ def register_signal_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data == "signals_history")
     async def show_signal_history(callback: types.CallbackQuery):
-        """نمایش تاریخچه سیگنال‌ها"""
+        """ÙÙØ§ÛØ´ ØªØ§Ø±ÛØ®ÚÙ Ø³ÛÚ¯ÙØ§ÙâÙØ§"""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    "http://localhost:8000/api/signals/",
+                    f"{_API_BASE_URL}/api/signals/",
                     params={"limit": 10},
                     timeout=10.0
                 )
@@ -88,51 +91,51 @@ def register_signal_handlers(dp: Dispatcher):
 
                 if not signals:
                     await callback.message.edit_text(
-                        "📭 <b>تاریخچه سیگنال‌ها</b>\n\n"
-                        "هیچ سیگنالی ثبت نشده.",
+                        "ð­ <b>ØªØ§Ø±ÛØ®ÚÙ Ø³ÛÚ¯ÙØ§ÙâÙØ§</b>\n\n"
+                        "ÙÛÚ Ø³ÛÚ¯ÙØ§ÙÛ Ø«Ø¨Øª ÙØ´Ø¯Ù.",
                         parse_mode="HTML"
                     )
                 else:
-                    text = "📜 <b>تاریخچه سیگنال‌ها</b>\n\n"
+                    text = "ð <b>ØªØ§Ø±ÛØ®ÚÙ Ø³ÛÚ¯ÙØ§ÙâÙØ§</b>\n\n"
 
                     wins = 0
                     losses = 0
 
                     for signal in signals[:10]:
                         status_emoji = {
-                            "executed": "✅",
-                            "expired": "⏰",
-                            "skipped": "⏭"
-                        }.get(signal.get("status"), "❓")
+                            "executed": "â",
+                            "expired": "â°",
+                            "skipped": "â­"
+                        }.get(signal.get("status"), "â")
 
-                        direction_emoji = "🟢" if signal.get("direction") == "buy" else "🔴"
+                        direction_emoji = "ð¢" if signal.get("direction") == "buy" else "ð´"
 
                         result_text = ""
                         if signal.get("result"):
                             if signal["result"] == "win":
                                 wins += 1
-                                result_text = " 💰"
+                                result_text = " ð°"
                             elif signal["result"] == "loss":
                                 losses += 1
-                                result_text = " 📉"
+                                result_text = " ð"
 
                         text += (
                             f"{status_emoji} {direction_emoji} <b>{signal.get('symbol')}</b> "
-                            f"- امتیاز: {signal.get('total_score', 0):.0f}{result_text}\n"
+                            f"- Ø§ÙØªÛØ§Ø²: {signal.get('total_score', 0):.0f}{result_text}\n"
                         )
 
-                    text += f"\n📊 برنده: {wins} | بازنده: {losses}"
+                    text += f"\nð Ø¨Ø±ÙØ¯Ù: {wins} | Ø¨Ø§Ø²ÙØ¯Ù: {losses}"
                     await callback.message.edit_text(text, parse_mode="HTML")
             else:
                 await callback.message.edit_text(
-                    "❌ خطا در دریافت تاریخچه",
+                    "â Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª ØªØ§Ø±ÛØ®ÚÙ",
                     parse_mode="HTML"
                 )
 
         except Exception as e:
-            logger.error(f"خطا در دریافت تاریخچه: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø¯Ø±ÛØ§ÙØª ØªØ§Ø±ÛØ®ÚÙ: {e}")
             await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
+                "â Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø±ÙØ±",
                 parse_mode="HTML"
             )
 
@@ -140,32 +143,32 @@ def register_signal_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data.startswith("signal_execute_"))
     async def execute_signal(callback: types.CallbackQuery):
-        """اجرای سیگنال"""
+        """Ø§Ø¬Ø±Ø§Û Ø³ÛÚ¯ÙØ§Ù"""
         signal_id = callback.data.split("_")[2]
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"http://localhost:8000/api/signals/{signal_id}/execute",
+                    f"{_API_BASE_URL}/api/signals/{signal_id}/execute",
                     timeout=30.0
                 )
 
             if response.status_code == 200:
                 await callback.message.edit_text(
-                    "✅ <b>سیگنال اجرا شد!</b>\n\n"
-                    "معامله با موفقیت باز شد.",
+                    "â <b>Ø³ÛÚ¯ÙØ§Ù Ø§Ø¬Ø±Ø§ Ø´Ø¯!</b>\n\n"
+                    "ÙØ¹Ø§ÙÙÙ Ø¨Ø§ ÙÙÙÙÛØª Ø¨Ø§Ø² Ø´Ø¯.",
                     parse_mode="HTML"
                 )
             else:
                 await callback.message.edit_text(
-                    "❌ خطا در اجرای سیگنال",
+                    "â Ø®Ø·Ø§ Ø¯Ø± Ø§Ø¬Ø±Ø§Û Ø³ÛÚ¯ÙØ§Ù",
                     parse_mode="HTML"
                 )
 
         except Exception as e:
-            logger.error(f"خطا در اجرای سیگنال: {e}")
+            logger.error(f"Ø®Ø·Ø§ Ø¯Ø± Ø§Ø¬Ø±Ø§Û Ø³ÛÚ¯ÙØ§Ù: {e}")
             await callback.message.edit_text(
-                "❌ خطا در ارتباط با سرور",
+                "â Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø±ÙØ±",
                 parse_mode="HTML"
             )
 
@@ -173,21 +176,21 @@ def register_signal_handlers(dp: Dispatcher):
 
     @dp.callback_query(F.data.startswith("signal_skip_"))
     async def skip_signal(callback: types.CallbackQuery):
-        """رد کردن سیگنال"""
+        """Ø±Ø¯ Ú©Ø±Ø¯Ù Ø³ÛÚ¯ÙØ§Ù"""
         signal_id = callback.data.split("_")[2]
 
         await callback.message.edit_text(
-            "⏭ <b>سیگنال رد شد</b>",
+            "â­ <b>Ø³ÛÚ¯ÙØ§Ù Ø±Ø¯ Ø´Ø¯</b>",
             parse_mode="HTML"
         )
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("signal_remind_"))
     async def remind_signal(callback: types.CallbackQuery):
-        """یادآوری سیگنال"""
+        """ÛØ§Ø¯Ø¢ÙØ±Û Ø³ÛÚ¯ÙØ§Ù"""
         await callback.message.edit_text(
-            "🔔 <b>یادآوری تنظیم شد</b>\n\n"
-            "به زودی یادآوری دریافت خواهید کرد.",
+            "ð <b>ÛØ§Ø¯Ø¢ÙØ±Û ØªÙØ¸ÛÙ Ø´Ø¯</b>\n\n"
+            "Ø¨Ù Ø²ÙØ¯Û ÛØ§Ø¯Ø¢ÙØ±Û Ø¯Ø±ÛØ§ÙØª Ø®ÙØ§ÙÛØ¯ Ú©Ø±Ø¯.",
             parse_mode="HTML"
         )
         await callback.answer()
