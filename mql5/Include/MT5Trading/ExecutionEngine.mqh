@@ -1,384 +1,306 @@
-
 //+------------------------------------------------------------------+
-//|                                          ExecutionEngine.mqh     |
+//|                                              ExecutionEngine.mqh |
+//|                         موتور اجرای مرکزی سیستم معاملاتی حرفه‌ای |
 //|                                                                  |
-//|  توضیح: موتور اجرای معاملات حرفه‌ای برای پروژه Bot12          |
-//|                                                                  |
-//|  این ماژول مسئول اجرای دقیق و هوشمند معاملات است:             |
-//|  - اجرای Market Order با اسلیپیج کنترل شده                    |
-//|  - اجرای Limit Order و Stop Order                              |
-//|  - مدیریت خطاهای اجرا با Retry Logic                          |
-//|  - تایید اجرا و ثبت لاگ کامل                                  |
-//|  - Slippage Monitor و هشدار                                    |
-//|  - Pre-trade Validation کامل                                    |
+//| این فایل هسته اجرایی سیستم است که تمام ماژول‌ها را به هم وصل    |
+//| می‌کند. وظیفه هماهنگی بین SMC، Price Action، Decision، Risk،    |
+//| Trade و Notification را دارد. تمام چرخه معاملاتی از تحلیل تا   |
+//| اجرا و مدیریت پوزیشن در اینجا کنترل می‌شود.                    |
 //+------------------------------------------------------------------+
+#pragma once
+#include "Config.mqh"
+#include "TradeManager.mqh"
+#include "RiskManager.mqh"
+#include "PositionManager.mqh"
+#include "DrawManager.mqh"
+#include "NotificationManager.mqh"
+#include "StrategyLoader.mqh"
+#include "LicenseChecker.mqh"
+#include "DecisionConnector.mqh"
+#include "SMCAnalyzer.mqh"
+#include "PAAnalyzer.mqh"
+#include "Helpers.mqh"
 
-#ifndef EXECUTION_ENGINE_MQH
-#define EXECUTION_ENGINE_MQH
+//--- ثابت‌های موتور اجرا
+#define ENGINE_VERSION      "2.0.0"
+#define ENGINE_TICK_MIN_MS  100
+#define ENGINE_MAX_ERRORS   10
 
-#include <Trade\Trade.mqh>
-#include <Trade\PositionInfo.mqh>
-#include <Trade\OrderInfo.mqh>
-
-//--- ساختار نتیجه اجرا
-struct ExecutionResult {
-   bool     success;          // آیا موفق بود؟
-   ulong    ticket;           // شماره تیکت
-   double   executed_price;   // قیمت اجرا شده
-   double   slippage_points;  // اسلیپیج واقعی
-   double   spread_at_exec;   // اسپرد در زمان اجرا
-   int      retry_count;      // تعداد تلاش‌ها
-   string   error_message;    // پیام خطا (اگر باشد)
-   datetime exec_time;        // زمان اجرا
-   ulong    execution_ms;     // زمان اجرا به میلی‌ثانیه
+//--- حالت‌های موتور
+enum ENUM_ENGINE_STATE {
+   ENGINE_STOPPED = 0,      // متوقف
+   ENGINE_RUNNING = 1,      // در حال اجرا
+   ENGINE_PAUSED  = 2,      // مکث
+   ENGINE_ERROR   = 3       // خطا
 };
 
-//--- ساختار درخواست معامله
-struct TradeRequest {
-   ENUM_POSITION_TYPE  direction;        // جهت: BUY یا SELL
-   double              volume;           // حجم
-   double              price;            // قیمت (برای Limit/Stop)
-   double              stop_loss;        // حد ضرر
-   double              take_profit;      // حد سود
-   ENUM_ORDER_TYPE     order_type;       // نوع سفارش
-   string              comment;          // کامنت
-   ulong               magic;            // magic number
-   int                 max_slippage;     // حداکثر اسلیپیج مجاز (پوینت)
-   bool                use_market;       // آیا Market Order استفاده شود؟
+//--- نتیجه یک چرخه اجرا
+struct EngineTickResult {
+   bool              analysisRun;      // آیا تحلیل انجام شد؟
+   bool              decisionMade;     // آیا تصمیم گرفته شد؟
+   bool              tradeOpened;      // آیا معامله باز شد؟
+   bool              positionsManaged; // آیا پوزیشن‌ها مدیریت شدند؟
+   string            decisionReason;   // دلیل تصمیم
+   double            finalScore;       // امتیاز نهایی
+   datetime          tickTime;         // زمان تیک
 };
 
 //+------------------------------------------------------------------+
-//| موتور اجرای معاملات                                              |
+//| کلاس موتور اجرای مرکزی                                          |
 //+------------------------------------------------------------------+
-class CExecutionEngine
-{
+class CExecutionEngine {
 private:
-   string         m_symbol;          // نماد
-   CTrade         m_trade;           // شیء معامله
-   CPositionInfo  m_position;        // اطلاعات پوزیشن
-   COrderInfo     m_order;           // اطلاعات سفارش
+   CTradeManager*       m_tradeManager;
+   CRiskManager*        m_riskManager;
+   CPositionManager*    m_positionManager;
+   CDrawManager*        m_drawManager;
+   CNotificationManager* m_notificationManager;
+   CStrategyLoader*     m_strategyLoader;
+   CLicenseChecker*     m_licenseChecker;
+   CDecisionConnector*  m_decisionConnector;
+   CSMCAnalyzer*        m_smcAnalyzer;
+   CPAAnalyzer*         m_paAnalyzer;
 
-   // تنظیمات اجرا
-   int            m_max_retries;     // حداکثر تلاش مجدد
-   int            m_retry_delay_ms;  // تاخیر بین تلاش‌ها (میلی‌ثانیه)
-   int            m_max_slippage;    // حداکثر اسلیپیج مجاز
-   bool           m_log_enabled;     // آیا لاگ فعال است؟
+   ENUM_ENGINE_STATE    m_state;
+   bool                 m_initialized;
+   int                  m_errorCount;
+   datetime             m_lastTickTime;
+   datetime             m_lastAnalysisTime;
+   long                 m_totalTicks;
+   long                 m_totalAnalyses;
+   long                 m_totalDecisions;
+   long                 m_totalTradesOpened;
+   datetime             m_startTime;
+   string               m_lastError;
+   string               m_symbol;
+   ENUM_TIMEFRAMES      m_primaryTF;
+   int                  m_analysisIntervalSec;
+   bool                 m_enableAutoTrading;
+   bool                 m_enableNotifications;
+   bool                 m_enableDrawing;
 
-   // آمار اجرا
-   int            m_total_executions;   // کل اجراها
-   int            m_successful_execs;   // اجراهای موفق
-   double         m_avg_slippage;       // میانگین اسلیپیج
-
-   //--- لاگ اجرا
-   void LogExecution(const string action, const ExecutionResult &result) {
-      if(!m_log_enabled) return;
-      PrintFormat(
-         "[EXEC] %s | %s | موفق:%s | تیکت:%d | قیمت:%.5f | اسلیپیج:%.1f پوینت | زمان:%dms",
-         action, m_symbol,
-         result.success ? "بله" : "خیر",
-         result.ticket, result.executed_price,
-         result.slippage_points, result.execution_ms
-      );
-   }
-
-   //--- بررسی قبل از معامله
-   bool PreTradeCheck(const TradeRequest &req, string &error_msg) {
-      // بررسی نماد
-      if(!SymbolInfoInteger(m_symbol, SYMBOL_TRADE_MODE)) {
-         error_msg = "نماد در دسترس نیست";
-         return false;
-      }
-
-      // بررسی حجم
-      double min_lot  = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
-      double max_lot  = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MAX);
-      if(req.volume < min_lot || req.volume > max_lot) {
-         error_msg = StringFormat("حجم نامعتبر: %.2f (min:%.2f, max:%.2f)", req.volume, min_lot, max_lot);
-         return false;
-      }
-
-      // بررسی اسپرد
-      long spread = SymbolInfoInteger(m_symbol, SYMBOL_SPREAD);
-      if(spread > m_max_slippage * 2) {
-         error_msg = StringFormat("اسپرد خیلی بالا: %d پوینت", spread);
-         return false;
-      }
-
-      // بررسی مارجین کافی
-      double margin_required = 0;
-      ENUM_ORDER_TYPE ord_type = (req.direction == POSITION_TYPE_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-      if(!OrderCalcMargin(ord_type, m_symbol, req.volume, SymbolInfoDouble(m_symbol, SYMBOL_ASK), margin_required)) {
-         error_msg = "محاسبه مارجین ناموفق";
-         return false;
-      }
-
-      double free_margin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
-      if(free_margin < margin_required * 1.2) {
-         error_msg = StringFormat("مارجین ناکافی: %.2f < %.2f", free_margin, margin_required);
-         return false;
-      }
-
-      // بررسی SL و TP
-      if(req.stop_loss > 0 && req.take_profit > 0) {
-         int stop_level = (int)SymbolInfoInteger(m_symbol, SYMBOL_TRADE_STOPS_LEVEL);
-         double point   = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-         double ask     = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
-         double bid     = SymbolInfoDouble(m_symbol, SYMBOL_BID);
-
-         if(req.direction == POSITION_TYPE_BUY) {
-            if((ask - req.stop_loss) / point < stop_level) {
-               error_msg = StringFormat("SL خیلی نزدیک به قیمت (حداقل: %d پوینت)", stop_level);
-               return false;
-            }
-         } else {
-            if((req.stop_loss - bid) / point < stop_level) {
-               error_msg = StringFormat("SL خیلی نزدیک به قیمت (حداقل: %d پوینت)", stop_level);
-               return false;
-            }
-         }
-      }
-
-      return true;
-   }
+   bool                 InitializeModules();
+   bool                 RunAnalysisCycle();
+   bool                 RunDecisionCycle(EngineTickResult &result);
+   bool                 RunTradingCycle(EngineTickResult &result);
+   bool                 RunPositionManagement();
+   bool                 ShouldRunAnalysis();
+   void                 UpdateStats(const EngineTickResult &result);
 
 public:
-   //--- سازنده
-   CExecutionEngine(const string symbol, const ulong magic = 12345) {
-      m_symbol        = symbol;
-      m_max_retries   = 3;
-      m_retry_delay_ms = 500;
-      m_max_slippage  = 30;
-      m_log_enabled   = true;
-      m_total_executions  = 0;
-      m_successful_execs  = 0;
-      m_avg_slippage  = 0;
-
-      m_trade.SetExpertMagicNumber(magic);
-      m_trade.SetDeviationInPoints(m_max_slippage);
-      m_trade.SetTypeFilling(ORDER_FILLING_FOK);
-      m_trade.SetAsyncMode(false);
-   }
-
-   //--- تنظیمات
-   void SetMaxRetries(const int retries)    { m_max_retries = retries; }
-   void SetMaxSlippage(const int slippage)  { m_max_slippage = slippage; m_trade.SetDeviationInPoints(slippage); }
-   void SetLogEnabled(const bool enabled)   { m_log_enabled = enabled; }
-
-   //+----------------------------------------------------------------+
-   //| اجرای Market Order (خرید/فروش فوری)                          |
-   //| با Retry Logic و اسلیپیج کنترل شده                           |
-   //+----------------------------------------------------------------+
-   ExecutionResult ExecuteMarketOrder(const TradeRequest &req) {
-      ExecutionResult result;
-      result.success      = false;
-      result.ticket       = 0;
-      result.retry_count  = 0;
-      result.exec_time    = TimeCurrent();
-
-      // بررسی‌های قبل از معامله
-      string pre_check_error = "";
-      if(!PreTradeCheck(req, pre_check_error)) {
-         result.error_message = "Pre-check ناموفق: " + pre_check_error;
-         LogExecution("MARKET_ORDER_REJECTED", result);
-         return result;
-      }
-
-      uint start_ms = GetTickCount();
-
-      // حلقه Retry
-      for(int attempt = 0; attempt < m_max_retries; attempt++) {
-         result.retry_count = attempt + 1;
-
-         // دریافت قیمت جاری
-         double price = 0;
-         if(req.direction == POSITION_TYPE_BUY) {
-            price = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
-            result.spread_at_exec = (SymbolInfoDouble(m_symbol, SYMBOL_ASK) - SymbolInfoDouble(m_symbol, SYMBOL_BID)) /
-                                    SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-
-            if(m_trade.Buy(req.volume, m_symbol, price, req.stop_loss, req.take_profit, req.comment)) {
-               result.success = true;
-               result.ticket  = m_trade.ResultOrder();
-               result.executed_price = m_trade.ResultPrice();
-               result.slippage_points = MathAbs(price - result.executed_price) / SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-               break;
-            }
-         } else {
-            price = SymbolInfoDouble(m_symbol, SYMBOL_BID);
-            result.spread_at_exec = (SymbolInfoDouble(m_symbol, SYMBOL_ASK) - SymbolInfoDouble(m_symbol, SYMBOL_BID)) /
-                                    SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-
-            if(m_trade.Sell(req.volume, m_symbol, price, req.stop_loss, req.take_profit, req.comment)) {
-               result.success = true;
-               result.ticket  = m_trade.ResultOrder();
-               result.executed_price = m_trade.ResultPrice();
-               result.slippage_points = MathAbs(price - result.executed_price) / SymbolInfoDouble(m_symbol, SYMBOL_POINT);
-               break;
-            }
-         }
-
-         // خطا - بررسی نوع خطا
-         int error_code = (int)m_trade.ResultRetcode();
-         result.error_message = StringFormat("تلاش %d: کد خطا %d - %s", attempt+1, error_code, m_trade.ResultComment());
-
-         // اگر خطا قابل retry نباشد، متوقف شو
-         if(error_code == TRADE_RETCODE_INVALID_STOPS ||
-            error_code == TRADE_RETCODE_TOO_MANY_REQUESTS ||
-            error_code == TRADE_RETCODE_MARKET_CLOSED) {
-            break;
-         }
-
-         // انتظار قبل از تلاش مجدد
-         if(attempt < m_max_retries - 1)
-            Sleep(m_retry_delay_ms);
-      }
-
-      result.execution_ms = GetTickCount() - start_ms;
-
-      // به‌روزرسانی آمار
-      m_total_executions++;
-      if(result.success) {
-         m_successful_execs++;
-         m_avg_slippage = (m_avg_slippage * (m_successful_execs - 1) + result.slippage_points) / m_successful_execs;
-      }
-
-      LogExecution("MARKET_ORDER", result);
-      return result;
-   }
-
-   //+----------------------------------------------------------------+
-   //| اجرای Pending Order (Limit یا Stop)                           |
-   //+----------------------------------------------------------------+
-   ExecutionResult PlacePendingOrder(const TradeRequest &req) {
-      ExecutionResult result;
-      result.success     = false;
-      result.ticket      = 0;
-      result.retry_count = 1;
-      result.exec_time   = TimeCurrent();
-
-      uint start_ms = GetTickCount();
-      bool placed = false;
-
-      if(req.order_type == ORDER_TYPE_BUY_LIMIT) {
-         placed = m_trade.BuyLimit(req.volume, req.price, m_symbol, req.stop_loss, req.take_profit, ORDER_TIME_GTC, 0, req.comment);
-      } else if(req.order_type == ORDER_TYPE_SELL_LIMIT) {
-         placed = m_trade.SellLimit(req.volume, req.price, m_symbol, req.stop_loss, req.take_profit, ORDER_TIME_GTC, 0, req.comment);
-      } else if(req.order_type == ORDER_TYPE_BUY_STOP) {
-         placed = m_trade.BuyStop(req.volume, req.price, m_symbol, req.stop_loss, req.take_profit, ORDER_TIME_GTC, 0, req.comment);
-      } else if(req.order_type == ORDER_TYPE_SELL_STOP) {
-         placed = m_trade.SellStop(req.volume, req.price, m_symbol, req.stop_loss, req.take_profit, ORDER_TIME_GTC, 0, req.comment);
-      } else {
-         result.error_message = "نوع سفارش نامعتبر";
-         return result;
-      }
-
-      result.execution_ms = GetTickCount() - start_ms;
-
-      if(placed) {
-         result.success        = true;
-         result.ticket         = m_trade.ResultOrder();
-         result.executed_price = req.price;
-         result.slippage_points = 0;
-         m_total_executions++;
-         m_successful_execs++;
-      } else {
-         result.error_message = m_trade.ResultComment();
-         m_total_executions++;
-      }
-
-      LogExecution("PENDING_ORDER", result);
-      return result;
-   }
-
-   //+----------------------------------------------------------------+
-   //| بستن پوزیشن با بررسی‌های کامل                                 |
-   //+----------------------------------------------------------------+
-   ExecutionResult ClosePosition(const ulong ticket, const string reason = "") {
-      ExecutionResult result;
-      result.success     = false;
-      result.ticket      = ticket;
-      result.retry_count = 0;
-      result.exec_time   = TimeCurrent();
-
-      if(!m_position.SelectByTicket(ticket)) {
-         result.error_message = "پوزیشن یافت نشد";
-         return result;
-      }
-
-      uint start_ms = GetTickCount();
-
-      for(int attempt = 0; attempt < m_max_retries; attempt++) {
-         result.retry_count++;
-
-         if(m_trade.PositionClose(ticket, m_max_slippage)) {
-            result.success        = true;
-            result.executed_price = m_trade.ResultPrice();
-            result.slippage_points = 0;
-            break;
-         }
-
-         result.error_message = StringFormat("تلاش %d: %s", attempt+1, m_trade.ResultComment());
-
-         if(attempt < m_max_retries - 1)
-            Sleep(m_retry_delay_ms);
-      }
-
-      result.execution_ms = GetTickCount() - start_ms;
-
-      if(result.success) {
-         Print("✅ پوزیشن بسته شد | تیکت:", ticket, " | دلیل:", reason);
-      } else {
-         Print("❌ خطا در بستن پوزیشن | تیکت:", ticket, " | خطا:", result.error_message);
-      }
-
-      return result;
-   }
-
-   //+----------------------------------------------------------------+
-   //| بستن تمام پوزیشن‌های باز                                      |
-   //+----------------------------------------------------------------+
-   int CloseAllPositions(const string reason = "Close All") {
-      int closed = 0;
-      for(int i = PositionsTotal() - 1; i >= 0; i--) {
-         ulong ticket = PositionGetTicket(i);
-         if(ticket == 0) continue;
-         if(!m_position.SelectByTicket(ticket)) continue;
-         if(m_position.Symbol() != m_symbol) continue;
-
-         ExecutionResult res = ClosePosition(ticket, reason);
-         if(res.success) closed++;
-      }
-      PrintFormat("✅ %d پوزیشن بسته شد | دلیل: %s", closed, reason);
-      return closed;
-   }
-
-   //+----------------------------------------------------------------+
-   //| بستن تمام Buy یا تمام Sell                                    |
-   //+----------------------------------------------------------------+
-   int CloseByDirection(const ENUM_POSITION_TYPE dir, const string reason = "") {
-      int closed = 0;
-      for(int i = PositionsTotal() - 1; i >= 0; i--) {
-         ulong ticket = PositionGetTicket(i);
-         if(ticket == 0) continue;
-         if(!m_position.SelectByTicket(ticket)) continue;
-         if(m_position.Symbol() != m_symbol) continue;
-         if(m_position.PositionType() != dir) continue;
-
-         ExecutionResult res = ClosePosition(ticket, reason);
-         if(res.success) closed++;
-      }
-      return closed;
-   }
-
-   //--- آمار اجرا
-   string GetExecutionStats() {
-      double success_rate = (m_total_executions > 0) ?
-         (double)m_successful_execs / m_total_executions * 100.0 : 0;
-      return StringFormat(
-         "📈 آمار اجرا:\n کل: %d | موفق: %d | نرخ: %.1f%% | میانگین اسلیپیج: %.1f پوینت",
-         m_total_executions, m_successful_execs, success_rate, m_avg_slippage
-      );
-   }
+                        CExecutionEngine();
+                       ~CExecutionEngine();
+   bool                 Initialize(const string symbol, const ENUM_TIMEFRAMES tf);
+   void                 Deinitialize();
+   bool                 Start();
+   void                 Stop();
+   void                 Pause();
+   void                 Resume();
+   EngineTickResult     OnTick();
+   ENUM_ENGINE_STATE    GetState()         const { return m_state; }
+   bool                 IsRunning()        const { return m_state == ENGINE_RUNNING; }
+   bool                 IsInitialized()    const { return m_initialized; }
+   string               GetLastError()     const { return m_lastError; }
+   string               GetVersion()       const { return ENGINE_VERSION; }
+   string               GetStatusReport();
+   string               GetStatisticsReport();
 };
 
-#endif // EXECUTION_ENGINE_MQH
+CExecutionEngine::CExecutionEngine() {
+   m_tradeManager=NULL; m_riskManager=NULL; m_positionManager=NULL;
+   m_drawManager=NULL; m_notificationManager=NULL; m_strategyLoader=NULL;
+   m_licenseChecker=NULL; m_decisionConnector=NULL;
+   m_smcAnalyzer=NULL; m_paAnalyzer=NULL;
+   m_state=ENGINE_STOPPED; m_initialized=false; m_errorCount=0;
+   m_totalTicks=0; m_totalAnalyses=0; m_totalDecisions=0; m_totalTradesOpened=0;
+   m_startTime=0; m_lastTickTime=0; m_lastAnalysisTime=0; m_lastError="";
+   m_symbol=""; m_primaryTF=PERIOD_H1; m_analysisIntervalSec=60;
+   m_enableAutoTrading=false; m_enableNotifications=true; m_enableDrawing=true;
+}
+
+CExecutionEngine::~CExecutionEngine() { Deinitialize(); }
+
+bool CExecutionEngine::Initialize(const string symbol, const ENUM_TIMEFRAMES tf) {
+   m_symbol=symbol; m_primaryTF=tf; m_startTime=TimeCurrent();
+   Print("🚀 موتور اجرا در حال راه‌اندازی... نماد: ",symbol," تایم‌فریم: ",EnumToString(tf));
+   if(!InitializeModules()) { m_state=ENGINE_ERROR; return false; }
+   m_initialized=true; m_state=ENGINE_STOPPED;
+   Print("✅ موتور اجرا با موفقیت راه‌اندازی شد.");
+   return true;
+}
+
+bool CExecutionEngine::InitializeModules() {
+   m_licenseChecker=new CLicenseChecker();
+   if(!m_licenseChecker.Validate()) { m_lastError="❌ لایسنس معتبر نیست"; Print(m_lastError); return false; }
+   m_riskManager=new CRiskManager(m_symbol);
+   m_riskManager.InitializeATR(14,m_primaryTF);
+   m_tradeManager=new CTradeManager(m_symbol);
+   m_tradeManager.SetRiskManager(m_riskManager);
+   m_tradeManager.SetMagicNumber(MagicNumber);
+   m_tradeManager.SetMaxSlippage(MaxSlippage);
+   m_positionManager=new CPositionManager(m_symbol,MagicNumber);
+   m_positionManager.SetRiskManager(m_riskManager);
+   m_decisionConnector=new CDecisionConnector();
+   m_decisionConnector.SetApiUrl(ApiUrl);
+   m_decisionConnector.SetApiKey(ApiKey);
+   m_decisionConnector.SetSymbol(m_symbol);
+   m_drawManager=new CDrawManager();
+   m_notificationManager=new CNotificationManager();
+   m_notificationManager.SetTelegramToken(TelegramToken);
+   m_notificationManager.SetTelegramChatId(TelegramChatId);
+   m_notificationManager.SetEnabled(EnableTelegramAlerts);
+   m_smcAnalyzer=new CSMCAnalyzer(m_symbol,m_primaryTF);
+   m_paAnalyzer=new CPAAnalyzer(m_symbol,m_primaryTF);
+   m_strategyLoader=new CStrategyLoader();
+   m_strategyLoader.SetDecisionConnector(m_decisionConnector);
+   return true;
+}
+
+bool CExecutionEngine::Start() {
+   if(!m_initialized) { m_lastError="موتور مقداردهی نشده"; return false; }
+   if(m_state==ENGINE_RUNNING) return true;
+   m_state=ENGINE_RUNNING; m_enableAutoTrading=true;
+   Print("▶️ موتور اجرا شروع به کار کرد.");
+   if(m_notificationManager!=NULL)
+      m_notificationManager.SendSystemAlert("▶️ ربات معاملاتی فعال شد\n📊 نماد: "+m_symbol);
+   return true;
+}
+
+void CExecutionEngine::Stop() {
+   m_state=ENGINE_STOPPED; m_enableAutoTrading=false;
+   Print("⏹ موتور متوقف شد.");
+   if(m_notificationManager!=NULL)
+      m_notificationManager.SendSystemAlert("⏹ ربات معاملاتی متوقف شد");
+}
+
+void CExecutionEngine::Pause() {
+   if(m_state==ENGINE_RUNNING) {
+      m_state=ENGINE_PAUSED;
+      Print("⏸ موتور در حالت مکث");
+      if(m_notificationManager!=NULL)
+         m_notificationManager.SendSystemAlert("⏸ ربات در حالت مکث قرار گرفت");
+   }
+}
+
+void CExecutionEngine::Resume() {
+   if(m_state==ENGINE_PAUSED) {
+      m_state=ENGINE_RUNNING;
+      Print("▶️ موتور از مکث خارج شد");
+      if(m_notificationManager!=NULL)
+         m_notificationManager.SendSystemAlert("▶️ ربات از مکث خارج شد");
+   }
+}
+
+bool CExecutionEngine::ShouldRunAnalysis() {
+   if(m_lastAnalysisTime==0) return true;
+   return (TimeCurrent()-m_lastAnalysisTime)>=m_analysisIntervalSec;
+}
+
+EngineTickResult CExecutionEngine::OnTick() {
+   EngineTickResult result;
+   result.analysisRun=false; result.decisionMade=false;
+   result.tradeOpened=false; result.positionsManaged=false;
+   result.finalScore=0; result.tickTime=TimeCurrent(); result.decisionReason="";
+   m_totalTicks++; m_lastTickTime=TimeCurrent();
+   if(m_state!=ENGINE_RUNNING) return result;
+   if(m_positionManager!=NULL) { m_positionManager.ManageAll(); result.positionsManaged=true; }
+   if(ShouldRunAnalysis()) {
+      m_lastAnalysisTime=TimeCurrent(); m_totalAnalyses++;
+      if(RunAnalysisCycle()) {
+         result.analysisRun=true;
+         if(RunDecisionCycle(result)) {
+            result.decisionMade=true; m_totalDecisions++;
+            if(m_enableAutoTrading && result.finalScore>0) {
+               if(RunTradingCycle(result)) { result.tradeOpened=true; m_totalTradesOpened++; }
+            }
+         }
+      }
+   }
+   UpdateStats(result);
+   return result;
+}
+
+bool CExecutionEngine::RunAnalysisCycle() {
+   bool smcOk=false,paOk=false;
+   if(m_smcAnalyzer!=NULL) {
+      smcOk=m_smcAnalyzer.Analyze();
+      if(smcOk && m_enableDrawing && m_drawManager!=NULL) {
+         SMCAnalysisResult smcResult=m_smcAnalyzer.GetResult();
+         m_drawManager.DrawSMCZones(smcResult);
+      }
+   }
+   if(m_paAnalyzer!=NULL) paOk=m_paAnalyzer.Analyze();
+   return smcOk||paOk;
+}
+
+bool CExecutionEngine::RunDecisionCycle(EngineTickResult &result) {
+   if(m_decisionConnector==NULL) return false;
+   DecisionRequest req;
+   req.symbol=m_symbol; req.timeframe=EnumToString(m_primaryTF); req.timestamp=TimeCurrent();
+   if(m_smcAnalyzer!=NULL) req.smcData=m_smcAnalyzer.GetJsonData();
+   if(m_paAnalyzer!=NULL)  req.paData=m_paAnalyzer.GetJsonData();
+   if(m_riskManager!=NULL) req.riskData=m_riskManager.GetRiskJsonData();
+   DecisionResponse resp=m_decisionConnector.GetDecision(req);
+   result.finalScore=resp.score; result.decisionReason=resp.reason;
+   return resp.valid;
+}
+
+bool CExecutionEngine::RunTradingCycle(EngineTickResult &result) {
+   if(m_tradeManager==NULL||m_riskManager==NULL) return false;
+   if(!m_riskManager.CanOpenTrade()) { result.decisionReason+=" | محدودیت ریسک فعال"; return false; }
+   TradeSignal signal=m_decisionConnector.GetTradeSignal();
+   string errMsg;
+   bool ok=m_tradeManager.OpenTrade(signal,errMsg);
+   if(ok && m_notificationManager!=NULL) {
+      m_notificationManager.SendTradeEntry(
+         signal.direction==POSITION_TYPE_BUY?"خرید":"فروش",
+         m_symbol, signal.entryPrice, signal.stopLoss, signal.takeProfit,
+         signal.volume, result.finalScore
+      );
+   }
+   return ok;
+}
+
+void CExecutionEngine::UpdateStats(const EngineTickResult &result) {
+   if(m_totalTicks%1000==0)
+      Print("📊 آمار موتور: تیک=",m_totalTicks," | تحلیل=",m_totalAnalyses,
+            " | تصمیم=",m_totalDecisions," | معامله=",m_totalTradesOpened);
+}
+
+void CExecutionEngine::Deinitialize() {
+   Stop();
+   if(m_tradeManager)        { delete m_tradeManager;        m_tradeManager=NULL; }
+   if(m_riskManager)         { delete m_riskManager;         m_riskManager=NULL; }
+   if(m_positionManager)     { delete m_positionManager;     m_positionManager=NULL; }
+   if(m_drawManager)         { delete m_drawManager;         m_drawManager=NULL; }
+   if(m_notificationManager) { delete m_notificationManager; m_notificationManager=NULL; }
+   if(m_strategyLoader)      { delete m_strategyLoader;      m_strategyLoader=NULL; }
+   if(m_licenseChecker)      { delete m_licenseChecker;      m_licenseChecker=NULL; }
+   if(m_decisionConnector)   { delete m_decisionConnector;   m_decisionConnector=NULL; }
+   if(m_smcAnalyzer)         { delete m_smcAnalyzer;         m_smcAnalyzer=NULL; }
+   if(m_paAnalyzer)          { delete m_paAnalyzer;          m_paAnalyzer=NULL; }
+   m_initialized=false;
+   Print("🔴 موتور اجرا آزادسازی شد.");
+}
+
+string CExecutionEngine::GetStatusReport() {
+   string states[]={"متوقف","در حال اجرا","مکث","خطا"};
+   string r="⚙️ وضعیت موتور اجرا\n";
+   r+="نسخه: "+ENGINE_VERSION+"\n";
+   r+="حالت: "+states[(int)m_state]+"\n";
+   r+="نماد: "+m_symbol+" | تایم‌فریم: "+EnumToString(m_primaryTF)+"\n";
+   if(m_riskManager!=NULL) r+=m_riskManager.GetRiskReport();
+   return r;
+}
+
+string CExecutionEngine::GetStatisticsReport() {
+   string r="📈 آمار موتور\n";
+   r+=StringFormat("کل تیک: %I64d\n",m_totalTicks);
+   r+=StringFormat("کل تحلیل: %I64d\n",m_totalAnalyses);
+   r+=StringFormat("کل تصمیم: %I64d\n",m_totalDecisions);
+   r+=StringFormat("کل معامله: %I64d\n",m_totalTradesOpened);
+   long uptime=(long)(TimeCurrent()-m_startTime);
+   r+=StringFormat("آپ‌تایم: %d:%02d:%02d\n",(int)(uptime/3600),(int)((uptime%3600)/60),(int)(uptime%60));
+   return r;
+}
+//+------------------------------------------------------------------+
