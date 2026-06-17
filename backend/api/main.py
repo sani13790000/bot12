@@ -14,12 +14,90 @@ from contextlib import asynccontextmanager
 import time
 import uuid
 from typing import Dict, Any
+from collections import defaultdict
+import threading
 
 from ..core.config import settings
 from ..core.logger import get_logger
 from ..core.exceptions import MT5TradingError
 
 logger = get_logger("api")
+
+
+# =====================================================
+# Rate Limiter ساده در حافظه
+# =====================================================
+
+class InMemoryRateLimiter:
+    """
+    Rate Limiter ساده مبتنی بر IP + Sliding Window
+
+    در production از Redis استفاده کنید.
+    این implementation برای single-instance مناسب است.
+    """
+
+    def __init__(self, max_requests: int = 100, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._store: Dict[str, list] = defaultdict(list)
+        self._lock = threading.Lock()
+
+    def is_allowed(self, identifier: str) -> bool:
+        """بررسی اینکه آیا درخواست مجاز است"""
+        now = time.time()
+        window_start = now - self.window_seconds
+
+        with self._lock:
+            # حذف درخواست‌های خارج از window
+            self._store[identifier] = [
+                ts for ts in self._store[identifier]
+                if ts > window_start
+            ]
+            # بررسی تعداد درخواست‌ها
+            if len(self._store[identifier]) >= self.max_requests:
+                return False
+            # ثبت درخواست جدید
+            self._store[identifier].append(now)
+            return True
+
+    def get_remaining(self, identifier: str) -> int:
+        """تعداد درخواست‌های باقی‌مانده"""
+        now = time.time()
+        window_start = now - self.window_seconds
+        with self._lock:
+            count = len([
+                ts for ts in self._store.get(identifier, [])
+                if ts > window_start
+            ])
+            return max(0, self.max_requests - count)
+
+    def cleanup(self):
+        """پاکسازی ورودی‌های قدیمی"""
+        now = time.time()
+        window_start = now - self.window_seconds
+        with self._lock:
+            keys_to_delete = []
+            for key, timestamps in self._store.items():
+                cleaned = [ts for ts in timestamps if ts > window_start]
+                if cleaned:
+                    self._store[key] = cleaned
+                else:
+                    keys_to_delete.append(key)
+            for key in keys_to_delete:
+                del self._store[key]
+
+
+# instance سراسری
+rate_limiter = InMemoryRateLimiter(
+    max_requests=100,
+    window_seconds=60
+)
+
+# Rate limiter سخت‌گیرانه‌تر برای auth endpoints
+auth_rate_limiter = InMemoryRateLimiter(
+    max_requests=10,
+    window_seconds=60
+)
 
 
 # =====================================================
@@ -32,10 +110,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"سرور {settings.APP_NAME} v{settings.APP_VERSION} راه‌اندازی شد")
     logger.info(f"محیط: {settings.ENVIRONMENT}")
+    logger.info(f"Rate Limiting فعال: {rate_limiter.max_requests} req/{rate_limiter.window_seconds}s")
 
     yield
 
     # Shutdown
+    rate_limiter.cleanup()
     logger.info("سرور متوقف شد")
 
 
@@ -47,7 +127,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-## اکوسیستم معامله‌گری MT5
+## اکوسیستم معاملاتی MT5
 
 این API برای تحلیل بازار و تولید سیگنال‌های معاملاتی طراحی شده است.
 
@@ -99,13 +179,79 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
+# Rate Limiting Middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Rate Limiting middleware — جلوگیری از سوءاستفاده
+
+    - عمومی: ۱۰۰ req/min per IP
+    - auth endpoints: ۱۰ req/min per IP (سخت‌گیرانه‌تر)
+    - health endpoints: بدون محدودیت
+    """
+    path = request.url.path
+
+    # health checks از rate limiting معاف هستند
+    if path in ["/health", "/health/details", "/"]:
+        return await call_next(request)
+
+    # شناسه client = IP اصلی (با X-Forwarded-For در production)
+    client_ip = request.headers.get("X-Forwarded-For", "")
+    if not client_ip:
+        client_ip = request.client.host if request.client else "unknown"
+    # فقط IP اول را در نظر می‌گیریم
+    client_ip = client_ip.split(",")[0].strip()
+
+    # auth endpoints محدودیت سخت‌تری دارند
+    if "/auth/" in path or "/license/validate" in path:
+        limiter = auth_rate_limiter
+        limit_type = "auth"
+    else:
+        limiter = rate_limiter
+        limit_type = "general"
+
+    if not limiter.is_allowed(client_ip):
+        remaining = limiter.get_remaining(client_ip)
+        logger.warning(
+            f"Rate limit exceeded: {client_ip} → {path} "
+            f"(type={limit_type}, remaining={remaining})"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "success": False,
+                "error": {
+                    "code": "RATE_LIMIT_EXCEEDED",
+                    "message": "تعداد درخواست‌ها از حد مجاز فراتر رفته. لطفاً کمی صبر کنید.",
+                    "retry_after": limiter.window_seconds,
+                }
+            },
+            headers={
+                "Retry-After": str(limiter.window_seconds),
+                "X-RateLimit-Limit": str(limiter.max_requests),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time()) + limiter.window_seconds),
+            }
+        )
+
+    response = await call_next(request)
+
+    # افزودن هدرهای Rate Limit به هر پاسخ
+    remaining = limiter.get_remaining(client_ip)
+    response.headers["X-RateLimit-Limit"] = str(limiter.max_requests)
+    response.headers["X-RateLimit-Remaining"] = str(remaining)
+    response.headers["X-RateLimit-Reset"] = str(int(time.time()) + limiter.window_seconds)
+
+    return response
+
+
 # =====================================================
 # Exception Handlers
 # =====================================================
 
 @app.exception_handler(MT5TradingError)
 async def mt5_trading_error_handler(request: Request, exc: MT5TradingError):
-    """هندلر خطاهای سفارشی"""
+    """مدیریت خطاهای سفارشی"""
     logger.error(f"خطای سیستم: {exc.message}", extra={"error_code": exc.error_code})
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -115,7 +261,7 @@ async def mt5_trading_error_handler(request: Request, exc: MT5TradingError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """هندلر خطاهای عمومی"""
+    """مدیریت خطاهای عمومی"""
     logger.exception(f"خطای غیرمنتظره: {str(exc)}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -155,7 +301,6 @@ async def health_check():
 
     database_status = "healthy"
     try:
-        # تست اتصال دیتابیس
         await db.count("user_profiles", use_admin=True)
     except Exception as e:
         database_status = f"error: {str(e)[:50]}"
@@ -205,7 +350,11 @@ async def health_detailed():
     # پردازش
     details["components"]["api"] = {
         "status": "healthy",
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
+        "rate_limiter": {
+            "max_requests": rate_limiter.max_requests,
+            "window_seconds": rate_limiter.window_seconds,
+        }
     }
 
     return details
