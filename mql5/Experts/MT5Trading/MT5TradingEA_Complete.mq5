@@ -100,6 +100,18 @@ input string   SignalFile       = "bot12_signal.json"; // فایل سیگنال
 input int      SignalCheckMs    = 1000;           // فرکانس بررسی سیگنال (ms)
 
 //--- ==============================================================
+
+//--- [اتصال به Python API — فاز ۱]
+input group "═══ Python API Connection ═══"
+input bool     EnableAPI         = true;            // اتصال به Python Backend
+input string   APIBaseURL        = "http://localhost:8000";  // آدرس API
+input int      APITimeoutMs      = 5000;            // تایم‌اوت (ms)
+
+//--- [محدودیت‌های پیشرفته — فاز ۱]
+input group "═══ محدودیت‌های معاملاتی ═══"
+input int      MaxDailyTrades    = 5;               // حداکثر معاملات روزانه
+input int      MaxOpenPositions  = 3;               // حداکثر پوزیشن همزمان
+
 //--- متغیرهای سراسری
 //--- ==============================================================
 
@@ -138,6 +150,186 @@ bool     g_prev_kz_active      = false; // آیا Kill Zone قبلی فعال ب
 //+------------------------------------------------------------------+
 //| مقداردهی اولیه اکسپرت                                           |
 //+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| ارتباط با Python API از طریق WebRequest — فاز ۱                 |
+//+------------------------------------------------------------------+
+
+struct APISignalResponse {
+   string signal_type;      // BUY / SELL / NO_TRADE
+   double entry_price;
+   double stop_loss;
+   double take_profit;
+   double score;
+   bool   valid;
+};
+
+APISignalResponse FetchSignalFromAPI(string symbol) {
+   APISignalResponse resp;
+   resp.valid = false;
+   resp.signal_type = "NO_TRADE";
+
+   if(!EnableAPI) return resp;
+
+   string url     = APIBaseURL + "/api/v1/signal";
+   string headers = "Content-Type: application/json\r\n";
+   string body    = StringFormat(
+      "{\"symbol\":\"%s\",\"time\":%d}",
+      symbol, (int)TimeCurrent()
+   );
+
+   char post_data[], result_data[];
+   string result_headers;
+   StringToCharArray(body, post_data, 0, StringLen(body));
+
+   int res = WebRequest("POST", url, headers, APITimeoutMs, post_data, result_data, result_headers);
+
+   if(res == -1) {
+      int err = GetLastError();
+      if(err == 4014)
+         Print("⚠️ WebRequest غیرفعال — Tools > Options > Expert Advisors > Allow WebRequest را فعال کنید");
+      else
+         PrintFormat("⚠️ خطای WebRequest: %d", err);
+      return resp;
+   }
+
+   if(res != 200) {
+      PrintFormat("⚠️ API HTTP %d", res);
+      return resp;
+   }
+
+   string r = CharArrayToString(result_data);
+
+   int p = StringFind(r, "\"signal\":\"");
+   if(p >= 0) {
+      int s = p + 10, e = StringFind(r, "\"", s);
+      resp.signal_type = StringSubstr(r, s, e - s);
+   }
+
+   p = StringFind(r, "\"score\":"); if(p >= 0) resp.score       = StringToDouble(StringSubstr(r, p+9,  8));
+   p = StringFind(r, "\"entry\":"); if(p >= 0) resp.entry_price = StringToDouble(StringSubstr(r, p+9, 12));
+   p = StringFind(r, "\"sl\":");    if(p >= 0) resp.stop_loss   = StringToDouble(StringSubstr(r, p+6, 12));
+   p = StringFind(r, "\"tp\":");    if(p >= 0) resp.take_profit = StringToDouble(StringSubstr(r, p+6, 12));
+
+   resp.valid = (resp.signal_type == "BUY" || resp.signal_type == "SELL");
+   return resp;
+}
+
+void SendEAStatusToAPI(string status) {
+   if(!EnableAPI) return;
+   string url = APIBaseURL + "/api/v1/ea/heartbeat";
+   string headers = "Content-Type: application/json\r\n";
+   string body = StringFormat(
+      "{\"status\":\"%s\",\"symbol\":\"%s\",\"equity\":%.2f,\"time\":%d}",
+      status, g_active_symbol,
+      AccountInfoDouble(ACCOUNT_EQUITY),
+      (int)TimeCurrent()
+   );
+   char p[], r[]; string rh;
+   StringToCharArray(body, p, 0, StringLen(body));
+   WebRequest("POST", url, headers, 3000, p, r, rh);
+}
+
+//+------------------------------------------------------------------+
+//| اعتبارسنجی قبل از معامله — فاز ۱                                |
+//+------------------------------------------------------------------+
+
+struct PreTradeCheck {
+   bool   ok;
+   string reason;
+};
+
+bool IsWeekend() {
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   return (dt.day_of_week == 0 || dt.day_of_week == 6);
+}
+
+bool IsNearWeekendClose() {
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   return (dt.day_of_week == 5 && dt.hour >= 21);
+}
+
+int CountTodayTrades() {
+   int count = 0;
+   datetime today = StringToTime(StringFormat("%04d.%02d.%02d 00:00",
+      TimeYear(TimeCurrent()), TimeMonth(TimeCurrent()), TimeDay(TimeCurrent())));
+   HistorySelect(today, TimeCurrent());
+   for(int i = 0; i < HistoryDealsTotal(); i++) {
+      ulong tk = HistoryDealGetTicket(i);
+      if(HistoryDealGetString(tk, DEAL_SYMBOL) != g_active_symbol) continue;
+      long type = HistoryDealGetInteger(tk, DEAL_TYPE);
+      if(type == DEAL_TYPE_BUY || type == DEAL_TYPE_SELL) count++;
+   }
+   return count;
+}
+
+PreTradeCheck ValidateBeforeTrade(ENUM_POSITION_TYPE dir, double entry, double sl, double vol) {
+   PreTradeCheck c; c.ok = false;
+
+   // چک ۱: آخر هفته
+   if(IsWeekend())         { c.reason = "آخر هفته - بازار بسته"; return c; }
+   if(IsNearWeekendClose()){ c.reason = "نزدیک بسته شدن آخر هفته"; return c; }
+
+   // چک ۲: نماد
+   if(!SymbolSelect(g_active_symbol, true)) { c.reason = "نماد نامعتبر: " + g_active_symbol; return c; }
+   double ask = SymbolInfoDouble(g_active_symbol, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(g_active_symbol, SYMBOL_BID);
+   if(ask <= 0 || bid <= 0) { c.reason = "قیمت نماد صفر - بازار بسته؟"; return c; }
+
+   // چک ۳: موجودی
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double margin  = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+   if(balance <= 0) { c.reason = "موجودی صفر"; return c; }
+   if(margin  <= 0) { c.reason = "مارجین آزاد ندارید"; return c; }
+
+   // چک ۴: مارجین کافی
+   double req_margin = 0;
+   ENUM_ORDER_TYPE ot = (dir == POSITION_TYPE_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   if(OrderCalcMargin(ot, g_active_symbol, vol, entry, req_margin)) {
+      if(margin < req_margin * 1.5) {
+         c.reason = StringFormat("مارجین ناکافی: آزاد=%.2f نیاز=%.2f", margin, req_margin * 1.5);
+         return c;
+      }
+   }
+
+   // چک ۵: معاملات روزانه
+   int today_count = CountTodayTrades();
+   if(today_count >= MaxDailyTrades) {
+      c.reason = StringFormat("سقف روزانه: %d/%d", today_count, MaxDailyTrades);
+      return c;
+   }
+
+   // چک ۶: پوزیشن‌های باز
+   if(PositionsTotal() >= MaxOpenPositions) {
+      c.reason = StringFormat("سقف پوزیشن: %d/%d", PositionsTotal(), MaxOpenPositions);
+      return c;
+   }
+
+   // چک ۷: اسپرد
+   double spread = (ask - bid) / SymbolInfoDouble(g_active_symbol, SYMBOL_POINT);
+   if(spread > MaxSpread) {
+      c.reason = StringFormat("اسپرد زیاد: %.0f > %d", spread, MaxSpread);
+      return c;
+   }
+
+   // چک ۸: فاصله SL
+   double sl_dist  = MathAbs(entry - sl);
+   double min_dist = SymbolInfoDouble(g_active_symbol, SYMBOL_POINT)
+                   * (double)SymbolInfoInteger(g_active_symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   if(sl_dist < min_dist) {
+      c.reason = StringFormat("SL خیلی نزدیک: %.5f < %.5f", sl_dist, min_dist);
+      return c;
+   }
+
+   c.ok = true;
+   PrintFormat("✅ Pre-Trade OK | موجودی=%.2f مارجین=%.2f امروز=%d پوزیشن=%d",
+      balance, margin, today_count, PositionsTotal());
+   return c;
+}
+
+
 int OnInit() {
    Print("═══════════════════════════════════════════");
    Print("  Bot12 Trading System v3.0 - شروع مقداردهی");
@@ -345,6 +537,14 @@ void ProcessNewSignal() {
    req.magic        = 12345;
    req.max_slippage = MaxSpread;
    req.use_market   = true;
+
+   // ─── اعتبارسنجی قبل از معامله — فاز ۱ ───
+   PreTradeCheck ptc = ValidateBeforeTrade(direction, entry, sl, lot_result.lot);
+   if(!ptc.ok) {
+      PrintFormat("⛔ Pre-Trade Blocked: %s", ptc.reason);
+      g_notification.SendText(NOTIF_RISK, "⛔ معامله رد شد: " + ptc.reason);
+      return;
+   }
 
    // اجرای معامله
    ExecutionResult exec = g_execution.ExecuteMarketOrder(req);
