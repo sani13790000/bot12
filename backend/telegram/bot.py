@@ -108,9 +108,23 @@ class TelegramBot:
 
     async def _error_handler(self, update, exception):
         """
-        هندلر خطاهای کلی
+        مدیریت خطاهای کلی — با logging کامل (بدون بلع خاموش)
         """
-        logger.error(f"خطا در پردازش آپدیت: {exception}")
+        logger.error(
+            f"خطا در پردازش آپدیت: {type(exception).__name__}: {exception}",
+            exc_info=exception,
+        )
+
+        # اطلاع به ادمین‌ها در صورت خطای بحرانی
+        if not isinstance(exception, TelegramAPIError):
+            try:
+                await self.notify_admins(
+                    f"⚠️ خطای بحرانی ربات:\n"
+                    f"نوع: {type(exception).__name__}\n"
+                    f"پیام: {str(exception)[:200]}"
+                )
+            except Exception as notify_err:
+                logger.error(f"خطا در اطلاع به ادمین: {notify_err}")
 
         # ارسال پیام خطا به کاربر
         if hasattr(update, 'message') and update.message:
@@ -119,17 +133,18 @@ class TelegramBot:
                     "❌ خطایی رخ داد. لطفاً مجدداً تلاش کنید.",
                     parse_mode="HTML"
                 )
-            except Exception:
-                pass
+            except TelegramAPIError as send_err:
+                # اگر ارسال پیام خطا هم fail شد، فقط log می‌کنیم
+                logger.warning(f"نمی‌توان پیام خطا را ارسال کرد: {send_err}")
 
         return True
 
     async def _unknown_command_handler(self, message: Message):
         """
-        هندلر دستورات ناشناخته
+        مدیریت دستورات ناشناخته
         """
         await message.answer(
-            "❓ دستور نامعتبر است.\n\n"
+            "❌ دستور نامعتبر است.\n\n"
             "برای مشاهده دستورات موجود از /help استفاده کنید.",
             parse_mode="HTML"
         )
@@ -177,7 +192,7 @@ class TelegramBot:
 
     async def send_trade_alert(self, chat_id: int, trade_data: dict):
         """
-        ارسال اعلان معامله جدید
+        ارسال اعلان معاملاه جدید
         """
         from .utils import format_trade_detail
 
@@ -239,7 +254,7 @@ class TelegramBot:
         return self._running
 
 
-# نمونه گلوبال
+# نمونه سراسری
 telegram_bot = TelegramBot()
 
 
