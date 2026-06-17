@@ -1,12 +1,160 @@
 //+------------------------------------------------------------------+
-//|                                           DecisionConnector.mqh     |
-//|                                    MT5 Trading System             |
-//|                                    اتصال به Decision Engine       |
+//|                                        DecisionConnector.mqh    |
+//|                                    MT5 Trading System           |
+//|                                    اتصال به Decision Engine     |
 //+------------------------------------------------------------------+
 #property strict
 
 #include "Config.mqh"
 #include "Helpers.mqh"
+
+//+
+// ===================== کمک‌کار JSON =====================
+// جایگزین StringFind دستی — ایمن در برابر whitespace و nested objects
+//+
+
+// استخراج مقدار string از JSON با کلید مشخص
+bool JsonGetString(const string json, const string key, string &value) {
+   string searchKey = "\"" + key + "\"";
+   int keyPos = StringFind(json, searchKey);
+   if(keyPos < 0) return false;
+
+   int colonPos = StringFind(json, ":", keyPos + StringLen(searchKey));
+   if(colonPos < 0) return false;
+
+   // رد کردن فضای خالی
+   int i = colonPos + 1;
+   while(i < StringLen(json) && (json[i] == ' ' || json[i] == '\t' || json[i] == '\r' || json[i] == '\n'))
+      i++;
+
+   if(i >= StringLen(json)) return false;
+
+   // اگر مقدار با " شروع شود
+   if(json[i] == '"') {
+      i++;  // رد کردن "
+      string result = "";
+      while(i < StringLen(json)) {
+         if(json[i] == '\\' && i + 1 < StringLen(json)) {
+            i++;
+            if(json[i] == '"') result += "\"";
+            else if(json[i] == 'n') result += "\n";
+            else if(json[i] == 't') result += "\t";
+            else if(json[i] == '\\') result += "\\";
+            else result += CharToString(json[i]);
+         }
+         else if(json[i] == '"') {
+            break;
+         }
+         else {
+            result += CharToString(json[i]);
+         }
+         i++;
+      }
+      value = result;
+      return true;
+   }
+
+   return false;
+}
+
+// استخراج مقدار عدد صحیح
+bool JsonGetInt(const string json, const string key, int &value) {
+   string searchKey = "\"" + key + "\"";
+   int keyPos = StringFind(json, searchKey);
+   if(keyPos < 0) return false;
+
+   int colonPos = StringFind(json, ":", keyPos + StringLen(searchKey));
+   if(colonPos < 0) return false;
+
+   int i = colonPos + 1;
+   while(i < StringLen(json) && (json[i] == ' ' || json[i] == '\t')) i++;
+
+   string numStr = "";
+   bool negative = false;
+   if(i < StringLen(json) && json[i] == '-') { negative = true; i++; }
+
+   while(i < StringLen(json) && json[i] >= '0' && json[i] <= '9') {
+      numStr += CharToString(json[i]);
+      i++;
+   }
+
+   if(StringLen(numStr) == 0) return false;
+   value = (int)StringToInteger(numStr) * (negative ? -1 : 1);
+   return true;
+}
+
+// استخراج مقدار double
+bool JsonGetDouble(const string json, const string key, double &value) {
+   string searchKey = "\"" + key + "\"";
+   int keyPos = StringFind(json, searchKey);
+   if(keyPos < 0) return false;
+
+   int colonPos = StringFind(json, ":", keyPos + StringLen(searchKey));
+   if(colonPos < 0) return false;
+
+   int i = colonPos + 1;
+   while(i < StringLen(json) && (json[i] == ' ' || json[i] == '\t')) i++;
+
+   string numStr = "";
+   bool negative = false;
+   if(i < StringLen(json) && json[i] == '-') { negative = true; i++; }
+
+   while(i < StringLen(json) && ((json[i] >= '0' && json[i] <= '9') || json[i] == '.' || json[i] == 'e' || json[i] == 'E' || json[i] == '+' || (json[i] == '-' && StringLen(numStr) > 0))) {
+      numStr += CharToString(json[i]);
+      i++;
+   }
+
+   if(StringLen(numStr) == 0) return false;
+   value = StringToDouble(numStr) * (negative ? -1.0 : 1.0);
+   return true;
+}
+
+// استخراج مقدار bool
+bool JsonGetBool(const string json, const string key, bool &value) {
+   string searchKey = "\"" + key + "\"";
+   int keyPos = StringFind(json, searchKey);
+   if(keyPos < 0) return false;
+
+   int colonPos = StringFind(json, ":", keyPos + StringLen(searchKey));
+   if(colonPos < 0) return false;
+
+   int i = colonPos + 1;
+   while(i < StringLen(json) && (json[i] == ' ' || json[i] == '\t')) i++;
+
+   if(StringFind(json, "true", i) == i) { value = true; return true; }
+   if(StringFind(json, "false", i) == i) { value = false; return true; }
+   return false;
+}
+
+// استخراج یک آبجکت nested با کلید
+bool JsonGetObject(const string json, const string key, string &obj) {
+   string searchKey = "\"" + key + "\"";
+   int keyPos = StringFind(json, searchKey);
+   if(keyPos < 0) return false;
+
+   int colonPos = StringFind(json, ":", keyPos + StringLen(searchKey));
+   if(colonPos < 0) return false;
+
+   int i = colonPos + 1;
+   while(i < StringLen(json) && (json[i] == ' ' || json[i] == '\t')) i++;
+
+   if(i >= StringLen(json) || json[i] != '{') return false;
+
+   int depth = 0;
+   int start = i;
+   while(i < StringLen(json)) {
+      if(json[i] == '{') depth++;
+      else if(json[i] == '}') {
+         depth--;
+         if(depth == 0) {
+            obj = StringSubstr(json, start, i - start + 1);
+            return true;
+         }
+      }
+      i++;
+   }
+   return false;
+}
 
 //+
 // ساختار درخواست تصمیم
@@ -18,7 +166,7 @@ struct DecisionRequest {
    double previousClose[3];
    double high[10];
    double low[10];
-   double open[10];
+   double open_[10];
    double close[10];
    double volume[10];
 
@@ -105,10 +253,8 @@ private:
    int m_timeout;
    bool m_enabled;
 
-   // وضعیت اتصال
    ConnectionStatus m_status;
 
-   // کش تصمیمات
    struct DecisionCache {
       string symbol;
       string timeframe;
@@ -117,10 +263,8 @@ private:
       datetime cachedAt;
    };
    DecisionCache m_cache[];
+   int m_cacheLifetime;
 
-   int m_cacheLifetime;  // ثانیه
-
-   // توابع داخلی
    string GenerateRequestId();
    string BuildDecisionUrl(const DecisionRequest &request);
    bool ParseDecisionResponse(const string data, DecisionResponse &response);
@@ -134,38 +278,30 @@ public:
    CDecisionConnector();
    ~CDecisionConnector();
 
-   // تنظیمات
    void SetApiUrl(const string url);
    void SetLicenseKey(const string key);
    void SetTimeout(const int ms);
    void Enable(const bool enable);
    void SetCacheLifetime(const int seconds);
 
-   // درخواست تصمیم
    DecisionResponse RequestDecision(DecisionRequest &request);
    DecisionResponse RequestDecisionAsync(DecisionRequest &request);
    DecisionResponse GetDecisionForSymbol(const string symbol, const string timeframe);
 
-   // بررسی تصمیم
    bool IsAllowedToTrade(const string symbol, const string direction);
    bool ValidateDecision(const DecisionResponse &response);
    bool ShouldClosePosition(const string symbol, const string direction);
 
-   // وضعیت اتصال
    bool IsConnected();
    ConnectionStatus GetConnectionStatus();
    int GetSuccessRate();
    void ResetStats();
 
-   // مدیریت کش
    void ClearCache();
    int GetCacheSize();
 
-   // تست اتصال
    bool TestConnection();
    string GetHealthStatus();
-
-   // گزارش
    string GetConnectorReport();
 };
 
@@ -178,100 +314,48 @@ CDecisionConnector::CDecisionConnector() {
    m_deviceId = "";
    m_timeout = ApiTimeout;
    m_enabled = true;
-   m_cacheLifetime = 60;  // 60 ثانیه
+   m_cacheLifetime = 60;
 
    ZeroMemory(m_status);
    m_status.isConnected = false;
-
    ArrayResize(m_cache, 0);
 }
 
-//+
-// مخرب
-//+
 CDecisionConnector::~CDecisionConnector() {
    ArrayResize(m_cache, 0);
 }
 
-//+
-// تولید شناسه درخواست
-//+
 string CDecisionConnector::GenerateRequestId() {
    return StringFormat("REQ-%I64X-%d", TimeCurrent(), MathRand());
 }
 
-//+
-// تنظیم آدرس API
-//+
 void CDecisionConnector::SetApiUrl(const string url) {
    m_apiUrl = url;
    m_status.isConnected = false;
 }
 
-//+
-// تنظیم کلید لایسنس
-//+
-void CDecisionConnector::SetLicenseKey(const string key) {
-   m_licenseKey = key;
-}
+void CDecisionConnector::SetLicenseKey(const string key) { m_licenseKey = key; }
+void CDecisionConnector::SetTimeout(const int ms) { m_timeout = MathMax(1000, MathMin(30000, ms)); }
+void CDecisionConnector::Enable(const bool enable) { m_enabled = enable; }
+void CDecisionConnector::SetCacheLifetime(const int seconds) { m_cacheLifetime = MathMax(10, seconds); }
 
-//+
-// تنظیم تایم‌اوت
-//+
-void CDecisionConnector::SetTimeout(const int ms) {
-   m_timeout = MathMax(1000, MathMin(30000, ms));
-}
-
-//+
-// فعال/غیرفعال کردن
-//+
-void CDecisionConnector::Enable(const bool enable) {
-   m_enabled = enable;
-}
-
-//+
-// تنظیم عمر کش
-//+
-void CDecisionConnector::SetCacheLifetime(const int seconds) {
-   m_cacheLifetime = MathMax(10, seconds);
-}
-
-//+
-// اعتبارسنجی درخواست
-//+
 bool CDecisionConnector::ValidateRequest(const DecisionRequest &request) {
-   if(request.symbol == "") {
-      LogMessage("نماد خالی است", "ERROR");
-      return false;
-   }
-
-   if(request.currentPrice <= 0) {
-      LogMessage("قیمت نامعتبر است", "ERROR");
-      return false;
-   }
-
+   if(request.symbol == "") { LogMessage("نماد خالی است", "ERROR"); return false; }
+   if(request.currentPrice <= 0) { LogMessage("قیمت نامعتبر است", "ERROR"); return false; }
    return true;
 }
 
-//+
-// ساخت URL درخواست
-//+
 string CDecisionConnector::BuildDecisionUrl(const DecisionRequest &request) {
    string url = m_apiUrl + "/decision";
-
    url += "?symbol=" + request.symbol;
    url += "&timeframe=" + request.timeframe;
    url += "&price=" + DoubleToString(request.currentPrice, 5);
-
-   if(m_licenseKey != "") {
-      url += "&license=" + m_licenseKey;
-   }
-
+   if(m_licenseKey != "") url += "&license=" + m_licenseKey;
    return url;
 }
 
 //+
-// پارس پاسخ تصمیم
+// ParseDecisionResponse — ایمن با کمک‌کارهای JSON
 //+
 bool CDecisionConnector::ParseDecisionResponse(const string data, DecisionResponse &response) {
    ZeroMemory(response);
@@ -282,201 +366,119 @@ bool CDecisionConnector::ParseDecisionResponse(const string data, DecisionRespon
       return false;
    }
 
-   // بررسی خطا
-   if(StringFind(data, "\"error\"") >= 0) {
-      int errorPos = StringFind(data, "\"message\":");
-      if(errorPos >= 0) {
-         int start = errorPos + 11;
-         int end = StringFind(data, "\"", start + 1);
-         if(end > start) {
-            response.errorMessage = StringSubstr(data, start, end - start);
-         }
-      }
+   // بررسی خطا در ابتدا
+   string errMsg = "";
+   if(JsonGetString(data, "error", errMsg) || StringFind(data, "\"error\"") >= 0) {
+      JsonGetString(data, "message", response.errorMessage);
+      if(response.errorMessage == "") response.errorMessage = "خطای ناشناخته سرور";
       return false;
    }
 
-   // استخراج success
-   if(StringFind(data, "\"success\":true") >= 0 || StringFind(data, "\"decision\":") >= 0) {
-      response.success = true;
+   // success
+   JsonGetBool(data, "success", response.success);
+
+   // استخراج بلاک data اگر وجود داشت
+   string dataBlock = "";
+   string parseTarget = data;
+   if(JsonGetObject(data, "data", dataBlock)) {
+      parseTarget = dataBlock;
    }
 
-   // استخراج decision
-   int decisionPos = StringFind(data, "\"decision\":");
-   if(decisionPos >= 0) {
-      int start = decisionPos + 12;
-      if(data[start] == '"') {
-         start++;
-         int end = StringFind(data, "\"", start);
-         if(end > start) {
-            response.decision = StringSubstr(data, start, end - start);
-         }
-      }
+   // decision
+   if(!JsonGetString(parseTarget, "decision", response.decision)) {
+      response.errorMessage = "فیلد decision یافت نشد";
+      return false;
    }
 
-   // استخراج direction
-   int dirPos = StringFind(data, "\"direction\":");
-   if(dirPos >= 0) {
-      int start = dirPos + 12;
-      if(data[start] == '"') {
-         start++;
-         int end = StringFind(data, "\"", start);
-         if(end > start) {
-            response.direction = StringSubstr(data, start, end - start);
-         }
-      }
+   // direction
+   JsonGetString(parseTarget, "direction", response.direction);
+
+   // confidence_score / total_score
+   if(!JsonGetInt(parseTarget, "confidence_score", response.confidenceScore)) {
+      JsonGetInt(parseTarget, "total_score", response.confidenceScore);
    }
 
-   // استخراج confidence_score
-   int confPos = StringFind(data, "\"confidence_score\":");
-   if(confPos >= 0) {
-      string numStr = "";
-      int start = confPos + 19;
-      while(start < StringLen(data) && (data[start] >= '0' && data[start] <= '9')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.confidenceScore = (int)StringToInteger(numStr);
+   // quality_score
+   JsonGetInt(parseTarget, "quality_score", response.qualityScore);
+
+   // allowed
+   JsonGetBool(parseTarget, "allowed", response.allowed);
+
+   // trading levels — ابتدا در nested object بعد مستقیم
+   string levelsObj = "";
+   string levelsSrc = parseTarget;
+   if(JsonGetObject(parseTarget, "trading_levels", levelsObj)) {
+      levelsSrc = levelsObj;
    }
 
-   // استخراج quality_score
-   int qualPos = StringFind(data, "\"quality_score\":");
-   if(qualPos >= 0) {
-      string numStr = "";
-      int start = qualPos + 16;
-      while(start < StringLen(data) && (data[start] >= '0' && data[start] <= '9')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.qualityScore = (int)StringToInteger(numStr);
+   JsonGetDouble(levelsSrc, "entry_zone", response.entryZone);
+   JsonGetDouble(levelsSrc, "stop_loss", response.stopLoss);
+   JsonGetDouble(levelsSrc, "take_profit_1", response.takeProfit1);
+   JsonGetDouble(levelsSrc, "take_profit_2", response.takeProfit2);
+   JsonGetDouble(levelsSrc, "take_profit_3", response.takeProfit3);
+   JsonGetDouble(levelsSrc, "risk_reward_ratio", response.riskRewardRatio);
+
+   // fallback برای فیلدهای مستقیم
+   if(response.entryZone == 0) JsonGetDouble(parseTarget, "suggested_entry", response.entryZone);
+   if(response.stopLoss == 0) JsonGetDouble(parseTarget, "suggested_sl", response.stopLoss);
+   if(response.takeProfit1 == 0) JsonGetDouble(parseTarget, "suggested_tp", response.takeProfit1);
+   if(response.riskRewardRatio == 0) JsonGetDouble(parseTarget, "risk_reward", response.riskRewardRatio);
+
+   // score breakdown
+   string scoresObj = "";
+   if(JsonGetObject(parseTarget, "score_breakdown", scoresObj)) {
+      JsonGetInt(scoresObj, "smc", response.smcScore);
+      JsonGetInt(scoresObj, "price_action", response.paScore);
+      JsonGetInt(scoresObj, "session", response.sessionScore);
    }
 
-   // استخراج allowed
-   int allowedPos = StringFind(data, "\"allowed\":");
-   if(allowedPos >= 0) {
-      int start = allowedPos + 10;
-      if(StringFind(data, "true", start) <= start + 6) {
-         response.allowed = true;
-      }
-   }
-
-   // استخراج trading_levels
-   int entryPos = StringFind(data, "\"entry_zone\":");
-   if(entryPos >= 0) {
-      string numStr = "";
-      int start = entryPos + 13;
-      while(start < StringLen(data) && ((data[start] >= '0' && data[start] <= '9') || data[start] == '.' || data[start] == '-')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.entryZone = StringToDouble(numStr);
-   }
-
-   int slPos = StringFind(data, "\"stop_loss\":");
-   if(slPos >= 0) {
-      string numStr = "";
-      int start = slPos + 12;
-      while(start < StringLen(data) && ((data[start] >= '0' && data[start] <= '9') || data[start] == '.' || data[start] == '-')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.stopLoss = StringToDouble(numStr);
-   }
-
-   int tp1Pos = StringFind(data, "\"take_profit_1\":");
-   if(tp1Pos >= 0) {
-      string numStr = "";
-      int start = tp1Pos + 16;
-      while(start < StringLen(data) && ((data[start] >= '0' && data[start] <= '9') || data[start] == '.' || data[start] == '-')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.takeProfit1 = StringToDouble(numStr);
-   }
-
-   int rrPos = StringFind(data, "\"risk_reward_ratio\":");
-   if(rrPos >= 0) {
-      string numStr = "";
-      int start = rrPos + 19;
-      while(start < StringLen(data) && ((data[start] >= '0' && data[start] <= '9') || data[start] == '.')) {
-         numStr += CharToString(data[start]);
-         start++;
-      }
-      response.riskRewardRatio = StringToDouble(numStr);
-   }
+   // decisionId
+   JsonGetString(parseTarget, "decision_id", response.decisionId);
 
    response.createdAt = TimeCurrent();
+   response.success = (response.decision == "BUY" || response.decision == "SELL" || response.decision == "NO_TRADE");
 
-   return true;
+   return response.success;
 }
 
-//+
-// به‌روزرسانی وضعیت اتصال
-//+
 void CDecisionConnector::UpdateConnectionStatus(const bool success, const int statusCode,
    const string error, const double responseTime) {
-
    if(success) {
       m_status.isConnected = true;
       m_status.lastSuccessfulCall = TimeCurrent();
       m_status.successfulCalls++;
       m_status.failedAttempts = 0;
-
       double totalTime = m_status.averageResponseTime * (m_status.successfulCalls - 1) + responseTime;
       m_status.averageResponseTime = totalTime / m_status.successfulCalls;
    } else {
       m_status.failedAttempts++;
-
-      if(m_status.failedAttempts >= 3) {
-         m_status.isConnected = false;
-      }
+      if(m_status.failedAttempts >= 3) m_status.isConnected = false;
    }
-
    m_status.lastStatusCode = statusCode;
    m_status.lastError = error;
 }
 
-//+
-// پاکسازی کش قدیمی
-//+
 void CDecisionConnector::CleanupCache() {
    if(ArraySize(m_cache) == 0) return;
-
    datetime threshold = TimeCurrent() - m_cacheLifetime;
    int validCount = 0;
-
-   for(int i = 0; i < ArraySize(m_cache); i++) {
-      if(m_cache[i].cachedAt > threshold) {
-         validCount++;
-      }
-   }
+   for(int i = 0; i < ArraySize(m_cache); i++)
+      if(m_cache[i].cachedAt > threshold) validCount++;
 
    if(validCount < ArraySize(m_cache)) {
       DecisionCache temp[];
       ArrayResize(temp, validCount);
-
       int index = 0;
-      for(int i = 0; i < ArraySize(m_cache); i++) {
-         if(m_cache[i].cachedAt > threshold) {
-            temp[index] = m_cache[i];
-            index++;
-         }
-      }
-
+      for(int i = 0; i < ArraySize(m_cache); i++)
+         if(m_cache[i].cachedAt > threshold) { temp[index] = m_cache[i]; index++; }
       ArrayCopy(m_cache, temp);
-      LogMessage(StringFormat("کش پاکسازی شد: %d ورودی قدیمی حذف", ArraySize(temp) - validCount), "INFO");
    }
 }
 
-//+
-// دریافت تصمیم از کش
-//+
 bool CDecisionConnector::GetCachedDecision(const DecisionRequest &request, DecisionResponse &response) {
    for(int i = 0; i < ArraySize(m_cache); i++) {
-      if(m_cache[i].symbol == request.symbol &&
-         m_cache[i].timeframe == request.timeframe) {
-
+      if(m_cache[i].symbol == request.symbol && m_cache[i].timeframe == request.timeframe) {
          double priceTolerance = request.currentPrice * 0.0001;
-
          if(MathAbs(m_cache[i].price - request.currentPrice) < priceTolerance) {
             if(m_cache[i].cachedAt > TimeCurrent() - m_cacheLifetime) {
                response = m_cache[i].response;
@@ -485,17 +487,12 @@ bool CDecisionConnector::GetCachedDecision(const DecisionRequest &request, Decis
          }
       }
    }
-
    return false;
 }
 
-//+
-// کش کردن تصمیم
-//+
 void CDecisionConnector::CacheDecision(const DecisionRequest &request, const DecisionResponse &response) {
    int size = ArraySize(m_cache);
    ArrayResize(m_cache, size + 1);
-
    m_cache[size].symbol = request.symbol;
    m_cache[size].timeframe = request.timeframe;
    m_cache[size].price = request.currentPrice;
@@ -503,56 +500,30 @@ void CDecisionConnector::CacheDecision(const DecisionRequest &request, const Dec
    m_cache[size].cachedAt = TimeCurrent();
 }
 
-//+
-// درخواست تصمیم
-//+
 DecisionResponse CDecisionConnector::RequestDecision(DecisionRequest &request) {
    DecisionResponse response;
    ZeroMemory(response);
 
-   if(!m_enabled) {
-      response.success = false;
-      response.errorMessage = "Decision Connector غیرفعال است";
-      return response;
-   }
-
-   if(!ValidateRequest(request)) {
-      response.success = false;
-      response.errorMessage = "درخواست نامعتبر";
-      return response;
-   }
-
-   if(GetCachedDecision(request, response)) {
-      LogMessage("تصمیم از کش دریافت شد", "INFO");
-      return response;
-   }
+   if(!m_enabled) { response.errorMessage = "Decision Connector غیرفعال است"; return response; }
+   if(!ValidateRequest(request)) { response.errorMessage = "درخواست نامعتبر"; return response; }
+   if(GetCachedDecision(request, response)) { LogMessage("تصمیم از کش دریافت شد", "INFO"); return response; }
 
    string url = BuildDecisionUrl(request);
-
    char data[];
    char result[];
    string headers = "Content-Type: application/json\r\n";
    headers += "X-Request-ID: " + GenerateRequestId() + "\r\n";
-
-   if(m_licenseKey != "") {
-      headers += "X-License-Key: " + m_licenseKey + "\r\n";
-   }
+   if(m_licenseKey != "") headers += "X-License-Key: " + m_licenseKey + "\r\n";
 
    datetime startTime = TimeCurrent();
-   int timeoutSeconds = m_timeout / 1000;
-
-   int res = WebRequest("GET", url, headers, timeoutSeconds, data, result, headers);
-
+   int res = WebRequest("GET", url, headers, m_timeout / 1000, data, result, headers);
    double responseTime = (double)(TimeCurrent() - startTime) * 1000;
 
    if(res == -1) {
       int lastError = GetLastError();
       string errorMsg = "خطا در ارتباط با سرور: " + IntegerToString(lastError);
       LogMessage(errorMsg, "ERROR");
-
       UpdateConnectionStatus(false, lastError, errorMsg, responseTime);
-
-      response.success = false;
       response.errorMessage = errorMsg;
       return response;
    }
@@ -560,8 +531,6 @@ DecisionResponse CDecisionConnector::RequestDecision(DecisionRequest &request) {
    if(res >= 400) {
       string errorMsg = "خطای سرور: HTTP " + IntegerToString(res);
       UpdateConnectionStatus(false, res, errorMsg, responseTime);
-
-      response.success = false;
       response.errorMessage = errorMsg;
       return response;
    }
@@ -571,248 +540,114 @@ DecisionResponse CDecisionConnector::RequestDecision(DecisionRequest &request) {
    if(ParseDecisionResponse(responseData, response)) {
       UpdateConnectionStatus(true, res, "", responseTime);
       CacheDecision(request, response);
-
-      LogMessage(StringFormat("تصمیم دریافت شد: %s | Score: %d",
-         response.decision, response.confidenceScore), "INFO");
+      LogMessage(StringFormat("تصمیم دریافت شد: %s | Score: %d", response.decision, response.confidenceScore), "INFO");
    } else {
       UpdateConnectionStatus(false, res, response.errorMessage, responseTime);
+      LogMessage("خطا در parse پاسخ: " + response.errorMessage, "ERROR");
    }
 
    return response;
 }
 
-//+
-// درخواست تصمیم غیرهمزمان
-//+
 DecisionResponse CDecisionConnector::RequestDecisionAsync(DecisionRequest &request) {
    return RequestDecision(request);
 }
 
-//+
-// دریافت تصمیم برای نماد
-//+
 DecisionResponse CDecisionConnector::GetDecisionForSymbol(const string symbol, const string timeframe) {
    DecisionRequest request;
    ZeroMemory(request);
-
    request.symbol = symbol;
    request.timeframe = timeframe;
    request.currentPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
    request.requestTime = TimeCurrent();
-
    return RequestDecision(request);
 }
 
-//+
-// آیا معامله مجاز است
-//+
 bool CDecisionConnector::IsAllowedToTrade(const string symbol, const string direction) {
    DecisionResponse response = GetDecisionForSymbol(symbol, "H1");
-
-   if(!response.success) {
-      return false;
-   }
-
-   if(!response.allowed) {
-      return false;
-   }
-
-   if(response.decision == "NO_TRADE") {
-      return false;
-   }
-
-   if(direction == "buy" && response.direction != "bullish") {
-      return false;
-   }
-
-   if(direction == "sell" && response.direction != "bearish") {
-      return false;
-   }
-
+   if(!response.success || !response.allowed || response.decision == "NO_TRADE") return false;
+   if(direction == "buy" && response.direction != "bullish") return false;
+   if(direction == "sell" && response.direction != "bearish") return false;
    return true;
 }
 
-//+
-// اعتبارسنجی تصمیم
-//+
 bool CDecisionConnector::ValidateDecision(const DecisionResponse &response) {
-   if(!response.success) return false;
-   if(!response.allowed) return false;
-
-   if(response.decision != "BUY" && response.decision != "SELL") {
-      if(response.decision != "NO_TRADE") {
-         return false;
-      }
-   }
-
+   if(!response.success || !response.allowed) return false;
+   if(response.decision != "BUY" && response.decision != "SELL" && response.decision != "NO_TRADE") return false;
    if(response.confidenceScore < MinEntryScore) {
-      LogMessage(StringFormat("امتیاز پایین: %d < %d",
-         response.confidenceScore, MinEntryScore), "WARNING");
+      LogMessage(StringFormat("امتیاز پایین: %d < %d", response.confidenceScore, MinEntryScore), "WARNING");
       return false;
    }
-
-   if(response.decision == "BUY" || response.decision == "SELL") {
-      if(response.entryZone <= 0 || response.stopLoss <= 0 || response.takeProfit1 <= 0) {
-         LogMessage("سطوح معاملاتی نامعتبر", "ERROR");
-         return false;
-      }
+   if((response.decision == "BUY" || response.decision == "SELL") &&
+      (response.entryZone <= 0 || response.stopLoss <= 0 || response.takeProfit1 <= 0)) {
+      LogMessage("سطوح معاملاتی نامعتبر", "ERROR");
+      return false;
    }
-
    return true;
 }
 
-//+
-// آیا باید پوزیشن بسته شود
-//+
 bool CDecisionConnector::ShouldClosePosition(const string symbol, const string direction) {
    DecisionResponse response = GetDecisionForSymbol(symbol, "H1");
-
-   if(!response.success) {
-      return false;
-   }
-
-   if(response.direction == "neutral") {
-      return true;
-   }
-
-   if(direction == "buy" && response.direction == "bearish") {
-      return true;
-   }
-
-   if(direction == "sell" && response.direction == "bullish") {
-      return true;
-   }
-
+   if(!response.success) return false;
+   if(response.direction == "neutral") return true;
+   if(direction == "buy" && response.direction == "bearish") return true;
+   if(direction == "sell" && response.direction == "bullish") return true;
    return false;
 }
 
-//+
-// آیا متصل است
-//+
 bool CDecisionConnector::IsConnected() {
-   if(!m_enabled) return false;
-
-   if(m_status.failedAttempts >= 3) {
-      return false;
-   }
-
-   if(m_status.lastSuccessfulCall > 0) {
-      int secondsSinceLast = (int)(TimeCurrent() - m_status.lastSuccessfulCall);
-      return secondsSinceLast < 300;
-   }
-
+   if(!m_enabled || m_status.failedAttempts >= 3) return false;
+   if(m_status.lastSuccessfulCall > 0)
+      return (int)(TimeCurrent() - m_status.lastSuccessfulCall) < 300;
    return false;
 }
 
-//+
-// دریافت وضعیت اتصال
-//+
-ConnectionStatus CDecisionConnector::GetConnectionStatus() {
-   return m_status;
-}
+ConnectionStatus CDecisionConnector::GetConnectionStatus() { return m_status; }
 
-//+
-// نرخ موفقیت
-//+
 int CDecisionConnector::GetSuccessRate() {
    int total = m_status.successfulCalls + m_status.failedAttempts;
-
    if(total == 0) return 0;
-
    return (int)(m_status.successfulCalls * 100.0 / total);
 }
 
-//+
-// بازنشانی آمار
-//+
-void CDecisionConnector::ResetStats() {
-   ZeroMemory(m_status);
-   m_status.isConnected = false;
-}
+void CDecisionConnector::ResetStats() { ZeroMemory(m_status); m_status.isConnected = false; }
 
-//+
-// پاک کردن کش
-//+
-void CDecisionConnector::ClearCache() {
-   ArrayResize(m_cache, 0);
-   LogMessage("کش تصمیمات پاک شد", "INFO");
-}
+void CDecisionConnector::ClearCache() { ArrayResize(m_cache, 0); LogMessage("کش تصمیمات پاک شد", "INFO"); }
 
-//+
-// اندازه کش
-//+
-int CDecisionConnector::GetCacheSize() {
-   CleanupCache();
-   return ArraySize(m_cache);
-}
+int CDecisionConnector::GetCacheSize() { CleanupCache(); return ArraySize(m_cache); }
 
-//+
-// تست اتصال
-//+
 bool CDecisionConnector::TestConnection() {
    string url = m_apiUrl + "/health";
-
-   char data[];
-   char result[];
+   char data[]; char result[];
    string headers = "Content-Type: application/json\r\n";
-
    int res = WebRequest("GET", url, headers, m_timeout / 1000, data, result, headers);
-
-   if(res == 200) {
-      m_status.isConnected = true;
-      LogMessage("اتصال به Decision Engine برقرار شد", "INFO");
-      return true;
-   }
-
+   if(res == 200) { m_status.isConnected = true; LogMessage("اتصال به Decision Engine برقرار شد", "INFO"); return true; }
    m_status.isConnected = false;
    LogMessage("خطا در اتصال به Decision Engine: " + IntegerToString(res), "ERROR");
    return false;
 }
 
-//+
-// وضعیت سلامت
-//+
 string CDecisionConnector::GetHealthStatus() {
-   if(!m_enabled) {
-      return "Decision Connector غیرفعال";
-   }
-
-   if(IsConnected()) {
-      return StringFormat("متصل | نرخ موفقیت: %d%% | میانگین پاسخ: %.0f ms",
-         GetSuccessRate(), m_status.averageResponseTime);
-   }
-
-   return StringFormat("قطع | آخرین خطا: %s | تلاش ناموفق: %d",
-      m_status.lastError, m_status.failedAttempts);
+   if(!m_enabled) return "Decision Connector غیرفعال";
+   if(IsConnected()) return StringFormat("متصل | نرخ موفقیت: %d%% | میانگین پاسخ: %.0f ms", GetSuccessRate(), m_status.averageResponseTime);
+   return StringFormat("قطع | آخرین خطا: %s | تلاش ناموفق: %d", m_status.lastError, m_status.failedAttempts);
 }
 
-//+
-// گزارش Connector
-//+
 string CDecisionConnector::GetConnectorReport() {
    string report = "📊 گزارش Decision Connector\n\n";
-
    report += StringFormat("وضعیت: %s\n", IsConnected() ? "✅ متصل" : "❌ قطع");
    report += StringFormat("URL: %s\n", m_apiUrl);
    report += StringFormat("Enabled: %s\n\n", m_enabled ? "بله" : "خیر");
-
    report += "📈 آمار:\n";
    report += StringFormat("   موفق: %d\n", m_status.successfulCalls);
    report += StringFormat("   ناموفق: %d\n", m_status.failedAttempts);
    report += StringFormat("   نرخ موفقیت: %d%%\n", GetSuccessRate());
    report += StringFormat("   میانگین پاسخ: %.0f ms\n\n", m_status.averageResponseTime);
-
    report += StringFormat("Cache: %d تصمیم\n", GetCacheSize());
-
-   if(m_status.lastSuccessfulCall > 0) {
-      report += StringFormat("آخرین موفقیت: %s\n",
-         TimeToString(m_status.lastSuccessfulCall, TIME_DATE|TIME_MINUTES));
-   }
-
-   if(m_status.lastError != "") {
+   if(m_status.lastSuccessfulCall > 0)
+      report += StringFormat("آخرین موفقیت: %s\n", TimeToString(m_status.lastSuccessfulCall, TIME_DATE|TIME_MINUTES));
+   if(m_status.lastError != "")
       report += StringFormat("آخرین خطا: %s\n", m_status.lastError);
-   }
-
    return report;
 }
 //+------------------------------------------------------------------+
