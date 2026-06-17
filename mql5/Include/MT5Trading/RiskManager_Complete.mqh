@@ -1,314 +1,454 @@
+
 //+------------------------------------------------------------------+
-//|                                      RiskManager_Complete.mqh     |
-//|                         سیستم معامله‌گری حرفه‌ای MT5               |
-//|                                                                    |
-//| توضیح فارسی:                                                       |
-//| این فایل تمام متدهای ناقص RiskManager را تکمیل می‌کند             |
-//| شامل: محاسبه لات، SL/TP، مدیریت ریسک، بررسی محدودیت‌ها،         |
-//|        Trailing Stop، Break Even، توقف اضطراری                    |
+//|                                        RiskManager_Complete.mqh  |
+//|                                                                  |
+//|  توضیح: تکمیل ماژول مدیریت ریسک برای پروژه Bot12              |
+//|                                                                  |
+//|  این فایل شامل توابع تکمیلی RiskManager است که در فایل اصلی   |
+//|  موجود نبودند:                                                   |
+//|  - محاسبه TakeProfit بر اساس روش‌های مختلف                     |
+//|  - سیستم Partial Close حرفه‌ای                                  |
+//|  - سیستم Scale In/Out                                          |
+//|  - مدیریت پوزیشن‌های متعدد                                     |
+//|  - سیستم هشدار ریسک پیشرفته                                   |
 //+------------------------------------------------------------------+
-// این فایل به عنوان extension به RiskManager اصلی اضافه می‌شود
-// متدهای جدید که باید در کلاس CRiskManager پیاده‌سازی شوند:
 
-/*
-   ===== متدهای ناقص که باید تکمیل شوند =====
+#ifndef RISK_MANAGER_COMPLETE_MQH
+#define RISK_MANAGER_COMPLETE_MQH
 
-   1. GetFreeMargin() -> double
-   2. CountPositionsForSymbol(string symbol) -> int
-   3. CountTodayDeals() -> int
-   4. CalculateTodayPnL() -> double
-   5. CalculateMaxDrawdown() -> double
-   6. IsSpreadAcceptable(string symbol) -> bool
-   7. IsMarginAvailable(double lots, string symbol) -> bool
-   8. NormalizeLot(double lots, string symbol) -> double
-   9. CalculateLot(string symbol, double slPoints) -> double
-   10. CheckRiskBeforeTrade(...) -> RiskCheckResult
-   11. CanOpenTrade(string symbol) -> bool
-   12. IsDailyLossLimitReached() -> bool
-   13. IsMaxPositionsReached(string symbol) -> bool
-   14. IsMaxDrawdownReached() -> bool
-   15. IsEmergencyStop() -> bool
-   16. TriggerEmergencyStop(string reason) -> void
-   17. UpdateTrailingStop(ulong ticket) -> void
-   18. UpdateBreakEven(ulong ticket) -> void
-   19. GetCurrentDrawdown() -> double
-   20. GetDailyPnL() -> double
-   21. GetAccountBalance() -> double
-   22. GetRiskReport() -> string
+#include <Trade\Trade.mqh>
+#include <Trade\PositionInfo.mqh>
+#include <Arrays\ArrayDouble.mqh>
 
-   پیاده‌سازی کامل این متدها در فایل RiskManager.mqh اصلی انجام شده
-   و در این فایل extension، نسخه‌های کامل ارائه می‌شود.
-*/
-
-// ===== نسخه کامل ساختارها =====
-
-struct LotCalculationResult {
-   double lot;
-   double riskAmount;
-   double riskPercent;
-   bool   isValid;
-   string reason;
+//--- ساختار نتیجه TakeProfit
+struct TakeProfitResult {
+   double   tp1;              // هدف اول (۱:۱)
+   double   tp2;              // هدف دوم (۱:۲)
+   double   tp3;              // هدف سوم (۱:۳)
+   double   tp_structure;     // هدف بر اساس ساختار بازار
+   double   tp_fib_618;       // هدف فیبوناچی ۶۱.۸
+   double   tp_fib_100;       // هدف فیبوناچی ۱۰۰
+   double   tp_fib_161;       // هدف فیبوناچی ۱۶۱.۸
+   double   recommended_tp;   // هدف پیشنهادی
+   double   risk_reward;      // نسبت ریسک به ریوارد
+   bool     is_valid;         // آیا محاسبه معتبر است؟
+   string   reason;           // دلیل انتخاب
 };
 
-struct RiskCheckResult {
-   bool   canTrade;
-   double recommendedLot;
-   double maxLot;
-   string reason;
-   double marginRequired;
-   double freeMargin;
+//--- ساختار نتیجه Partial Close
+struct PartialCloseResult {
+   bool     executed;         // آیا اجرا شد؟
+   double   closed_volume;    // حجم بسته شده
+   double   remaining_volume; // حجم باقی‌مانده
+   double   realized_pnl;     // سود/زیان تحقق یافته
+   string   message;          // پیام نتیجه
 };
 
-struct SLTPResult {
-   double stopLoss;
-   double takeProfit;
-   double slPoints;
-   double tpPoints;
-   double riskReward;
-   bool   isValid;
+//--- ساختار سطح Scale Out
+struct ScaleOutLevel {
+   double   price;            // قیمت هدف
+   double   percent;          // درصد حجم برای بستن
+   bool     move_sl_to_entry; // آیا SL به نقطه ورود منتقل شود؟
+   bool     executed;         // آیا اجرا شده؟
 };
 
-// ===== پیاده‌سازی کامل متدهای مدیریت ریسک =====
+//+------------------------------------------------------------------+
+//| کلاس تکمیلی مدیریت ریسک                                         |
+//+------------------------------------------------------------------+
+class CRiskManagerComplete
+{
+private:
+   string            m_symbol;          // نماد معاملاتی
+   CTrade            m_trade;           // شیء معامله
+   CPositionInfo     m_position;        // اطلاعات پوزیشن
 
-// متدهای زیر باید در کلاس CRiskManager قرار بگیرند:
+   // پارامترهای TP
+   double            m_atr_value;       // مقدار ATR جاری
+   double            m_pip_size;        // اندازه پیپ
 
-double GetFreeMargin_Impl() {
-   return AccountInfoDouble(ACCOUNT_MARGIN_FREE);
-}
+   // سطوح Scale Out
+   ScaleOutLevel     m_scale_levels[5]; // حداکثر ۵ سطح
+   int               m_scale_count;     // تعداد سطوح فعال
 
-double GetAccountBalance_Impl() {
-   return AccountInfoDouble(ACCOUNT_BALANCE);
-}
-
-double GetEquity_Impl() {
-   return AccountInfoDouble(ACCOUNT_EQUITY);
-}
-
-double GetUsedMargin_Impl() {
-   return AccountInfoDouble(ACCOUNT_MARGIN);
-}
-
-int CountPositionsForSymbol_Impl(string symbol) {
-   int count = 0;
-   for(int i = PositionsTotal() - 1; i >= 0; i--) {
-      ulong ticket = PositionGetTicket(i);
-      if(ticket > 0 && PositionGetString(POSITION_SYMBOL) == symbol)
-         count++;
+public:
+   //--- سازنده
+   void CRiskManagerComplete(const string symbol) {
+      m_symbol = symbol;
+      m_pip_size = SymbolInfoDouble(symbol, SYMBOL_POINT) * 10;
+      if(SymbolInfoInteger(symbol, SYMBOL_DIGITS) == 3 || 
+         SymbolInfoInteger(symbol, SYMBOL_DIGITS) == 5)
+         m_pip_size = SymbolInfoDouble(symbol, SYMBOL_POINT) * 10;
+      else
+         m_pip_size = SymbolInfoDouble(symbol, SYMBOL_POINT);
+      m_scale_count = 0;
+      m_trade.SetExpertMagicNumber(12345);
+      m_trade.SetDeviationInPoints(10);
+      m_trade.SetTypeFilling(ORDER_FILLING_FOK);
    }
-   return count;
-}
 
-int CountTodayDeals_Impl() {
-   datetime dayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
-   HistorySelect(dayStart, TimeCurrent());
-   return HistoryDealsTotal();
-}
+   //+----------------------------------------------------------------+
+   //| به‌روزرسانی مقدار ATR                                          |
+   //+----------------------------------------------------------------+
+   void UpdateATR(const double atr_value) {
+      // به‌روزرسانی مقدار ATR برای محاسبات
+      m_atr_value = atr_value;
+   }
 
-double CalculateTodayPnL_Impl() {
-   datetime dayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
-   HistorySelect(dayStart, TimeCurrent());
-   double pnl = 0;
-   for(int i = HistoryDealsTotal() - 1; i >= 0; i--) {
-      ulong ticket = HistoryDealGetTicket(i);
-      if(ticket <= 0) continue;
-      ENUM_DEAL_ENTRY entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(ticket, DEAL_ENTRY);
-      if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT) {
-         pnl += HistoryDealGetDouble(ticket, DEAL_PROFIT)
-              + HistoryDealGetDouble(ticket, DEAL_SWAP)
-              + HistoryDealGetDouble(ticket, DEAL_COMMISSION);
+   //+----------------------------------------------------------------+
+   //| محاسبه TakeProfit بر اساس روش‌های مختلف                       |
+   //| این تابع چندین روش مختلف محاسبه TP را پیاده‌سازی می‌کند      |
+   //+----------------------------------------------------------------+
+   TakeProfitResult CalculateTakeProfits(
+      const ENUM_POSITION_TYPE direction,
+      const double entry_price,
+      const double stop_loss,
+      const double swing_high = 0,
+      const double swing_low = 0,
+      const double structure_target = 0
+   ) {
+      TakeProfitResult result;
+      result.is_valid = false;
+
+      // اعتبارسنجی ورودی‌ها
+      if(entry_price <= 0 || stop_loss <= 0) {
+         result.reason = "ورودی‌های نامعتبر";
+         return result;
+      }
+
+      double point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+      double sl_distance = 0;
+
+      // محاسبه فاصله SL
+      if(direction == POSITION_TYPE_BUY) {
+         if(stop_loss >= entry_price) {
+            result.reason = "SL باید زیر قیمت ورود باشد";
+            return result;
+         }
+         sl_distance = (entry_price - stop_loss);
+      } else {
+         if(stop_loss <= entry_price) {
+            result.reason = "SL باید بالای قیمت ورود باشد";
+            return result;
+         }
+         sl_distance = (stop_loss - entry_price);
+      }
+
+      if(sl_distance <= 0) {
+         result.reason = "فاصله SL صفر است";
+         return result;
+      }
+
+      // --- محاسبه اهداف RR ---
+      if(direction == POSITION_TYPE_BUY) {
+         result.tp1 = NormalizeDouble(entry_price + sl_distance * 1.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         result.tp2 = NormalizeDouble(entry_price + sl_distance * 2.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         result.tp3 = NormalizeDouble(entry_price + sl_distance * 3.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+      } else {
+         result.tp1 = NormalizeDouble(entry_price - sl_distance * 1.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         result.tp2 = NormalizeDouble(entry_price - sl_distance * 2.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         result.tp3 = NormalizeDouble(entry_price - sl_distance * 3.0, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+      }
+
+      // --- محاسبه اهداف فیبوناچی (بر اساس Swing) ---
+      if(swing_high > 0 && swing_low > 0 && swing_high > swing_low) {
+         double swing_range = swing_high - swing_low;
+         if(direction == POSITION_TYPE_BUY) {
+            result.tp_fib_618 = NormalizeDouble(swing_low + swing_range * 0.618, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+            result.tp_fib_100 = NormalizeDouble(swing_high, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+            result.tp_fib_161 = NormalizeDouble(swing_low + swing_range * 1.618, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         } else {
+            result.tp_fib_618 = NormalizeDouble(swing_high - swing_range * 0.618, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+            result.tp_fib_100 = NormalizeDouble(swing_low, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+            result.tp_fib_161 = NormalizeDouble(swing_high - swing_range * 1.618, (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS));
+         }
+      }
+
+      // --- هدف بر اساس ساختار بازار ---
+      if(structure_target > 0) {
+         result.tp_structure = structure_target;
+      }
+
+      // --- انتخاب بهترین TP پیشنهادی ---
+      // اولویت: ساختار > فیبو > RR 2:1
+      if(result.tp_structure > 0) {
+         // بررسی اینکه آیا هدف ساختار معقول است
+         double struct_distance = MathAbs(result.tp_structure - entry_price);
+         double struct_rr = struct_distance / sl_distance;
+
+         if(struct_rr >= 1.5 && struct_rr <= 5.0) {
+            result.recommended_tp = result.tp_structure;
+            result.reason = "هدف بر اساس ساختار بازار";
+            result.risk_reward = struct_rr;
+         } else if(result.tp_fib_618 > 0) {
+            result.recommended_tp = result.tp_fib_618;
+            result.reason = "هدف فیبوناچی ۶۱.۸%";
+            result.risk_reward = MathAbs(result.tp_fib_618 - entry_price) / sl_distance;
+         } else {
+            result.recommended_tp = result.tp2;
+            result.reason = "هدف RR 2:1";
+            result.risk_reward = 2.0;
+         }
+      } else if(result.tp_fib_618 > 0) {
+         result.recommended_tp = result.tp_fib_618;
+         result.reason = "هدف فیبوناچی ۶۱.۸%";
+         result.risk_reward = MathAbs(result.tp_fib_618 - entry_price) / sl_distance;
+      } else {
+         result.recommended_tp = result.tp2;
+         result.reason = "هدف RR 2:1 (پیش‌فرض)";
+         result.risk_reward = 2.0;
+      }
+
+      result.is_valid = true;
+      return result;
+   }
+
+   //+----------------------------------------------------------------+
+   //| بستن بخشی از پوزیشن (Partial Close)                          |
+   //| این تابع مکانیزم حرفه‌ای Partial Close را پیاده‌سازی می‌کند  |
+   //+----------------------------------------------------------------+
+   PartialCloseResult PartialClose(
+      const ulong ticket,
+      const double close_percent,
+      const bool move_sl_to_entry = false
+   ) {
+      PartialCloseResult result;
+      result.executed = false;
+
+      // اعتبارسنجی ورودی
+      if(close_percent <= 0 || close_percent > 100) {
+         result.message = "درصد بستن نامعتبر است";
+         return result;
+      }
+
+      // انتخاب پوزیشن
+      if(!m_position.SelectByTicket(ticket)) {
+         result.message = "پوزیشن یافت نشد: " + IntegerToString(ticket);
+         return result;
+      }
+
+      double current_volume = m_position.Volume();
+      double entry_price    = m_position.PriceOpen();
+      double current_sl     = m_position.StopLoss();
+      double current_tp     = m_position.TakeProfit();
+      string symbol         = m_position.Symbol();
+
+      // محاسبه حجم برای بستن
+      double close_volume = NormalizeDouble(current_volume * (close_percent / 100.0), 2);
+
+      // اطمینان از حداقل لات
+      double min_lot  = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+      double step_lot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+
+      close_volume = MathFloor(close_volume / step_lot) * step_lot;
+
+      if(close_volume < min_lot) {
+         result.message = "حجم برای Partial Close کمتر از حداقل مجاز است";
+         return result;
+      }
+
+      // بستن بخشی از پوزیشن
+      bool closed = false;
+      if(m_position.PositionType() == POSITION_TYPE_BUY) {
+         double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+         closed = m_trade.Sell(close_volume, symbol, bid, 0, 0, "Partial Close");
+      } else {
+         double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
+         closed = m_trade.Buy(close_volume, symbol, ask, 0, 0, "Partial Close");
+      }
+
+      if(closed) {
+         result.executed = true;
+         result.closed_volume = close_volume;
+         result.remaining_volume = current_volume - close_volume;
+
+         // محاسبه سود تحقق یافته
+         double price_diff = 0;
+         if(m_position.PositionType() == POSITION_TYPE_BUY)
+            price_diff = SymbolInfoDouble(symbol, SYMBOL_BID) - entry_price;
+         else
+            price_diff = entry_price - SymbolInfoDouble(symbol, SYMBOL_ASK);
+
+         double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+         double tick_size  = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+         result.realized_pnl = (price_diff / tick_size) * tick_value * close_volume;
+
+         // انتقال SL به نقطه ورود (Break Even)
+         if(move_sl_to_entry && result.remaining_volume > 0) {
+            double new_sl = entry_price;
+            // اضافه کردن چند پوینت برای اطمینان
+            double buffer = SymbolInfoDouble(symbol, SYMBOL_POINT) * 5;
+            if(m_position.PositionType() == POSITION_TYPE_BUY)
+               new_sl = entry_price + buffer;
+            else
+               new_sl = entry_price - buffer;
+
+            m_trade.PositionModify(ticket, new_sl, current_tp);
+         }
+
+         result.message = StringFormat(
+            "Partial Close موفق | بسته: %.2f | باقی: %.2f | P&L: %.2f",
+            close_volume, result.remaining_volume, result.realized_pnl
+         );
+      } else {
+         result.message = "خطا در Partial Close: " + m_trade.ResultComment();
+      }
+
+      return result;
+   }
+
+   //+----------------------------------------------------------------+
+   //| تنظیم سطوح Scale Out خودکار                                   |
+   //| این تابع سطوح خروج تدریجی را تعریف می‌کند                    |
+   //+----------------------------------------------------------------+
+   void SetScaleOutLevels(
+      const ENUM_POSITION_TYPE direction,
+      const double entry_price,
+      const double stop_loss,
+      const double final_tp
+   ) {
+      // پاک کردن سطوح قبلی
+      m_scale_count = 0;
+      ArrayInitialize(m_scale_levels, 0);
+
+      double sl_dist = MathAbs(entry_price - stop_loss);
+      int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
+
+      // سطح ۱: بستن ۳۰% در RR 1:1
+      m_scale_levels[0].price = direction == POSITION_TYPE_BUY ?
+         NormalizeDouble(entry_price + sl_dist * 1.0, digits) :
+         NormalizeDouble(entry_price - sl_dist * 1.0, digits);
+      m_scale_levels[0].percent = 30.0;
+      m_scale_levels[0].move_sl_to_entry = true;
+      m_scale_levels[0].executed = false;
+
+      // سطح ۲: بستن ۳۰% در RR 1:2
+      m_scale_levels[1].price = direction == POSITION_TYPE_BUY ?
+         NormalizeDouble(entry_price + sl_dist * 2.0, digits) :
+         NormalizeDouble(entry_price - sl_dist * 2.0, digits);
+      m_scale_levels[1].percent = 30.0;
+      m_scale_levels[1].move_sl_to_entry = false;
+      m_scale_levels[1].executed = false;
+
+      // سطح ۳: بستن ۴۰% باقیمانده در TP نهایی
+      m_scale_levels[2].price = final_tp;
+      m_scale_levels[2].percent = 100.0;
+      m_scale_levels[2].move_sl_to_entry = false;
+      m_scale_levels[2].executed = false;
+
+      m_scale_count = 3;
+   }
+
+   //+----------------------------------------------------------------+
+   //| بررسی و اجرای Scale Out در هر تیک                            |
+   //| این تابع باید در OnTick فراخوانی شود                         |
+   //+----------------------------------------------------------------+
+   void CheckAndExecuteScaleOut(const ulong ticket) {
+      if(m_scale_count == 0) return;
+
+      if(!m_position.SelectByTicket(ticket)) return;
+
+      ENUM_POSITION_TYPE pos_type = m_position.PositionType();
+      double current_price = (pos_type == POSITION_TYPE_BUY) ?
+         SymbolInfoDouble(m_symbol, SYMBOL_BID) :
+         SymbolInfoDouble(m_symbol, SYMBOL_ASK);
+
+      for(int i = 0; i < m_scale_count; i++) {
+         if(m_scale_levels[i].executed) continue;
+
+         bool level_hit = false;
+         if(pos_type == POSITION_TYPE_BUY && current_price >= m_scale_levels[i].price)
+            level_hit = true;
+         else if(pos_type == POSITION_TYPE_SELL && current_price <= m_scale_levels[i].price)
+            level_hit = true;
+
+         if(level_hit) {
+            PartialCloseResult pcr = PartialClose(
+               ticket,
+               m_scale_levels[i].percent,
+               m_scale_levels[i].move_sl_to_entry
+            );
+
+            if(pcr.executed) {
+               m_scale_levels[i].executed = true;
+               Print("✅ Scale Out سطح ", i+1, " اجرا شد | ", pcr.message);
+            }
+         }
       }
    }
-   return pnl;
-}
 
-double CalculateCurrentDrawdown_Impl() {
-   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   double equity  = AccountInfoDouble(ACCOUNT_EQUITY);
-   if(balance <= 0) return 0;
-   return (balance - equity) / balance * 100.0;
-}
+   //+----------------------------------------------------------------+
+   //| محاسبه نسبت ریسک به ریوارد واقعی                             |
+   //+----------------------------------------------------------------+
+   double CalculateRealRiskReward(
+      const ENUM_POSITION_TYPE direction,
+      const double entry,
+      const double sl,
+      const double tp
+   ) {
+      if(entry <= 0 || sl <= 0 || tp <= 0) return 0;
 
-bool IsSpreadAcceptable_Impl(string symbol, double maxSpreadPoints) {
-   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD);
-   return spread <= maxSpreadPoints;
-}
+      double risk   = MathAbs(entry - sl);
+      double reward = MathAbs(tp - entry);
 
-bool IsMarginAvailable_Impl(string symbol, double lots) {
-   double marginRequired;
-   if(!OrderCalcMargin(ORDER_TYPE_BUY, symbol, lots,
-      SymbolInfoDouble(symbol, SYMBOL_ASK), marginRequired)) return false;
-   return AccountInfoDouble(ACCOUNT_MARGIN_FREE) >= marginRequired * 1.2;
-}
-
-double NormalizeLot_Impl(string symbol, double lots) {
-   double minLot  = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-   double maxLot  = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-   double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-   lots = MathFloor(lots / lotStep) * lotStep;
-   lots = MathMax(lots, minLot);
-   lots = MathMin(lots, maxLot);
-   return NormalizeDouble(lots, 2);
-}
-
-double CalculateLotByRisk_Impl(string symbol, double slPoints, double riskPercent) {
-   double balance    = AccountInfoDouble(ACCOUNT_BALANCE);
-   double riskAmount = balance * riskPercent / 100.0;
-   double tickValue  = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-   double tickSize   = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-   double point      = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   if(tickSize <= 0 || slPoints <= 0) return 0;
-   double lotValue = (tickValue / tickSize) * point;
-   if(lotValue <= 0) return 0;
-   double lot = riskAmount / (slPoints * lotValue);
-   return NormalizeLot_Impl(symbol, lot);
-}
-
-SLTPResult CalculateSLTP_ATR_Impl(string symbol, ENUM_TIMEFRAMES tf,
-                                    ENUM_ORDER_TYPE orderType,
-                                    double atrMultiplierSL, double rrRatio) {
-   SLTPResult result;
-   ZeroMemory(result);
-   int handle = iATR(symbol, tf, 14);
-   if(handle == INVALID_HANDLE) return result;
-   double atr[];
-   if(CopyBuffer(handle, 0, 1, 1, atr) < 1) { IndicatorRelease(handle); return result; }
-   IndicatorRelease(handle);
-
-   double atrVal  = atr[0];
-   double slDist  = atrVal * atrMultiplierSL;
-   double tpDist  = slDist * rrRatio;
-   double point   = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double bid     = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask     = SymbolInfoDouble(symbol, SYMBOL_ASK);
-
-   if(orderType == ORDER_TYPE_BUY) {
-      result.stopLoss   = ask - slDist;
-      result.takeProfit = ask + tpDist;
-   } else {
-      result.stopLoss   = bid + slDist;
-      result.takeProfit = bid - tpDist;
+      if(risk <= 0) return 0;
+      return NormalizeDouble(reward / risk, 2);
    }
 
-   result.slPoints  = slDist / point;
-   result.tpPoints  = tpDist / point;
-   result.riskReward = rrRatio;
-   result.isValid    = (result.slPoints > 0);
-   return result;
-}
+   //+----------------------------------------------------------------+
+   //| بررسی ریسک کل سبد پوزیشن‌ها                                  |
+   //+----------------------------------------------------------------+
+   double GetPortfolioRiskPercent() {
+      double total_risk = 0;
+      double account_equity = AccountInfoDouble(ACCOUNT_EQUITY);
 
-RiskCheckResult CheckRiskBeforeTrade_Impl(string symbol, ENUM_ORDER_TYPE orderType,
-                                           double entryPrice, double stopLoss,
-                                           double riskPercent, double maxSpreadPoints,
-                                           int maxPositions, double dailyLossLimit) {
-   RiskCheckResult result;
-   ZeroMemory(result);
-   result.freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
+      if(account_equity <= 0) return 0;
 
-   // بررسی اسپرد
-   if(!IsSpreadAcceptable_Impl(symbol, maxSpreadPoints)) {
-      result.canTrade = false;
-      result.reason   = "اسپرد بیش از حد مجاز";
-      return result;
-   }
+      for(int i = PositionsTotal() - 1; i >= 0; i--) {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket == 0) continue;
+         if(!m_position.SelectByTicket(ticket)) continue;
+         if(m_position.Symbol() != m_symbol) continue;
 
-   // محاسبه فاصله SL
-   double point    = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double slPoints = MathAbs(entryPrice - stopLoss) / point;
-   if(slPoints < 5) { result.canTrade = false; result.reason = "SL خیلی نزدیک"; return result; }
+         double entry_p = m_position.PriceOpen();
+         double sl_p    = m_position.StopLoss();
+         double vol     = m_position.Volume();
 
-   // محاسبه لات
-   double lot = CalculateLotByRisk_Impl(symbol, slPoints, riskPercent);
-   if(lot <= 0) { result.canTrade = false; result.reason = "محاسبه لات ناموفق"; return result; }
+         if(sl_p <= 0) continue;
 
-   // بررسی مارجین
-   if(!IsMarginAvailable_Impl(symbol, lot)) {
-      result.canTrade = false;
-      result.reason   = "مارجین کافی نیست";
-      return result;
-   }
+         double sl_dist  = MathAbs(entry_p - sl_p);
+         double tick_val = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_VALUE);
+         double tick_sz  = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_SIZE);
+         double point    = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
 
-   // بررسی تعداد پوزیشن
-   if(CountPositionsForSymbol_Impl(symbol) >= maxPositions) {
-      result.canTrade = false;
-      result.reason   = "حداکثر پوزیشن‌ها پر شده";
-      return result;
-   }
-
-   // بررسی ضرر روزانه
-   double todayPnL  = CalculateTodayPnL_Impl();
-   double balance   = AccountInfoDouble(ACCOUNT_BALANCE);
-   if(balance > 0 && (todayPnL / balance * 100) < -dailyLossLimit) {
-      result.canTrade = false;
-      result.reason   = "محدودیت ضرر روزانه";
-      return result;
-   }
-
-   result.canTrade       = true;
-   result.recommendedLot = lot;
-   result.maxLot         = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-   result.reason         = StringFormat("لات: %.2f ریسک: %.1f%% SL: %.0f پیپ", lot, riskPercent, slPoints);
-   return result;
-}
-
-void UpdateTrailingStop_Impl(ulong ticket, string symbol, double trailPoints) {
-   if(!PositionSelectByTicket(ticket)) return;
-   ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-   double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-   double currentSL = PositionGetDouble(POSITION_SL);
-   double point     = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double bid       = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask       = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double trailDist = trailPoints * point;
-   double newSL;
-   CTrade trade;
-
-   if(posType == POSITION_TYPE_BUY) {
-      newSL = bid - trailDist;
-      if(newSL > currentSL + point) trade.PositionModify(ticket, newSL, PositionGetDouble(POSITION_TP));
-   } else {
-      newSL = ask + trailDist;
-      if(newSL < currentSL - point || currentSL == 0) trade.PositionModify(ticket, newSL, PositionGetDouble(POSITION_TP));
-   }
-}
-
-void UpdateBreakEven_Impl(ulong ticket, string symbol, double bePoints) {
-   if(!PositionSelectByTicket(ticket)) return;
-   ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-   double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-   double currentSL = PositionGetDouble(POSITION_SL);
-   double point     = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double bid       = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask       = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double beDist    = bePoints * point;
-   CTrade trade;
-
-   if(posType == POSITION_TYPE_BUY) {
-      if(bid >= openPrice + beDist && currentSL < openPrice) {
-         trade.PositionModify(ticket, openPrice + point, PositionGetDouble(POSITION_TP));
+         double risk_money = (sl_dist / point) * tick_val * vol;
+         total_risk += risk_money;
       }
-   } else {
-      if(ask <= openPrice - beDist && (currentSL > openPrice || currentSL == 0)) {
-         trade.PositionModify(ticket, openPrice - point, PositionGetDouble(POSITION_TP));
-      }
+
+      return NormalizeDouble((total_risk / account_equity) * 100.0, 2);
    }
-}
 
-string GetRiskReport_Impl() {
-   double balance   = AccountInfoDouble(ACCOUNT_BALANCE);
-   double equity    = AccountInfoDouble(ACCOUNT_EQUITY);
-   double drawdown  = CalculateCurrentDrawdown_Impl();
-   double todayPnL  = CalculateTodayPnL_Impl();
-   int    positions = PositionsTotal();
-   int    todayDeals= CountTodayDeals_Impl();
+   //+----------------------------------------------------------------+
+   //| گزارش وضعیت ریسک جاری                                        |
+   //+----------------------------------------------------------------+
+   string GetRiskStatusReport() {
+      double equity      = AccountInfoDouble(ACCOUNT_EQUITY);
+      double balance     = AccountInfoDouble(ACCOUNT_BALANCE);
+      double drawdown    = (balance > 0) ? ((balance - equity) / balance * 100.0) : 0;
+      double port_risk   = GetPortfolioRiskPercent();
+      int    pos_count   = PositionsTotal();
 
-   return StringFormat(
-      "=== گزارش ریسک ===\n"
-      "موجودی: %.2f | اکویتی: %.2f\n"
-      "درافداون: %.2f%% | سود/ضرر امروز: %.2f\n"
-      "پوزیشن‌های باز: %d | معاملات امروز: %d\n"
-      "مارجین آزاد: %.2f",
-      balance, equity, drawdown, todayPnL,
-      positions, todayDeals,
-      AccountInfoDouble(ACCOUNT_MARGIN_FREE)
-   );
-}
+      string report = StringFormat(
+         "📊 وضعیت ریسک:\n"
+         "  موجودی: %.2f\n"
+         "  اکوئیتی: %.2f\n"
+         "  افت سرمایه: %.2f%%\n"
+         "  ریسک سبد: %.2f%%\n"
+         "  پوزیشن‌های باز: %d",
+         balance, equity, drawdown, port_risk, pos_count
+      );
+
+      return report;
+   }
+};
+
+#endif // RISK_MANAGER_COMPLETE_MQH
