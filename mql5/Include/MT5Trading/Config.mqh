@@ -1,172 +1,191 @@
 //+------------------------------------------------------------------+
-//|                                                    Config.mqh     |
-//|                                    MT5 Trading System             |
-//|                                    پیکربندی اصلی سیستم           |
+//|                                                    Config.mqh      |
+//|                         سیستم معامله‌گری حرفه‌ای MT5               |
+//|                                                                    |
+//| توضیح فارسی:                                                       |
+//| این فایل شامل تمام تنظیمات قابل تغییر سیستم معامله‌گری است.        |
+//| تمام پارامترها از اینجا خوانده می‌شوند و قابل تنظیم هستند.         |
+//| هر گروه از تنظیمات با توضیح فارسی مشخص شده است.                   |
 //+------------------------------------------------------------------+
 #property strict
 
-//+
-// تنظیمات عمومی
-//+
-input string   __GENERAL__ = "=== تنظیمات عمومی ===";
-input string   MagicNumber = "123456";        // شماره مجیک
-input int      MaxSpread = 30;                // حداکثر اسپرد مجاز (پوینت)
-input int      Slippage = 3;                  // حداکثر اسلیپیج
-input bool     UseTimeFilter = true;          // استفاده از فیلتر زمانی
+//+------------------------------------------------------------------+
+//| ===== تنظیمات اصلی ربات =====                                      |
+//+------------------------------------------------------------------+
+input string   RobotName         = "MT5TradingSystem";  // نام ربات
+input int      MagicNumber        = 20240101;            // شماره جادویی
+input bool     RobotEnabled       = true;                // ربات فعال باشد
+input bool     TradeEnabled       = true;                // معامله فعال باشد
 
-//+
-// تنظیمات مدیریت سرمایه
-//+
-input string   __RISK__ = "=== مدیریت سرمایه ===";
-input double   RiskPercent = 1.0;             // ریسک هر معامله (%)
-input double   FixedLot = 0.0;                 // لات ثابت (0 = خودکار)
-input double   MinLot = 0.01;                  // حداقل لات
-input double   MaxLot = 5.0;                   // حداکثر لات
-input int      MaxDailyTrades = 5;             // حداکثر معاملات روزانه
-input int      MaxOpenTrades = 3;              // حداکثر معاملات همزمان
+//+------------------------------------------------------------------+
+//| ===== تنظیمات نماد =====                                           |
+//+------------------------------------------------------------------+
+input string   AllowedSymbol      = "XAUUSD";            // نماد مجاز (خالی = نماد فعال)
+input bool     UseCurrentSymbol   = true;                // از نماد فعال چارت استفاده کن
 
-//+
-// تنظیمات حد ضرر و سود
-//+
-input string   __SLTP__ = "=== حد ضرر و سود ===";
-input int      DefaultSL = 500;               // حد ضرر پیش‌فرض (پوینت)
-input int      DefaultTP = 1000;               // حد سود پیش‌فرض (پوینت)
-input int      MinSL = 100;                    // حداقل حد ضرر (پوینت)
-input int      MaxSL = 2000;                   // حداکثر حد ضرر (پوینت)
-input bool     UseDynamicSLTP = true;          // استفاده از SL/TP داینامیک
+//+------------------------------------------------------------------+
+//| ===== تنظیمات مدیریت ریسک =====                                   |
+//+------------------------------------------------------------------+
+input double   RiskPercent        = 1.0;                 // درصد ریسک هر معامله
+input double   FixedLot           = 0.0;                 // لات ثابت (0 = محاسبه اتوماتیک)
+input double   MinLot             = 0.01;                // حداقل لات
+input double   MaxLot             = 10.0;                // حداکثر لات
+input bool     UseEquityForRisk   = false;               // استفاده از اکوئیتی برای ریسک
+input double   MaxDailyLossPercent = 5.0;                // حداکثر ضرر روزانه (%)
+input double   MaxDrawdownPercent = 10.0;                // حداکثر drawdown (%)
+input int      MaxOpenTrades      = 3;                   // حداکثر معاملات باز
+input int      MaxDailyTrades     = 10;                  // حداکثر معاملات روزانه
+input int      MaxSpread          = 30;                  // حداکثر اسپرد مجاز (پوینت)
 
-//+
-// تنظیمات مدیریت پوزیشن
-//+
-input string   __POSITION__ = "=== مدیریت پوزیشن ===";
-input int      TrailingStop = 200;            // فاصله تریلینگ استاپ (پوینت)
-input int      TrailingStep = 20;             // گام تریلینگ استاپ (پوینت)
-input int      BreakEvenTrigger = 150;       // تریگر انتقال به BE (پوینت)
-input int      BreakEvenOffset = 10;          // آفست BE از قیمت ورود (پوینت)
-input double   PartialCloseRR = 2.0;          // R:R تریگر بستن جزئی
-input double   PartialClosePercent = 50.0;    // درصد بستن جزئی
+//+------------------------------------------------------------------+
+//| ===== تنظیمات SL/TP =====                                         |
+//+------------------------------------------------------------------+
+input double   DefaultRR          = 2.0;                 // نسبت پیش‌فرض سود به ریسک
+input double   ATRMultiplierSL    = 1.5;                 // ضریب ATR برای StopLoss
+input double   ATRMultiplierTP    = 3.0;                 // ضریب ATR برای TakeProfit
+input int      ATRPeriod          = 14;                  // دوره ATR
+input double   MinRR              = 1.5;                 // حداقل نسبت سود به ریسک
 
-//+
-// تنظیمات زمانی (Kill Zones)
-//+
-input string   __TIME__ = "=== Kill Zones (UTC) ===";
-input bool     UseLondonKZ = true;             // استفاده از Kill Zone لندن
-input int      LondonStart = 8;                // شروع لندن (UTC)
-input int      LondonEnd = 11;                 // پایان لندن (UTC)
-input bool     UseNYKZ = true;                  // استفاده از Kill Zone نیویورک
-input int      NYStart = 13;                    // شروع نیویورک (UTC)
-input int      NYEnd = 16;                      // پایان نیویورک (UTC)
-input bool     UseTokyoKZ = true;               // استفاده از Kill Zone توکیو
-input int      TokyoStart = 0;                  // شروع توکیو (UTC)
-input int      TokyoEnd = 3;                    // پایان توکیو (UTC)
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Trailing Stop و Break Even =====                    |
+//+------------------------------------------------------------------+
+input bool     UseTrailingStop    = true;                // استفاده از Trailing Stop
+input double   TrailingPoints     = 200;                 // فاصله Trailing Stop (پوینت)
+input double   TrailingStep       = 50;                  // گام جابجایی Trailing (پوینت)
+input bool     UseBreakEven       = true;                // استفاده از Break Even
+input double   BreakEvenTrigger   = 100;                 // فعال شدن BE بعد از (پوینت)
+input double   BreakEvenOffset    = 5;                   // بافر Break Even (پوینت)
 
-//+
-// تنظیمات SMC
-//+
-input string   __SMC__ = "=== تنظیمات SMC ===";
-input bool     EnableSMC = true;               // فعال‌سازی تحلیل SMC
-input bool     RequireBOS = true;              // نیاز به BOS برای ورود
-input bool     RequireCHOCH = false;           // نیاز به CHOCH برای ورود
-input int      SwingLookback = 50;             // بازه جستجوی سویینگ
-input double   OBThreshold = 0.1;              // آستانه تشخیص Order Block
-input int      FVGMinSize = 10;                // حداقل اندازه FVG (پوینت)
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Smart Money Concept =====                            |
+//+------------------------------------------------------------------+
+input bool     SMCEnabled         = true;                // SMC فعال باشد
+input bool     DetectBOS          = true;                // تشخیص Break of Structure
+input bool     DetectCHOCH        = true;                // تشخیص Change of Character
+input bool     DetectOrderBlocks  = true;                // تشخیص Order Block
+input bool     DetectFVG          = true;                // تشخیص Fair Value Gap
+input bool     DetectLiquidity    = true;                // تشخیص نقدینگی
+input bool     DetectKillZones    = true;                // تشخیص Kill Zones
+input int      SMCLookback        = 100;                 // تعداد کندل برای بررسی SMC
+input double   MinSMCScore        = 60.0;                // حداقل امتیاز SMC برای ورود
+input bool     SMCMultiTimeframe  = true;                // بررسی چند تایم‌فریم
 
-//+
-// تنظیمات Price Action
-//+
-input string   __PA__ = "=== تنظیمات Price Action ===";
-input bool     EnablePA = true;               // فعال‌سازی تحلیل Price Action
-input bool     RequirePinBar = false;          // نیاز به Pin Bar
-input bool     RequireEngulfing = true;        // نیاز به Engulfing
-input bool     RequireInsideBar = false;       // نیاز به Inside Bar
-input double   PinBarBodyRatio = 0.3;          // نسبت بدنه Pin Bar
-input double   EngulfingMinRatio = 1.5;        // حداقل نسبت Engulfing
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Price Action =====                                   |
+//+------------------------------------------------------------------+
+input bool     PAEnabled          = true;                // Price Action فعال باشد
+input bool     DetectPinBar       = true;                // تشخیص Pin Bar
+input bool     DetectEngulfing    = true;                // تشخیص Engulfing
+input bool     DetectFakey        = true;                // تشخیص Fakey
+input bool     DetectInsideBar    = true;                // تشخیص Inside Bar
+input double   MinPAScore         = 50.0;                // حداقل امتیاز PA برای ورود
+input int      PALookback         = 50;                  // تعداد کندل برای بررسی PA
 
-//+
-// تنظیمات امتیازدهی
-//+
-input string   __SCORING__ = "=== سیستم امتیازدهی ===";
-input int      MinEntryScore = 65;             // حداقل امتیاز ورود (0-100)
-input int      StrongSignalScore = 80;         // امتیاز سیگنال قوی
-input int      WeakSignalScore = 50;           // امتیاز سیگنال ضعیف
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Decision Engine =====                                |
+//+------------------------------------------------------------------+
+input double   MinTotalScore      = 65.0;                // حداقل امتیاز کل برای ورود
+input double   WeightSMC          = 0.35;                // وزن امتیاز SMC
+input double   WeightMTF          = 0.25;                // وزن همسویی تایم‌فریم
+input double   WeightPA           = 0.20;                // وزن امتیاز Price Action
+input double   WeightRisk         = 0.10;                // وزن ریسک
+input double   WeightSession      = 0.10;                // وزن سشن
 
-//+
-// تنظیمات اتصال به API
-//+
-input string   __API__ = "=== تنظیمات API ===";
-input string   ApiBaseUrl = "http://localhost:8000/api";  // آدرس API
-input int      ApiTimeout = 5000;              // تایم‌اوت API (میلی‌ثانیه)
-input bool     EnableTelegram = true;          // فعال‌سازی اعلان‌های تلگرام
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Multi-Timeframe =====                               |
+//+------------------------------------------------------------------+
+input ENUM_TIMEFRAMES HTF_Period  = PERIOD_H4;           // تایم‌فریم بالا (HTF)
+input ENUM_TIMEFRAMES MTF_Period  = PERIOD_H1;           // تایم‌فریم میانی (MTF)
+input ENUM_TIMEFRAMES LTF_Period  = PERIOD_M15;          // تایم‌فریم پایین (LTF)
+input bool     RequireHTFAlign    = true;                // الزام همسویی HTF
+input bool     RequireMTFAlign    = true;                // الزام همسویی MTF
 
-//+
-// تنظیمات لاگ
-//+
-input string   __LOG__ = "=== تنظیمات لاگ ===";
-input bool     EnableLogging = true;           // فعال‌سازی لاگ
-input bool     LogToEmail = false;              // ارسال لاگ به ایمیل
-input bool     LogToFile = true;                // ذخیره لاگ در فایل
+//+------------------------------------------------------------------+
+//| ===== تنظیمات فیلتر زمانی و سشن =====                            |
+//+------------------------------------------------------------------+
+input bool     UseTimeFilter      = true;                // فیلتر زمانی فعال باشد
+input bool     TradeAsianSession  = false;               // معامله در سشن آسیا
+input bool     TradeLondonSession = true;                // معامله در سشن لندن
+input bool     TradeNYSession     = true;                // معامله در سشن نیویورک
+input int      LondonOpenHour     = 8;                   // ساعت باز شدن لندن (UTC)
+input int      LondonCloseHour    = 17;                  // ساعت بسته شدن لندن (UTC)
+input int      NYOpenHour         = 13;                  // ساعت باز شدن نیویورک (UTC)
+input int      NYCloseHour        = 22;                  // ساعت بسته شدن نیویورک (UTC)
+input int      AsianOpenHour      = 23;                  // ساعت باز شدن آسیا (UTC)
+input int      AsianCloseHour     = 8;                   // ساعت بسته شدن آسیا (UTC)
 
-//+
-// ثابت‌های سیستم
-//+
-#define VERSION "1.0.0"
-#define AUTHOR "MT5 Trading Team"
+//+------------------------------------------------------------------+
+//| ===== تنظیمات Kill Zones =====                                     |
+//+------------------------------------------------------------------+
+input bool     TradeLondonKZ      = true;                // معامله در London Kill Zone
+input bool     TradeNYKZ          = true;                // معامله در NY Kill Zone
+input bool     TradeLondonCloseKZ = false;               // معامله در London Close KZ
+input int      LKZ_StartHour      = 8;                   // شروع London KZ
+input int      LKZ_EndHour        = 10;                  // پایان London KZ
+input int      NYKZ_StartHour     = 13;                  // شروع NY KZ
+input int      NYKZ_EndHour       = 15;                  // پایان NY KZ
 
-//+
-// تایم‌فریم‌های پشتیبانی
-//+
-enum ENUM_TIMEFRAME_SUPPORT {
-   TF_M1 = 1,
-   TF_M5 = 5,
-   TF_M15 = 15,
-   TF_M30 = 30,
-   TF_H1 = 60,
-   TF_H4 = 240,
-   TF_D1 = 1440,
-   TF_W1 = 10080
-};
+//+------------------------------------------------------------------+
+//| ===== تنظیمات تلگرام =====                                         |
+//+------------------------------------------------------------------+
+input bool     TelegramEnabled    = false;               // تلگرام فعال باشد
+input string   TelegramToken      = "";                  // توکن ربات تلگرام
+input string   TelegramChatId     = "";                  // شناسه چت تلگرام
+input bool     NotifyOnEntry      = true;                // اعلام ورود
+input bool     NotifyOnExit       = true;                // اعلام خروج
+input bool     NotifyOnSL         = true;                // اعلام StopLoss
+input bool     NotifyOnTP         = true;                // اعلام TakeProfit
+input bool     NotifyOnSession    = true;                // اعلام سشن
+input bool     SendDailyReports   = true;                // ارسال گزارش روزانه
+input int      DailyReportHour    = 22;                  // ساعت گزارش روزانه
 
-//+
-// ساختارهای داده
-//+
+//+------------------------------------------------------------------+
+//| ===== تنظیمات رسم روی چارت =====                                  |
+//+------------------------------------------------------------------+
+input bool     DrawEnabled        = true;                // رسم روی چارت فعال باشد
+input bool     DrawOrderBlocks    = true;                // رسم Order Block
+input bool     DrawFVG            = true;                // رسم Fair Value Gap
+input bool     DrawBOSCHOCH       = true;                // رسم BOS/CHOCH
+input bool     DrawLiquidity      = true;                // رسم سطوح نقدینگی
+input bool     DrawKillZones      = true;                // رسم Kill Zones
+input bool     DrawEntryArrows    = true;                // رسم فلش‌های ورود
+input color    ColorBullish       = clrLime;             // رنگ صعودی
+input color    ColorBearish       = clrRed;              // رنگ نزولی
+input color    ColorNeutral       = clrGray;             // رنگ خنثی
+input color    ColorFVG           = clrCyan;             // رنگ FVG
+input color    ColorKillZone      = clrYellow;           // رنگ Kill Zone
+input int      LabelFontSize      = 8;                   // اندازه فونت برچسب‌ها
 
-// ساختار تحلیل SMC
-struct SMCData {
-   bool hasBOS;
-   bool hasCHOCH;
-   bool hasMSS;
-   string trendDirection;
-   bool hasOrderBlock;
-   string obType;
-   double obHigh;
-   double obLow;
-   bool hasFVG;
-   double fvgHigh;
-   double fvgLow;
-   int smcScore;
-};
+//+------------------------------------------------------------------+
+//| ===== تنظیمات لایسنس =====                                        |
+//+------------------------------------------------------------------+
+input string   LicenseKey         = "";                  // کلید لایسنس
+input string   LicenseServer      = "https://api.yourserver.com"; // سرور لایسنس
+input bool     CheckLicenseOnline = true;                // بررسی آنلاین لایسنس
 
-// ساختارPrice Action
-struct PAData {
-   bool hasPinBar;
-   bool hasEngulfing;
-   bool hasInsideBar;
-   bool hasFakey;
-   string patternBias;
-   int paScore;
-};
+//+------------------------------------------------------------------+
+//| ===== تنظیمات API =====                                           |
+//+------------------------------------------------------------------+
+input string   APIBaseURL         = "http://localhost:8000"; // آدرس API
+input string   APIKey             = "";                  // کلید API
+input bool     APIEnabled         = false;               // API فعال باشد
+input int      APITimeoutMs       = 5000;                // timeout درخواست (میلی‌ثانیه)
 
-// ساختار سیگنال
-struct TradeSignal {
-   string symbol;
-   string direction;
-   double entryPrice;
-   double stopLoss;
-   double takeProfit;
-   double volume;
-   int totalScore;
-   bool entryAllowed;
-   string reason;
-   datetime validUntil;
-};
+//+------------------------------------------------------------------+
+//| ===== تنظیمات لاگ =====                                           |
+//+------------------------------------------------------------------+
+input bool     LogEnabled         = true;                // لاگ فعال باشد
+input bool     LogToFile          = true;                // لاگ به فایل
+input string   LogFileName        = "MT5Trading.log";    // نام فایل لاگ
+input bool     LogDebug           = false;               // لاگ دیباگ
+
+//+------------------------------------------------------------------+
+//| ===== تنظیمات اطلاعات روی چارت =====                              |
+//+------------------------------------------------------------------+
+input bool     ShowDashboard      = true;                // نمایش داشبورد روی چارت
+input bool     ShowScore          = true;                // نمایش امتیاز
+input bool     ShowRiskInfo       = true;                // نمایش اطلاعات ریسک
+input bool     ShowSessionInfo    = true;                // نمایش اطلاعات سشن
+input int      DashboardX         = 10;                  // موقعیت افقی داشبورد
+input int      DashboardY         = 30;                  // موقعیت عمودی داشبورد
 //+------------------------------------------------------------------+
