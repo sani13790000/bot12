@@ -1,12 +1,12 @@
 """
-اتصال به دیتابیس Supabase — نسخه تکمیل شده فاز ۱
+Ø§ØªØµØ§Ù Ø¨Ù Ø¯ÛØªØ§Ø¨ÛØ³ Supabase â ÙØ³Ø®Ù ØªÚ©ÙÛÙ Ø´Ø¯Ù ÙØ§Ø² Û±
 
-تغییرات فاز ۱:
-- اضافه شدن Connection Pool با asyncpg
-- اضافه شدن Retry with exponential backoff
-- اضافه شدن health_check و reconnect خودکار
-- اضافه شدن connection_status و metrics
-- اضافه شدن thread-safe Singleton با Lock
+ØªØºÛÛØ±Ø§Øª ÙØ§Ø² Û±:
+- Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù Connection Pool Ø¨Ø§ asyncpg
+- Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù Retry with exponential backoff
+- Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù health_check Ù reconnect Ø®ÙØ¯Ú©Ø§Ø±
+- Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù connection_status Ù metrics
+- Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù thread-safe Singleton Ø¨Ø§ Lock
 """
 
 from typing import Optional, Dict, Any, List
@@ -24,42 +24,42 @@ from ..core.exceptions import DatabaseError, RecordNotFoundError
 logger = get_logger("database")
 
 
-# ═══════════════════════════════════════════════════════════
-# تنظیمات Connection Pool و Retry
-# ═══════════════════════════════════════════════════════════
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# ØªÙØ¸ÛÙØ§Øª Connection Pool Ù Retry
+# âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-# تعداد دفعات retry پس از قطع اتصال
+# ØªØ¹Ø¯Ø§Ø¯ Ø¯ÙØ¹Ø§Øª retry Ù¾Ø³ Ø§Ø² ÙØ·Ø¹ Ø§ØªØµØ§Ù
 DB_MAX_RETRIES = 3
 
-# تأخیر پایه بین هر retry (ثانیه) — exponential backoff
+# ØªØ£Ø®ÛØ± Ù¾Ø§ÛÙ Ø¨ÛÙ ÙØ± retry (Ø«Ø§ÙÛÙ) â exponential backoff
 DB_RETRY_BASE_DELAY = 1.0
 
-# حداکثر تأخیر بین retries (ثانیه)
+# Ø­Ø¯Ø§Ú©Ø«Ø± ØªØ£Ø®ÛØ± Ø¨ÛÙ retries (Ø«Ø§ÙÛÙ)
 DB_RETRY_MAX_DELAY = 30.0
 
-# فاصله زمانی health check (ثانیه)
+# ÙØ§ØµÙÙ Ø²ÙØ§ÙÛ health check (Ø«Ø§ÙÛÙ)
 DB_HEALTH_CHECK_INTERVAL = 60
 
 
 class ConnectionMetrics:
     """
-    متریک‌های اتصال دیتابیس برای مانیتورینگ
+    ÙØªØ±ÛÚ©âÙØ§Û Ø§ØªØµØ§Ù Ø¯ÛØªØ§Ø¨ÛØ³ Ø¨Ø±Ø§Û ÙØ§ÙÛØªÙØ±ÛÙÚ¯
 
-    تمام آمار اتصال اینجا نگهداری می‌شود
+    ØªÙØ§Ù Ø¢ÙØ§Ø± Ø§ØªØµØ§Ù Ø§ÛÙØ¬Ø§ ÙÚ¯ÙØ¯Ø§Ø±Û ÙÛâØ´ÙØ¯
     """
 
     def __init__(self):
-        self.total_queries: int = 0          # تعداد کل کوئری‌ها
-        self.failed_queries: int = 0          # تعداد کوئری‌های ناموفق
-        self.total_retries: int = 0           # تعداد کل retryها
-        self.last_error: Optional[str] = None # آخرین خطا
-        self.last_error_time: Optional[datetime] = None  # زمان آخرین خطا
-        self.connected_at: Optional[datetime] = None     # زمان اتصال
-        self.reconnect_count: int = 0         # تعداد اتصال مجدد
+        self.total_queries: int = 0          # ØªØ¹Ø¯Ø§Ø¯ Ú©Ù Ú©ÙØ¦Ø±ÛâÙØ§
+        self.failed_queries: int = 0          # ØªØ¹Ø¯Ø§Ø¯ Ú©ÙØ¦Ø±ÛâÙØ§Û ÙØ§ÙÙÙÙ
+        self.total_retries: int = 0           # ØªØ¹Ø¯Ø§Ø¯ Ú©Ù retryÙØ§
+        self.last_error: Optional[str] = None # Ø¢Ø®Ø±ÛÙ Ø®Ø·Ø§
+        self.last_error_time: Optional[datetime] = None  # Ø²ÙØ§Ù Ø¢Ø®Ø±ÛÙ Ø®Ø·Ø§
+        self.connected_at: Optional[datetime] = None     # Ø²ÙØ§Ù Ø§ØªØµØ§Ù
+        self.reconnect_count: int = 0         # ØªØ¹Ø¯Ø§Ø¯ Ø§ØªØµØ§Ù ÙØ¬Ø¯Ø¯
         self._lock = threading.Lock()
 
     def record_query(self, success: bool, error: Optional[str] = None):
-        """ثبت نتیجه یک کوئری"""
+        """Ø«Ø¨Øª ÙØªÛØ¬Ù ÛÚ© Ú©ÙØ¦Ø±Û"""
         with self._lock:
             self.total_queries += 1
             if not success:
@@ -68,18 +68,18 @@ class ConnectionMetrics:
                 self.last_error_time = datetime.utcnow()
 
     def record_retry(self):
-        """ثبت یک retry"""
+        """Ø«Ø¨Øª ÛÚ© retry"""
         with self._lock:
             self.total_retries += 1
 
     def record_reconnect(self):
-        """ثبت اتصال مجدد"""
+        """Ø«Ø¨Øª Ø§ØªØµØ§Ù ÙØ¬Ø¯Ø¯"""
         with self._lock:
             self.reconnect_count += 1
             self.connected_at = datetime.utcnow()
 
     def to_dict(self) -> Dict[str, Any]:
-        """تبدیل به دیکشنری برای گزارش"""
+        """ØªØ¨Ø¯ÛÙ Ø¨Ù Ø¯ÛÚ©Ø´ÙØ±Û Ø¨Ø±Ø§Û Ú¯Ø²Ø§Ø±Ø´"""
         with self._lock:
             success_rate = (
                 (self.total_queries - self.failed_queries) / self.total_queries * 100
@@ -99,14 +99,14 @@ class ConnectionMetrics:
 
 class SupabaseManager:
     """
-    مدیر Supabase — با Connection Pool و Retry
+    ÙØ¯ÛØ± Supabase â Ø¨Ø§ Connection Pool Ù Retry
 
-    ویژگی‌های اضافه شده در فاز ۱:
-    - Thread-safe Singleton با Lock
-    - Retry با exponential backoff برای تمام عملیات
-    - Health check خودکار در پس‌زمینه
-    - Reconnect خودکار پس از قطع اتصال
-    - متریک‌های کامل برای مانیتورینگ
+    ÙÛÚÚ¯ÛâÙØ§Û Ø§Ø¶Ø§ÙÙ Ø´Ø¯Ù Ø¯Ø± ÙØ§Ø² Û±:
+    - Thread-safe Singleton Ø¨Ø§ Lock
+    - Retry Ø¨Ø§ exponential backoff Ø¨Ø±Ø§Û ØªÙØ§Ù Ø¹ÙÙÛØ§Øª
+    - Health check Ø®ÙØ¯Ú©Ø§Ø± Ø¯Ø± Ù¾Ø³âØ²ÙÛÙÙ
+    - Reconnect Ø®ÙØ¯Ú©Ø§Ø± Ù¾Ø³ Ø§Ø² ÙØ·Ø¹ Ø§ØªØµØ§Ù
+    - ÙØªØ±ÛÚ©âÙØ§Û Ú©Ø§ÙÙ Ø¨Ø±Ø§Û ÙØ§ÙÛØªÙØ±ÛÙÚ¯
     """
 
     _instance: Optional["SupabaseManager"] = None
@@ -116,14 +116,14 @@ class SupabaseManager:
     _init_done: bool = False
 
     def __new__(cls):
-        """پیاده‌سازی Thread-safe Singleton"""
+        """Ù¾ÛØ§Ø¯ÙâØ³Ø§Ø²Û Thread-safe Singleton"""
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        """مقداردهی اولیه — فقط یک‌بار اجرا می‌شود"""
+        """ÙÙØ¯Ø§Ø±Ø¯ÙÛ Ø§ÙÙÛÙ â ÙÙØ· ÛÚ©âØ¨Ø§Ø± Ø§Ø¬Ø±Ø§ ÙÛâØ´ÙØ¯"""
         if self._init_done:
             return
         with self._lock:
@@ -137,73 +137,73 @@ class SupabaseManager:
 
     def _connect(self) -> None:
         """
-        برقراری اتصال به Supabase با Retry
+        Ø¨Ø±ÙØ±Ø§Ø±Û Ø§ØªØµØ§Ù Ø¨Ù Supabase Ø¨Ø§ Retry
 
-        در صورت خطا تا DB_MAX_RETRIES بار تلاش می‌کند
-        با exponential backoff بین هر تلاش
+        Ø¯Ø± ØµÙØ±Øª Ø®Ø·Ø§ ØªØ§ DB_MAX_RETRIES Ø¨Ø§Ø± ØªÙØ§Ø´ ÙÛâÚ©ÙØ¯
+        Ø¨Ø§ exponential backoff Ø¨ÛÙ ÙØ± ØªÙØ§Ø´
         """
         last_error = None
         for attempt in range(1, DB_MAX_RETRIES + 1):
             try:
-                # کلاینت عادی با RLS
+                # Ú©ÙØ§ÛÙØª Ø¹Ø§Ø¯Û Ø¨Ø§ RLS
                 self._client = create_client(
                     settings.SUPABASE_URL,
                     settings.SUPABASE_ANON_KEY
                 )
-                # کلاینت ادمین بدون RLS
+                # Ú©ÙØ§ÛÙØª Ø§Ø¯ÙÛÙ Ø¨Ø¯ÙÙ RLS
                 self._admin_client = create_client(
                     settings.SUPABASE_URL,
                     settings.SUPABASE_SERVICE_ROLE_KEY
                 )
                 self._is_healthy = True
                 self.metrics.record_reconnect()
-                logger.info(f"✅ اتصال به Supabase برقرار شد (تلاش {attempt})")
+                logger.info(f"â Ø§ØªØµØ§Ù Ø¨Ù Supabase Ø¨Ø±ÙØ±Ø§Ø± Ø´Ø¯ (ØªÙØ§Ø´ {attempt})")
                 return
 
             except Exception as e:
                 last_error = e
                 self.metrics.record_retry()
                 delay = min(DB_RETRY_BASE_DELAY * (2 ** (attempt - 1)), DB_RETRY_MAX_DELAY)
-                logger.warning(f"⚠️ تلاش {attempt}/{DB_MAX_RETRIES} ناموفق: {e} — صبر {delay:.1f}s")
+                logger.warning(f"â ï¸ ØªÙØ§Ø´ {attempt}/{DB_MAX_RETRIES} ÙØ§ÙÙÙÙ: {e} â ØµØ¨Ø± {delay:.1f}s")
                 if attempt < DB_MAX_RETRIES:
                     time_module.sleep(delay)
 
         self._is_healthy = False
-        logger.error(f"❌ اتصال به Supabase ناموفق پس از {DB_MAX_RETRIES} تلاش")
-        raise DatabaseError(f"خطای اتصال به دیتابیس پس از {DB_MAX_RETRIES} تلاش: {last_error}")
+        logger.error(f"â Ø§ØªØµØ§Ù Ø¨Ù Supabase ÙØ§ÙÙÙÙ Ù¾Ø³ Ø§Ø² {DB_MAX_RETRIES} ØªÙØ§Ø´")
+        raise DatabaseError(f"Ø®Ø·Ø§Û Ø§ØªØµØ§Ù Ø¨Ù Ø¯ÛØªØ§Ø¨ÛØ³ Ù¾Ø³ Ø§Ø² {DB_MAX_RETRIES} ØªÙØ§Ø´: {last_error}")
 
     def _reconnect_if_needed(self) -> None:
         """
-        بررسی سلامت اتصال و reconnect در صورت نیاز
+        Ø¨Ø±Ø±Ø³Û Ø³ÙØ§ÙØª Ø§ØªØµØ§Ù Ù reconnect Ø¯Ø± ØµÙØ±Øª ÙÛØ§Ø²
 
-        هر DB_HEALTH_CHECK_INTERVAL ثانیه یک‌بار اجرا می‌شود
+        ÙØ± DB_HEALTH_CHECK_INTERVAL Ø«Ø§ÙÛÙ ÛÚ©âØ¨Ø§Ø± Ø§Ø¬Ø±Ø§ ÙÛâØ´ÙØ¯
         """
         now = time_module.time()
         if now - self._last_health_check < DB_HEALTH_CHECK_INTERVAL:
             return
         self._last_health_check = now
         try:
-            # یک کوئری ساده برای تست اتصال
+            # ÛÚ© Ú©ÙØ¦Ø±Û Ø³Ø§Ø¯Ù Ø¨Ø±Ø§Û ØªØ³Øª Ø§ØªØµØ§Ù
             self._client.table("_health").select("*").limit(1).execute()
             self._is_healthy = True
         except Exception:
-            logger.warning("⚠️ اتصال Supabase قطع شده — reconnect...")
+            logger.warning("â ï¸ Ø§ØªØµØ§Ù Supabase ÙØ·Ø¹ Ø´Ø¯Ù â reconnect...")
             self._is_healthy = False
             try:
                 self._connect()
             except Exception as e:
-                logger.error(f"❌ reconnect ناموفق: {e}")
+                logger.error(f"â reconnect ÙØ§ÙÙÙÙ: {e}")
 
     def _execute_with_retry(self, operation, op_name: str = "query"):
         """
-        اجرای یک عملیات دیتابیس با retry خودکار
+        Ø§Ø¬Ø±Ø§Û ÛÚ© Ø¹ÙÙÛØ§Øª Ø¯ÛØªØ§Ø¨ÛØ³ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±
 
-        پارامترها:
-            operation: تابع lambda که عملیات را انجام می‌دهد
-            op_name: نام عملیات برای لاگ
+        Ù¾Ø§Ø±Ø§ÙØªØ±ÙØ§:
+            operation: ØªØ§Ø¨Ø¹ lambda Ú©Ù Ø¹ÙÙÛØ§Øª Ø±Ø§ Ø§ÙØ¬Ø§Ù ÙÛâØ¯ÙØ¯
+            op_name: ÙØ§Ù Ø¹ÙÙÛØ§Øª Ø¨Ø±Ø§Û ÙØ§Ú¯
 
-        خروجی:
-            نتیجه عملیات
+        Ø®Ø±ÙØ¬Û:
+            ÙØªÛØ¬Ù Ø¹ÙÙÛØ§Øª
         """
         self._reconnect_if_needed()
         last_error = None
@@ -219,7 +219,7 @@ class SupabaseManager:
                 self.metrics.record_query(success=False, error=str(e))
                 self.metrics.record_retry()
 
-                # اگر خطای اتصال است، reconnect کن
+                # Ø§Ú¯Ø± Ø®Ø·Ø§Û Ø§ØªØµØ§Ù Ø§Ø³ØªØ reconnect Ú©Ù
                 error_str = str(e).lower()
                 is_connection_error = any(
                     kw in error_str for kw in
@@ -227,48 +227,51 @@ class SupabaseManager:
                 )
 
                 if is_connection_error and attempt < DB_MAX_RETRIES:
-                    logger.warning(f"⚠️ خطای اتصال در {op_name} (تلاش {attempt}): {e}")
+                    logger.warning(f"â ï¸ Ø®Ø·Ø§Û Ø§ØªØµØ§Ù Ø¯Ø± {op_name} (ØªÙØ§Ø´ {attempt}): {e}")
                     self._is_healthy = False
                     try:
                         self._connect()
-                    except Exception:
-                        pass
+                    except Exception as reconnect_err:
+                        logger.error(
+                            f"⚠️ reconnect در حین retry ناموفق: {reconnect_err}",
+                            exc_info=True,
+                        )
                     delay = min(DB_RETRY_BASE_DELAY * (2 ** (attempt - 1)), DB_RETRY_MAX_DELAY)
                     time_module.sleep(delay)
                 elif attempt < DB_MAX_RETRIES:
-                    logger.warning(f"⚠️ خطا در {op_name} (تلاش {attempt}): {e}")
+                    logger.warning(f"â ï¸ Ø®Ø·Ø§ Ø¯Ø± {op_name} (ØªÙØ§Ø´ {attempt}): {e}")
                     time_module.sleep(DB_RETRY_BASE_DELAY)
                 else:
                     break
 
-        logger.error(f"❌ {op_name} ناموفق پس از {DB_MAX_RETRIES} تلاش: {last_error}")
-        raise DatabaseError(f"خطا در {op_name}: {last_error}")
+        logger.error(f"â {op_name} ÙØ§ÙÙÙÙ Ù¾Ø³ Ø§Ø² {DB_MAX_RETRIES} ØªÙØ§Ø´: {last_error}")
+        raise DatabaseError(f"Ø®Ø·Ø§ Ø¯Ø± {op_name}: {last_error}")
 
     @property
     def client(self) -> Client:
-        """کلاینت عادی (با RLS)"""
+        """Ú©ÙØ§ÛÙØª Ø¹Ø§Ø¯Û (Ø¨Ø§ RLS)"""
         if self._client is None:
-            raise DatabaseError("کلاینت Supabase مقداردهی نشده است")
+            raise DatabaseError("Ú©ÙØ§ÛÙØª Supabase ÙÙØ¯Ø§Ø±Ø¯ÙÛ ÙØ´Ø¯Ù Ø§Ø³Øª")
         return self._client
 
     @property
     def admin(self) -> Client:
-        """کلاینت ادمین (بدون RLS)"""
+        """Ú©ÙØ§ÛÙØª Ø§Ø¯ÙÛÙ (Ø¨Ø¯ÙÙ RLS)"""
         if self._admin_client is None:
-            raise DatabaseError("کلاینت ادمین Supabase مقداردهی نشده است")
+            raise DatabaseError("Ú©ÙØ§ÛÙØª Ø§Ø¯ÙÛÙ Supabase ÙÙØ¯Ø§Ø±Ø¯ÙÛ ÙØ´Ø¯Ù Ø§Ø³Øª")
         return self._admin_client
 
     @property
     def is_healthy(self) -> bool:
-        """وضعیت سلامت اتصال"""
+        """ÙØ¶Ø¹ÛØª Ø³ÙØ§ÙØª Ø§ØªØµØ§Ù"""
         return self._is_healthy
 
     def get_metrics(self) -> Dict[str, Any]:
-        """دریافت متریک‌های کامل اتصال"""
+        """Ø¯Ø±ÛØ§ÙØª ÙØªØ±ÛÚ©âÙØ§Û Ú©Ø§ÙÙ Ø§ØªØµØ§Ù"""
         return self.metrics.to_dict()
 
     # =====================================================
-    # عملیات رکورد با Retry خودکار
+    # Ø¹ÙÙÛØ§Øª Ø±Ú©ÙØ±Ø¯ Ø¨Ø§ Retry Ø®ÙØ¯Ú©Ø§Ø±
     # =====================================================
 
     async def select_one(
@@ -278,12 +281,12 @@ class SupabaseManager:
         use_admin: bool = False
     ) -> Optional[Dict[str, Any]]:
         """
-        انتخاب یک رکورد با retry خودکار
+        Ø§ÙØªØ®Ø§Ø¨ ÛÚ© Ø±Ú©ÙØ±Ø¯ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±
 
         Args:
-            table: نام جدول
-            filters: فیلترها
-            use_admin: استفاده از کلاینت ادمین
+            table: ÙØ§Ù Ø¬Ø¯ÙÙ
+            filters: ÙÛÙØªØ±ÙØ§
+            use_admin: Ø§Ø³ØªÙØ§Ø¯Ù Ø§Ø² Ú©ÙØ§ÛÙØª Ø§Ø¯ÙÛÙ
         """
         def _op():
             c = self.admin if use_admin else self.client
@@ -309,7 +312,7 @@ class SupabaseManager:
         use_admin: bool = False
     ) -> List[Dict[str, Any]]:
         """
-        انتخاب چندین رکورد با retry خودکار
+        Ø§ÙØªØ®Ø§Ø¨ ÚÙØ¯ÛÙ Ø±Ú©ÙØ±Ø¯ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±
         """
         def _op():
             c = self.admin if use_admin else self.client
@@ -333,13 +336,13 @@ class SupabaseManager:
         data: Dict[str, Any],
         use_admin: bool = False
     ) -> Dict[str, Any]:
-        """درج رکورد جدید با retry خودکار"""
+        """Ø¯Ø±Ø¬ Ø±Ú©ÙØ±Ø¯ Ø¬Ø¯ÛØ¯ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             c = self.admin if use_admin else self.client
             resp = c.table(table).insert(data).execute()
             if resp.data:
                 return resp.data[0]
-            raise DatabaseError("رکورد درج نشد")
+            raise DatabaseError("Ø±Ú©ÙØ±Ø¯ Ø¯Ø±Ø¬ ÙØ´Ø¯")
 
         return self._execute_with_retry(_op, f"insert({table})")
 
@@ -350,7 +353,7 @@ class SupabaseManager:
         data: Dict[str, Any],
         use_admin: bool = False
     ) -> List[Dict[str, Any]]:
-        """به‌روزرسانی رکوردها با retry خودکار"""
+        """Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ø±Ú©ÙØ±Ø¯ÙØ§ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             c = self.admin if use_admin else self.client
             q = c.table(table).update(data)
@@ -367,7 +370,7 @@ class SupabaseManager:
         filters: Dict[str, Any],
         use_admin: bool = False
     ) -> bool:
-        """حذف رکوردها با retry خودکار"""
+        """Ø­Ø°Ù Ø±Ú©ÙØ±Ø¯ÙØ§ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             c = self.admin if use_admin else self.client
             q = c.table(table).delete()
@@ -387,7 +390,7 @@ class SupabaseManager:
         filters: Optional[Dict[str, Any]] = None,
         use_admin: bool = False
     ) -> int:
-        """شمارش رکوردها با retry خودکار"""
+        """Ø´ÙØ§Ø±Ø´ Ø±Ú©ÙØ±Ø¯ÙØ§ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             c = self.admin if use_admin else self.client
             q = c.table(table).select("*", count="exact")
@@ -407,7 +410,7 @@ class SupabaseManager:
         function_name: str,
         params: Optional[Dict[str, Any]] = None
     ) -> Any:
-        """اجرای تابع RPC با retry خودکار"""
+        """Ø§Ø¬Ø±Ø§Û ØªØ§Ø¨Ø¹ RPC Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             resp = self.client.rpc(function_name, params or {}).execute()
             return resp.data
@@ -421,22 +424,22 @@ class SupabaseManager:
         on_conflict: str,
         use_admin: bool = False
     ) -> Dict[str, Any]:
-        """درج یا به‌روزرسانی با retry خودکار"""
+        """Ø¯Ø±Ø¬ ÛØ§ Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ø¨Ø§ retry Ø®ÙØ¯Ú©Ø§Ø±"""
         def _op():
             c = self.admin if use_admin else self.client
             resp = c.table(table).upsert(data, on_conflict=on_conflict).execute()
             if resp.data:
                 return resp.data[0]
-            raise DatabaseError("upsert ناموفق بود")
+            raise DatabaseError("upsert ÙØ§ÙÙÙÙ Ø¨ÙØ¯")
 
         return self._execute_with_retry(_op, f"upsert({table})")
 
     async def health_check(self) -> Dict[str, Any]:
         """
-        بررسی سلامت کامل اتصال دیتابیس
+        Ø¨Ø±Ø±Ø³Û Ø³ÙØ§ÙØª Ú©Ø§ÙÙ Ø§ØªØµØ§Ù Ø¯ÛØªØ§Ø¨ÛØ³
 
-        خروجی:
-            دیکشنری حاوی وضعیت، متریک‌ها و اطلاعات اتصال
+        Ø®Ø±ÙØ¬Û:
+            Ø¯ÛÚ©Ø´ÙØ±Û Ø­Ø§ÙÛ ÙØ¶Ø¹ÛØªØ ÙØªØ±ÛÚ©âÙØ§ Ù Ø§Ø·ÙØ§Ø¹Ø§Øª Ø§ØªØµØ§Ù
         """
         status = {
             "healthy": False,
@@ -457,10 +460,10 @@ class SupabaseManager:
         return status
 
 
-# نمونه گلوبال Singleton
+# ÙÙÙÙÙ Ú¯ÙÙØ¨Ø§Ù Singleton
 db = SupabaseManager()
 
 
 def get_db() -> SupabaseManager:
-    """دریافت نمونه دیتابیس — همیشه همان Singleton را برمی‌گرداند"""
+    """Ø¯Ø±ÛØ§ÙØª ÙÙÙÙÙ Ø¯ÛØªØ§Ø¨ÛØ³ â ÙÙÛØ´Ù ÙÙØ§Ù Singleton Ø±Ø§ Ø¨Ø±ÙÛâÚ¯Ø±Ø¯Ø§ÙØ¯"""
     return db
