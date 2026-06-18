@@ -1,61 +1,64 @@
-# =====================================================================
-# وابستگی‌های Python - bot12
-# =====================================================================
-# برای نصب: pip install -r requirements.txt
-# =====================================================================
+# Galaxy Vast AI Trading Platform
+# Requirements v2 — Institutional Backtesting Edition
 
-# ----- FastAPI و سرور -----
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-pydantic==2.9.2
-pydantic-settings==2.6.1
-python-multipart==0.0.12
+# Core
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.6.0
+python-dotenv==1.0.0
 
-# ----- تلگرام -----
-aiogram==3.13.0
-aiohttp==3.10.10
+# Database
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.25
+alembic==1.13.1
 
-# ----- دیتابیس -----
-supabase==2.9.1
-postgrest==0.17.0
-gotrue==2.9.3
+# Cache
+redis==5.0.1
+aioredis==2.0.1
 
-# ----- تحلیل داده -----
-numpy==2.1.3
-pandas==2.2.3
-scipy==1.14.1
-ta==0.11.0
-pandas-ta==0.3.14b0
+# Task Queue
+celery==5.3.6
+flower==2.0.1
 
-# ----- HTTP Client -----
-httpx==0.27.2
-aiofiles==24.1.0
+# ML & Analytics
+xgboost==2.0.3
+lightgbm==4.3.0
+catboost==1.2.3
+scikit-learn==1.4.0
+numpy==1.26.3
+pandas==2.2.0
+scipy==1.12.0
 
-# ----- امنیت -----
+# Backtesting & Analysis
+statsmodels==0.14.1
+
+# Telegram
+python-telegram-bot==20.7
+
+# MetaTrader 5
+MetaTrader5==5.0.4424
+
+# Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-cryptography==43.0.3
+pyotp==2.9.0
 
-# ----- لاگ‌گیری -----
-loguru==0.7.2
-structlog==24.4.0
+# HTTP
+httpx==0.26.0
+aiohttp==3.9.3
 
-# ----- زمان -----
-python-dateutil==2.9.0
-pytz==2024.2
+# Reports
+jinja2==3.1.3
+weasyprint==61.2
+matplotlib==3.8.2
 
-# ----- ابزارهای عمومی -----
-python-dotenv==1.0.1
-tenacity==9.0.0
-cachetools==5.5.0
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.4
+pytest-cov==4.1.0
+httpx==0.26.0
 
-# ----- تست -----
-pytest==8.3.3
-pytest-asyncio==0.24.0
-pytest-cov==6.0.0
-httpx==0.27.2
-
-# ----- ابزارهای توسعه -----
-black==24.10.0
-isort==5.13.2
-flake8==7.1.1
+# Utils
+python-multipart==0.0.9
+orjson==3.9.12
+structlog==24.1.0
