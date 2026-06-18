@@ -12,7 +12,7 @@
 - SUPER_ADMIN: مدیر کل (همه دسترسی‌ها)
 - OWNER      : مالک سیستم (بالاترین سطح + مدیریت لایسنس و API)
 
-نویسنده: MT5 Trading Team
+نویسنده: Galaxy Vast Team
 """
 
 from enum import Enum
@@ -561,7 +561,7 @@ PERMISSION_DENIED_MESSAGES = {
 2️⃣ لایسنس معتبر تهیه کنید
 3️⃣ اکانت تلگرام خود را متصل کنید
 
-📞 پشتیبانی: @MT5Trading_Support
+📞 پشتیبانی: @GalaxyVast_Support
     """,
 
     "no_permission": """
@@ -573,7 +573,7 @@ PERMISSION_DENIED_MESSAGES = {
 حداقل نقش مورد نیاز: {required_role}
 
 برای ارتقا با پشتیبانی تماس بگیرید.
-📞 @MT5Trading_Support
+📞 @GalaxyVast_Support
     """,
 
     "license_expired": """
@@ -582,7 +582,7 @@ PERMISSION_DENIED_MESSAGES = {
 ⚠️ لایسنس شما منقضی شده است.
 
 برای تمدید با پشتیبانی تماس بگیرید.
-📞 @MT5Trading_Support
+📞 @GalaxyVast_Support
     """,
 
     "license_invalid": """
@@ -591,7 +591,7 @@ PERMISSION_DENIED_MESSAGES = {
 ⚠️ لایسنس شما معتبر نیست یا suspended شده.
 
 برای حل مشکل با پشتیبانی تماس بگیرید.
-📞 @MT5Trading_Support
+📞 @GalaxyVast_Support
     """,
 
     "feature_not_allowed": """
@@ -600,7 +600,7 @@ PERMISSION_DENIED_MESSAGES = {
 ⚠️ این ویژگی در پلن شما موجود نیست.
 
 برای دسترسی پلن خود را ارتقا دهید.
-📞 @MT5Trading_Support
+📞 @GalaxyVast_Support
     """,
 
     "operator_only": """
