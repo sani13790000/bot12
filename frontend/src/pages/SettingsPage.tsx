@@ -1,249 +1,155 @@
-/**
- * صفحه تنظیمات
- *
- * نویسنده: MT5 Trading Team
- */
+import { useState } from "react";
+import { Settings, Save, ToggleLeft, ToggleRight } from "lucide-react";
+import { settingsApi } from "../utils/api";
+import type { SystemSettings, TradingMode } from "../types";
 
-import { useState } from 'react';
-import {
-  User,
-  Bell,
-  DollarSign,
-  Save,
-  RefreshCw
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { TIMEFRAMES, DEFAULT_SYMBOLS } from '@/utils/config';
+const DEFAULT_SETTINGS: SystemSettings = {
+  trading_mode:"FULL_AUTO",
+  risk_per_trade_percent:1.0,
+  max_portfolio_risk_percent:5.0,
+  max_daily_trades:5,
+  max_daily_loss_percent:3.0,
+  max_weekly_loss_percent:7.0,
+  max_monthly_drawdown_percent:15.0,
+  min_confidence_score:80.0,
+  max_spread_points:30,
+  enable_smc_engine:true,
+  enable_pa_engine:true,
+  enable_ml_learning:true,
+  enable_news_filter:false,
+  allowed_sessions:["London","NewYork"],
+  allowed_symbols:["XAUUSD","EURUSD","GBPUSD"],
+};
 
-export function SettingsPage() {
-  const { user, settings, updateSettings } = useAuth();
+function Toggle({ value, onChange }: { value:boolean; onChange:(v:boolean)=>void }) {
+  return (
+    <button onClick={()=>onChange(!value)} className="flex items-center gap-2 text-sm transition-colors"
+      style={{ color: value ? "#10b981" : "var(--gv-text-muted)" }}
+    >
+      {value ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+      <span className="text-xs">{value ? "فعال" : "غیرفعال"}</span>
+    </button>
+  );
+}
 
-  // Local state
-  const [formData, setFormData] = useState({
-    default_symbol: settings?.default_symbol || 'EURUSD',
-    default_lot: settings?.default_lot || 0.1,
-    risk_per_trade: settings?.risk_per_trade || 1,
-    max_daily_trades: settings?.max_daily_trades || 5,
-    min_entry_score: settings?.min_entry_score || 65,
-    telegram_notifications: settings?.telegram_notifications ?? true,
-    default_timeframe: settings?.default_timeframe || 'H1'
-  });
+function NumberInput({ label, value, onChange, min, max, step, suffix }:
+  { label:string; value:number; onChange:(v:number)=>void; min?:number; max?:number; step?:number; suffix?:string }) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-xl"
+      style={{ background:"var(--gv-bg-secondary)", border:"1px solid var(--gv-border)" }}
+    >
+      <span className="text-sm" style={{ color:"var(--gv-text-secondary)" }}>{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="number" min={min} max={max} step={step} value={value}
+          onChange={(e)=>onChange(+e.target.value)}
+          className="w-20 px-2 py-1 rounded-lg text-sm text-center outline-none font-mono"
+          style={{ background:"var(--gv-bg-card)", color:"var(--gv-accent)", border:"1px solid var(--gv-border)" }}
+        />
+        {suffix && <span className="text-xs" style={{ color:"var(--gv-text-muted)" }}>{suffix}</span>}
+      </div>
+    </div>
+  );
+}
 
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+export default function SettingsPage() {
+  const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
+  const [saved, setSaved]       = useState(false);
 
-  // Save handler
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await updateSettings(formData);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (error) {
-      console.error('خطا در ذخیره:', error);
-    } finally {
-      setSaving(false);
-    }
+  const update = <K extends keyof SystemSettings>(key:K, value:SystemSettings[K]) => {
+    setSettings(s=>({...s,[key]:value}));
+    setSaved(false);
   };
 
+  const handleSave = async () => {
+    await settingsApi.update(settings);
+    setSaved(true);
+    setTimeout(()=>setSaved(false), 3000);
+  };
+
+  const MODES: { value:TradingMode; label:string; desc:string }[] = [
+    { value:"SIGNAL_ONLY", label:"فقط سیگنال",  desc:"فقط تحلیل و سیگنال — بدون اجرا" },
+    { value:"SEMI_AUTO",   label:"نیمه خودکار", desc:"نیاز به تأیید کاربر قبل از اجرا" },
+    { value:"FULL_AUTO",   label:"تمام خودکار", desc:"اجرای کامل بدون دخالت" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">تنظیمات</h1>
-          <p className="text-slate-500 mt-1">پیکربندی سیستم معاملاتی</p>
-        </div>
+    <div className="space-y-5 max-w-3xl">
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-sky-500/20 text-sky-400 rounded-lg hover:bg-sky-500/30 transition-colors disabled:opacity-50"
-        >
-          {saving ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          <span>{saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'}</span>
-        </button>
-      </div>
-
-      {/* Saved notification */}
-      {saved && (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex items-center gap-2">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-          <span className="text-emerald-400">تنظیمات با موفقیت ذخیره شد</span>
-        </div>
-      )}
-
-      {/* Profile Section */}
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <User className="w-5 h-5 text-sky-500" />
-          <h2 className="text-lg font-semibold text-slate-100">پروفایل</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">نام</label>
-            <input
-              type="text"
-              value={user?.first_name || ''}
-              disabled
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-300 disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">ایمیل</label>
-            <input
-              type="email"
-              value={user?.email || ''}
-              disabled
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-300 disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">نقش</label>
-            <input
-              type="text"
-              value={user?.role === 'admin' ? 'مدیر' : user?.role === 'trader' ? 'تریدر' : 'کاربر'}
-              disabled
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-300 disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">وضعیت</label>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                user?.status === 'active' ? 'bg-emerald-500' : 'bg-slate-500'
-              }`}></div>
-              <span className={user?.status === 'active' ? 'text-emerald-400' : 'text-slate-400'}>
-                {user?.status === 'active' ? 'فعال' : 'غیرفعال'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trading Settings */}
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <DollarSign className="w-5 h-5 text-emerald-500" />
-          <h2 className="text-lg font-semibold text-slate-100">تنظیمات معاملات</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">نماد پیش‌فرض</label>
-            <select
-              value={formData.default_symbol}
-              onChange={(e) => setFormData({ ...formData, default_symbol: e.target.value })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            >
-              {DEFAULT_SYMBOLS.map((symbol) => (
-                <option key={symbol} value={symbol}>{symbol}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">تایم‌فریم پیش‌فرض</label>
-            <select
-              value={formData.default_timeframe}
-              onChange={(e) => setFormData({ ...formData, default_timeframe: e.target.value })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            >
-              {TIMEFRAMES.map((tf) => (
-                <option key={tf.value} value={tf.value}>{tf.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">لات پیش‌فرض</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="10"
-              value={formData.default_lot}
-              onChange={(e) => setFormData({ ...formData, default_lot: parseFloat(e.target.value) || 0.01 })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">ریسک هر معامله (%)</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0.5"
-              max="10"
-              value={formData.risk_per_trade}
-              onChange={(e) => setFormData({ ...formData, risk_per_trade: parseFloat(e.target.value) || 1 })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">حداکثر معاملات روزانه</label>
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={formData.max_daily_trades}
-              onChange={(e) => setFormData({ ...formData, max_daily_trades: parseInt(e.target.value) || 5 })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 text-sm mb-2">حداقل امتیاز ورود</label>
-            <input
-              type="number"
-              min="50"
-              max="90"
-              value={formData.min_entry_score}
-              onChange={(e) => setFormData({ ...formData, min_entry_score: parseInt(e.target.value) || 65 })}
-              className="w-full bg-slate-700/50 border border-slate-600/50 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-sky-500/50"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Bell className="w-5 h-5 text-amber-500" />
-          <h2 className="text-lg font-semibold text-slate-100">اعلان‌ها</h2>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-slate-700/30 rounded-lg">
-            <div>
-              <p className="text-slate-200 font-medium">اعلان‌های تلگرام</p>
-              <p className="text-slate-500 text-sm">دریافت سیگنال‌ها و گزارش‌ها از طریق تلگرام</p>
-            </div>
-
+      {/* Trading mode */}
+      <div className="gv-card p-5">
+        <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color:"var(--gv-text-primary)" }}>
+          <Settings size={16} style={{ color:"var(--gv-accent)" }} />
+          حالت معاملاتی
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {MODES.map((m) => (
             <button
-              onClick={() => setFormData({ ...formData, telegram_notifications: !formData.telegram_notifications })}
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                formData.telegram_notifications ? 'bg-sky-500' : 'bg-slate-600'
-              }`}
+              key={m.value}
+              onClick={()=>update("trading_mode",m.value)}
+              className="p-4 rounded-xl text-right transition-all"
+              style={{
+                background: settings.trading_mode===m.value ? "rgba(0,212,255,0.1)" : "var(--gv-bg-secondary)",
+                border:`1px solid ${settings.trading_mode===m.value ? "rgba(0,212,255,0.4)" : "var(--gv-border)"}`,
+              }}
             >
-              <div
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                  formData.telegram_notifications ? 'right-1' : 'left-1'
-                }`}
-              />
+              <div className="font-semibold text-sm mb-1" style={{ color: settings.trading_mode===m.value ? "var(--gv-accent)" : "var(--gv-text-primary)" }}>
+                {m.label}
+              </div>
+              <div className="text-xs" style={{ color:"var(--gv-text-muted)" }}>{m.desc}</div>
             </button>
-          </div>
+          ))}
         </div>
       </div>
+
+      {/* Risk settings */}
+      <div className="gv-card p-5">
+        <h3 className="font-semibold mb-4" style={{ color:"var(--gv-text-primary)" }}>تنظیمات ریسک</h3>
+        <div className="space-y-3">
+          <NumberInput label="ریسک هر معامله"        value={settings.risk_per_trade_percent}      onChange={v=>update("risk_per_trade_percent",v)}      min={0.1} max={5}   step={0.1} suffix="%" />
+          <NumberInput label="حداکثر ریسک پرتفولیو"  value={settings.max_portfolio_risk_percent}   onChange={v=>update("max_portfolio_risk_percent",v)}  min={1}   max={20}  step={0.5} suffix="%" />
+          <NumberInput label="حداکثر معاملات روزانه" value={settings.max_daily_trades}            onChange={v=>update("max_daily_trades",v)}            min={1}   max={20}  step={1} suffix="معامله" />
+          <NumberInput label="حداکثر ضرر روزانه"     value={settings.max_daily_loss_percent}      onChange={v=>update("max_daily_loss_percent",v)}      min={0.5} max={10}  step={0.5} suffix="%" />
+          <NumberInput label="حداکثر ضرر هفتگی"      value={settings.max_weekly_loss_percent}     onChange={v=>update("max_weekly_loss_percent",v)}     min={1}   max={20}  step={0.5} suffix="%" />
+          <NumberInput label="حداکثر Drawdown ماهانه" value={settings.max_monthly_drawdown_percent} onChange={v=>update("max_monthly_drawdown_percent",v)} min={2} max={30} step={1} suffix="%" />
+          <NumberInput label="حداقل امتیاز سیگنال"  value={settings.min_confidence_score}        onChange={v=>update("min_confidence_score",v)}        min={50}  max={99}  step={1} suffix="%" />
+          <NumberInput label="حداکثر اسپرد"          value={settings.max_spread_points}           onChange={v=>update("max_spread_points",v)}           min={5}   max={100} step={5} suffix="پیپ" />
+        </div>
+      </div>
+
+      {/* Module toggles */}
+      <div className="gv-card p-5">
+        <h3 className="font-semibold mb-4" style={{ color:"var(--gv-text-primary)" }}>ماژول‌های فعال</h3>
+        <div className="space-y-3">
+          {[
+            { key:"enable_smc_engine",  label:"موتور SMC (Smart Money Concepts)" },
+            { key:"enable_pa_engine",   label:"موتور Price Action" },
+            { key:"enable_ml_learning", label:"سیستم یادگیری ML" },
+            { key:"enable_news_filter", label:"فیلتر اخبار (News Filter)" },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between p-3 rounded-xl"
+              style={{ background:"var(--gv-bg-secondary)", border:"1px solid var(--gv-border)" }}
+            >
+              <span className="text-sm" style={{ color:"var(--gv-text-secondary)" }}>{label}</span>
+              <Toggle value={(settings as any)[key]} onChange={(v)=>update(key as any, v)} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save button */}
+      <button
+        onClick={handleSave}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all"
+        style={{
+          background: saved ? "rgba(16,185,129,0.2)" : "rgba(0,212,255,0.15)",
+          color: saved ? "#10b981" : "var(--gv-accent)",
+          border:`1px solid ${saved ? "rgba(16,185,129,0.4)" : "rgba(0,212,255,0.3)"}`,
+        }}
+      >
+        <Save size={16} />
+        {saved ? "✅ تنظیمات ذخیره شد" : "ذخیره تنظیمات"}
+      </button>
     </div>
   );
 }
