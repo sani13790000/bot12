@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                             TradeManager.mqh       |
 //|                                    MT5 Trading System             |
-//|                                    مدیریت کامل معاملات            |
+//|                                    ÙØ¯ÛØ±ÛØª Ú©Ø§ÙÙ ÙØ¹Ø§ÙÙØ§Øª            |
 //+------------------------------------------------------------------+
 #property strict
 #include <Trade/Trade.mqh>
@@ -10,7 +10,7 @@
 #include "RiskManager.mqh"
 
 //+
-// نوع سفارش پندینگ
+// ÙÙØ¹ Ø³ÙØ§Ø±Ø´ Ù¾ÙØ¯ÛÙÚ¯
 //+
 enum ENUM_PENDING_TYPE {
    PENDING_NONE,
@@ -19,7 +19,7 @@ enum ENUM_PENDING_TYPE {
 };
 
 //+
-// ساختار نتیجه سفارش
+// Ø³Ø§Ø®ØªØ§Ø± ÙØªÛØ¬Ù Ø³ÙØ§Ø±Ø´
 //+
 struct OrderResult {
    bool success;
@@ -34,7 +34,7 @@ struct OrderResult {
 };
 
 //+
-// ساختار درخواست معامله
+// Ø³Ø§Ø®ØªØ§Ø± Ø¯Ø±Ø®ÙØ§Ø³Øª ÙØ¹Ø§ÙÙÙ
 //+
 struct TradeRequest {
    string symbol;
@@ -53,7 +53,7 @@ struct TradeRequest {
 };
 
 //+
-// کلاس مدیریت معاملات کامل
+// Ú©ÙØ§Ø³ ÙØ¯ÛØ±ÛØª ÙØ¹Ø§ÙÙØ§Øª Ú©Ø§ÙÙ
 //+
 class CTradeManager {
 private:
@@ -63,23 +63,23 @@ private:
    int m_magic;
    int m_orderCount;
 
-   // تنظیمات اجرا
+   // ØªÙØ¸ÛÙØ§Øª Ø§Ø¬Ø±Ø§
    int m_maxSlippage;
    int m_maxRetries;
    int m_retryDelayMs;
 
-   // محدودیت‌های نماد
+   // ÙØ­Ø¯ÙØ¯ÛØªâÙØ§Û ÙÙØ§Ø¯
    double m_stopLevel;
    double m_freezeLevel;
    double m_point;
    int m_digits;
 
-   // آمار
+   // Ø¢ÙØ§Ø±
    int m_totalOrders;
    int m_successfulOrders;
    int m_failedOrders;
 
-   // توابع داخلی
+   // ØªÙØ§Ø¨Ø¹ Ø¯Ø§Ø®ÙÛ
    bool ValidateSignal(const TradeSignal &signal);
    double CalculatePositionSize(const TradeSignal &signal);
    bool CheckRiskLimits();
@@ -105,13 +105,13 @@ public:
    CTradeManager(const string symbol, CRiskManager *riskManager);
    ~CTradeManager();
 
-   // تنظیمات
+   // ØªÙØ¸ÛÙØ§Øª
    void SetRiskManager(CRiskManager *riskManager);
    void SetMaxSlippage(const int points);
    void SetMaxRetries(const int count, const int delayMs);
    void SetMagicNumber(const int magic);
 
-   // اجرای معاملات
+   // Ø§Ø¬Ø±Ø§Û ÙØ¹Ø§ÙÙØ§Øª
    OrderResult OpenMarketOrder(const ENUM_POSITION_TYPE direction, const double volume,
       const double sl = 0, const double tp = 0, const string comment = "");
 
@@ -126,7 +126,7 @@ public:
    bool OpenTrade(const TradeSignal &signal, string &errorMsg);
    OrderResult OpenTradeEx(const TradeSignal &signal);
 
-   // مدیریت پوزیشن
+   // ÙØ¯ÛØ±ÛØª Ù¾ÙØ²ÛØ´Ù
    bool CloseTrade(const ulong ticket, const string reason = "");
    bool CloseTradePartial(const ulong ticket, const double volume, const string reason = "");
    bool CloseAllTrades(const string direction = "");
@@ -134,21 +134,21 @@ public:
    bool CloseProfitableTrades();
    bool CloseLosingTrades();
 
-   // تغییر SL/TP
+   // ØªØºÛÛØ± SL/TP
    bool ModifySlTp(const ulong ticket, const double sl, const double tp);
    bool ModifySl(const ulong ticket, const double sl);
    bool ModifyTp(const ulong ticket, const double tp);
    bool MoveToBreakeven(const ulong ticket);
    bool SetTrailingStop(const ulong ticket, const double distance, const double step = 0);
 
-   // مدیریت سفارش‌های پندینگ
+   // ÙØ¯ÛØ±ÛØª Ø³ÙØ§Ø±Ø´âÙØ§Û Ù¾ÙØ¯ÛÙÚ¯
    bool DeletePendingOrder(const ulong ticket);
    bool ModifyPendingOrder(const ulong ticket, const double price,
       const double sl = 0, const double tp = 0);
    int DeleteAllPendingOrders();
    int CountPendingOrders();
 
-   // اطلاعات و آمار
+   // Ø§Ø·ÙØ§Ø¹Ø§Øª Ù Ø¢ÙØ§Ø±
    int GetOpenPositionsCount();
    int GetBuyPositionsCount();
    int GetSellPositionsCount();
@@ -157,12 +157,12 @@ public:
    int GetDailyPnL();
    double GetAverageEntryPrice(const ENUM_POSITION_TYPE direction);
 
-   // گزارش
+   // Ú¯Ø²Ø§Ø±Ø´
    string GetTradeReport();
    string GetLastErrorDescription(const int code);
    void PrintOrderResult(const OrderResult &result);
 
-   // اعتبارسنجی
+   // Ø§Ø¹ØªØ¨Ø§Ø±Ø³ÙØ¬Û
    bool IsMarketOpen();
    bool IsTradeAllowed();
    bool HasOpenPosition(const ENUM_POSITION_TYPE direction = POSITION_TYPE_BUY);
@@ -170,7 +170,7 @@ public:
 };
 
 //+
-// سازنده
+// Ø³Ø§Ø²ÙØ¯Ù
 //+
 CTradeManager::CTradeManager(const string symbol) {
    m_symbol = symbol;
@@ -189,7 +189,7 @@ CTradeManager::CTradeManager(const string symbol) {
    m_trade.SetExpertMagicNumber(m_magic);
    m_trade.SetDeviationInPoints(m_maxSlippage);
 
-   // دریافت اطلاعات نماد
+   // Ø¯Ø±ÛØ§ÙØª Ø§Ø·ÙØ§Ø¹Ø§Øª ÙÙØ§Ø¯
    m_stopLevel = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_STOPS_LEVEL);
    m_freezeLevel = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_FREEZE_LEVEL);
    m_point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
@@ -197,7 +197,7 @@ CTradeManager::CTradeManager(const string symbol) {
 }
 
 //+
-// سازنده با RiskManager
+// Ø³Ø§Ø²ÙØ¯Ù Ø¨Ø§ RiskManager
 //+
 CTradeManager::CTradeManager(const string symbol, CRiskManager *riskManager) {
    m_symbol = symbol;
@@ -222,20 +222,20 @@ CTradeManager::CTradeManager(const string symbol, CRiskManager *riskManager) {
 }
 
 //+
-// مخرب
+// ÙØ®Ø±Ø¨
 //+
 CTradeManager::~CTradeManager() {
 }
 
 //+
-// تنظیم RiskManager
+// ØªÙØ¸ÛÙ RiskManager
 //+
 void CTradeManager::SetRiskManager(CRiskManager *riskManager) {
    m_riskManager = riskManager;
 }
 
 //+
-// تنظیم انحراف مجاز
+// ØªÙØ¸ÛÙ Ø§ÙØ­Ø±Ø§Ù ÙØ¬Ø§Ø²
 //+
 void CTradeManager::SetMaxSlippage(const int points) {
    m_maxSlippage = MathMax(0, points);
@@ -243,7 +243,7 @@ void CTradeManager::SetMaxSlippage(const int points) {
 }
 
 //+
-// تنظیم تلاش مجدد
+// ØªÙØ¸ÛÙ ØªÙØ§Ø´ ÙØ¬Ø¯Ø¯
 //+
 void CTradeManager::SetMaxRetries(const int count, const int delayMs) {
    m_maxRetries = MathMax(0, MathMin(10, count));
@@ -251,7 +251,7 @@ void CTradeManager::SetMaxRetries(const int count, const int delayMs) {
 }
 
 //+
-// تنظیم شماره مجیک
+// ØªÙØ¸ÛÙ Ø´ÙØ§Ø±Ù ÙØ¬ÛÚ©
 //+
 void CTradeManager::SetMagicNumber(const int magic) {
    m_magic = magic;
@@ -259,16 +259,16 @@ void CTradeManager::SetMagicNumber(const int magic) {
 }
 
 //+
-// اعتبارسنجی سیگنال
+// Ø§Ø¹ØªØ¨Ø§Ø±Ø³ÙØ¬Û Ø³ÛÚ¯ÙØ§Ù
 //+
 bool CTradeManager::ValidateSignal(const TradeSignal &signal) {
    if(signal.totalScore < MinEntryScore) {
-      LogMessage("امتیاز سیگنال کمتر از حد نصاب: " + IntegerToString(signal.totalScore), "WARNING");
+      LogMessage("Ø§ÙØªÛØ§Ø² Ø³ÛÚ¯ÙØ§Ù Ú©ÙØªØ± Ø§Ø² Ø­Ø¯ ÙØµØ§Ø¨: " + IntegerToString(signal.totalScore), "WARNING");
       return false;
    }
 
    if(!signal.entryAllowed) {
-      LogMessage("ورود مجاز نیست: " + signal.reason, "WARNING");
+      LogMessage("ÙØ±ÙØ¯ ÙØ¬Ø§Ø² ÙÛØ³Øª: " + signal.reason, "WARNING");
       return false;
    }
 
@@ -276,7 +276,7 @@ bool CTradeManager::ValidateSignal(const TradeSignal &signal) {
 }
 
 //+
-// محاسبه حجم پوزیشن
+// ÙØ­Ø§Ø³Ø¨Ù Ø­Ø¬Ù Ù¾ÙØ²ÛØ´Ù
 //+
 double CTradeManager::CalculatePositionSize(const TradeSignal &signal) {
    if(FixedLot > 0) {
@@ -297,25 +297,25 @@ double CTradeManager::CalculatePositionSize(const TradeSignal &signal) {
 }
 
 //+
-// بررسی محدودیت ریسک
+// Ø¨Ø±Ø±Ø³Û ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©
 //+
 bool CTradeManager::CheckRiskLimits() {
    if(m_riskManager != NULL) {
       RiskCheckResult result = m_riskManager->CheckRiskBeforeTrade(POSITION_TYPE_BUY);
       if(!result.allowed) {
-         LogMessage("محدودیت ریسک: " + result.reason, "WARNING");
+         LogMessage("ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©: " + result.reason, "WARNING");
          return false;
       }
       return true;
    }
 
    if(CountTodayTrades() >= MaxDailyTrades) {
-      LogMessage("حداکثر معاملات روزانه", "WARNING");
+      LogMessage("Ø­Ø¯Ø§Ú©Ø«Ø± ÙØ¹Ø§ÙÙØ§Øª Ø±ÙØ²Ø§ÙÙ", "WARNING");
       return false;
    }
 
    if(CountOpenTrades(m_symbol) >= MaxOpenTrades) {
-      LogMessage("حداکثر معاملات همزمان", "WARNING");
+      LogMessage("Ø­Ø¯Ø§Ú©Ø«Ø± ÙØ¹Ø§ÙÙØ§Øª ÙÙØ²ÙØ§Ù", "WARNING");
       return false;
    }
 
@@ -323,19 +323,19 @@ bool CTradeManager::CheckRiskLimits() {
 }
 
 //+
-// بررسی اسپرد
+// Ø¨Ø±Ø±Ø³Û Ø§Ø³Ù¾Ø±Ø¯
 //+
 bool CTradeManager::CheckSpread() {
    int currentSpread = (int)SymbolInfoInteger(m_symbol, SYMBOL_SPREAD);
    if(currentSpread > MaxSpread) {
-      LogMessage("اسپرد بالا: " + IntegerToString(currentSpread), "WARNING");
+      LogMessage("Ø§Ø³Ù¾Ø±Ø¯ Ø¨Ø§ÙØ§: " + IntegerToString(currentSpread), "WARNING");
       return false;
    }
    return true;
 }
 
 //+
-// بررسی مارجین
+// Ø¨Ø±Ø±Ø³Û ÙØ§Ø±Ø¬ÛÙ
 //+
 bool CTradeManager::CheckMargin(const double volume) {
    double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
@@ -347,7 +347,7 @@ bool CTradeManager::CheckMargin(const double volume) {
    marginRequired = (volume * contractSize) / leverage;
 
    if(marginRequired > freeMargin * 0.8) {
-      LogMessage(StringFormat("مارجین کافی نیست: نیاز $%.2f، موجود $%.2f",
+      LogMessage(StringFormat("ÙØ§Ø±Ø¬ÛÙ Ú©Ø§ÙÛ ÙÛØ³Øª: ÙÛØ§Ø² $%.2fØ ÙÙØ¬ÙØ¯ $%.2f",
          marginRequired, freeMargin), "WARNING");
       return false;
    }
@@ -356,7 +356,7 @@ bool CTradeManager::CheckMargin(const double volume) {
 }
 
 //+
-// بررسی stop level
+// Ø¨Ø±Ø±Ø³Û stop level
 //+
 bool CTradeManager::CheckStopLevels(const double price, const double sl, const double tp, const ENUM_POSITION_TYPE direction) {
    if(sl <= 0 && tp <= 0) return true;
@@ -366,23 +366,23 @@ bool CTradeManager::CheckStopLevels(const double price, const double sl, const d
 
    if(direction == POSITION_TYPE_BUY) {
       if(sl > 0 && price - sl < stopLevelPrice) {
-         LogMessage(StringFormat("SL به قیمت نزدیک است: فاصله %.0f < %.0f",
+         LogMessage(StringFormat("SL Ø¨Ù ÙÛÙØª ÙØ²Ø¯ÛÚ© Ø§Ø³Øª: ÙØ§ØµÙÙ %.0f < %.0f",
             (price - sl) / m_point, stopLevelPrice / m_point), "WARNING");
          return false;
       }
       if(tp > 0 && tp - price < stopLevelPrice) {
-         LogMessage(StringFormat("TP به قیمت نزدیک است: فاصله %.0f < %.0f",
+         LogMessage(StringFormat("TP Ø¨Ù ÙÛÙØª ÙØ²Ø¯ÛÚ© Ø§Ø³Øª: ÙØ§ØµÙÙ %.0f < %.0f",
             (tp - price) / m_point, stopLevelPrice / m_point), "WARNING");
          return false;
       }
    } else {
       if(sl > 0 && sl - price < stopLevelPrice) {
-         LogMessage(StringFormat("SL به قیمت نزدیک است: فاصله %.0f < %.0f",
+         LogMessage(StringFormat("SL Ø¨Ù ÙÛÙØª ÙØ²Ø¯ÛÚ© Ø§Ø³Øª: ÙØ§ØµÙÙ %.0f < %.0f",
             (sl - price) / m_point, stopLevelPrice / m_point), "WARNING");
          return false;
       }
       if(tp > 0 && price - tp < stopLevelPrice) {
-         LogMessage(StringFormat("TP به قیمت نزدیک است: فاصله %.0f < %.0f",
+         LogMessage(StringFormat("TP Ø¨Ù ÙÛÙØª ÙØ²Ø¯ÛÚ© Ø§Ø³Øª: ÙØ§ØµÙÙ %.0f < %.0f",
             (price - tp) / m_point, stopLevelPrice / m_point), "WARNING");
          return false;
       }
@@ -392,7 +392,7 @@ bool CTradeManager::CheckStopLevels(const double price, const double sl, const d
 }
 
 //+
-// بررسی freeze level
+// Ø¨Ø±Ø±Ø³Û freeze level
 //+
 bool CTradeManager::CheckFreezeLevel(const double price, const ENUM_POSITION_TYPE direction) {
    double freezeLevelPrice = m_freezeLevel * m_point;
@@ -406,7 +406,7 @@ bool CTradeManager::CheckFreezeLevel(const double price, const ENUM_POSITION_TYP
    }
 
    if(MathAbs(price - currentPrice) < freezeLevelPrice) {
-      LogMessage("قیمت در محدوده freeze level", "WARNING");
+      LogMessage("ÙÛÙØª Ø¯Ø± ÙØ­Ø¯ÙØ¯Ù freeze level", "WARNING");
       return false;
    }
 
@@ -414,7 +414,7 @@ bool CTradeManager::CheckFreezeLevel(const double price, const ENUM_POSITION_TYP
 }
 
 //+
-// تنظیم قیمت برای stop level
+// ØªÙØ¸ÛÙ ÙÛÙØª Ø¨Ø±Ø§Û stop level
 //+
 double CTradeManager::AdjustPriceForStopLevel(const double price, const ENUM_POSITION_TYPE direction) {
    double stopLevelPrice = m_stopLevel * m_point;
@@ -437,14 +437,14 @@ double CTradeManager::AdjustPriceForStopLevel(const double price, const ENUM_POS
 }
 
 //+
-// نرمال‌سازی قیمت
+// ÙØ±ÙØ§ÙâØ³Ø§Ø²Û ÙÛÙØª
 //+
 double CTradeManager::NormalizePrice(const double price) {
    return NormalizeDouble(price, m_digits);
 }
 
 //+
-// نرمال‌سازی حجم
+// ÙØ±ÙØ§ÙâØ³Ø§Ø²Û Ø­Ø¬Ù
 //+
 double CTradeManager::NormalizeVolume(const double volume) {
    double minLot = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
@@ -462,7 +462,7 @@ double CTradeManager::NormalizeVolume(const double volume) {
 }
 
 //+
-// تنظیم درخواست معامله از سیگنال
+// ØªÙØ¸ÛÙ Ø¯Ø±Ø®ÙØ§Ø³Øª ÙØ¹Ø§ÙÙÙ Ø§Ø² Ø³ÛÚ¯ÙØ§Ù
 //+
 bool CTradeManager::FillTradeRequest(TradeRequest &request, const TradeSignal &signal) {
    request.symbol = m_symbol;
@@ -492,7 +492,7 @@ bool CTradeManager::FillTradeRequest(TradeRequest &request, const TradeSignal &s
 }
 
 //+
-// به‌روزرسانی آمار سفارشات
+// Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ø¢ÙØ§Ø± Ø³ÙØ§Ø±Ø´Ø§Øª
 //+
 void CTradeManager::UpdateOrderStats(const bool success) {
    m_totalOrders++;
@@ -504,7 +504,7 @@ void CTradeManager::UpdateOrderStats(const bool success) {
 }
 
 //+
-// اجرای سفارش مارکت
+// Ø§Ø¬Ø±Ø§Û Ø³ÙØ§Ø±Ø´ ÙØ§Ø±Ú©Øª
 //+
 OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
    OrderResult result;
@@ -514,14 +514,14 @@ OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
    if(!CheckSpread()) {
       result.success = false;
       result.errorCode = -1;
-      result.errorMessage = "اسپرد بالا";
+      result.errorMessage = "Ø§Ø³Ù¾Ø±Ø¯ Ø¨Ø§ÙØ§";
       return result;
    }
 
    if(!CheckMargin(request.volume)) {
       result.success = false;
       result.errorCode = -2;
-      result.errorMessage = "مارجین کافی نیست";
+      result.errorMessage = "ÙØ§Ø±Ø¬ÛÙ Ú©Ø§ÙÛ ÙÛØ³Øª";
       return result;
    }
 
@@ -560,7 +560,7 @@ OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
    price = NormalizePrice(price);
    double volume = NormalizeVolume(request.volume);
 
-   LogMessage(StringFormat("ارسال سفارش مارکت: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
+   LogMessage(StringFormat("Ø§Ø±Ø³Ø§Ù Ø³ÙØ§Ø±Ø´ ÙØ§Ø±Ú©Øª: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
       request.direction == POSITION_TYPE_BUY ? "BUY" : "SELL",
       volume, price, sl, tp), "TRADE");
 
@@ -578,7 +578,7 @@ OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
       result.executedPrice = m_trade.ResultPrice();
       result.executedVolume = m_trade.ResultVolume();
 
-      LogMessage(StringFormat("سفارش موفق: Ticket #%I64u @ %.5f",
+      LogMessage(StringFormat("Ø³ÙØ§Ø±Ø´ ÙÙÙÙ: Ticket #%I64u @ %.5f",
          result.positionTicket, result.executedPrice), "INFO");
 
       UpdateOrderStats(true);
@@ -587,7 +587,7 @@ OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
       result.errorCode = GetLastError();
       result.errorMessage = GetLastErrorDescription(result.errorCode);
 
-      LogMessage("خطا در ارسال سفارش: " + result.errorMessage, "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±Ø³Ø§Ù Ø³ÙØ§Ø±Ø´: " + result.errorMessage, "ERROR");
       UpdateOrderStats(false);
    }
 
@@ -595,7 +595,7 @@ OrderResult CTradeManager::ExecuteMarketOrder(const TradeRequest &request) {
 }
 
 //+
-// اجرای سفارش لیمیت
+// Ø§Ø¬Ø±Ø§Û Ø³ÙØ§Ø±Ø´ ÙÛÙÛØª
 //+
 OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
    OrderResult result;
@@ -617,7 +617,7 @@ OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
       if(price >= currentPrice) {
          result.success = false;
          result.errorCode = -3;
-         result.errorMessage = "قیمت لیمیت خرید باید کمتر از قیمت فعلی باشد";
+         result.errorMessage = "ÙÛÙØª ÙÛÙÛØª Ø®Ø±ÛØ¯ Ø¨Ø§ÛØ¯ Ú©ÙØªØ± Ø§Ø² ÙÛÙØª ÙØ¹ÙÛ Ø¨Ø§Ø´Ø¯";
          return result;
       }
    } else {
@@ -626,7 +626,7 @@ OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
       if(price <= currentPrice) {
          result.success = false;
          result.errorCode = -3;
-         result.errorMessage = "قیمت لیمیت فروش باید بیشتر از قیمت فعلی باشد";
+         result.errorMessage = "ÙÛÙØª ÙÛÙÛØª ÙØ±ÙØ´ Ø¨Ø§ÛØ¯ Ø¨ÛØ´ØªØ± Ø§Ø² ÙÛÙØª ÙØ¹ÙÛ Ø¨Ø§Ø´Ø¯";
          return result;
       }
    }
@@ -636,7 +636,7 @@ OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
    double tp = NormalizePrice(request.takeProfit);
    datetime expiration = request.expiration > 0 ? request.expiration : 0;
 
-   LogMessage(StringFormat("ارسال سفارش لیمیت: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
+   LogMessage(StringFormat("Ø§Ø±Ø³Ø§Ù Ø³ÙØ§Ø±Ø´ ÙÛÙÛØª: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
       request.direction == POSITION_TYPE_BUY ? "BUY LIMIT" : "SELL LIMIT",
       volume, price, sl, tp), "TRADE");
 
@@ -649,14 +649,14 @@ OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
       result.executedPrice = price;
       result.executedVolume = volume;
 
-      LogMessage(StringFormat("سفارش لیمیت ثبت شد: Ticket #%I64u", result.orderTicket), "INFO");
+      LogMessage(StringFormat("Ø³ÙØ§Ø±Ø´ ÙÛÙÛØª Ø«Ø¨Øª Ø´Ø¯: Ticket #%I64u", result.orderTicket), "INFO");
       UpdateOrderStats(true);
    } else {
       result.success = false;
       result.errorCode = GetLastError();
       result.errorMessage = GetLastErrorDescription(result.errorCode);
 
-      LogMessage("خطا در ثبت سفارش لیمیت: " + result.errorMessage, "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø«Ø¨Øª Ø³ÙØ§Ø±Ø´ ÙÛÙÛØª: " + result.errorMessage, "ERROR");
       UpdateOrderStats(false);
    }
 
@@ -664,7 +664,7 @@ OrderResult CTradeManager::ExecuteLimitOrder(const TradeRequest &request) {
 }
 
 //+
-// اجرای سفارش استاپ
+// Ø§Ø¬Ø±Ø§Û Ø³ÙØ§Ø±Ø´ Ø§Ø³ØªØ§Ù¾
 //+
 OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
    OrderResult result;
@@ -676,7 +676,7 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
    if(!CheckFreezeLevel(price, request.direction)) {
       result.success = false;
       result.errorCode = -4;
-      result.errorMessage = "قیمت در محدوده freeze level";
+      result.errorMessage = "ÙÛÙØª Ø¯Ø± ÙØ­Ø¯ÙØ¯Ù freeze level";
       return result;
    }
 
@@ -689,7 +689,7 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
       if(price <= currentPrice) {
          result.success = false;
          result.errorCode = -3;
-         result.errorMessage = "قیمت استاپ خرید باید بیشتر از قیمت فعلی باشد";
+         result.errorMessage = "ÙÛÙØª Ø§Ø³ØªØ§Ù¾ Ø®Ø±ÛØ¯ Ø¨Ø§ÛØ¯ Ø¨ÛØ´ØªØ± Ø§Ø² ÙÛÙØª ÙØ¹ÙÛ Ø¨Ø§Ø´Ø¯";
          return result;
       }
    } else {
@@ -698,7 +698,7 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
       if(price >= currentPrice) {
          result.success = false;
          result.errorCode = -3;
-         result.errorMessage = "قیمت استاپ فروش باید کمتر از قیمت فعلی باشد";
+         result.errorMessage = "ÙÛÙØª Ø§Ø³ØªØ§Ù¾ ÙØ±ÙØ´ Ø¨Ø§ÛØ¯ Ú©ÙØªØ± Ø§Ø² ÙÛÙØª ÙØ¹ÙÛ Ø¨Ø§Ø´Ø¯";
          return result;
       }
    }
@@ -708,7 +708,7 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
    double tp = NormalizePrice(request.takeProfit);
    datetime expiration = request.expiration > 0 ? request.expiration : 0;
 
-   LogMessage(StringFormat("ارسال سفارش استاپ: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
+   LogMessage(StringFormat("Ø§Ø±Ø³Ø§Ù Ø³ÙØ§Ø±Ø´ Ø§Ø³ØªØ§Ù¾: %s %.2f @ %.5f | SL: %.5f TP: %.5f",
       request.direction == POSITION_TYPE_BUY ? "BUY STOP" : "SELL STOP",
       volume, price, sl, tp), "TRADE");
 
@@ -721,14 +721,14 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
       result.executedPrice = price;
       result.executedVolume = volume;
 
-      LogMessage(StringFormat("سفارش استاپ ثبت شد: Ticket #%I64u", result.orderTicket), "INFO");
+      LogMessage(StringFormat("Ø³ÙØ§Ø±Ø´ Ø§Ø³ØªØ§Ù¾ Ø«Ø¨Øª Ø´Ø¯: Ticket #%I64u", result.orderTicket), "INFO");
       UpdateOrderStats(true);
    } else {
       result.success = false;
       result.errorCode = GetLastError();
       result.errorMessage = GetLastErrorDescription(result.errorCode);
 
-      LogMessage("خطا در ثبت سفارش استاپ: " + result.errorMessage, "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø«Ø¨Øª Ø³ÙØ§Ø±Ø´ Ø§Ø³ØªØ§Ù¾: " + result.errorMessage, "ERROR");
       UpdateOrderStats(false);
    }
 
@@ -736,7 +736,7 @@ OrderResult CTradeManager::ExecuteStopOrder(const TradeRequest &request) {
 }
 
 //+
-// اجرای سفارش با تلاش مجدد
+// Ø§Ø¬Ø±Ø§Û Ø³ÙØ§Ø±Ø´ Ø¨Ø§ ØªÙØ§Ø´ ÙØ¬Ø¯Ø¯
 //+
 OrderResult CTradeManager::ExecuteWithRetry(TradeRequest &request) {
    OrderResult result;
@@ -763,7 +763,7 @@ OrderResult CTradeManager::ExecuteWithRetry(TradeRequest &request) {
       }
 
       if(attempts < maxAttempts) {
-         LogMessage(StringFormat("تلاش مجدد %d/%d بعد از %d ms", attempts, maxAttempts - 1, request.retryDelayMs), "INFO");
+         LogMessage(StringFormat("ØªÙØ§Ø´ ÙØ¬Ø¯Ø¯ %d/%d Ø¨Ø¹Ø¯ Ø§Ø² %d ms", attempts, maxAttempts - 1, request.retryDelayMs), "INFO");
          Sleep(request.retryDelayMs);
       }
    }
@@ -772,7 +772,7 @@ OrderResult CTradeManager::ExecuteWithRetry(TradeRequest &request) {
 }
 
 //+
-// باز کردن سفارش مارکت
+// Ø¨Ø§Ø² Ú©Ø±Ø¯Ù Ø³ÙØ§Ø±Ø´ ÙØ§Ø±Ú©Øª
 //+
 OrderResult CTradeManager::OpenMarketOrder(const ENUM_POSITION_TYPE direction, const double volume,
    const double sl, const double tp, const string comment) {
@@ -796,7 +796,7 @@ OrderResult CTradeManager::OpenMarketOrder(const ENUM_POSITION_TYPE direction, c
       OrderResult result;
       result.success = false;
       result.errorCode = -5;
-      result.errorMessage = "محدودیت ریسک";
+      result.errorMessage = "ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©";
       return result;
    }
 
@@ -804,7 +804,7 @@ OrderResult CTradeManager::OpenMarketOrder(const ENUM_POSITION_TYPE direction, c
 }
 
 //+
-// باز کردن سفارش لیمیت
+// Ø¨Ø§Ø² Ú©Ø±Ø¯Ù Ø³ÙØ§Ø±Ø´ ÙÛÙÛØª
 //+
 OrderResult CTradeManager::OpenLimitOrder(const ENUM_POSITION_TYPE direction, const double volume,
    const double price, const double sl, const double tp, const string comment, const datetime expiration) {
@@ -828,7 +828,7 @@ OrderResult CTradeManager::OpenLimitOrder(const ENUM_POSITION_TYPE direction, co
 }
 
 //+
-// باز کردن سفارش استاپ
+// Ø¨Ø§Ø² Ú©Ø±Ø¯Ù Ø³ÙØ§Ø±Ø´ Ø§Ø³ØªØ§Ù¾
 //+
 OrderResult CTradeManager::OpenStopOrder(const ENUM_POSITION_TYPE direction, const double volume,
    const double price, const double sl, const double tp, const string comment, const datetime expiration) {
@@ -852,7 +852,7 @@ OrderResult CTradeManager::OpenStopOrder(const ENUM_POSITION_TYPE direction, con
 }
 
 //+
-// باز کردن معامله از سیگنال (ساده)
+// Ø¨Ø§Ø² Ú©Ø±Ø¯Ù ÙØ¹Ø§ÙÙÙ Ø§Ø² Ø³ÛÚ¯ÙØ§Ù (Ø³Ø§Ø¯Ù)
 //+
 bool CTradeManager::OpenTrade(const TradeSignal &signal, string &errorMsg) {
    OrderResult result = OpenTradeEx(signal);
@@ -866,7 +866,7 @@ bool CTradeManager::OpenTrade(const TradeSignal &signal, string &errorMsg) {
 }
 
 //+
-// باز کردن معامله از سیگنال (کامل)
+// Ø¨Ø§Ø² Ú©Ø±Ø¯Ù ÙØ¹Ø§ÙÙÙ Ø§Ø² Ø³ÛÚ¯ÙØ§Ù (Ú©Ø§ÙÙ)
 //+
 OrderResult CTradeManager::OpenTradeEx(const TradeSignal &signal) {
    OrderResult result;
@@ -875,14 +875,14 @@ OrderResult CTradeManager::OpenTradeEx(const TradeSignal &signal) {
    if(!ValidateSignal(signal)) {
       result.success = false;
       result.errorCode = -6;
-      result.errorMessage = "سیگنال نامعتبر";
+      result.errorMessage = "Ø³ÛÚ¯ÙØ§Ù ÙØ§ÙØ¹ØªØ¨Ø±";
       return result;
    }
 
    if(!CheckRiskLimits()) {
       result.success = false;
       result.errorCode = -5;
-      result.errorMessage = "محدودیت ریسک";
+      result.errorMessage = "ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©";
       return result;
    }
 
@@ -890,7 +890,7 @@ OrderResult CTradeManager::OpenTradeEx(const TradeSignal &signal) {
    if(!FillTradeRequest(request, signal)) {
       result.success = false;
       result.errorCode = -7;
-      result.errorMessage = "خطا در ایجاد درخواست";
+      result.errorMessage = "Ø®Ø·Ø§ Ø¯Ø± Ø§ÛØ¬Ø§Ø¯ Ø¯Ø±Ø®ÙØ§Ø³Øª";
       return result;
    }
 
@@ -898,25 +898,25 @@ OrderResult CTradeManager::OpenTradeEx(const TradeSignal &signal) {
 }
 
 //+
-// بستن معامله
+// Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙÙ
 //+
 bool CTradeManager::CloseTrade(const ulong ticket, const string reason) {
    if(!PositionSelectByTicket(ticket)) {
-      LogMessage("پوزیشن یافت نشد: " + IntegerToString(ticket), "ERROR");
+      LogMessage("Ù¾ÙØ²ÛØ´Ù ÛØ§ÙØª ÙØ´Ø¯: " + IntegerToString(ticket), "ERROR");
       return false;
    }
 
    ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
    double volume = PositionGetDouble(POSITION_VOLUME);
 
-   LogMessage(StringFormat("بستن معامله #%I64u | %s | %.2f | دلیل: %s",
+   LogMessage(StringFormat("Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙÙ #%I64u | %s | %.2f | Ø¯ÙÛÙ: %s",
       ticket, posType == POSITION_TYPE_BUY ? "BUY" : "SELL", volume, reason), "TRADE");
 
    bool success = m_trade.PositionClose(ticket);
 
    if(!success) {
       int error = GetLastError();
-      LogMessage("خطا در بستن معامله: " + GetLastErrorDescription(error), "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙÙ: " + GetLastErrorDescription(error), "ERROR");
       return false;
    }
 
@@ -924,25 +924,25 @@ bool CTradeManager::CloseTrade(const ulong ticket, const string reason) {
 }
 
 //+
-// بستن جزئی معامله
+// Ø¨Ø³ØªÙ Ø¬Ø²Ø¦Û ÙØ¹Ø§ÙÙÙ
 //+
 bool CTradeManager::CloseTradePartial(const ulong ticket, const double volume, const string reason) {
    if(!PositionSelectByTicket(ticket)) {
-      LogMessage("پوزیشن یافت نشد: " + IntegerToString(ticket), "ERROR");
+      LogMessage("Ù¾ÙØ²ÛØ´Ù ÛØ§ÙØª ÙØ´Ø¯: " + IntegerToString(ticket), "ERROR");
       return false;
    }
 
    double currentVolume = PositionGetDouble(POSITION_VOLUME);
    double closeVolume = NormalizeVolume(MathMin(volume, currentVolume));
 
-   LogMessage(StringFormat("بستن جزئی #%I64u | %.2f از %.2f | دلیل: %s",
+   LogMessage(StringFormat("Ø¨Ø³ØªÙ Ø¬Ø²Ø¦Û #%I64u | %.2f Ø§Ø² %.2f | Ø¯ÙÛÙ: %s",
       ticket, closeVolume, currentVolume, reason), "TRADE");
 
    bool success = m_trade.PositionClose(ticket, closeVolume);
 
    if(!success) {
       int error = GetLastError();
-      LogMessage("خطا در بستن جزئی: " + GetLastErrorDescription(error), "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø¨Ø³ØªÙ Ø¬Ø²Ø¦Û: " + GetLastErrorDescription(error), "ERROR");
       return false;
    }
 
@@ -950,7 +950,7 @@ bool CTradeManager::CloseTradePartial(const ulong ticket, const double volume, c
 }
 
 //+
-// بستن همه معاملات
+// Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª
 //+
 bool CTradeManager::CloseAllTrades(const string direction) {
    int closed = 0;
@@ -970,27 +970,27 @@ bool CTradeManager::CloseAllTrades(const string direction) {
          if(direction == "sell" && posType != POSITION_TYPE_SELL) continue;
       }
 
-      if(CloseTrade(ticket, "بستن همه")) {
+      if(CloseTrade(ticket, "Ø¨Ø³ØªÙ ÙÙÙ")) {
          closed++;
       } else {
          failed++;
       }
    }
 
-   LogMessage(StringFormat("بسته شد: %d | ناموفق: %d", closed, failed), "TRADE");
+   LogMessage(StringFormat("Ø¨Ø³ØªÙ Ø´Ø¯: %d | ÙØ§ÙÙÙÙ: %d", closed, failed), "TRADE");
 
    return failed == 0;
 }
 
 //+
-// بستن همه معاملات نماد
+// Ø¨Ø³ØªÙ ÙÙÙ ÙØ¹Ø§ÙÙØ§Øª ÙÙØ§Ø¯
 //+
 bool CTradeManager::CloseAllTradesBySymbol() {
    return CloseAllTrades("");
 }
 
 //+
-// بستن معاملات سودده
+// Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø³ÙØ¯Ø¯Ù
 //+
 bool CTradeManager::CloseProfitableTrades() {
    int closed = 0;
@@ -1006,19 +1006,19 @@ bool CTradeManager::CloseProfitableTrades() {
       double profit = PositionGetDouble(POSITION_PROFIT);
 
       if(profit > 0) {
-         if(CloseTrade(ticket, "بستن سودده")) {
+         if(CloseTrade(ticket, "Ø¨Ø³ØªÙ Ø³ÙØ¯Ø¯Ù")) {
             closed++;
          }
       }
    }
 
-   LogMessage(StringFormat("معاملات سودده بسته شد: %d", closed), "INFO");
+   LogMessage(StringFormat("ÙØ¹Ø§ÙÙØ§Øª Ø³ÙØ¯Ø¯Ù Ø¨Ø³ØªÙ Ø´Ø¯: %d", closed), "INFO");
 
    return closed > 0;
 }
 
 //+
-// بستن معاملات زیان‌ده
+// Ø¨Ø³ØªÙ ÙØ¹Ø§ÙÙØ§Øª Ø²ÛØ§ÙâØ¯Ù
 //+
 bool CTradeManager::CloseLosingTrades() {
    int closed = 0;
@@ -1034,19 +1034,19 @@ bool CTradeManager::CloseLosingTrades() {
       double profit = PositionGetDouble(POSITION_PROFIT);
 
       if(profit < 0) {
-         if(CloseTrade(ticket, "بستن زیان‌ده")) {
+         if(CloseTrade(ticket, "Ø¨Ø³ØªÙ Ø²ÛØ§ÙâØ¯Ù")) {
             closed++;
          }
       }
    }
 
-   LogMessage(StringFormat("معاملات زیان‌ده بسته شد: %d", closed), "INFO");
+   LogMessage(StringFormat("ÙØ¹Ø§ÙÙØ§Øª Ø²ÛØ§ÙâØ¯Ù Ø¨Ø³ØªÙ Ø´Ø¯: %d", closed), "INFO");
 
    return closed > 0;
 }
 
 //+
-// تغییر SL و TP
+// ØªØºÛÛØ± SL Ù TP
 //+
 bool CTradeManager::ModifySlTp(const ulong ticket, const double sl, const double tp) {
    if(!PositionSelectByTicket(ticket)) {
@@ -1067,7 +1067,7 @@ bool CTradeManager::ModifySlTp(const ulong ticket, const double sl, const double
 }
 
 //+
-// تغییر SL
+// ØªØºÛÛØ± SL
 //+
 bool CTradeManager::ModifySl(const ulong ticket, const double sl) {
    if(!PositionSelectByTicket(ticket)) {
@@ -1079,7 +1079,7 @@ bool CTradeManager::ModifySl(const ulong ticket, const double sl) {
 }
 
 //+
-// تغییر TP
+// ØªØºÛÛØ± TP
 //+
 bool CTradeManager::ModifyTp(const ulong ticket, const double tp) {
    if(!PositionSelectByTicket(ticket)) {
@@ -1091,7 +1091,7 @@ bool CTradeManager::ModifyTp(const ulong ticket, const double tp) {
 }
 
 //+
-// انتقال به نقطه سر به سر
+// Ø§ÙØªÙØ§Ù Ø¨Ù ÙÙØ·Ù Ø³Ø± Ø¨Ù Ø³Ø±
 //+
 bool CTradeManager::MoveToBreakeven(const ulong ticket) {
    if(!PositionSelectByTicket(ticket)) {
@@ -1121,13 +1121,13 @@ bool CTradeManager::MoveToBreakeven(const ulong ticket) {
       newSl = NormalizePrice(openPrice - 10 * m_point);
    }
 
-   LogMessage(StringFormat("انتقال به BE: #%I64u | %.5f", ticket, newSl), "TRADE");
+   LogMessage(StringFormat("Ø§ÙØªÙØ§Ù Ø¨Ù BE: #%I64u | %.5f", ticket, newSl), "TRADE");
 
    return ModifySlTp(ticket, newSl, currentTp);
 }
 
 //+
-// تنظیم تریلینگ استاپ
+// ØªÙØ¸ÛÙ ØªØ±ÛÙÛÙÚ¯ Ø§Ø³ØªØ§Ù¾
 //+
 bool CTradeManager::SetTrailingStop(const ulong ticket, const double distance, const double step) {
    if(!PositionSelectByTicket(ticket)) {
@@ -1165,13 +1165,13 @@ bool CTradeManager::SetTrailingStop(const ulong ticket, const double distance, c
       }
    }
 
-   LogMessage(StringFormat("تریلینگ: #%I64u | SL: %.5f", ticket, newSl), "TRADE");
+   LogMessage(StringFormat("ØªØ±ÛÙÛÙÚ¯: #%I64u | SL: %.5f", ticket, newSl), "TRADE");
 
    return ModifySlTp(ticket, newSl, currentTp);
 }
 
 //+
-// حذف سفارش پندینگ
+// Ø­Ø°Ù Ø³ÙØ§Ø±Ø´ Ù¾ÙØ¯ÛÙÚ¯
 //+
 bool CTradeManager::DeletePendingOrder(const ulong ticket) {
    if(!OrderSelect(ticket)) {
@@ -1182,7 +1182,7 @@ bool CTradeManager::DeletePendingOrder(const ulong ticket) {
 }
 
 //+
-// تغییر سفارش پندینگ
+// ØªØºÛÛØ± Ø³ÙØ§Ø±Ø´ Ù¾ÙØ¯ÛÙÚ¯
 //+
 bool CTradeManager::ModifyPendingOrder(const ulong ticket, const double price, const double sl, const double tp) {
    if(!OrderSelect(ticket)) {
@@ -1197,7 +1197,7 @@ bool CTradeManager::ModifyPendingOrder(const ulong ticket, const double price, c
 }
 
 //+
-// حذف همه سفارش‌های پندینگ
+// Ø­Ø°Ù ÙÙÙ Ø³ÙØ§Ø±Ø´âÙØ§Û Ù¾ÙØ¯ÛÙÚ¯
 //+
 int CTradeManager::DeleteAllPendingOrders() {
    int deleted = 0;
@@ -1213,13 +1213,13 @@ int CTradeManager::DeleteAllPendingOrders() {
       }
    }
 
-   LogMessage(StringFormat("سفارش‌های پندینگ حذف شد: %d", deleted), "INFO");
+   LogMessage(StringFormat("Ø³ÙØ§Ø±Ø´âÙØ§Û Ù¾ÙØ¯ÛÙÚ¯ Ø­Ø°Ù Ø´Ø¯: %d", deleted), "INFO");
 
    return deleted;
 }
 
 //+
-// شمارش سفارش‌های پندینگ
+// Ø´ÙØ§Ø±Ø´ Ø³ÙØ§Ø±Ø´âÙØ§Û Ù¾ÙØ¯ÛÙÚ¯
 //+
 int CTradeManager::CountPendingOrders() {
    int count = 0;
@@ -1237,7 +1237,7 @@ int CTradeManager::CountPendingOrders() {
 }
 
 //+
-// تعداد پوزیشن‌های باز
+// ØªØ¹Ø¯Ø§Ø¯ Ù¾ÙØ²ÛØ´ÙâÙØ§Û Ø¨Ø§Ø²
 //+
 int CTradeManager::GetOpenPositionsCount() {
    int count = 0;
@@ -1257,7 +1257,7 @@ int CTradeManager::GetOpenPositionsCount() {
 }
 
 //+
-// تعداد پوزیشن خرید
+// ØªØ¹Ø¯Ø§Ø¯ Ù¾ÙØ²ÛØ´Ù Ø®Ø±ÛØ¯
 //+
 int CTradeManager::GetBuyPositionsCount() {
    int count = 0;
@@ -1280,7 +1280,7 @@ int CTradeManager::GetBuyPositionsCount() {
 }
 
 //+
-// تعداد پوزیشن فروش
+// ØªØ¹Ø¯Ø§Ø¯ Ù¾ÙØ²ÛØ´Ù ÙØ±ÙØ´
 //+
 int CTradeManager::GetSellPositionsCount() {
    int count = 0;
@@ -1303,7 +1303,7 @@ int CTradeManager::GetSellPositionsCount() {
 }
 
 //+
-// سود معاملات باز
+// Ø³ÙØ¯ ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø²
 //+
 double CTradeManager::GetOpenProfit() {
    double profit = 0;
@@ -1323,7 +1323,7 @@ double CTradeManager::GetOpenProfit() {
 }
 
 //+
-// سود معاملات باز بر اساس جهت
+// Ø³ÙØ¯ ÙØ¹Ø§ÙÙØ§Øª Ø¨Ø§Ø² Ø¨Ø± Ø§Ø³Ø§Ø³ Ø¬ÙØª
 //+
 double CTradeManager::GetOpenProfitByDirection(const ENUM_POSITION_TYPE direction) {
    double profit = 0;
@@ -1346,7 +1346,7 @@ double CTradeManager::GetOpenProfitByDirection(const ENUM_POSITION_TYPE directio
 }
 
 //+
-// سود/ضرر امروز
+// Ø³ÙØ¯/Ø¶Ø±Ø± Ø§ÙØ±ÙØ²
 //+
 int CTradeManager::GetDailyPnL() {
    double pnl = 0;
@@ -1370,7 +1370,7 @@ int CTradeManager::GetDailyPnL() {
 }
 
 //+
-// میانگین قیمت ورود
+// ÙÛØ§ÙÚ¯ÛÙ ÙÛÙØª ÙØ±ÙØ¯
 //+
 double CTradeManager::GetAverageEntryPrice(const ENUM_POSITION_TYPE direction) {
    double totalValue = 0;
@@ -1400,7 +1400,7 @@ double CTradeManager::GetAverageEntryPrice(const ENUM_POSITION_TYPE direction) {
 }
 
 //+
-// آیا بازار باز است
+// Ø¢ÛØ§ Ø¨Ø§Ø²Ø§Ø± Ø¨Ø§Ø² Ø§Ø³Øª
 //+
 bool CTradeManager::IsMarketOpen() {
    long sessionFlags = SymbolInfoInteger(m_symbol, SYMBOL_SESSION_MODE);
@@ -1408,7 +1408,7 @@ bool CTradeManager::IsMarketOpen() {
 }
 
 //+
-// آیا معامله مجاز است
+// Ø¢ÛØ§ ÙØ¹Ø§ÙÙÙ ÙØ¬Ø§Ø² Ø§Ø³Øª
 //+
 bool CTradeManager::IsTradeAllowed() {
    if(!SymbolInfoInteger(m_symbol, SYMBOL_TRADE_MODE)) {
@@ -1419,7 +1419,7 @@ bool CTradeManager::IsTradeAllowed() {
 }
 
 //+
-// آیا پوزیشن باز دارد
+// Ø¢ÛØ§ Ù¾ÙØ²ÛØ´Ù Ø¨Ø§Ø² Ø¯Ø§Ø±Ø¯
 //+
 bool CTradeManager::HasOpenPosition(const ENUM_POSITION_TYPE direction) {
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
@@ -1442,7 +1442,7 @@ bool CTradeManager::HasOpenPosition(const ENUM_POSITION_TYPE direction) {
 }
 
 //+
-// آخرین پوزیشن
+// Ø¢Ø®Ø±ÛÙ Ù¾ÙØ²ÛØ´Ù
 //+
 ulong CTradeManager::GetLastPositionTicket() {
    ulong lastTicket = 0;
@@ -1468,92 +1468,92 @@ ulong CTradeManager::GetLastPositionTicket() {
 }
 
 //+
-// گزارش معاملات
+// Ú¯Ø²Ø§Ø±Ø´ ÙØ¹Ø§ÙÙØ§Øª
 //+
 string CTradeManager::GetTradeReport() {
-   string report = "📊 گزارش معاملات\n\n";
+   string report = "ð Ú¯Ø²Ø§Ø±Ø´ ÙØ¹Ø§ÙÙØ§Øª\n\n";
 
-   report += StringFormat("معاملات امروز: %d\n", CountTodayTrades());
-   report += StringFormat("پوزیشن‌های باز: %d\n", GetOpenPositionsCount());
-   report += StringFormat("خرید: %d | فروش: %d\n", GetBuyPositionsCount(), GetSellPositionsCount());
-   report += StringFormat("سود/ضرر باز: $%.2f\n", GetOpenProfit());
+   report += StringFormat("ÙØ¹Ø§ÙÙØ§Øª Ø§ÙØ±ÙØ²: %d\n", CountTodayTrades());
+   report += StringFormat("Ù¾ÙØ²ÛØ´ÙâÙØ§Û Ø¨Ø§Ø²: %d\n", GetOpenPositionsCount());
+   report += StringFormat("Ø®Ø±ÛØ¯: %d | ÙØ±ÙØ´: %d\n", GetBuyPositionsCount(), GetSellPositionsCount());
+   report += StringFormat("Ø³ÙØ¯/Ø¶Ø±Ø± Ø¨Ø§Ø²: $%.2f\n", GetOpenProfit());
 
    if(m_riskManager != NULL) {
       report += "\n" + m_riskManager.GetRiskReport();
    }
 
-   report += StringFormat("\n آمار اجرا:\n");
-   report += StringFormat("کل سفارشات: %d\n", m_totalOrders);
-   report += StringFormat("موفق: %d | ناموفق: %d\n", m_successfulOrders, m_failedOrders);
+   report += StringFormat("\n Ø¢ÙØ§Ø± Ø§Ø¬Ø±Ø§:\n");
+   report += StringFormat("Ú©Ù Ø³ÙØ§Ø±Ø´Ø§Øª: %d\n", m_totalOrders);
+   report += StringFormat("ÙÙÙÙ: %d | ÙØ§ÙÙÙÙ: %d\n", m_successfulOrders, m_failedOrders);
 
    return report;
 }
 
 //+
-// توضیح خطا
+// ØªÙØ¶ÛØ­ Ø®Ø·Ø§
 //+
 string CTradeManager::GetLastErrorDescription(const int code) {
    switch(code) {
-      case 0: return "بدون خطا";
-      case 4756: return "خطا در ارسال درخواست";
-      case 10004: return "درخواست در حال پردازش";
-      case 10006: return "درخواست رد شد";
-      case 10007: return "درخواست لغو شد";
-      case 10010: return "فقط بخشی از درخواست اجرا شد";
-      case 10011: return "خطای تجاری";
-      case 10012: return "درخواست در انتظار";
-      case 10013: return "درخواست نامعتبر";
-      case 10014: return "حجم نامعتبر";
-      case 10015: return "قیمت نامعتبر";
-      case 10016: return "سطوح نامعتبر";
-      case 10017: return "خبر اقتصادی";
-      case 10018: return "بازار بسته";
-      case 10019: return "مارجین کافی نیست";
-      case 10020: return "موجودی کافی نیست";
-      case 10021: return "فروش ممنوع";
-      case 10022: return "خرید ممنوع";
-      case 10023: return "سفارش تکراری";
-      case 10024: return "درخواست çok زیاد";
-      case 10025: return "تغییرات نامعتبر";
-      case 10026: return "معامله غیرفعال";
-      case 10027: return "اتومات غیرفعال";
-      case 10028: return "درخواست محدود";
-      case 10029: return "اتصال قطع";
-      case 10030: return "فقط برای واقعی";
-      case 10031: return "در انتظار خبر";
-      case 10032: return "نوع سفارش نامعتبر";
-      case 10033: return "شناسه نامعتبر";
-      case 10034: return "باز شدن مجاز نیست";
-      case 10035: return "تاریخ نامعتبر";
-      case 10036: return "سفارش تکراری";
-      case 10038: return "مقدار نامعتبر";
-      case 10039: return "پوزیشن بسته";
-      case 10040: return "سفارش بسته";
-      case 10041: return "فقط بستن مجاز";
-      case -1: return "اسپرد بالا";
-      case -2: return "مارجین کافی نیست";
-      case -3: return "قیمت سفارش پندینگ نامعتبر";
-      case -4: return "قیمت در محدوده freeze level";
-      case -5: return "محدودیت ریسک";
-      case -6: return "سیگنال نامعتبر";
-      case -7: return "خطا در ایجاد درخواست";
-      default: return "خطای نامشخص: " + IntegerToString(code);
+      case 0: return "Ø¨Ø¯ÙÙ Ø®Ø·Ø§";
+      case 4756: return "Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±Ø³Ø§Ù Ø¯Ø±Ø®ÙØ§Ø³Øª";
+      case 10004: return "Ø¯Ø±Ø®ÙØ§Ø³Øª Ø¯Ø± Ø­Ø§Ù Ù¾Ø±Ø¯Ø§Ø²Ø´";
+      case 10006: return "Ø¯Ø±Ø®ÙØ§Ø³Øª Ø±Ø¯ Ø´Ø¯";
+      case 10007: return "Ø¯Ø±Ø®ÙØ§Ø³Øª ÙØºÙ Ø´Ø¯";
+      case 10010: return "ÙÙØ· Ø¨Ø®Ø´Û Ø§Ø² Ø¯Ø±Ø®ÙØ§Ø³Øª Ø§Ø¬Ø±Ø§ Ø´Ø¯";
+      case 10011: return "Ø®Ø·Ø§Û ØªØ¬Ø§Ø±Û";
+      case 10012: return "Ø¯Ø±Ø®ÙØ§Ø³Øª Ø¯Ø± Ø§ÙØªØ¸Ø§Ø±";
+      case 10013: return "Ø¯Ø±Ø®ÙØ§Ø³Øª ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10014: return "Ø­Ø¬Ù ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10015: return "ÙÛÙØª ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10016: return "Ø³Ø·ÙØ­ ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10017: return "Ø®Ø¨Ø± Ø§ÙØªØµØ§Ø¯Û";
+      case 10018: return "Ø¨Ø§Ø²Ø§Ø± Ø¨Ø³ØªÙ";
+      case 10019: return "ÙØ§Ø±Ø¬ÛÙ Ú©Ø§ÙÛ ÙÛØ³Øª";
+      case 10020: return "ÙÙØ¬ÙØ¯Û Ú©Ø§ÙÛ ÙÛØ³Øª";
+      case 10021: return "ÙØ±ÙØ´ ÙÙÙÙØ¹";
+      case 10022: return "Ø®Ø±ÛØ¯ ÙÙÙÙØ¹";
+      case 10023: return "Ø³ÙØ§Ø±Ø´ ØªÚ©Ø±Ø§Ø±Û";
+      case 10024: return "Ø¯Ø±Ø®ÙØ§Ø³Øª Ã§ok Ø²ÛØ§Ø¯";
+      case 10025: return "ØªØºÛÛØ±Ø§Øª ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10026: return "ÙØ¹Ø§ÙÙÙ ØºÛØ±ÙØ¹Ø§Ù";
+      case 10027: return "Ø§ØªÙÙØ§Øª ØºÛØ±ÙØ¹Ø§Ù";
+      case 10028: return "Ø¯Ø±Ø®ÙØ§Ø³Øª ÙØ­Ø¯ÙØ¯";
+      case 10029: return "Ø§ØªØµØ§Ù ÙØ·Ø¹";
+      case 10030: return "ÙÙØ· Ø¨Ø±Ø§Û ÙØ§ÙØ¹Û";
+      case 10031: return "Ø¯Ø± Ø§ÙØªØ¸Ø§Ø± Ø®Ø¨Ø±";
+      case 10032: return "ÙÙØ¹ Ø³ÙØ§Ø±Ø´ ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10033: return "Ø´ÙØ§Ø³Ù ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10034: return "Ø¨Ø§Ø² Ø´Ø¯Ù ÙØ¬Ø§Ø² ÙÛØ³Øª";
+      case 10035: return "ØªØ§Ø±ÛØ® ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10036: return "Ø³ÙØ§Ø±Ø´ ØªÚ©Ø±Ø§Ø±Û";
+      case 10038: return "ÙÙØ¯Ø§Ø± ÙØ§ÙØ¹ØªØ¨Ø±";
+      case 10039: return "Ù¾ÙØ²ÛØ´Ù Ø¨Ø³ØªÙ";
+      case 10040: return "Ø³ÙØ§Ø±Ø´ Ø¨Ø³ØªÙ";
+      case 10041: return "ÙÙØ· Ø¨Ø³ØªÙ ÙØ¬Ø§Ø²";
+      case -1: return "Ø§Ø³Ù¾Ø±Ø¯ Ø¨Ø§ÙØ§";
+      case -2: return "ÙØ§Ø±Ø¬ÛÙ Ú©Ø§ÙÛ ÙÛØ³Øª";
+      case -3: return "ÙÛÙØª Ø³ÙØ§Ø±Ø´ Ù¾ÙØ¯ÛÙÚ¯ ÙØ§ÙØ¹ØªØ¨Ø±";
+      case -4: return "ÙÛÙØª Ø¯Ø± ÙØ­Ø¯ÙØ¯Ù freeze level";
+      case -5: return "ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©";
+      case -6: return "Ø³ÛÚ¯ÙØ§Ù ÙØ§ÙØ¹ØªØ¨Ø±";
+      case -7: return "Ø®Ø·Ø§ Ø¯Ø± Ø§ÛØ¬Ø§Ø¯ Ø¯Ø±Ø®ÙØ§Ø³Øª";
+      default: return "Ø®Ø·Ø§Û ÙØ§ÙØ´Ø®Øµ: " + IntegerToString(code);
    }
 }
 
 //+
-// چاپ نتیجه سفارش
+// ÚØ§Ù¾ ÙØªÛØ¬Ù Ø³ÙØ§Ø±Ø´
 //+
 void CTradeManager::PrintOrderResult(const OrderResult &result) {
    if(result.success) {
-      Print("✅ سفارش موفق");
-      Print(StringFormat("   Ticket: #%I64u", result.positionTicket));
-      Print(StringFormat("   Price: %.5f", result.executedPrice));
-      Print(StringFormat("   Volume: %.2f", result.executedVolume));
+      LogMessage("✅ سفارش موفق", "TRADE");
+      LogMessage(StringFormat("   Ticket: #%I64u", result.positionTicket), "TRADE");
+      LogMessage(StringFormat("   Price: %.5f", result.executedPrice), "TRADE");
+      LogMessage(StringFormat("   Volume: %.2f", result.executedVolume), "TRADE");
    } else {
-      Print("❌ سفارش ناموفق");
-      Print(StringFormat("   Error: %s", result.errorMessage));
-      Print(StringFormat("   Code: %d", result.errorCode));
+      LogMessage("❌ سفارش ناموفق", "ERROR");
+      LogMessage(StringFormat("   Error: %s", result.errorMessage), "ERROR");
+      LogMessage(StringFormat("   Code: %d", result.errorCode), "ERROR");
    }
 }
 //+------------------------------------------------------------------+
