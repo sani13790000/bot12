@@ -1,71 +1,74 @@
 """
-هندلرهای ربات تلگرام
+===============================================================================
+Galaxy Vast AI Trading Platform
+ثبت همه هندلرهای تلگرام
 
-این فایل تمام هندلرهای ربات تلگرام را ثبت می‌کند.
-هر هندلر مستقل است و می‌تواند فعال/غیرفعال شود.
+این فایل تمام هندلرها را به dispatcher اصلی وصل می‌کند.
+ترتیب ثبت مهم است — هندلرهای عمومی‌تر بعد از خاص‌تر باشند.
 
-نویسنده: MT5 Trading Team
+نویسنده: Galaxy Vast Team
+نسخه: 2.1.0 — فاز ۲: Semi-Auto handler اضافه شد
 """
 
+import logging
 from aiogram import Dispatcher
 
 from .start import register_start_handlers
-from .analysis import register_analysis_handlers
+from .control import register_control_handlers
 from .trades import register_trade_handlers
 from .signals import register_signal_handlers
 from .settings import register_settings_handlers
 from .reports import register_report_handlers
-from .control import register_control_handlers
 from .alerts import register_alert_handlers
 from .admin_users import register_admin_user_handlers
+from .semi_auto import register_semi_auto_handlers
 
-from ....core.logger import get_logger
-
-logger = get_logger("telegram.handlers")
+logger = logging.getLogger("telegram.handlers")
 
 
 def setup_handlers(dp: Dispatcher) -> None:
     """
-    ثبت تمام هندلرهای ربات تلگرام
+    ثبت تمام هندلرهای تلگرام در dispatcher
 
-    ترتیب ثبت مهم است:
-    ابتدا هندلرهای اصلی، سپس admin، سپس fallback
+    ترتیب ثبت:
+    ۱. start — پیام خوشامدگویی و منوی اصلی
+    ۲. semi_auto — تأیید/رد سیگنال (callback های inline keyboard)
+    ۳. control — کنترل ربات (start/stop/pause/resume)
+    ۴. trades — مدیریت معاملات (close_all/buy/sell)
+    ۵. signals — مشاهده و اجرای سیگنال‌ها
+    ۶. reports — گزارش‌های روزانه/هفتگی/ماهانه
+    ۷. alerts — هشدارهای خودکار
+    ۸. settings — تنظیمات ربات
+    ۹. admin_users — مدیریت کاربران (فقط ADMIN+)
+
+    ورودی:
+        dp: Dispatcher اصلی aiogram
     """
-
-    # --- هندلر اصلی شروع ---
     register_start_handlers(dp)
-    logger.debug("هندلر start ثبت شد")
+    logger.debug("✅ start handlers ثبت شدند")
 
-    # --- هندلر کنترل ربات (start/stop/pause/resume) ---
+    register_semi_auto_handlers(dp)
+    logger.debug("✅ semi_auto handlers ثبت شدند")
+
     register_control_handlers(dp)
-    logger.debug("هندلر control ثبت شد")
+    logger.debug("✅ control handlers ثبت شدند")
 
-    # --- هندلر تحلیل بازار ---
-    register_analysis_handlers(dp)
-    logger.debug("هندلر analysis ثبت شد")
-
-    # --- هندلر معاملات ---
     register_trade_handlers(dp)
-    logger.debug("هندلر trades ثبت شد")
+    logger.debug("✅ trade handlers ثبت شدند")
 
-    # --- هندلر سیگنال‌ها ---
     register_signal_handlers(dp)
-    logger.debug("هندلر signals ثبت شد")
+    logger.debug("✅ signal handlers ثبت شدند")
 
-    # --- هندلر تنظیمات ---
-    register_settings_handlers(dp)
-    logger.debug("هندلر settings ثبت شد")
-
-    # --- هندلر گزارش‌ها ---
     register_report_handlers(dp)
-    logger.debug("هندلر reports ثبت شد")
+    logger.debug("✅ report handlers ثبت شدند")
 
-    # --- هندلر هشدارها (alert callbacks) ---
     register_alert_handlers(dp)
-    logger.debug("هندلر alerts ثبت شد")
+    logger.debug("✅ alert handlers ثبت شدند")
 
-    # --- هندلر مدیریت کاربران (فقط ADMIN+) ---
+    register_settings_handlers(dp)
+    logger.debug("✅ settings handlers ثبت شدند")
+
     register_admin_user_handlers(dp)
-    logger.debug("هندلر admin_users ثبت شد")
+    logger.debug("✅ admin_users handlers ثبت شدند")
 
-    logger.info("تمام هندلرهای تلگرام با موفقیت ثبت شدند — ۹ هندلر فعال")
+    logger.info("🌌 Galaxy Vast — تمام ۹ هندلر با موفقیت ثبت شدند")
