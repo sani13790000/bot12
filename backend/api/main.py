@@ -1,5 +1,4 @@
-"""
-faz F+G+H+I - Main FastAPI application
+"""faz F+G+H+I — Main FastAPI application.
 Sentry + RateLimit + CircuitBreaker + Observability + Security + Health
 """
 from __future__ import annotations
@@ -72,7 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # 5. Circuit breaker patch
     try:
-        from backend.analysis import decision_engine_patch  # noqa: F401
+        from backend.analysis import decision_engine_patch
         logger.info("Decision engine patch applied")
     except Exception as e:
         logger.warning(f"Decision engine patch skipped: {e}")
@@ -106,14 +105,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(
     title="Galaxy Vast AI Trading Bot",
     version="1.0.0",
-    description="AI-powered XAUUSD trading system with SMC + ML",
+    description="AI-powered XAUUSD trading system with SMC + ML + Institutional modules",
     lifespan=lifespan,
 )
 
 # CORS
 allowed_origins_str = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173",
+    "http://localhost:3000,http://localhost:5173,http://localhost:8501",
 )
 allowed_origins = [o.strip() for o in allowed_origins_str.split(",") if o.strip()]
 app.add_middleware(
@@ -146,47 +145,32 @@ except Exception as e:
 from backend.api.observability_routes import router as obs_router
 app.include_router(obs_router)
 
-try:
-    from backend.api.routes.auth import router as auth_router
-    app.include_router(auth_router, prefix="/auth", tags=["auth"])
-except Exception as e:
-    logger.warning(f"auth router skipped: {e}")
+# Institutional router loaded directly (no silent failure)
+from backend.api.routes.institutional import router as institutional_router
+app.include_router(institutional_router, prefix="/research/institutional", tags=["institutional"])
+logger.info("Institutional router registered")
 
-try:
-    from backend.api.routes.signals import router as signals_router
-    app.include_router(signals_router, prefix="/signals", tags=["signals"])
-except Exception as e:
-    logger.warning(f"signals router skipped: {e}")
+# Existing routers - loaded directly; startup will fail fast if broken
+from backend.api.routes.auth import router as auth_router
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
-try:
-    from backend.api.routes.trades import router as trades_router
-    app.include_router(trades_router, prefix="/trades", tags=["trades"])
-except Exception as e:
-    logger.warning(f"trades router skipped: {e}")
+from backend.api.routes.signals import router as signals_router
+app.include_router(signals_router, prefix="/signals", tags=["signals"])
 
-try:
-    from backend.api.routes.agents import router as agents_router
-    app.include_router(agents_router, prefix="/agents", tags=["agents"])
-except Exception as e:
-    logger.warning(f"agents router skipped: {e}")
+from backend.api.routes.trades import router as trades_router
+app.include_router(trades_router, prefix="/trades", tags=["trades"])
 
-try:
-    from backend.api.routes.research import router as research_router
-    app.include_router(research_router, prefix="/research", tags=["research"])
-except Exception as e:
-    logger.warning(f"research router skipped: {e}")
+from backend.api.routes.agents import router as agents_router
+app.include_router(agents_router, prefix="/agents", tags=["agents"])
 
-try:
-    from backend.api.routes.analytics import router as analytics_router
-    app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
-except Exception as e:
-    logger.warning(f"analytics router skipped: {e}")
+from backend.api.routes.research import router as research_router
+app.include_router(research_router, prefix="/research", tags=["research"])
 
-try:
-    from backend.api.routes.intelligence import router as intelligence_router
-    app.include_router(intelligence_router, prefix="/intelligence", tags=["intelligence"])
-except Exception as e:
-    logger.warning(f"intelligence router skipped: {e}")
+from backend.api.routes.analytics import router as analytics_router
+app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
+
+from backend.api.routes.intelligence import router as intelligence_router
+app.include_router(intelligence_router, prefix="/intelligence", tags=["intelligence"])
 
 
 # Health endpoint
@@ -220,7 +204,6 @@ async def health_check() -> dict:
     except Exception:
         pool_status = {}
 
-    # Secret validation status
     try:
         from backend.middleware.secret_manager import validate_secrets
         secret_status = validate_secrets().summary()
@@ -268,6 +251,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         content={
             "error": "internal_server_error",
             "message": "An unexpected error occurred",
-            "message_fa": "\u062e\u0637\u0627\u06cc \u062f\u0627\u062e\u0644\u06cc \u0633\u0631\u0648\u0631 \u0631\u062e \u062f\u0627\u062f",
+            "message_fa": "خطای داخلی رخ داد",
         },
     )
