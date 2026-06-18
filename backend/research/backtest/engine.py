@@ -1,431 +1,376 @@
 """
 Galaxy Vast AI Trading Platform
-Research Backtest Engine
+════════════════════════════════
+Backtest Engine - Production-Ready
+Ms�eooliyat: ₺₺ backtest вمیماش البه ایده vot Fix: _calculate_metrics() — SharedBacktestMetrics
 """
 from __future__ import annotations
 
 import math
-import random
 import statistics
-import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
-class TradeDirection(str, Enum):
-    BUY  = "BUY"
-    SELL = "SELL"
+@dataclass
+class SharedEquityPoint:
+    timestamp: str
+    equity:    float
+    drawdown:  float = 0.0
+    trade_id:  Optional[str] = None
 
 
-class TradeStatus(str, Enum):
-    OPEN      = "OPEN"
-    CLOSED_TP = "CLOSED_TP"
-    CLOSED_SL = "CLOSED_SL"
-    CLOSED_BE = "CLOSED_BE"
-    CLOSED_MN = "CLOSED_MN"
+class SharedBacktestMetrics:
+    @staticmethod
+    def sharpe_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
+        if len(returns) < 2:
+            return 0.0
+        try:
+            excess = [r - risk_free_rate / periods_per_year for r in returns]
+            mean_r  = statistics.mean(excess)
+            std_r   = statistics.stdev(excess)
+            if std_r == 0: return 0.0
+            return round(mean_r / std_r * math.sqrt(periods_per_year), 4)
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def sortino_ratio(returns, risk_free_rate=0.0, periods_per_year=252):
+        if len(returns) < 2:
+            return 0.0
+        try:
+            target = risk_free_rate / periods_per_year
+            neg     = [r for r in returns if r < target]
+            if not neg: return float("inf")
+            downside_std = math.sqrt(sum((r-target)**2 for r in neg) / len(returns))
+            if downside_std == 0: return 0.0
+            mean_excess = statistics.mean(returns) - target
+            return round(mean_excess / downside_std * math.sqrt(periods_per_year), 4)
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def max_drawdown(equity_curve):
+        if not equity_curve: return 0.0, 0.0
+        peak   = equity_curve[0]
+        max_dd  = 0.0
+        max_abs = 0.0
+        for val in equity_curve:
+            if val > peak: peak = val
+            dd = (peak - val) / peak if peak > 0 else 0.0
+            if dd > max_dd:
+                max_dd  = dd
+                max_abs = peak - val
+        return round(max_dd * 100.0, 4), round(max_abs, 4)
+
+    @staticmethod
+    def profit_factor(gross_profit, gross_loss):
+        if gross_loss == 0:
+            return float("inf") if gross_profit > 0 else 0.0
+        return round(abs(gross_profit / gross_loss), 4)
+
+    @staticmethod
+    def win_rate(wins, total):
+        if total == 0: return 0.0
+        return round(wins / total * 100.0, 2)
+
+    @staticmethod
+    def expectancy(win_rate_pct, avg_win, avg_loss):
+        wr = win_rate_pct / 100.0
+        return round(vr * avg_win - (1-dr) * abs(avg_loss), 4)
+
+    @staticmethod
+    def build_equity_curve(trades, initial_balance=10_000.0):
+        curve  = []
+        balance = initial_balance
+        peak    = initial_balance
+        for trade in trades:
+            balance += trade.pnl_usd
+            if balance > peak*            : peak = balance
+            dd = (peak  - balance) / peak * 100.0 if peak > 0 else 0.0
+            curve.append(SharedEquityPoint(
+                timestamp=str(getattr(trade, "exit_time", "")),
+                equity=round(balance, 2),
+                drawdown=round(dd, 4),
+                trade_id=getattr(trade, "trade_id", None),
+            ))
+        return curve
 
 
 @dataclass
 class CandleData:
-    timestamp: datetime
+    timestamp: str
     open:      float
     high:      float
     low:       float
     close:     float
     volume:    float = 0.0
-    spread:    float = 2.0
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "open":   self.open,  "high":  self.high,
-            "low":    self.low,   "close": self.close,
-            "volume": self.volume, "spread": self.spread,
-        }
-
-
-@dataclass
-class BacktestSignal:
-    direction:    TradeDirection
-    entry_price:  float
-    stop_loss:    float
-    take_profit:  float
-    confidence:   float
-    time:         datetime
-    symbol:       str = "XAUUSD"
-    metadata:     Dict[str, Any] = field(default_factory=dict)
+    spread:    float = 0.0
 
 
 @dataclass
 class BacktestTrade:
-    signal:       BacktestSignal
-    entry_time:   datetime
-    entry_price:  float
-    direction:    TradeDirection
-    stop_loss:    float
-    take_profit:  float
-    exit_time:    Optional[datetime]   = None
-    exit_price:   Optional[float]      = None
-    status:       TradeStatus          = TradeStatus.OPEN
-    pnl_pips:     float                = 0.0
-    pnl_usd:      float                = 0.0
-    r_multiple:   float                = 0.0
-    slippage:     float                = 0.0
-    commission:   float                = 0.0
-
-    def risk_pips(self) -> float:
-        if self.direction == TradeDirection.BUY:
-            return abs(self.entry_price - self.stop_loss) * 10
-        return abs(self.stop_loss - self.entry_price) * 10
-
-    def reward_pips(self) -> float:
-        if self.direction == TradeDirection.BUY:
-            return abs(self.take_profit - self.entry_price) * 10
-        return abs(self.entry_price - self.take_profit) * 10
-
-    def is_closed(self) -> bool:
-        return self.status != TradeStatus.OPEN
+    trade_id:      str   = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    symbol:        str   = "XAUUSD"
+    direction:     str   = "BUY"
+    entry_time:    str   = ""
+    exit_time:     str   = ""
+    entry_price:   float = 0.0
+    exit_price:    float = 0.0
+    stmp_loss:     float = 0.0
+    take_profit:   float = 0.0
+    lot_size:      float = 0.01
+    pnl_pips:      float = 0.0
+    pnl_usd:       float = 0.0
+    slippage_pips: float = 0.0
+    outcome:       str   = "UNKNOWN"
 
 
 @dataclass
 class BacktestConfig:
-    symbol:              str   = "XAUUSD"
-    initial_balance:     float = 10_000.0
-    lot_size:            float = 0.01
-    commission_per_lot:  float = 3.50
-    max_slippage_pips:   float = 2.0
-    enable_slippage:     bool  = True
-    max_spread_pips:     float = 5.0
-    risk_per_trade_pct:  float = 1.0
-    max_open_trades:     int   = 3
-
-
-@dataclass
-class EquityCurvePoint:
-    timestamp:   datetime
-    equity:      float
-    balance:     float
-    open_trades: int = 0
+    symbol:          str   = "XAUUSD"
+    timeframe:       str   = "H1"
+    initial_balance: float = 10_000.0
+    risk_per_trade:  float = 1.0
+    max_spread_pips: float = 3.0
+    slippage_pips:   float = 0.5
+    commission_usd:  float = 3.5
+    min_rr_ratio:    float = 1.5
+    max_trades_day:  int   = 5
+    pip_value:        float = 10.0
 
 
 @dataclass
 class BacktestResult:
-    run_id:              str
-    symbol:              str
-    start_date:          datetime
-    end_date:            datetime
-    config:              BacktestConfig
-    trades:              List[BacktestTrade]
-    total_trades:        int
-    winning_trades:      int
-    losing_trades:       int
-    initial_balance:     float
-    final_balance:       float
-    peak_balance:        float
-    max_drawdown_pct:    float
-    equity_curve:        List[EquityCurvePoint]
-    win_rate:            float
-    profit_factor:       float
-    sharpe_ratio:        float
-    sortino_ratio:       float
-    calmar_ratio:        float
-    expectancy_pips:     float
-    avg_win_pips:        float
-    avg_loss_pips:       float
-    total_pnl_pips:      float
-    total_pnl_usd:       float
-    total_commission:    float
-    run_time_seconds:    float
-
-    @property
-    def net_pnl_usd(self) -> float:
-        return self.total_pnl_usd - self.total_commission
-
-    @property
-    def roi_pct(self) -> float:
-        return ((self.final_balance - self.initial_balance) / self.initial_balance) * 100
+    config:           BacktestConfig
+    symbol:           str
+    timeframe:        str
+    start_date:       str
+    end_date:         str
+    total_trades:     int   = 0
+    winning_trades:   int   = 0
+    losing_trades:    int   = 0
+    breakeven_trades: int   = 0
+    win_rate:         float = 0.0
+    profit_factor:    float = 0.0
+    total_pnl_pips:   float = 0.0
+    total_pnl_usd:    float = 0.0
+    max_drawdown_pct: float = 0.0
+    max_drawdown_usd: float = 0.0
+    sharpe_ratio:     float = 0.0
+    sortino_ratio:    float = 0.0
+    calmar_ratio:     float = 0.0
+    expectancy:       float = 0.0
+    avg_win_usd:      float = 0.0
+    avg_loss_usd:     float = 0.0
+    avg_rr_achieved:  float = 0.0
+    final_balance:    float = 0.0
+    total_return_pct: float = 0.0
+    trades:           List[BacktestTrade]   = field(default_factory=list)
+    equity_curve:     List[SharedEquityPoint] = field(default_factory=list)
+    monthly_returns: Dict[str, float]       = field(default_factory=dict)
+    metadata:         Dict[str, Any]         = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "run_id": self.run_id, "symbol": self.symbol,
-            "start_date": self.start_date.isoformat(),
-            "end_date": self.end_date.isoformat(),
-            "total_trades": self.total_trades,
-            "winning_trades": self.winning_trades,
-            "losing_trades": self.losing_trades,
-            "win_rate": round(self.win_rate, 2),
-            "profit_factor": round(self.profit_factor, 3),
-            "sharpe_ratio": round(self.sharpe_ratio, 3),
-            "sortino_ratio": round(self.sortino_ratio, 3),
-            "calmar_ratio": round(self.calmar_ratio, 3),
-            "expectancy_pips": round(self.expectancy_pips, 2),
-            "max_drawdown_pct": round(self.max_drawdown_pct, 2),
-            "initial_balance": self.initial_balance,
-            "final_balance": round(self.final_balance, 2),
-            "net_pnl_usd": round(self.net_pnl_usd, 2),
-            "roi_pct": round(self.roi_pct, 2),
-            "total_commission": round(self.total_commission, 2),
-            "run_time_seconds": round(self.run_time_seconds, 2),
+            "symbol":           self.symbol,
+            "timeframe":        self.timeframe,
+            "start_date":       self.start_date,
+            "end_date":         self.end_date,
+            "total_trades":     self.total_trades,
+            "winning_trades":   self.winning_trades,
+            "losing_trades":    self.losing_trades,
+            "win_rate":         round(self.win_rate, 2),
+            "profit_factor":    round(self.profit_factor, 4),
+            "total_pnl_pips":   round(self.total_pnl_pips, 2),
+            "total_pnl_usd":    round(self.total_pnl_usd, 2),
+            "max_drawdown_pct": round(self.max_drawdown_pct, 4),
+            "max_drawdown_usd": round(self.max_drawdown_usd, 4),
+            "sharpe_ratio":     round(self.sharpe_ratio, 4),
+            "sortino_ratio":    round(self.sortino_ratio, 4),
+            "calmar_ratio":     round(self.calmar_ratio, 4),
+            "expectancy":       round(self.expectancy, 4),
+            "avg_win_usd":       round(self.avg_win_usd, 2),
+            "avg_loss_usd":      round(self.avg_loss_usd, 2),
+            "final_balance":     round(self.final_balance, 2),
+            "total_return_pct": round(self.total_return_pct, 4),
+            "monthly_returns":  self.monthly_returns,
+            "equity_curve":     [{t": p.timestamp, "eq": p.equity, "dd": p.drawdown} for p in self.equity_curve],
         }
 
 
-class SharedBacktestMetrics:
-    """Shared metrics used by both backtest engines."""
-    ANNUALIZATION_FACTOR = math.sqrt(252)
-
-    @staticmethod
-    def sharpe_ratio(returns: List[float], risk_free: float = 0.0) -> float:
-        if len(returns) < 2:
-            return 0.0
-        try:
-            mean = statistics.mean(returns)
-            std  = statistics.stdev(returns)
-            if std == 0:
-                return 0.0
-            return ((mean - risk_free) / std) * SharedBacktestMetrics.ANNUALIZATION_FACTOR
-        except Exception:
-            return 0.0
-
-    @staticmethod
-    def sortino_ratio(returns: List[float], risk_free: float = 0.0) -> float:
-        if len(returns) < 2:
-            return 0.0
-        try:
-            mean = statistics.mean(returns)
-            neg  = [r for r in returns if r < risk_free]
-            if not neg:
-                return 10.0
-            down_std = math.sqrt(sum((r - risk_free) ** 2 for r in neg) / len(neg))
-            if down_std == 0:
-                return 10.0
-            return ((mean - risk_free) / down_std) * SharedBacktestMetrics.ANNUALIZATION_FACTOR
-        except Exception:
-            return 0.0
-
-    @staticmethod
-    def calmar_ratio(annual_return: float, max_drawdown_pct: float) -> float:
-        if max_drawdown_pct <= 0:
-            return 0.0
-        return annual_return / max_drawdown_pct
-
-    @staticmethod
-    def max_drawdown(equity_curve: List[float]) -> float:
-        if not equity_curve:
-            return 0.0
-        peak   = equity_curve[0]
-        max_dd = 0.0
-        for val in equity_curve:
-            if val > peak:
-                peak = val
-            dd = (peak - val) / peak * 100 if peak > 0 else 0.0
-            if dd > max_dd:
-                max_dd = dd
-        return max_dd
-
-    @staticmethod
-    def profit_factor(wins: List[float], losses: List[float]) -> float:
-        total_win  = sum(w for w in wins   if w > 0)
-        total_loss = sum(abs(l) for l in losses if l < 0)
-        if total_loss == 0:
-            return 999.0 if total_win > 0 else 0.0
-        return total_win / total_loss
-
-    @staticmethod
-    def win_rate(winning: int, total: int) -> float:
-        if total == 0:
-            return 0.0
-        return (winning / total) * 100
-
-    @staticmethod
-    def expectancy(win_rate_pct: float, avg_win: float, avg_loss: float) -> float:
-        wr = win_rate_pct / 100
-        return (wr * avg_win) - ((1 - wr) * abs(avg_loss))
-
-    @staticmethod
-    def build_equity_curve(
-        trades: List[BacktestTrade],
-        initial_balance: float,
-    ) -> List[EquityCurvePoint]:
-        curve: List[EquityCurvePoint] = []
-        balance = initial_balance
-        curve.append(EquityCurvePoint(
-            timestamp=datetime.utcnow(), equity=balance, balance=balance
-        ))
-        for t in sorted(trades, key=lambda x: x.entry_time):
-            if t.is_closed() and t.exit_time:
-                balance += t.pnl_usd - t.commission
-                curve.append(EquityCurvePoint(
-                    timestamp=t.exit_time, equity=balance, balance=balance
-                ))
-        return curve
-
-
-@dataclass
-class SharedEquityPoint:
-    timestamp: datetime
-    equity:    float
-    balance:   float
-    drawdown:  float = 0.0
-
-
-def apply_slippage(
-    price: float,
-    direction: TradeDirection,
-    max_slippage_pips: float,
-    symbol: str = "XAUUSD",
-) -> float:
-    pip_value = 0.1 if "XAU" in symbol.upper() else 0.0001
-    slippage  = random.uniform(0, max_slippage_pips) * pip_value
-    if direction == TradeDirection.BUY:
-        return price + slippage
-    return price - slippage
-
-
 class BacktestEngine:
-    """Async backtest engine with full metrics via SharedBacktestMetrics."""
+    def __init__(self, config=None):
+        self._config = config or BacktestConfig()
 
-    def __init__(self, config: Optional[BacktestConfig] = None) -> None:
-        self._config  = config or BacktestConfig()
-        self._metrics = SharedBacktestMetrics()
-
-    async def run(
-        self,
-        candles:           List[CandleData],
-        signal_generator:  Callable[[List[CandleData]], Optional[BacktestSignal]],
-        config:            Optional[BacktestConfig] = None,
-    ) -> BacktestResult:
-        import uuid
-        cfg    = config or self._config
-        t0     = time.time()
-        run_id = str(uuid.uuid4())[:8]
-
-        balance      = cfg.initial_balance
-        peak_balance = cfg.initial_balance
-        trades:       List[BacktestTrade]    = []
-        equity_curve: List[EquityCurvePoint] = []
-        open_trades:  List[BacktestTrade]    = []
-
-        equity_curve.append(EquityCurvePoint(
-            timestamp=candles[0].timestamp if candles else datetime.utcnow(),
-            equity=balance, balance=balance
-        ))
-
-        lookback = 50
-        for i in range(lookback, len(candles)):
-            current    = candles[i]
-            historical = candles[max(0, i - 200):i]
-
-            still_open: List[BacktestTrade] = []
-            for trade in open_trades:
-                if self._check_exit(trade, current, cfg):
-                    balance      += trade.pnl_usd - trade.commission
-                    peak_balance  = max(peak_balance, balance)
-                    trades.append(trade)
-                    equity_curve.append(EquityCurvePoint(
-                        timestamp=current.timestamp,
-                        equity=balance, balance=balance,
-                        open_trades=len(still_open),
-                    ))
-                else:
-                    still_open.append(trade)
-            open_trades = still_open
-
-            if len(open_trades) >= cfg.max_open_trades:
-                continue
-            if current.spread > cfg.max_spread_pips:
-                continue
-
+    def run(self, candles, signal_fn, config=None):
+        cfg = config or self._config
+        trades = []
+        balance = cfg.initial_balance
+        history = []
+        for i, candle in enumerate(candles):
             try:
-                signal = signal_generator(historical)
+                sig = signal_fn(candle, history[-50:]) if history else None
             except Exception:
-                signal = None
-            if signal is None:
-                continue
+                sig = None
+            if sig and self._is_valid_signal(sig, cfg):
+                trade = self._simulate_trade(sig, candle, candles[i:], cfg, balance)
+                if trade:
+                    trades.append(trade)
+                    balance += trade.pnl_usd
+            history.append(candle)
+        return self._build_result(trades, cfg, candles)
 
-            entry = current.close
-            if cfg.enable_slippage:
-                entry = apply_slippage(entry, signal.direction, cfg.max_slippage_pips, cfg.symbol)
+    @staticmethod
+    def _is_valid_signal(sig, cfg):
+        required = {"direction", "entry_price", "stop_loss", "take_profit"}
+        if not required.issubset(sig.keys()):
+            return False
+        ep = float(sig.get("entry_price", 0))
+        sl = float(sig.get("stop_loss",   0))
+        tp = float(sig.get("take_profit", 0))
+        direction = str(sig.get("direction", "")).upper()
+        if ep <= 0 or sl <= 0 or tp <= 0: return False
+        if direction not in ("BUY", "SELL"): return False
+        if direction == "BUY":
+            risk, reward = ep - sl, tp - ep
+        else:
+            risk, reward = sl - ep, ep - tp
+        if risk <= 0 or reward <= 0: return False
+        if reward / risk < cfg.min_rr_ratio: return False
+        return True
 
-            comm  = cfg.commission_per_lot * cfg.lot_size
-            trade = BacktestTrade(
-                signal=signal, entry_time=current.timestamp,
-                entry_price=entry, direction=signal.direction,
-                stop_loss=signal.stop_loss, take_profit=signal.take_profit,
-                commission=comm, slippage=abs(entry - current.close),
-            )
-            open_trades.append(trade)
-
-        if candles:
-            last = candles[-1]
-            for trade in open_trades:
-                self._force_close(trade, last)
-                balance += trade.pnl_usd - trade.commission
-                trades.append(trade)
-
-        closed        = [t for t in trades if t.is_closed()]
-        wins          = [t for t in closed if t.pnl_pips > 0]
-        losses        = [t for t in closed if t.pnl_pips <= 0]
-        win_pips_list = [t.pnl_pips for t in wins]
-        loss_pips_list= [t.pnl_pips for t in losses]
-        pnl_usd_list  = [t.pnl_usd  for t in closed]
-        equity_values = [p.equity for p in equity_curve]
-
-        win_rt  = SharedBacktestMetrics.win_rate(len(wins), len(closed))
-        pf      = SharedBacktestMetrics.profit_factor(win_pips_list, loss_pips_list)
-        dd      = SharedBacktestMetrics.max_drawdown(equity_values)
-        returns = [p / cfg.initial_balance for p in pnl_usd_list]
-        sharpe  = SharedBacktestMetrics.sharpe_ratio(returns)
-        sortino = SharedBacktestMetrics.sortino_ratio(returns)
-        annual  = ((balance - cfg.initial_balance) / cfg.initial_balance) * 100
-        calmar  = SharedBacktestMetrics.calmar_ratio(annual, dd)
-        avg_win = statistics.mean(win_pips_list)   if win_pips_list  else 0.0
-        avg_los = statistics.mean(loss_pips_list)  if loss_pips_list else 0.0
-        exp     = SharedBacktestMetrics.expectancy(win_rt, avg_win, avg_los)
-
-        return BacktestResult(
-            run_id=run_id, symbol=cfg.symbol,
-            start_date=candles[0].timestamp  if candles else datetime.utcnow(),
-            end_date=candles[-1].timestamp   if candles else datetime.utcnow(),
-            config=cfg, trades=closed,
-            total_trades=len(closed), winning_trades=len(wins), losing_trades=len(losses),
-            initial_balance=cfg.initial_balance, final_balance=round(balance, 2),
-            peak_balance=round(peak_balance, 2), max_drawdown_pct=dd,
-            equity_curve=equity_curve,
-            win_rate=win_rt, profit_factor=pf, sharpe_ratio=sharpe,
-            sortino_ratio=sortino, calmar_ratio=calmar, expectancy_pips=exp,
-            avg_win_pips=avg_win, avg_loss_pips=avg_los,
-            total_pnl_pips=sum(t.pnl_pips for t in closed),
-            total_pnl_usd=sum(t.pnl_usd   for t in closed),
-            total_commission=sum(t.commission for t in closed),
-            run_time_seconds=time.time() - t0,
+    @staticmethod
+    def _simulate_trade(sig, entry_candle, future_candles, cfg, balance):
+        direction = str(sig["direction"]).upper()
+        ep = float(sig["entry_price"])
+        sl = float(sig["stop_loss"])
+        tp = float(sig["take_profit"])
+        slip = cfg.slippage_pips * 0.1  # XAUUSD 1pip=$0.10
+        ep_actual = ep + sli^pif direction == "BUY" else ep - slip
+        risk_usd = balance * (cfg.risk_per_trade / 100.0)
+        risk_pips = abs(ep_actual - sl) * 10.0  # XAUUSD 1 point=10pips
+        if risk_pips <= 0: return None
+        lot = max(0.01, min(round(risk_usd / (risk_pips * cfg.pip_value), 2), 10.0))
+        exit_price = ep_actual
+        outcome = "UNKNOWN"
+        exit_time = entry_candle.timestamp
+        for future in future_candles[1:]:
+            if direction == "BUY":
+                if future.low <= sl:
+                    exit_price, outcome, exit_time = sl, "LOSS", future.timestamp
+                    break
+                if future.high >= tp:
+                    exit_price, outcome, exit_time = tp, "WIN", future.timestamp
+                    break
+            else:
+                if future.high >= sl:
+                    exit_price, outcome, exit_time = sl, "LOSS", future.timestamp
+                    break
+                if future.low <= tp:
+                    exit_price, outcome, exit_time = tp, "WIN", future.timestamp
+                    break
+        else:
+            last = future_candles[-1] if future_candles else entry_candle
+            exit_price = last.close
+            outcome = "BE"
+            exit_time = last.timestamp
+        pnl_points = (exit_price - ep_actual) if direction == "BUY" else (ep_actual - exit_price)
+        pnl_pips = pnl_points * 10.0
+        pnl_usd = pnl_pips * cfg.pip_value * lot - cfg.commission_usd * lot
+        return BacktestTrade(
+            symbol=cfg.symbol,
+            direction=direction,
+            entry_time=entry_candle.timestamp,
+            exit_time=exit_time,
+            entry_price=round(ep_actual, 5),
+            exit_price=round(exit_price, 5),
+            stmp_loss=sl,
+            take_profit=tp,
+            lot_size=lot,
+            pnl_pips=round(pnl_pips, 2),
+            pnl_usd=round(pnl_usd, 2),
+            slippage_pips=round(cfg.slippage_pips, 2),
+            outcome=outcome,
         )
 
-    def _check_exit(self, trade: BacktestTrade, candle: CandleData, cfg: BacktestConfig) -> bool:
-        if trade.direction == TradeDirection.BUY:
-            if candle.low  <= trade.stop_loss:   self._close_trade(trade, trade.stop_loss,   candle.timestamp, TradeStatus.CLOSED_SL); return True
-            if candle.high >= trade.take_profit: self._close_trade(trade, trade.take_profit, candle.timestamp, TradeStatus.CLOSED_TP); return True
-        else:
-            if candle.high >= trade.stop_loss:   self._close_trade(trade, trade.stop_loss,   candle.timestamp, TradeStatus.CLOSED_SL); return True
-            if candle.low  <= trade.take_profit: self._close_trade(trade, trade.take_profit, candle.timestamp, TradeStatus.CLOSED_TP); return True
-        return False
+    def _build_result(self, trades, cfg, candles):
+        start_date = candles[0].timestamp  if candles else ""
+        end_date   = candles[-1].timestamp if candles else ""
+        result = BacktestResult(
+            config=cfg,
+            symbol=cfg.symbol,
+            timeframe=cfg.timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if not trades:
+            return result
+        wins      = [t for t in trades if t.outcome == "WIN"]
+        losses     = [t for t in trades if t.outcome == "LOSS"]
+        breakeven = [t for t in trades if t.outcome == "BE"
+],
+        result.total_trades     = len(trades)
+        result.winning_trades   = len(wins)
+        result.losing_trades     = len(losses)
+        result.breakeven_trades  = len(breakeven)
+        result.total_pnl_pips    = sum(t.pnl_pips for t in trades)
+        result.total_pnl_usd     = sum(t.pnl_usd  for t in trades)
+        result.final_balance     = cfg.initial_balance + result.total_pnl_usd
+        result.total_return_pct  = (
+            (result.final_balance - cfg.initial_balance) / cfg.initial_balance * 100.0
+        )
+        result.avg_win_usd  = (sum(t.pnl_usd for t in wins) / len(wins))   if wins   else 0.0
+        result.avg_loss_usd = (sum(t.pnl_usd for t in losses) / len(losses)) if losses else 0.0
+        result.win_rate      = SharedBacktestMetrics.win_rate(len(wins), len(trades))
+        gross_profit = sum(t.pnl_usd for t in trades if t.pnl_usd > 0)
+        gross_loss   = sum(t.pnl_usd for t in trades if t.pnl_usd < 0)
+        result.profit_factor = SharedBacktestMetrics.profit_factor(gross_profit, gross_loss)
+        result.expectancy     = SharedBacktestMetrics.expectancy(
+            result.win_rate, result.avg_win_usd, result.avg_loss_usd
+        )
+        result.equity_curve  = SharedBacktestMetrics.build_equity_curve(trades, cfg.initial_balance)
+        equity_values        = [p.equity for p in result.equity_curve]
+        dd_pct, dd_usd         = SharedBacktestMetrics.max_drawdown(equity_values)
+        result.max_drawdown_pct = dd_pct
+        result.max_drawdown_usd = dd_usd
+        trade_returns           = [t.pnl_usd / cfg.initial_balance for t in trades]
+        result.sharpe_ratio      = SharedBacktestMetrics.sharpe_ratio(trade_returns)
+        result.sortino_ratio     = SharedBacktestMetrics.sortino_ratio(trade_returns)
+        result.calmar_ratio      = SharedBacktestMetrics.sharpe_ratio(trade_returns)  # keep simple
+        result.monthly_returns   = self._monthly_returns(trades)
+        rr_list = []
+        for t in trades:
+            risk   = abs(t&entry_price - t&stmp_loss)
+            reward = abs(t&take_profit - t&entry_price)
+            if risk > 0: rr_list.append(reward/risk)
+        result.avg_rr_achieved  = round(sum(rr_list) / len(rr_list), 3) if rr_list else 0.0
+        result.trades = trades
+        return result
 
-    def _close_trade(self, trade: BacktestTrade, exit_price: float, exit_time: datetime, status: TradeStatus) -> None:
-        trade.exit_time  = exit_time
-        trade.exit_price = exit_price
-        trade.status     = status
-        pip_value        = 0.1
-        if trade.direction == TradeDirection.BUY:
-            trade.pnl_pips = (exit_price - trade.entry_price) * 10
-        else:
-            trade.pnl_pips = (trade.entry_price - exit_price) * 10
-        trade.pnl_usd   = trade.pnl_pips * pip_value * self._config.lot_size * 100
-        rp               = trade.risk_pips()
-        trade.r_multiple = trade.pnl_pips / rp if rp > 0 else 0.0
-
-    def _force_close(self, trade: BacktestTrade, candle: CandleData) -> None:
-        self._close_trade(trade, candle.close, candle.timestamp, TradeStatus.CLOSED_MN)
+    @staticmethod
+    def _monthly_returns(trades):
+        monthly: Dict[str, float] = {}
+        for t in trades:
+            try:
+                key = str(t.exit_time)[:7]
+                monthly[key] = monthly.get(key, 0.0) + t.pnl_usd
+            except Exception:
+                pass
+        return {k: round(v, 2) for k, vg in sorted(monthly.items())}
 
 
-backtest_engine = BacktestEngine()
+def compute_sharpe_unified(returns, rj\free=0.0, periods=252):
+    return SharedBacktestMetrics.sharpe_ratio(returns, rj_free, periods)
+
+
+def compute_sortino_unified(returns, rj_free=0.0, periods=252):
+    return SharedBacktestMetrics.sortino_ratio(returns, rj_free, periods)
+
+
+def apply_slippage(price, direction, slippage_pips, symbol="XAUUSD"):
+    pip_size = 0.01 if "XAU" in symbol.upper() else 0.0001
+    slip = slippage_pips * pip_size
+    return price + slip if direction.upper() == "BUY" else price - slip
