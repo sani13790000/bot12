@@ -1,377 +1,278 @@
 """
-سرویس نقش‌ها و دسترسی‌ها
+سرویس RBAC — مدیریت کاربران و دسترسی‌ها در دیتابیس
 
-مدیریت نقش‌های کاربری از دیتابیس.
+این سرویس مسئول CRUD کاربران، role‌ها، و validation دسترسی است.
+از Supabase به عنوان backend دیتابیس استفاده می‌کند.
 
 نویسنده: MT5 Trading Team
 """
 
+import os
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from typing import Dict, Any, Optional
-from functools import lru_cache
 
+from ..database.connection import get_supabase_client
+from ..telegram.rbac import UserRole, Permission, has_permission, ROLE_NAMES_FA
 from ..core.logger import get_logger
-from ..core.exceptions import DatabaseError
-from ..database import db
-from ..telegram.rbac import (
-    UserRole, Permission, has_permission,
-    get_role_level, get_min_role_for_permission,
-    get_permission_denied_message
-)
 
-logger = get_logger("rbac_service")
+logger = get_logger("services.rbac_service")
 
 
 class RBACService:
     """
-    سرویس مدیریت نقش‌ها
+    سرویس مدیریت نقش‌ها و دسترسی‌ها
 
-    مسئولیت‌ها:
-    - دریافت و ذخیره نقش کاربر
-    - بررسی دسترسی‌ها
-    - ارتباط با لایسنس
+    تمام عملیات CRUD کاربران از طریق این سرویس انجام می‌شود.
     """
 
     def __init__(self):
-        self._cache: Dict[int, Dict[str, Any]] = {}
+        """مقداردهی اولیه سرویس"""
+        self._table = "users"
 
-    async def get_user_role(
-        self,
-        telegram_user_id: int
-    ) -> Optional[UserRole]:
+    async def get_user(self, telegram_id: int) -> Optional[Dict[str, Any]]:
         """
-        دریافت نقش کاربر از دیتابیس
+        دریافت اطلاعات یک کاربر بر اساس Chat ID
 
         Args:
-            telegram_user_id: شناسه تلگرام کاربر
+            telegram_id: شناسه تلگرام کاربر
 
         Returns:
-            نقش کاربری یا None
+            دیکشنری اطلاعات کاربر یا None
         """
-        # بررسی کش
-        cached = self._get_cached(telegram_user_id)
-        if cached:
-            return UserRole(cached.get("role", "user"))
-
         try:
-            # جستجو در user_profiles با telegram_id
-            user = await db.select_one(
-                "user_profiles",
-                {"telegram_id": telegram_user_id},
-                use_admin=True
-            )
-
-            if not user:
-                logger.debug(f"کاربر با telegram_id {telegram_user_id} یافت نشد")
-                return None
-
-            role_str = user.get("role", "user")
-
-            # کش کردن
-            self._set_cache(telegram_user_id, {
-                "role": role_str,
-                "user_id": user.get("id"),
-                "email": user.get("email"),
-                "status": user.get("status")
-            })
-
-            return UserRole(role_str)
-
+            client = await get_supabase_client()
+            result = client.table(self._table).select("*").eq(
+                "telegram_id", telegram_id
+            ).single().execute()
+            return result.data if result.data else None
         except Exception as e:
-            logger.error(f"خطا در دریافت نقش کاربر: {e}")
+            logger.error(f"خطا در دریافت کاربر {telegram_id}: {e}", exc_info=True)
             return None
 
-    async def get_user_by_telegram_id(
-        self,
-        telegram_user_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_all_users(self) -> List[Dict[str, Any]]:
         """
-        دریافت اطلاعات کامل کاربر با telegram_id
+        دریافت لیست کامل کاربران
+
+        Returns:
+            لیست دیکشنری اطلاعات کاربران
+        """
+        try:
+            client = await get_supabase_client()
+            result = client.table(self._table).select("*").order(
+                "created_at", desc=True
+            ).execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"خطا در دریافت لیست کاربران: {e}", exc_info=True)
+            return []
+
+    async def get_users_by_role(self, role: UserRole) -> List[Dict[str, Any]]:
+        """
+        دریافت کاربران بر اساس نقش
 
         Args:
-            telegram_user_id: شناسه تلگرام
+            role: نقش مورد نظر
 
         Returns:
-            اطلاعات کاربر
+            لیست کاربران با نقش مشخص
         """
-        cached = self._get_cached(telegram_user_id)
-        if cached:
-            return cached
+        try:
+            client = await get_supabase_client()
+            result = client.table(self._table).select("*").eq(
+                "role", role.value
+            ).execute()
+            return result.data or []
+        except Exception as e:
+            logger.error(f"خطا در دریافت کاربران با نقش {role.value}: {e}", exc_info=True)
+            return []
+
+    async def add_user(
+        self,
+        telegram_id: int,
+        role: UserRole,
+        added_by: int,
+        username: Optional[str] = None,
+        license_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        اضافه کردن کاربر جدید
+
+        Args:
+            telegram_id: شناسه تلگرام
+            role: نقش کاربر
+            added_by: Chat ID کسی که کاربر را اضافه کرده
+            username: نام کاربری تلگرام
+            license_key: کلید لایسنس (اختیاری)
+
+        Returns:
+            دیکشنری کاربر ایجاد شده
+
+        Raises:
+            ValueError: اگر کاربر از قبل وجود داشته باشد
+        """
+        existing = await self.get_user(telegram_id)
+        if existing:
+            raise ValueError(f"کاربر {telegram_id} از قبل وجود دارد")
 
         try:
-            user = await db.select_one(
-                "user_profiles",
-                {"telegram_id": telegram_user_id},
-                use_admin=True
-            )
+            client = await get_supabase_client()
+            data = {
+                "telegram_id": telegram_id,
+                "role": role.value,
+                "is_active": True,
+                "added_by": added_by,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            if username:
+                data["username"] = username
+            if license_key:
+                data["license_key"] = license_key
 
-            if user:
-                self._set_cache(telegram_user_id, user)
-
-            return user
-
+            result = client.table(self._table).insert(data).execute()
+            logger.info(f"کاربر {telegram_id} با نقش {role.value} اضافه شد")
+            return result.data[0] if result.data else data
         except Exception as e:
-            logger.error(f"خطا در دریافت کاربر: {e}")
+            logger.error(f"خطا در اضافه کردن کاربر {telegram_id}: {e}", exc_info=True)
+            raise
+
+    async def remove_user(self, telegram_id: int, removed_by: int) -> bool:
+        """
+        حذف کاربر (غیرفعال کردن — soft delete)
+
+        Args:
+            telegram_id: شناسه تلگرام
+            removed_by: Chat ID کسی که حذف کرده
+
+        Returns:
+            True در صورت موفقیت
+        """
+        try:
+            client = await get_supabase_client()
+            client.table(self._table).update({
+                "is_active": False,
+                "deactivated_by": removed_by,
+                "deactivated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("telegram_id", telegram_id).execute()
+            logger.info(f"کاربر {telegram_id} توسط {removed_by} حذف (غیرفعال) شد")
+            return True
+        except Exception as e:
+            logger.error(f"خطا در حذف کاربر {telegram_id}: {e}", exc_info=True)
+            raise
+
+    async def update_user_role(
+        self,
+        telegram_id: int,
+        new_role: UserRole,
+        changed_by: int
+    ) -> bool:
+        """
+        تغییر نقش کاربر
+
+        Args:
+            telegram_id: شناسه تلگرام
+            new_role: نقش جدید
+            changed_by: Chat ID کسی که تغییر داده
+
+        Returns:
+            True در صورت موفقیت
+        """
+        try:
+            client = await get_supabase_client()
+            client.table(self._table).update({
+                "role": new_role.value,
+                "role_changed_by": changed_by,
+                "role_changed_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }).eq("telegram_id", telegram_id).execute()
+            logger.info(
+                f"نقش کاربر {telegram_id} به {new_role.value} توسط {changed_by} تغییر یافت"
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                f"خطا در تغییر نقش کاربر {telegram_id}: {e}", exc_info=True
+            )
+            raise
+
+    async def get_user_role(self, telegram_id: int) -> Optional[UserRole]:
+        """
+        دریافت نقش کاربر
+
+        Args:
+            telegram_id: شناسه تلگرام
+
+        Returns:
+            نقش کاربر یا None
+        """
+        user = await self.get_user(telegram_id)
+        if not user:
             return None
+        try:
+            return UserRole(user.get("role", "viewer"))
+        except ValueError:
+            return UserRole.VIEWER
 
     async def check_permission(
         self,
-        telegram_user_id: int,
+        telegram_id: int,
         permission: Permission
-    ) -> Dict[str, Any]:
-        """
-        بررسی دسترسی کاربر
-
-        Args:
-            telegram_user_id: شناسه تلگرام
-            permission: دسترسی مورد نظر
-
-        Returns:
-            نتیجه بررسی
-        """
-        # دریافت کاربر
-        user = await self.get_user_by_telegram_id(telegram_user_id)
-
-        if not user:
-            return {
-                "allowed": False,
-                "reason": "not_registered",
-                "message": get_permission_denied_message("not_registered")
-            }
-
-        # بررسی وضعیت
-        if user.get("status") != "active":
-            return {
-                "allowed": False,
-                "reason": "account_inactive",
-                "message": "🚫 حساب شما غیرفعال است."
-            }
-
-        # دریافت نقش
-        role = UserRole(user.get("role", "user"))
-
-        # بررسی دسترسی
-        if not has_permission(role, permission):
-            required = get_min_role_for_permission(permission)
-            return {
-                "allowed": False,
-                "reason": "no_permission",
-                "role": role.value,
-                "required_role": required.value if required else "unknown",
-                "message": get_permission_denied_message(
-                    "no_permission",
-                    role.value,
-                    required.value if required else "unknown"
-                )
-            }
-
-        # بررسی لایسنس برای دسترسی‌های حساس
-        if permission in [
-            Permission.CLOSE_ALL_TRADES,
-            Permission.CLOSE_BUY_TRADES,
-            Permission.CLOSE_SELL_TRADES,
-            Permission.START_BOT,
-            Permission.STOP_BOT,
-        ]:
-            license_check = await self._check_license(user.get("id"))
-            if not license_check["valid"]:
-                return license_check
-
-        return {
-            "allowed": True,
-            "role": role,
-            "user_id": user.get("id")
-        }
-
-    async def check_command_permission(
-        self,
-        telegram_user_id: int,
-        command: str
-    ) -> Dict[str, Any]:
-        """
-        بررسی دسترسی به یک command
-
-        Args:
-            telegram_user_id: شناسه تلگرام
-            command: دستور
-
-        Returns:
-            نتیجه بررسی
-        """
-        # استخراج دستور اصلی
-        cmd = command.split()[0] if " " in command else command
-        cmd = cmd.split("@")[0] if "@" in cmd else cmd
-
-        # دریافت دسترسی مورد نیاز
-        from ..telegram.rbac import COMMAND_PERMISSIONS
-
-        permission = COMMAND_PERMISSIONS.get(cmd)
-        if not permission:
-            # command بدون محدودیت
-            return {"allowed": True}
-
-        return await self.check_permission(telegram_user_id, permission)
-
-    async def set_user_role(
-        self,
-        telegram_user_id: int,
-        new_role: UserRole,
-        admin_id: int
     ) -> bool:
         """
-        تنظیم نقش کاربر (نیاز به admin)
+        بررسی اینکه آیا کاربر دسترسی مشخصی دارد
 
         Args:
-            telegram_user_id: شناسه تلگرام کاربر
-            new_role: نقش جدید
-            admin_id: شناسه ادمین
+            telegram_id: شناسه تلگرام
+            permission: دسترسی مورد بررسی
 
         Returns:
-            True اگر موفق بود
+            True اگر کاربر دسترسی داشته باشد
         """
-        # بررسی دسترسی admin
-        admin_role = await self.get_user_role(admin_id)
-        if not admin_role or admin_role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
-            logger.warning(f"تلاش غیرمجاز برای تغییر نقش توسط {admin_id}")
+        role = await self.get_user_role(telegram_id)
+        if not role:
             return False
+        return has_permission(role, permission)
 
-        # فقط super_admin می‌تواند admin بسازد
-        if new_role == UserRole.ADMIN and admin_role != UserRole.SUPER_ADMIN:
-            return False
-
-        try:
-            user = await self.get_user_by_telegram_id(telegram_user_id)
-            if not user:
-                return False
-
-            await db.update(
-                "user_profiles",
-                {"id": user.get("id")},
-                {"role": new_role.value, "updated_at": datetime.utcnow().isoformat()},
-                use_admin=True
-            )
-
-            # پاک کردن کش
-            self._clear_cache(telegram_user_id)
-
-            logger.info(f"نقش کاربر {telegram_user_id} به {new_role.value} تغییر کرد توسط {admin_id}")
-            return True
-
-        except Exception as e:
-            logger.error(f"خطا در تغییر نقش: {e}")
-            return False
-
-    async def register_telegram_user(
-        self,
-        telegram_user_id: int,
-        telegram_username: Optional[str] = None,
-        referrer_code: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def is_user_active(self, telegram_id: int) -> bool:
         """
-        ثبت کاربر جدید در سیستم
+        بررسی فعال بودن کاربر
 
         Args:
-            telegram_user_id: شناسه تلگرام
-            telegram_username: نام کاربری تلگرام
-            referrer_code: کد معرف
+            telegram_id: شناسه تلگرام
 
         Returns:
-            نتیجه ثبت
+            True اگر کاربر فعال باشد
         """
-        # بررسی موجود بودن
-        existing = await self.get_user_by_telegram_id(telegram_user_id)
-        if existing:
-            return {
-                "success": True,
-                "new": False,
-                "user": existing
-            }
+        user = await self.get_user(telegram_id)
+        return bool(user and user.get("is_active"))
 
+    async def get_users_stats(self) -> Dict[str, Any]:
+        """
+        آمار کلی کاربران به تفکیک نقش
+
+        Returns:
+            دیکشنری آمار
+        """
         try:
-            # ایجاد کاربر جدید
-            user_data = {
-                "telegram_id": telegram_user_id,
-                "telegram_username": telegram_username,
-                "role": "user",
-                "status": "active",
-                "created_at": datetime.utcnow().isoformat()
-            }
-
-            if referrer_code:
-                user_data["referrer_code"] = referrer_code
-
-            result = await db.insert("user_profiles", user_data, use_admin=True)
-
-            logger.info(f"کاربر جدید ثبت شد: {telegram_user_id}")
-
+            users = await self.get_all_users()
+            stats: Dict[str, int] = {}
+            active_count = 0
+            for u in users:
+                role_val = u.get("role", "viewer")
+                stats[role_val] = stats.get(role_val, 0) + 1
+                if u.get("is_active"):
+                    active_count += 1
             return {
-                "success": True,
-                "new": True,
-                "user": result
+                "total": len(users),
+                "active": active_count,
+                "inactive": len(users) - active_count,
+                "by_role": stats,
             }
-
         except Exception as e:
-            logger.error(f"خطا در ثبت کاربر: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
-    async def _check_license(self, user_id: str) -> Dict[str, Any]:
-        """بررسی لایسنس کاربر"""
-        from ..license.manager import license_manager
-
-        try:
-            license_data = await license_manager.get_user_license(user_id)
-
-            if not license_data:
-                return {
-                    "valid": False,
-                    "allowed": False,
-                    "reason": "license_invalid",
-                    "message": get_permission_denied_message("license_invalid")
-                }
-
-            if license_data.get("status") != "active":
-                return {
-                    "valid": False,
-                    "allowed": False,
-                    "reason": "license_invalid",
-                    "message": get_permission_denied_message("license_invalid")
-                }
-
-            return {"valid": True, "allowed": True, "license": license_data}
-
-        except Exception as e:
-            logger.error(f"خطا در بررسی لایسنس: {e}")
-            return {
-                "valid": False,
-                "allowed": False,
-                "reason": "license_check_failed",
-                "message": "❌ خطا در بررسی لایسنس"
-            }
-
-    def _get_cached(self, telegram_user_id: int) -> Optional[Dict[str, Any]]:
-        """دریافت از کش"""
-        cached = self._cache.get(telegram_user_id)
-        if cached:
-            cached_at = cached.get("_cached_at")
-            if cached_at:
-                age = (datetime.utcnow() - datetime.fromisoformat(cached_at)).total_seconds()
-                if age < 300:  # 5 دقیقه
-                    return cached
-        return None
-
-    def _set_cache(self, telegram_user_id: int, data: Dict[str, Any]) -> None:
-        """تنظیم کش"""
-        data["_cached_at"] = datetime.utcnow().isoformat()
-        self._cache[telegram_user_id] = data
-
-    def _clear_cache(self, telegram_user_id: int) -> None:
-        """پاک کردن کش"""
-        if telegram_user_id in self._cache:
-            del self._cache[telegram_user_id]
+            logger.error(f"خطا در دریافت آمار کاربران: {e}", exc_info=True)
+            return {"total": 0, "active": 0, "inactive": 0, "by_role": {}}
 
 
-# نمونه گلوبال
+# Singleton
 rbac_service = RBACService()
