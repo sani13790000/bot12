@@ -106,17 +106,111 @@ auth_rate_limiter = InMemoryRateLimiter(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """مدیریت چرخه حیات برنامه"""
+    """
+    مدیریت چرخه حیات برنامه
+
+    Startup:
+    - SessionAlertService راه‌اندازی می‌شود
+    - ربات تلگرام در background اجرا می‌شود
+    - اتصال به دیتابیس تأیید می‌شود
+
+    Shutdown:
+    - SessionAlertService متوقف می‌شود
+    - ربات تلگرام gracefully متوقف می‌شود
+    - Rate limiter پاکسازی می‌شود
+    """
+    import asyncio
+    from ..services.session_alert_service import SessionAlertService
+    from ..telegram.handlers.alerts import AlertsHandler
+    from ..telegram.bot import telegram_bot
+
+    # ====================================================
     # Startup
+    # ====================================================
     logger.info(f"سرور {settings.APP_NAME} v{settings.APP_VERSION} راه‌اندازی شد")
     logger.info(f"محیط: {settings.ENVIRONMENT}")
     logger.info(f"Rate Limiting فعال: {rate_limiter.max_requests} req/{rate_limiter.window_seconds}s")
 
+    # --- راه‌اندازی ربات تلگرام ---
+    _bot_task = None
+    if settings.TELEGRAM_BOT_TOKEN:
+        try:
+            # راه‌اندازی ربات برای دریافت دستورات
+            await telegram_bot.initialize()
+            logger.info("ربات تلگرام راه‌اندازی شد")
+
+            # ایجاد AlertsHandler با bot instance
+            alerts_handler = AlertsHandler(bot=telegram_bot.bot)
+
+            # --- راه‌اندازی SessionAlertService ---
+            session_alert_service = SessionAlertService()
+
+            async def _on_session_event(event_type: str, session_data: dict):
+                """callback برای رویدادهای سشن — ارسال به تلگرام"""
+                try:
+                    if event_type == "SESSION_OPEN":
+                        await alerts_handler.send_session_open_alert(session_data)
+                    elif event_type == "SESSION_CLOSE":
+                        await alerts_handler.send_session_close_alert(session_data)
+                    elif event_type == "KILL_ZONE_OPEN":
+                        await alerts_handler.send_kill_zone_alert(session_data)
+                    elif event_type == "KILL_ZONE_CLOSE":
+                        logger.info(f"Kill Zone پایان یافت: {session_data.get('name')}")
+                except Exception as cb_err:
+                    logger.error(f"خطا در callback سشن: {cb_err}", exc_info=True)
+
+            await session_alert_service.start(callback=_on_session_event)
+            logger.info("SessionAlertService راه‌اندازی شد — هشدارهای سشن فعال")
+
+            # اجرای ربات تلگرام در background task
+            _bot_task = asyncio.create_task(
+                telegram_bot.start(),
+                name="telegram_bot_polling"
+            )
+            logger.info("ربات تلگرام در background شروع به polling کرد")
+
+        except Exception as startup_err:
+            logger.error(f"خطا در راه‌اندازی ربات/سشن: {startup_err}", exc_info=True)
+    else:
+        logger.warning("TELEGRAM_BOT_TOKEN تنظیم نشده — ربات تلگرام غیرفعال")
+        session_alert_service = None
+
+    logger.info("✅ سیستم کاملاً راه‌اندازی شد")
+
     yield
 
+    # ====================================================
     # Shutdown
+    # ====================================================
+    logger.info("شروع graceful shutdown...")
+
+    # توقف SessionAlertService
+    if session_alert_service is not None:
+        try:
+            await session_alert_service.stop()
+            logger.info("SessionAlertService متوقف شد")
+        except Exception as stop_err:
+            logger.error(f"خطا در توقف SessionAlertService: {stop_err}")
+
+    # توقف ربات تلگرام
+    if settings.TELEGRAM_BOT_TOKEN:
+        try:
+            await telegram_bot.stop()
+            logger.info("ربات تلگرام متوقف شد")
+        except Exception as bot_err:
+            logger.error(f"خطا در توقف ربات: {bot_err}")
+
+    # لغو bot task
+    if _bot_task and not _bot_task.done():
+        _bot_task.cancel()
+        try:
+            await _bot_task
+        except asyncio.CancelledError:
+            pass
+
+    # پاکسازی Rate Limiter
     rate_limiter.cleanup()
-    logger.info("سرور متوقف شد")
+    logger.info("✅ سیستم با موفقیت متوقف شد")
 
 
 # =====================================================
