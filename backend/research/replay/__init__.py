@@ -1,10 +1,10 @@
 """
 ================================================================================
 Galaxy Vast AI Trading Platform
-موتور ریپلی بازار — Market Replay Package
+موتور Replay — Market Replay Package
 ================================================================================
 """
+from .engine import ReplayEngine, ReplayState, ReplayConfig
+from .controller import ReplayController
 
-from .engine import ReplayEngine, ReplayConfig, ReplayState, ReplayCandle
-
-__all__ = ["ReplayEngine", "ReplayConfig", "ReplayState", "ReplayCandle"]
+__all__ = ["ReplayEngine", "ReplayState", "ReplayConfig", "ReplayController"]
