@@ -3,7 +3,7 @@ API اصلی - FastAPI
 
 این فایل اصلی‌ترین نقاط ورود REST API را تعریف می‌کند.
 
-نویسنده: MT5 Trading Team
+نویسنده: Galaxy Vast Team
 تاریخ: 2026-06-12
 """
 
@@ -19,7 +19,7 @@ import threading
 
 from ..core.config import settings
 from ..core.logger import get_logger
-from ..core.exceptions import MT5TradingError
+from ..core.exceptions import GalaxyVastError
 
 logger = get_logger("api")
 
@@ -343,8 +343,8 @@ async def rate_limit_middleware(request: Request, call_next):
 # Exception Handlers
 # =====================================================
 
-@app.exception_handler(MT5TradingError)
-async def mt5_trading_error_handler(request: Request, exc: MT5TradingError):
+@app.exception_handler(GalaxyVastError)
+async def galaxy_vast_error_handler(request: Request, exc: GalaxyVastError):
     """مدیریت خطاهای سفارشی"""
     logger.error(f"خطای سیستم: {exc.message}", extra={"error_code": exc.error_code})
     return JSONResponse(
