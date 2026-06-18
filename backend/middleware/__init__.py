@@ -1,0 +1,1 @@
+"""Galaxy Vast API Middleware"""
