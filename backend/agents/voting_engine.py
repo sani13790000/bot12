@@ -1,7 +1,5 @@
-"""
-Galaxy Vast AI Trading Platform
-VotingEngine - Multi-Agent Weighted Voting System
-"""
+"""Galaxy Vast AI Trading Platform
+VotingEngine - Multi-Agent Weighted Voting System"""
 from __future__ import annotations
 
 import asyncio
@@ -27,7 +25,7 @@ class VoteDecision(str, Enum):
 class VoteResult:
     decision:       VoteDecision
     weighted_score: float
-    confidence:     float
+    confidence:     float          # primary confidence field
     direction:      str
     agent_results:  List[AgentResult]  = field(default_factory=list)
     blocked_by:     Optional[str]      = None
@@ -35,15 +33,56 @@ class VoteResult:
     elapsed_ms:     float              = 0.0
     metadata:       Dict[str, Any]     = field(default_factory=dict)
 
+    # ─── aliases used by decision_service.py (D1 fix) ───────────────────────
+    @property
+    def final_confidence(self) -> float:
+        """Alias for confidence — used by decision_service.py"""
+        return self.confidence
+
+    @property
+    def passed_threshold(self) -> bool:
+        """True when decision is BUY or SELL (not NO_TRADE / BLOCKED)"""
+        return self.decision in (VoteDecision.BUY, VoteDecision.SELL)
+
+    @property
+    def blocking_agents(self) -> List[str]:
+        """List of agent names that issued a BLOCKED vote"""
+        return (
+            [self.blocked_by]
+            if self.blocked_by
+            else [
+                r.agent_name
+                for r in self.agent_results
+                if r.vote.status == AgentStatus.ERROR and r.vote.score == 0.0
+            ]
+        )
+
+    @property
+    def votes_summary(self) -> Dict[str, Any]:
+        """Per-agent vote summary dict used by decision_service.py"""
+        return {
+            r.agent_name: {
+                'score':     round(r.vote.score, 2),
+                'direction': r.vote.direction,
+                'status':    r.vote.status.value,
+                'reason':    r.vote.reason,
+            }
+            for r in self.agent_results
+        }
+
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'decision':       self.decision.value,
-            'weighted_score': round(self.weighted_score, 2),
-            'confidence':     round(self.confidence, 2),
-            'direction':      self.direction,
-            'blocked_by':     self.blocked_by,
-            'reasons':        self.reasons,
-            'elapsed_ms':     round(self.elapsed_ms, 1),
+            'decision':        self.decision.value,
+            'weighted_score':  round(self.weighted_score, 2),
+            'confidence':      round(self.confidence, 2),
+            'final_confidence':round(self.confidence, 2),
+            'direction':       self.direction,
+            'blocked_by':      self.blocked_by,
+            'blocking_agents': self.blocking_agents,
+            'passed_threshold':self.passed_threshold,
+            'reasons':         self.reasons,
+            'elapsed_ms':      round(self.elapsed_ms, 1),
+            'votes_summary':   self.votes_summary,
             'agents': [
                 {
                     'name':       r.agent_name,
@@ -65,7 +104,7 @@ class VotingEngine:
 
     def __init__(
         self,
-        agents:                    List[BaseAgent],
+        agents:                      List[BaseAgent],
         min_score_threshold:       float = 65.0,
         min_confidence_threshold:  float = 50.0,
         run_parallel:              bool  = True,
@@ -134,6 +173,10 @@ class VotingEngine:
     def get_weights(self) -> Dict[str, float]:
         """Return current weight map for all agents."""
         return {a.name: a.weight for a in self._agents}
+
+    @property
+    def agents(self) -> List[BaseAgent]:
+        return self._agents
 
     # ------------------------------------------------------------------ #
     # Internal                                                             #
