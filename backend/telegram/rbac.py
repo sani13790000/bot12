@@ -19,6 +19,12 @@ from enum import Enum
 from typing import Dict, List, Optional, Set
 from functools import wraps
 
+from ..core.logger import get_logger
+
+# لاگر اختصاصی برای سیستم RBAC
+logger = get_logger("telegram.rbac")
+
+
 
 class UserRole(str, Enum):
     """نقش‌های کاربری — ۷ سطح"""
