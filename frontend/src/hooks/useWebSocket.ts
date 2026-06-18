@@ -1,92 +1,85 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import type { WSMessage, WSMessageType } from "../types";
+import type { WSMessageType } from "../types";
+import { WS_URL } from "../utils/config";
 
-type Handler<T = unknown> = (data: T) => void;
+type Handler = (data: unknown) => void;
 
-interface UseWebSocketOptions {
-  url?: string;
-  reconnectDelay?: number;
-  maxRetries?: number;
+export interface WSState {
+  connected: boolean;
+  reconnecting: boolean;
+  latency: number;
 }
 
-export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const {
-    url = `ws://${window.location.hostname}:8000/ws`,
-    reconnectDelay = 3000,
-    maxRetries = 10,
-  } = options;
-
-  const ws = useRef<WebSocket | null>(null);
-  const handlers = useRef<Map<WSMessageType, Handler[]>>(new Map());
-  const retries = useRef(0);
-  const [connected, setConnected] = useState(false);
-  const [lastPing, setLastPing] = useState<Date | null>(null);
+export function useWebSocket() {
+  const ws        = useRef<WebSocket | null>(null);
+  const handlers  = useRef<Map<string, Set<Handler>>>(new Map());
+  const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pingTs    = useRef<number>(0);
+  const retry     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount= useRef(0);
+  const [state, setState] = useState<WSState>({ connected: false, reconnecting: false, latency: 0 });
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
+    setState(s => ({ ...s, reconnecting: retryCount.current > 0 }));
+    const socket = new WebSocket(WS_URL);
 
-    try {
-      const token = localStorage.getItem("gv_token");
-      const fullUrl = token ? `${url}?token=${token}` : url;
-      ws.current = new WebSocket(fullUrl);
-
-      ws.current.onopen = () => {
-        setConnected(true);
-        retries.current = 0;
-        setLastPing(new Date());
-      };
-
-      ws.current.onmessage = (event) => {
-        try {
-          const msg: WSMessage = JSON.parse(event.data);
-          setLastPing(new Date());
-          const list = handlers.current.get(msg.type as WSMessageType) ?? [];
-          list.forEach((fn) => fn(msg.data));
-          const allHandlers = handlers.current.get("*" as WSMessageType) ?? [];
-          allHandlers.forEach((fn) => fn(msg));
-        } catch {
-          // ignore parse errors
+    socket.onopen = () => {
+      retryCount.current = 0;
+      setState({ connected: true, reconnecting: false, latency: 0 });
+      pingTimer.current = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          pingTs.current = Date.now();
+          socket.send(JSON.stringify({ type: "PING" }));
         }
-      };
+      }, 15_000);
+    };
 
-      ws.current.onclose = () => {
-        setConnected(false);
-        if (retries.current < maxRetries) {
-          retries.current += 1;
-          setTimeout(connect, reconnectDelay);
+    socket.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "PONG") {
+          setState(s => ({ ...s, latency: Date.now() - pingTs.current }));
+          return;
         }
-      };
+        const set = handlers.current.get(msg.type);
+        set?.forEach(fn => fn(msg.data));
+        // wildcard
+        handlers.current.get("*")?.forEach(fn => fn(msg));
+      } catch { /* ignore parse errors */ }
+    };
 
-      ws.current.onerror = () => {
-        ws.current?.close();
-      };
-    } catch {
-      setConnected(false);
-    }
-  }, [url, reconnectDelay, maxRetries]);
+    socket.onclose = () => {
+      setState(s => ({ ...s, connected: false }));
+      if (pingTimer.current) clearInterval(pingTimer.current);
+      const delay = Math.min(1000 * 2 ** retryCount.current, 30_000);
+      retryCount.current += 1;
+      retry.current = setTimeout(connect, delay);
+    };
+
+    socket.onerror = () => socket.close();
+    ws.current = socket;
+  }, []);
 
   useEffect(() => {
     connect();
     return () => {
+      if (pingTimer.current) clearInterval(pingTimer.current);
+      if (retry.current)     clearTimeout(retry.current);
       ws.current?.close();
     };
   }, [connect]);
 
-  const on = useCallback(<T>(type: WSMessageType | "*", handler: Handler<T>) => {
-    const key = type as WSMessageType;
-    const existing = handlers.current.get(key) ?? [];
-    handlers.current.set(key, [...existing, handler as Handler]);
-    return () => {
-      const updated = (handlers.current.get(key) ?? []).filter((h) => h !== handler);
-      handlers.current.set(key, updated);
-    };
+  const on = useCallback((type: WSMessageType | "*", fn: Handler) => {
+    if (!handlers.current.has(type)) handlers.current.set(type, new Set());
+    handlers.current.get(type)!.add(fn);
+    return () => handlers.current.get(type)?.delete(fn);
   }, []);
 
-  const send = useCallback((msg: object) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(msg));
-    }
+  const send = useCallback((type: string, data: unknown = {}) => {
+    if (ws.current?.readyState === WebSocket.OPEN)
+      ws.current.send(JSON.stringify({ type, data }));
   }, []);
 
-  return { connected, lastPing, on, send };
+  return { ...state, on, send };
 }
