@@ -1,198 +1,134 @@
 import { useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, TrendingUp, Zap, Shield,
-  Brain, FlaskConical, Settings, ChevronLeft,
-  Activity, Bell, Moon,
+  LayoutDashboard, Activity, History, Brain, ShieldAlert,
+  BarChart2, TrendingUp, Cpu, Settings, ChevronRight,
+  ChevronLeft, Menu, X, LogOut, Zap
 } from "lucide-react";
+import { WSIndicator } from "../components/common/WSIndicator";
 
-// ── Nav items ────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "داشبورد" },
-  { to: "/trades",    icon: TrendingUp,       label: "معاملات" },
-  { to: "/signals",   icon: Zap,              label: "سیگنال‌ها" },
-  { to: "/portfolio", icon: Shield,            label: "ریسک پرتفولیو" },
-  { to: "/learning",  icon: Brain,             label: "یادگیری ML" },
-  { to: "/backtest",  icon: FlaskConical,      label: "بک‌تست" },
-  { to: "/settings",  icon: Settings,          label: "تنظیمات" },
-] as const;
+  { path: "dashboard",      label: "داشبورد",         icon: LayoutDashboard },
+  { path: "live-trades",    label: "معاملات زنده",     icon: Activity        },
+  { path: "trade-history",  label: "تاریخچه",          icon: History         },
+  { path: "ai-predictions", label: "پیش‌بینی هوش مصنوعی", icon: Brain       },
+  { path: "risk",           label: "مدیریت ریسک",      icon: ShieldAlert     },
+  { path: "analytics",      label: "آنالیتیکس",        icon: BarChart2       },
+  { path: "equity-curve",   label: "منحنی سرمایه",     icon: TrendingUp      },
+  { path: "model-performance", label: "عملکرد مدل",    icon: Cpu             },
+  { path: "settings",       label: "تنظیمات",          icon: Settings        },
+];
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
 
-  // ── Current page title ──────────────────────────────────
-  const currentItem = NAV_ITEMS.find((n) => location.pathname.startsWith(n.to));
-  const pageTitle = currentItem?.label ?? "Galaxy Vast";
+  const handleLogout = () => {
+    localStorage.removeItem("gv_token");
+    navigate("/login");
+  };
+
+  const Sidebar = () => (
+    <aside className={`
+      flex flex-col h-full bg-[#0d1420] border-l border-[#1e2d40]
+      transition-all duration-300 ease-in-out
+      ${collapsed ? "w-[64px]" : "w-[240px]"}
+    `}>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-[#1e2d40] min-h-[68px]">
+        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-[#00d4ff] to-[#0ea5e9] flex items-center justify-center shadow-lg">
+          <Zap size={18} className="text-[#070b12]" strokeWidth={2.5} />
+        </div>
+        {!collapsed && (
+          <div>
+            <div className="text-[#f0f6ff] font-bold text-sm leading-tight">Galaxy Vast</div>
+            <div className="text-[#00d4ff] text-[10px] font-mono">AI TRADING</div>
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {NAV_ITEMS.map(({ path, label, icon: Icon }) => (
+          <NavLink
+            key={path}
+            to={path}
+            onClick={() => setMobileOpen(false)}
+            className={({ isActive }) => `
+              flex items-center gap-3 px-4 py-3 my-0.5 mx-2 rounded-xl
+              transition-all duration-200 cursor-pointer group
+              ${isActive ? "nav-item-active" : "text-[#94a3b8] hover:text-[#f0f6ff] hover:bg-[#111827]"}
+              ${collapsed ? "justify-center" : ""}
+            `}
+            title={collapsed ? label : undefined}
+          >
+            <Icon size={18} className="flex-shrink-0" />
+            {!collapsed && <span className="text-sm">{label}</span>}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Collapse + Logout */}
+      <div className="border-t border-[#1e2d40] p-3 space-y-2">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="w-full flex items-center justify-center p-2.5 rounded-xl text-[#475569] hover:text-[#00d4ff] hover:bg-[#111827] transition-all"
+          title={collapsed ? "باز کردن" : "جمع کردن"}
+        >
+          {collapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl text-[#475569] hover:text-[#ef4444] hover:bg-[#ef444410] transition-all"
+          title="خروج"
+        >
+          <LogOut size={16} />
+          {!collapsed && <span className="text-xs">خروج</span>}
+        </button>
+      </div>
+    </aside>
+  );
 
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--gv-bg-primary)" }}>
+    <div className="flex h-screen overflow-hidden bg-[#070b12]">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex flex-shrink-0">
+        <Sidebar />
+      </div>
 
-      {/* ── Sidebar ─────────────────────────────────────── */}
-      <aside
-        className="flex flex-col transition-all duration-300 shrink-0"
-        style={{
-          width: collapsed ? 64 : 240,
-          background: "var(--gv-bg-secondary)",
-          borderLeft: "1px solid var(--gv-border)",
-        }}
-      >
-        {/* Logo */}
-        <div
-          className="flex items-center gap-3 px-4 py-5"
-          style={{ borderBottom: "1px solid var(--gv-border)" }}
-        >
-          <div
-            className="flex items-center justify-center rounded-xl shrink-0"
-            style={{
-              width: 36, height: 36,
-              background: "linear-gradient(135deg, #00d4ff22, #0ea5e922)",
-              border: "1px solid rgba(0,212,255,0.3)",
-            }}
-          >
-            <Activity size={18} style={{ color: "var(--gv-accent)" }} />
+      {/* Mobile Sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setMobileOpen(false)} />
+          <div className="absolute right-0 top-0 bottom-0 w-[240px]">
+            <Sidebar />
           </div>
-          {!collapsed && (
-            <div>
-              <div
-                className="font-bold text-sm leading-tight"
-                style={{ color: "var(--gv-accent)" }}
-              >
-                Galaxy Vast
-              </div>
-              <div className="text-xs" style={{ color: "var(--gv-text-muted)" }}>
-                AI Trading
-              </div>
-            </div>
-          )}
         </div>
+      )}
 
-        {/* Nav */}
-        <nav className="flex-1 py-3 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 transition-all duration-150 cursor-pointer
-                 text-sm font-medium ${isActive ? "nav-item-active" : ""}`
-              }
-              style={({ isActive }) => ({
-                color: isActive ? "var(--gv-accent)" : "var(--gv-text-secondary)",
-              })}
-            >
-              <Icon size={18} className="shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Collapse toggle */}
-        <div style={{ borderTop: "1px solid var(--gv-border)" }} className="p-3">
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="w-full flex items-center justify-center rounded-lg py-2 transition-colors"
-            style={{
-              color: "var(--gv-text-muted)",
-              background: "transparent",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "var(--gv-bg-card)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            <ChevronLeft
-              size={16}
-              style={{
-                transform: collapsed ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.3s",
-              }}
-            />
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main content ────────────────────────────────── */}
-      <div className="flex flex-col flex-1 min-w-0">
-
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header
-          className="flex items-center justify-between px-6 py-4 shrink-0"
-          style={{
-            background: "var(--gv-bg-secondary)",
-            borderBottom: "1px solid var(--gv-border)",
-          }}
-        >
-          <h1
-            className="text-lg font-bold"
-            style={{ color: "var(--gv-text-primary)" }}
+        <header className="flex items-center justify-between px-4 py-3 bg-[#0d1420] border-b border-[#1e2d40] min-h-[60px]">
+          <button
+            className="md:hidden text-[#94a3b8] hover:text-[#00d4ff] transition-colors"
+            onClick={() => setMobileOpen(!mobileOpen)}
           >
-            {pageTitle}
-          </h1>
-
-          <div className="flex items-center gap-3">
-            {/* Live indicator */}
-            <div className="flex items-center gap-2">
-              <span
-                className="pulse-dot rounded-full"
-                style={{ width: 8, height: 8, background: "var(--gv-green)" }}
-              />
-              <span className="text-xs" style={{ color: "var(--gv-text-muted)" }}>
-                Live
-              </span>
-            </div>
-
-            <button
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: "var(--gv-text-muted)" }}
-            >
-              <Bell size={16} />
-            </button>
-            <button
-              className="p-2 rounded-lg transition-colors"
-              style={{ color: "var(--gv-text-muted)" }}
-            >
-              <Moon size={16} />
-            </button>
-
-            {/* User badge */}
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-              style={{
-                background: "var(--gv-bg-card)",
-                border: "1px solid var(--gv-border)",
-              }}
-            >
-              <div
-                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ background: "rgba(0,212,255,0.15)", color: "var(--gv-accent)" }}
-              >
-                A
-              </div>
-              <span className="text-xs" style={{ color: "var(--gv-text-secondary)" }}>
-                Admin
-              </span>
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <div className="flex items-center gap-3 mr-auto">
+            <WSIndicator />
+            <div className="text-[#475569] text-xs font-mono hidden sm:block">
+              {new Date().toLocaleDateString("fa-IR")}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>
-
-        {/* Footer */}
-        <footer
-          className="px-6 py-2 text-center text-xs shrink-0"
-          style={{
-            color: "var(--gv-text-muted)",
-            borderTop: "1px solid var(--gv-border)",
-          }}
-        >
-          Galaxy Vast AI Trading Platform v2.0 — Institutional Grade
-        </footer>
       </div>
     </div>
   );
