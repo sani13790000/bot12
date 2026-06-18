@@ -1,25 +1,26 @@
 """
-F4 - connection_health.py
-Health check helper for /health endpoint.
+Phase 8 — Connection Health (updated)
+Bridge: imports pool_monitor and query_optimizer for /health endpoint.
 """
-from typing import Dict, Any
+from __future__ import annotations
+from typing import Any, Dict
 
 
-async def get_connection_status() -> Dict[str, Any]:
+async def get_db_health() -> Dict[str, Any]:
     """
-    F4 Health check helper - returns DB connection status for /health endpoint.
+    Unified DB health report used by /health endpoint.
+    Returns pool status + slow query summary.
     """
-    try:
-        from . import db
-        status = await db.health_check()
-        return {
-            'connected': status.get('healthy', False),
-            'status': 'connected' if status.get('healthy') else 'disconnected',
-            'latency_ms': status.get('latency_ms'),
-        }
-    except Exception as exc:
-        return {
-            'connected': False,
-            'status': f'error: {exc}',
-            'latency_ms': None,
-        }
+    from backend.database.connection import db
+    from backend.database.connection_pool_monitor import pool_monitor
+    from backend.database.query_optimizer import query_optimizer
+
+    basic = await db.health_check()
+    pool_status = await pool_monitor.get_status()
+    slow_summary = await query_optimizer.get_stats_summary()
+
+    return {
+        "database": basic,
+        "pool": pool_status,
+        "slow_queries_top5": slow_summary[:5],
+    }
