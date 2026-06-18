@@ -1,186 +1,124 @@
 """
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: FastAPI Application Entry Point
-هدف: راه‌اندازی کامل سرور با تمام سرویس‌ها در lifespan
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FastAPI Application Entry Point — v3.0.0
 """
 
 from __future__ import annotations
 
-import asyncio
+import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
-import asyncpg
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from ..core.config import settings
-from ..core.logger import get_logger
-from ..self_learning import (
-    PerformanceTracker,
-    RetrainingService,
-    TradeDatasetGenerator,
-    TrainingPipeline,
-)
-from ..self_learning.training_pipeline import TrainingConfig
+logger = logging.getLogger("galaxy_vast.api")
 
-logger = get_logger("api.main")
+# ── Routers ──────────────────────────────────────────────────────────────────
+from backend.api.routes.agents        import router as agents_router
+from backend.api.routes.ai_prediction import router as ai_prediction_router
+from backend.api.routes.self_learning import router as self_learning_router
+from backend.api.routes.research      import router as research_router
+from backend.api.routes.risk          import router as risk_router
+from backend.api.routes.analytics     import router as analytics_router
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Lifespan — راه‌اندازی و خاموش کردن سرویس‌ها
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Services ─────────────────────────────────────────────────────────────────
+from backend.self_learning.retraining_service import RetrainingService
+_retraining_service: RetrainingService = RetrainingService()
+
+from backend.analytics import AnalyticsService
+from backend.api.routes.analytics import get_analytics_service
+_analytics_service: AnalyticsService = AnalyticsService(db_pool=None)
+
+
+# ── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """راه‌اندازی تمام سرویس‌ها در startup و خاموش کردن در shutdown."""
+async def lifespan(app: FastAPI):
+    logger.info("🌌 Galaxy Vast AI Trading Platform — starting up")
 
-    logger.info("🌌 Galaxy Vast AI Trading Platform — Starting up...")
+    # Self-Learning weekly scheduler
+    await _retraining_service.start()
+    logger.info("✅ RetrainingService started")
 
-    # ─── PostgreSQL Pool ───
-    db_pool = await asyncpg.create_pool(
-        dsn         = settings.DATABASE_URL,
-        min_size    = 5,
-        max_size    = 20,
-        command_timeout = 60,
-    )
-    app.state.db_pool = db_pool
-    logger.info("✅ PostgreSQL pool ready")
+    # Analytics service ready
+    logger.info("✅ AnalyticsService ready")
 
-    # ─── Self-Learning Module ───
-    dataset_gen = TradeDatasetGenerator(db_pool=db_pool)
-    await dataset_gen.ensure_schema()
+    yield
 
-    tracker = PerformanceTracker(db_pool=db_pool)
-    await tracker.ensure_schema()
-
-    config   = TrainingConfig()
-    pipeline = TrainingPipeline(config=config)
-
-    retrain_svc = RetrainingService(
-        db_pool             = db_pool,
-        dataset_generator   = dataset_gen,
-        training_pipeline   = pipeline,
-        performance_tracker = tracker,
-        symbols             = settings.SYMBOLS,
-        retrain_interval_hours = settings.RETRAIN_INTERVAL_HOURS,
-        min_new_trades      = settings.RETRAIN_MIN_NEW_TRADES,
-    )
-    await retrain_svc.ensure_schema()
-    await retrain_svc.start()
-
-    app.state.dataset_generator   = dataset_gen
-    app.state.performance_tracker = tracker
-    app.state.retraining_service  = retrain_svc
-    logger.info("✅ Self-Learning Module ready")
-
-    # ─── Telegram Bot ───
-    try:
-        from ..telegram.bot import GalaxyVastBot
-        bot = GalaxyVastBot()
-        await bot.start()
-        app.state.telegram_bot = bot
-        logger.info("✅ Telegram bot ready")
-    except Exception as exc:
-        logger.error(f"Telegram bot failed: {exc}")
-
-    logger.info("🚀 Galaxy Vast — All systems operational")
-
-    yield   # سرور در حال اجراست
-
-    # ─── Shutdown ───
-    logger.info("Galaxy Vast — Shutting down...")
-
-    await retrain_svc.stop()
-
-    if hasattr(app.state, "telegram_bot"):
-        await app.state.telegram_bot.stop()
-
-    await db_pool.close()
-    logger.info("Galaxy Vast — Shutdown complete")
+    # Shutdown
+    await _retraining_service.stop()
+    logger.info("🌌 Galaxy Vast — shutdown complete")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Application
-# ─────────────────────────────────────────────────────────────────────────────
+# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title       = "Galaxy Vast AI Trading Platform",
-    description = "Institutional-Grade AI Trading Intelligence System",
-    version     = "2.0.0",
-    docs_url    = "/docs",
-    redoc_url   = "/redoc",
-    lifespan    = lifespan,
+    title="Galaxy Vast AI Trading Platform",
+    description=(
+        "Institutional-Grade AI Trading Intelligence System.\n\n"
+        "Modules: SMC Engine · Price Action · Multi-Agent Voting · "
+        "Portfolio Risk · Backtest · Replay · ML Learning · Analytics"
+    ),
+    version="3.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = settings.ALLOWED_ORIGINS,
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Error Handlers
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Global error handler ──────────────────────────────────────────────────────
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
-        status_code = 500,
-        content     = {
-            "error":   "Internal Server Error",
-            "message": str(exc),
-            "brand":   "Galaxy Vast AI Trading Platform",
-        },
+        status_code=500,
+        content={"success": False, "error": str(exc), "brand": "Galaxy Vast"},
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Routes
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Routes ────────────────────────────────────────────────────────────────────
 
-from .routes.ai_prediction  import router as ai_prediction_router
-from .routes.analysis       import router as analysis_router
-from .routes.intelligence   import router as intelligence_router
-from .routes.research       import router as research_router
-from .routes.self_learning  import router as self_learning_router
-
-app.include_router(analysis_router)
+app.include_router(agents_router)
 app.include_router(ai_prediction_router)
-app.include_router(intelligence_router)
-app.include_router(research_router)
 app.include_router(self_learning_router)
+app.include_router(research_router)
+app.include_router(risk_router)
+app.include_router(analytics_router)          # ← NEW: Analytics Module
 
 
-# ─── Health Check ────────────────────────────────────────────────────────────
-
-@app.get("/health", tags=["System"])
-async def health_check() -> dict:
-    return {
-        "status":  "operational",
-        "brand":   "Galaxy Vast AI Trading Platform",
-        "version": "2.0.0",
-        "modules": {
-            "self_learning": True,
-            "ai_prediction": True,
-            "backtest":      True,
-            "telegram":      True,
-        },
-    }
-
-
-@app.get("/", tags=["System"])
-async def root() -> dict:
+@app.get("/", tags=["Health"])
+async def root():
     return {
         "platform": "Galaxy Vast AI Trading Platform",
-        "version":  "2.0.0",
-        "docs":     "/docs",
+        "version":  "3.0.0",
         "status":   "operational",
+        "modules": [
+            "SMC Engine",
+            "Price Action Engine",
+            "Multi-Agent Voting",
+            "Portfolio Risk Manager",
+            "Backtest Engine",
+            "Market Replay",
+            "Walk-Forward Analysis",
+            "Self-Learning System",
+            "AI Prediction (XGBoost)",
+            "Professional Analytics",      # ← NEW
+        ],
     }
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    return {"status": "healthy", "brand": "Galaxy Vast AI Trading Platform"}
