@@ -1,27 +1,34 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { WebSocketProvider } from "./contexts/WebSocketContext";
 import MainLayout from "./layouts/MainLayout";
-import DashboardPage from "./pages/DashboardPage";
-import TradesPage from "./pages/TradesPage";
-import SignalsPage from "./pages/SignalsPage";
-import PortfolioPage from "./pages/PortfolioPage";
-import LearningPage from "./pages/LearningPage";
-import BacktestPage from "./pages/BacktestPage";
-import SettingsPage from "./pages/SettingsPage";
+import DashboardPage      from "./pages/DashboardPage";
+import LiveTradesPage     from "./pages/LiveTradesPage";
+import TradeHistoryPage   from "./pages/TradeHistoryPage";
+import AIPredictionsPage  from "./pages/AIPredictionsPage";
+import RiskPage           from "./pages/RiskPage";
+import AnalyticsPage      from "./pages/AnalyticsPage";
+import EquityCurvePage    from "./pages/EquityCurvePage";
+import ModelPerformancePage from "./pages/ModelPerformancePage";
+import SettingsPage       from "./pages/SettingsPage";
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard"  element={<DashboardPage />} />
-        <Route path="trades"     element={<TradesPage />} />
-        <Route path="signals"    element={<SignalsPage />} />
-        <Route path="portfolio"  element={<PortfolioPage />} />
-        <Route path="learning"   element={<LearningPage />} />
-        <Route path="backtest"   element={<BacktestPage />} />
-        <Route path="settings"   element={<SettingsPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <WebSocketProvider>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard"         element={<DashboardPage />} />
+          <Route path="live-trades"       element={<LiveTradesPage />} />
+          <Route path="trade-history"     element={<TradeHistoryPage />} />
+          <Route path="ai-predictions"    element={<AIPredictionsPage />} />
+          <Route path="risk"              element={<RiskPage />} />
+          <Route path="analytics"         element={<AnalyticsPage />} />
+          <Route path="equity-curve"      element={<EquityCurvePage />} />
+          <Route path="model-performance" element={<ModelPerformancePage />} />
+          <Route path="settings"          element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </WebSocketProvider>
   );
 }
