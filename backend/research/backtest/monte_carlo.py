@@ -1,17 +1,17 @@
 """
 ================================================================================
 Galaxy Vast AI Trading Platform
-شبیه‌سازی مونت‌کارلو — Monte Carlo Simulation
+شبیه‌سازی مونت کارلو — Monte Carlo Simulator
+================================================================================
+این ماژول شبیه‌سازی مونت کارلو را برای ارزیابی ریسک استراتژی پیاده‌سازی می‌کند.
 
-این ماژول با اجرای هزاران شبیه‌سازی تصادفی از دنباله معاملات،
-توزیع احتمال نتایج را محاسبه می‌کند.
+قابلیت‌ها:
+  - اجرای N شبیه‌سازی با ترتیب تصادفی معاملات
+  - محاسبه توزیع احتمال drawdown و بازده
+  - محاسبه Value at Risk (VaR) در سطوح ۹۰٪، ۹۵٪، ۹۹٪
+  - تشخیص بدترین سناریوی ممکن
 
-کاربرد:
-- ارزیابی استحکام استراتژی در برابر تصادف
-- محاسبه worst-case drawdown با اطمینان ۹۵٪ و ۹۹٪
-- تخمین احتمال رسیدن به اهداف سود
-
-نسخه: 3.0.0
+نویسنده: Galaxy Vast AI Engine
 ================================================================================
 """
 
@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import math
 import random
-import statistics
+import asyncio
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 from ...core.logger import get_logger
 from .engine import BacktestTrade
@@ -32,144 +32,234 @@ logger = get_logger("research.backtest.monte_carlo")
 @dataclass
 class MonteCarloResult:
     """
-    نتیجه شبیه‌سازی مونت‌کارلو
+    نتیجه شبیه‌سازی مونت کارلو
 
-    شامل توزیع احتمال نتایج در N بار اجرا است.
+    شامل توزیع احتمال نتایج در N شبیه‌سازی مختلف.
     """
-    simulations         : int
-    # توزیع سود نهایی
-    mean_final_return   : float     # میانگین بازده نهایی (درصد)
-    median_final_return : float     # میانه بازده نهایی
-    std_final_return    : float     # انحراف معیار بازده نهایی
-    p5_final_return     : float     # پنجک ۵٪ (بدترین ۵٪)
-    p95_final_return    : float     # پنجک ۹۵٪ (بهترین ۵٪)
-    # توزیع drawdown
-    mean_max_drawdown   : float     # میانگین بیشترین افت
-    p95_max_drawdown    : float     # بدترین drawdown با اطمینان ۹۵٪
-    p99_max_drawdown    : float     # بدترین drawdown با اطمینان ۹۹٪
-    # احتمالات
-    prob_profit         : float     # احتمال سودده بودن (۰-۱)
-    prob_ruin           : float     # احتمال از دست دادن بیش از ۲۰٪ سرمایه
-    # خلاصه برای نمایش
-    summary             : str
+    simulations_count: int
+    initial_balance: float
+
+    # ─── توزیع بازده نهایی ───
+    median_return: float
+    mean_return: float
+    best_return: float
+    worst_return: float
+    std_return: float
+
+    # ─── توزیع Max Drawdown ───
+    median_max_drawdown: float
+    worst_max_drawdown: float
+    probability_ruin: float        # احتمال رسیدن drawdown به ۵۰٪+
+
+    # ─── Value at Risk ───
+    var_90: float    # در ۹۰٪ موارد ضرر از این مقدار بیشتر نیست
+    var_95: float
+    var_99: float
+
+    # ─── تعداد شبیه‌سازی‌های سودآور ───
+    profitable_simulations: int
+    probability_profit: float
+
+    # ─── curve های ۱۰٪، ۵۰٪، ۹۰٪ ───
+    percentile_10_curve: List[float]
+    percentile_50_curve: List[float]
+    percentile_90_curve: List[float]
+
+    def to_dict(self) -> Dict:
+        """تبدیل به dictionary برای نمایش در داشبورد"""
+        return {
+            "simulations": self.simulations_count,
+            "initial_balance": self.initial_balance,
+            "returns": {
+                "median": round(self.median_return, 2),
+                "mean": round(self.mean_return, 2),
+                "best": round(self.best_return, 2),
+                "worst": round(self.worst_return, 2),
+                "std": round(self.std_return, 2),
+            },
+            "drawdown": {
+                "median_max": round(self.median_max_drawdown, 2),
+                "worst_max": round(self.worst_max_drawdown, 2),
+                "probability_ruin": round(self.probability_ruin * 100, 1),
+            },
+            "value_at_risk": {
+                "var_90": round(self.var_90, 2),
+                "var_95": round(self.var_95, 2),
+                "var_99": round(self.var_99, 2),
+            },
+            "probability_profit": round(self.probability_profit * 100, 1),
+        }
 
 
 class MonteCarloSimulator:
     """
-    شبیه‌سازگر مونت‌کارلو
+    شبیه‌ساز مونت کارلو Galaxy Vast
 
-    از نتایج واقعی معاملات بک‌تست برای شبیه‌سازی استفاده می‌کند.
+    با تغییر ترتیب تصادفی معاملات، هزاران سناریوی مختلف
+    را شبیه‌سازی می‌کند تا توزیع واقعی ریسک مشخص شود.
     """
 
-    def __init__(self, simulations: int = 1000) -> None:
+    def __init__(self, simulations: int = 1000, seed: Optional[int] = None) -> None:
         """
-        پارامترها:
-            simulations: تعداد دفعات شبیه‌سازی (پیش‌فرض ۱۰۰۰)
-        """
-        self.simulations = simulations
-        logger.info(f"🎲 Monte Carlo Simulator آماده | {simulations} شبیه‌سازی")
+        مقداردهی اولیه شبیه‌ساز
 
-    def run(
+        Args:
+            simulations: تعداد شبیه‌سازی
+            seed: seed برای reproducibility (اختیاری)
+        """
+        self._simulations = simulations
+        self._rng = random.Random(seed)
+        logger.info(f"شبیه‌ساز مونت کارلو آماده — تعداد: {simulations}")
+
+    async def run(
         self,
-        trades          : List[BacktestTrade],
-        initial_balance : float = 10_000.0,
-        risk_per_trade  : float = 1.0,
+        trades: List[BacktestTrade],
+        initial_balance: float,
+        ruin_threshold_percent: float = 50.0,
     ) -> MonteCarloResult:
         """
-        اجرای شبیه‌سازی مونت‌کارلو
+        اجرای شبیه‌سازی مونت کارلو
 
-        پارامترها:
-            trades: لیست معاملات واقعی از بک‌تست
+        Args:
+            trades: لیست معاملات بک‌تست
             initial_balance: موجودی اولیه
-            risk_per_trade: درصد ریسک هر معامله
+            ruin_threshold_percent: آستانه ورشکستگی (درصد)
 
-        خروجی:
-            MonteCarloResult — نتیجه توزیع احتمال
+        Returns:
+            MonteCarloResult: نتیجه کامل شبیه‌سازی
         """
         if len(trades) < 10:
-            logger.warning("⚠️ تعداد معاملات برای مونت‌کارلو کافی نیست (حداقل ۱۰)")
-            return self._empty_result()
+            raise ValueError("حداقل ۱۰ معامله برای مونت کارلو لازم است")
 
-        # استخراج نرخ سود/ضرر از معاملات واقعی
-        pnl_list = [t.pnl_dollar for t in trades]
-
-        final_returns   : List[float] = []
-        max_drawdowns   : List[float] = []
-
-        for _ in range(self.simulations):
-            # ── شافل تصادفی دنباله معاملات ────────────────────────────────────
-            shuffled = random.sample(pnl_list, len(pnl_list))
-
-            balance      = initial_balance
-            peak_balance = initial_balance
-            max_dd       = 0.0
-
-            for pnl in shuffled:
-                # مقیاس‌بندی بر اساس موجودی فعلی (risk% ثابت)
-                scale   = balance / initial_balance
-                adj_pnl = pnl * scale
-                balance = max(0.0, balance + adj_pnl)
-
-                if balance > peak_balance:
-                    peak_balance = balance
-                dd = (peak_balance - balance) / peak_balance * 100 if peak_balance > 0 else 0
-                max_dd = max(max_dd, dd)
-
-            final_return = (balance - initial_balance) / initial_balance * 100
-            final_returns.append(final_return)
-            max_drawdowns.append(max_dd)
-
-        # ── محاسبه آمارها ──────────────────────────────────────────────────────
-        final_returns.sort()
-        max_drawdowns.sort()
-        n = len(final_returns)
-
-        mean_ret    = statistics.mean(final_returns)
-        median_ret  = statistics.median(final_returns)
-        std_ret     = statistics.stdev(final_returns) if n > 1 else 0.0
-        p5_ret      = final_returns[int(n * 0.05)]
-        p95_ret     = final_returns[int(n * 0.95)]
-
-        mean_dd     = statistics.mean(max_drawdowns)
-        p95_dd      = max_drawdowns[int(n * 0.95)]
-        p99_dd      = max_drawdowns[int(n * 0.99)]
-
-        prob_profit = sum(1 for r in final_returns if r > 0) / n
-        prob_ruin   = sum(1 for r in final_returns if r < -20) / n
-
-        summary = (
-            f"Monte Carlo ({self.simulations} شبیه‌سازی) | "
-            f"بازده میانگین: {mean_ret:.1f}٪ | "
-            f"MaxDD 95٪: {p95_dd:.1f}٪ | "
-            f"احتمال سود: {prob_profit*100:.0f}٪"
-        )
-        logger.info(f"🎲 {summary}")
-
-        return MonteCarloResult(
-            simulations         = self.simulations,
-            mean_final_return   = round(mean_ret, 2),
-            median_final_return = round(median_ret, 2),
-            std_final_return    = round(std_ret, 2),
-            p5_final_return     = round(p5_ret, 2),
-            p95_final_return    = round(p95_ret, 2),
-            mean_max_drawdown   = round(mean_dd, 2),
-            p95_max_drawdown    = round(p95_dd, 2),
-            p99_max_drawdown    = round(p99_dd, 2),
-            prob_profit         = round(prob_profit, 4),
-            prob_ruin           = round(prob_ruin, 4),
-            summary             = summary,
+        logger.info(
+            f"شروع مونت کارلو | معاملات: {len(trades)} | "
+            f"شبیه‌سازی: {self._simulations}"
         )
 
-    def _empty_result(self) -> MonteCarloResult:
-        """نتیجه خالی برای حالت خطا"""
-        return MonteCarloResult(
-            simulations=0, mean_final_return=0, median_final_return=0,
-            std_final_return=0, p5_final_return=0, p95_final_return=0,
-            mean_max_drawdown=0, p95_max_drawdown=0, p99_max_drawdown=0,
-            prob_profit=0, prob_ruin=0,
-            summary="داده کافی برای شبیه‌سازی وجود ندارد",
+        pnl_list = [t.pnl_money for t in trades]
+        ruin_threshold = initial_balance * (1 - ruin_threshold_percent / 100)
+
+        all_final_balances: List[float] = []
+        all_max_drawdowns: List[float] = []
+        ruin_count = 0
+        all_equity_curves: List[List[float]] = []
+
+        # ─── اجرای N شبیه‌سازی ───
+        batch_size = 100
+        for batch_start in range(0, self._simulations, batch_size):
+            batch_end = min(batch_start + batch_size, self._simulations)
+
+            for _ in range(batch_start, batch_end):
+                shuffled = pnl_list.copy()
+                self._rng.shuffle(shuffled)
+
+                balance = initial_balance
+                peak = initial_balance
+                max_dd = 0.0
+                equity_curve = [initial_balance]
+
+                for pnl in shuffled:
+                    balance += pnl
+                    if balance > peak:
+                        peak = balance
+                    dd = ((peak - balance) / peak) * 100 if peak > 0 else 0
+                    max_dd = max(max_dd, dd)
+                    equity_curve.append(balance)
+                    if balance <= ruin_threshold:
+                        ruin_count += 1
+                        break
+
+                all_final_balances.append(balance)
+                all_max_drawdowns.append(max_dd)
+                all_equity_curves.append(equity_curve)
+
+            await asyncio.sleep(0)  # اجازه به event loop
+
+        # ─── محاسبه آمار ───
+        all_final_balances.sort()
+        all_max_drawdowns.sort()
+
+        returns = [
+            ((b - initial_balance) / initial_balance) * 100
+            for b in all_final_balances
+        ]
+
+        median_idx = len(returns) // 2
+        mean_return = sum(returns) / len(returns)
+        variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+        std_return = math.sqrt(variance)
+
+        # ─── Value at Risk ───
+        sorted_returns = sorted(returns)
+        var_90_idx = int(len(sorted_returns) * 0.10)
+        var_95_idx = int(len(sorted_returns) * 0.05)
+        var_99_idx = int(len(sorted_returns) * 0.01)
+        var_90 = sorted_returns[max(0, var_90_idx)]
+        var_95 = sorted_returns[max(0, var_95_idx)]
+        var_99 = sorted_returns[max(0, var_99_idx)]
+
+        # ─── Percentile Curves (۱۰٪، ۵۰٪، ۹۰٪) ───
+        max_len = max(len(c) for c in all_equity_curves)
+        p10_curve = self._percentile_curve(all_equity_curves, 10, max_len)
+        p50_curve = self._percentile_curve(all_equity_curves, 50, max_len)
+        p90_curve = self._percentile_curve(all_equity_curves, 90, max_len)
+
+        profitable = sum(1 for b in all_final_balances if b > initial_balance)
+
+        result = MonteCarloResult(
+            simulations_count=self._simulations,
+            initial_balance=initial_balance,
+            median_return=returns[median_idx],
+            mean_return=mean_return,
+            best_return=returns[-1],
+            worst_return=returns[0],
+            std_return=std_return,
+            median_max_drawdown=all_max_drawdowns[median_idx],
+            worst_max_drawdown=all_max_drawdowns[-1],
+            probability_ruin=ruin_count / self._simulations,
+            var_90=var_90,
+            var_95=var_95,
+            var_99=var_99,
+            profitable_simulations=profitable,
+            probability_profit=profitable / self._simulations,
+            percentile_10_curve=p10_curve,
+            percentile_50_curve=p50_curve,
+            percentile_90_curve=p90_curve,
         )
 
+        logger.info(
+            f"مونت کارلو کامل | "
+            f"احتمال سود: {result.probability_profit*100:.1f}% | "
+            f"Median Return: {result.median_return:.1f}% | "
+            f"Worst DD: {result.worst_max_drawdown:.1f}%"
+        )
 
-# ─── نمونه singleton ──────────────────────────────────────────────────────────
-monte_carlo_simulator = MonteCarloSimulator(simulations=1000)
+        return result
+
+    def _percentile_curve(
+        self,
+        curves: List[List[float]],
+        percentile: int,
+        max_len: int,
+    ) -> List[float]:
+        """
+        استخراج curve در یک percentile مشخص
+
+        برای هر نقطه زمانی، مقدار percentile مشخص را از
+        تمام شبیه‌سازی‌ها استخراج می‌کند.
+        """
+        result = []
+        idx = int(len(curves) * percentile / 100)
+        idx = max(0, min(idx, len(curves) - 1))
+
+        for step in range(max_len):
+            values = []
+            for curve in curves:
+                if step < len(curve):
+                    values.append(curve[step])
+                else:
+                    values.append(curve[-1])
+            values.sort()
+            result.append(values[idx])
+
+        return result
