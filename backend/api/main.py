@@ -14,9 +14,14 @@ Routers registered:
   /api/v1/research      - Research (backtest/replay/walk-forward)
   /api/v1/ai            - AI prediction (XGBoost)
   /api/v1/backtest      - Institutional backtesting engine (NEW)
+
+C8 FIX: CORS origins از environment variable خوانده می‌شود.
+        در صورت عدم تنظیم → فقط localhost مجاز است.
+        allow_origins=["*"] حذف شد.
 """
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -24,6 +29,36 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+
+# ── C8 FIX: CORS origins از environment ──────────────────────────────────────────────
+def _get_allowed_origins() -> list[str]:
+    """
+    ALLOWED_ORIGINS را از environment می‌خواند.
+    فرمت: رشته‌های comma-separated
+    مثال: ALLOWED_ORIGINS="https://app.galaxyvast.com,https://dashboard.galaxyvast.com"
+
+    اگر تنظیم نشده باشد → فقط localhost در development مجاز است.
+    """
+    raw = os.getenv("ALLOWED_ORIGINS", "")
+    if raw.strip():
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        logger.info(f"CORS: {len(origins)} origin(s) from environment")
+        return origins
+
+    # fallback: فقط localhost — برای development
+    dev_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
+    logger.warning(
+        "CORS: ALLOWED_ORIGINS not set — allowing localhost only. "
+        "Set ALLOWED_ORIGINS env var for production."
+    )
+    return dev_origins
 
 
 @asynccontextmanager
@@ -37,9 +72,9 @@ app = FastAPI(
     title="Galaxy Vast AI Trading Platform",
     description=(
         "Institutional-Grade AI Trading Ecosystem\n\n"
-        "Features: SMC Analysis · AI Prediction · Multi-Agent Voting · "
-        "Portfolio Risk · Self-Learning · Analytics · "
-        "Institutional Backtest Engine · Market Replay · Walk-Forward"
+        "Features: SMC Analysis \u00b7 AI Prediction \u00b7 Multi-Agent Voting \u00b7 "
+        "Portfolio Risk \u00b7 Self-Learning \u00b7 Analytics \u00b7 "
+        "Institutional Backtest Engine \u00b7 Market Replay \u00b7 Walk-Forward"
     ),
     version="2.0.0",
     lifespan=lifespan,
@@ -49,16 +84,16 @@ app = FastAPI(
     license_info={"name": "Galaxy Vast Enterprise License"},
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ── C8 FIX: CORS با whitelist از environment ──────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_get_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-License-Key", "X-Request-ID"],
 )
 
-# ── Global error handler ──────────────────────────────────────────────────────
+# ── Global error handler ──────────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error: {exc}", exc_info=True)
@@ -67,7 +102,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error", "brand": "Galaxy Vast"},
     )
 
-# ── Register routers ──────────────────────────────────────────────────────────
+# ── Register routers ────────────────────────────────────────────────────────────────
 def _register_routers():
     registered = []
     failed = []
@@ -82,7 +117,7 @@ def _register_routers():
         "analytics":    ("backend.api.routes.analytics",    None),
         "research":     ("backend.api.routes.research",     None),
         "ai_prediction":("backend.api.routes.ai_prediction",None),
-        "backtest":     ("backend.api.routes.backtest_engine", None),  # NEW
+        "backtest":     ("backend.api.routes.backtest_engine", None),
     }
 
     for name, (module_path, _) in router_map.items():
@@ -97,13 +132,13 @@ def _register_routers():
             failed.append(f"{name}: {e}")
 
     if registered:
-        logger.info(f"✅ Routers registered: {registered}")
+        logger.info(f"\u2705 Routers registered: {registered}")
     if failed:
-        logger.warning(f"⚠️ Routers failed: {failed}")
+        logger.warning(f"\u26a0\ufe0f Routers failed: {failed}")
 
 _register_routers()
 
-# ── Health ────────────────────────────────────────────────────────────────────
+# ── Health ────────────────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])
 async def root():
     return {
