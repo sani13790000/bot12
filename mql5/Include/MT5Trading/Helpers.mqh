@@ -63,13 +63,11 @@ double CalculateStructureSL(
       SYMBOL_ASK : SYMBOL_BID);
 
    if(direction == ORDER_TYPE_BUY) {
-      // برای خرید، حد ضرر زیر ساختار
       if(smc.hasOrderBlock) {
          return smc.obLow - (50 * point);
       }
       return currentPrice - (DefaultSL * point);
    } else {
-      // برای فروش، حد ضرر بالای ساختار
       if(smc.hasOrderBlock) {
          return smc.obHigh + (50 * point);
       }
@@ -105,7 +103,6 @@ bool IsInKillZone(const int startHour, const int endHour) {
    if(startHour < endHour) {
       return (hour >= startHour && hour < endHour);
    } else {
-      // عبور از نیمه‌شب
       return (hour >= startHour || hour < endHour);
    }
 }
@@ -156,7 +153,6 @@ int CountTodayTrades() {
    int count = 0;
    datetime todayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
 
-   // این باید از تاریخچه خوانده شود
    if(HistorySelect(todayStart, TimeCurrent())) {
       for(int i = HistoryDealsTotal() - 1; i >= 0; i--) {
          ulong ticket = HistoryDealGetTicket(i);
@@ -179,7 +175,6 @@ bool HasLiquiditySweep(const string symbol, const int lookback = 20) {
    if(CopyHigh(symbol, PERIOD_CURRENT, 1, lookback, high) < lookback) return false;
    if(CopyLow(symbol, PERIOD_CURRENT, 1, lookback, low) < lookback) return false;
 
-   // بررسی شکست و بازگشت
    double currentHigh = high[0];
    double currentLow = low[0];
 
@@ -246,8 +241,7 @@ void LogMessage(const string message, const string level = "INFO") {
       message
    );
 
-   Print(logText);
-
+   // همیشه به فایل log می‌نویسیم (اگر LogToFile=true)
    if(LogToFile) {
       int fileHandle = FileOpen("MT5Trading.log", FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI);
       if(fileHandle != INVALID_HANDLE) {
@@ -256,9 +250,13 @@ void LogMessage(const string message, const string level = "INFO") {
          FileClose(fileHandle);
       }
    }
+   // در حالت DEBUG، در Expert tab نمایش می‌دهیم
+   if(DebugMode) {
+      Print(logText);
+   }
 }
 
-// لاگ معامله
+// لاگ معاملون
 void LogTrade(
    const string action,
    const string symbol,
