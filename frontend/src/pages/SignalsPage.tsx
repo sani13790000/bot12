@@ -1,251 +1,138 @@
-/**
- * صفحه سیگنال‌ها
- *
- * نویسنده: MT5 Trading Team
- */
+import { useEffect, useState } from "react";
+import { Zap, CheckCircle, XCircle, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import { signalsApi } from "../utils/api";
+import type { Signal } from "../types";
 
-import { useState } from 'react';
-import {
-  Bell,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  RefreshCw
-} from 'lucide-react';
-import { EmptyCard } from '@/components/common/Card';
-import { useActiveSignals, useSignals } from '@/hooks/useApi';
-import { formatRelativeTime, getDirectionText } from '@/utils/helpers';
+const MOCK_SIGNALS: Signal[] = [
+  { id:"s1", symbol:"XAUUSD", direction:"BUY",  entry_price:2341.50, stop_loss:2334.00, take_profit_1:2352.00, take_profit_2:2362.00, confidence_score:87, risk_level:"LOW",    risk_reward_ratio:2.4, status:"ACTIVE",   created_at:"2024-06-18T10:00:00Z", expires_at:"2024-06-18T12:00:00Z", context_explanation:"BOS صعودی در H4 تأیید شد. OB باکیفیت در ناحیه Discount. Kill Zone لندن.", smc_details:"BOS+OB+FVG", pa_pattern:"Pin Bar", session:"London" },
+  { id:"s2", symbol:"EURUSD", direction:"SELL", entry_price:1.0842,  stop_loss:1.0868,  take_profit_1:1.0790, take_profit_2:1.0750, confidence_score:82, risk_level:"MEDIUM", risk_reward_ratio:2.0, status:"ACTIVE",   created_at:"2024-06-18T09:30:00Z", expires_at:"2024-06-18T11:30:00Z", context_explanation:"CHOCH نزولی در H1. نقدینگی جارو شد. ساختار Premium.", smc_details:"CHOCH+LiqSweep", pa_pattern:"Engulfing", session:"London" },
+  { id:"s3", symbol:"GBPUSD", direction:"BUY",  entry_price:1.2680,  stop_loss:1.2640,  take_profit_1:1.2740, take_profit_2:1.2800, confidence_score:91, risk_level:"LOW",    risk_reward_ratio:2.8, status:"EXECUTED", created_at:"2024-06-17T13:00:00Z", expires_at:"2024-06-17T15:00:00Z", context_explanation:"OB اجرا شد. FVG پر شد.", smc_details:"OB+FVG", pa_pattern:"Inside Bar", session:"NewYork" },
+];
 
-type SignalFilter = 'all' | 'active' | 'executed' | 'expired';
-
-interface SignalData {
-  id: string;
-  symbol: string;
-  direction: 'buy' | 'sell';
-  status: string;
-  total_score: number;
-  entry_price: number;
-  stop_loss: number;
-  take_profit: number;
-  generated_at: string;
-  valid_until: string;
-  reason?: string;
+function ConfidenceBar({ score }: { score: number }) {
+  const color = score >= 85 ? "#10b981" : score >= 75 ? "#f59e0b" : "#ef4444";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--gv-bg-secondary)" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: color }} />
+      </div>
+      <span className="text-xs font-mono font-bold w-8" style={{ color }}>{score}%</span>
+    </div>
+  );
 }
 
-interface ActiveSignalsData {
-  active_signals: SignalData[];
-}
+export default function SignalsPage() {
+  const [signals, setSignals] = useState<Signal[]>([]);
 
-interface AllSignalsData {
-  signals: SignalData[];
-}
+  useEffect(() => {
+    signalsApi.list().then((res) => {
+      setSignals(res.success && res.data?.length ? res.data : MOCK_SIGNALS);
+    });
+  }, []);
 
-export function SignalsPage() {
-  const [filter, setFilter] = useState<SignalFilter>('all');
-
-  const { data: activeSignals } = useActiveSignals() as { data: ActiveSignalsData | null };
-  const { data: allSignals, refetch } = useSignals({ limit: 50 }) as { data: AllSignalsData | null; refetch: () => void };
-
-  // انتخاب داده‌ها
-  const signals: SignalData[] = filter === 'active'
-    ? activeSignals?.active_signals || []
-    : allSignals?.signals || [];
-
-  // آمار
-  const total = signals.length;
-  const executed = signals.filter(s => s.status === 'executed').length;
-  const expired = signals.filter(s => s.status === 'expired').length;
-  const pending = signals.filter(s => s.status === 'generated').length;
+  const handleExecute = async (id: string) => {
+    await signalsApi.execute(id);
+    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, status: "EXECUTED" } : s));
+  };
+  const handleCancel = async (id: string) => {
+    await signalsApi.cancel(id);
+    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, status: "CANCELLED" } : s));
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-100">سیگنال‌ها</h1>
-          <p className="text-slate-500 mt-1">سیگنال‌های خرید و فروش</p>
-        </div>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          به‌روزرسانی
-        </button>
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "سیگنال‌های فعال", value: signals.filter(s=>s.status==="ACTIVE").length,   color:"#00d4ff" },
+          { label: "اجرا شده",        value: signals.filter(s=>s.status==="EXECUTED").length, color:"#10b981" },
+          { label: "منقضی/لغو",       value: signals.filter(s=>["EXPIRED","CANCELLED"].includes(s.status)).length, color:"#475569" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="gv-card p-4 text-center">
+            <div className="metric-value" style={{ color }}>{value}</div>
+            <div className="text-xs mt-1" style={{ color: "var(--gv-text-muted)" }}>{label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-          <div className="flex items-center gap-2 mb-2">
-            <Bell className="w-5 h-5 text-slate-400" />
-            <span className="text-slate-500 text-sm">کل</span>
-          </div>
-          <p className="text-2xl font-bold text-slate-100">{total}</p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
-            <span className="text-slate-500 text-sm">اجرا شده</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-500">{executed}</p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-amber-400" />
-            <span className="text-slate-500 text-sm">در انتظار</span>
-          </div>
-          <p className="text-2xl font-bold text-amber-500">{pending}</p>
-        </div>
-
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-          <div className="flex items-center gap-2 mb-2">
-            <XCircle className="w-5 h-5 text-rose-400" />
-            <span className="text-slate-500 text-sm">منقضی</span>
-          </div>
-          <p className="text-2xl font-bold text-rose-500">{expired}</p>
-        </div>
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-2 bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
-        <span className="text-slate-500 text-sm">فیلتر:</span>
-        <div className="flex bg-slate-700/50 rounded-lg p-1">
-          {(['all', 'active', 'executed', 'expired'] as SignalFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-sky-500/20 text-sky-400'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {f === 'all' ? 'همه' : f === 'active' ? 'فعال' : f === 'executed' ? 'اجرا شده' : 'منقضی'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Signals Grid */}
-      {signals.length === 0 ? (
-        <EmptyCard message="سیگنالی یافت نشد" icon={Bell} />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {signals.map((signal: {
-            id: string;
-            symbol: string;
-            direction: 'buy' | 'sell';
-            status: string;
-            total_score: number;
-            entry_price: number;
-            stop_loss: number;
-            take_profit: number;
-            generated_at: string;
-            valid_until: string;
-            reason?: string;
-          }) => (
-            <div
-              key={signal.id}
-              className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 hover:border-slate-600/50 transition-colors"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    signal.direction === 'buy'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-rose-500/20 text-rose-400'
-                  }`}>
-                    {getDirectionText(signal.direction)}
-                  </span>
-                  <span className="font-semibold text-slate-100">{signal.symbol}</span>
+      <div className="space-y-3">
+        {signals.map((s) => (
+          <div key={s.id} className="gv-card p-4 fade-in-up"
+            style={{ borderColor: s.status === "ACTIVE" ? "rgba(0,212,255,0.2)" : "var(--gv-border)" }}
+          >
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.direction==="BUY" ? "badge-buy" : "badge-sell"}`}>
+                  {s.direction === "BUY" ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                 </div>
-
-                <div className={`px-2 py-1 rounded text-xs font-medium ${
-                  signal.status === 'executed'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : signal.status === 'expired'
-                      ? 'bg-rose-500/20 text-rose-400'
-                      : 'bg-sky-500/20 text-sky-400'
-                }`}>
-                  {signal.status === 'executed' ? 'اجرا شده' :
-                   signal.status === 'expired' ? 'منقضی' :
-                   signal.status === 'generated' ? 'در انتظار' : signal.status}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold" style={{ color: "var(--gv-text-primary)" }}>{s.symbol}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.direction==="BUY" ? "badge-buy" : "badge-sell"}`}>
+                      {s.direction === "BUY" ? "خرید" : "فروش"}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${s.status==="ACTIVE" ? "badge-active" : s.status==="EXECUTED" ? "badge-buy" : "badge-wait"}`}>
+                      {s.status === "ACTIVE" ? "فعال" : s.status === "EXECUTED" ? "اجرا شد" : "منقضی"}
+                    </span>
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: "var(--gv-text-muted)" }}>
+                    {s.session} · {new Date(s.created_at).toLocaleTimeString("fa-IR")}
+                  </div>
                 </div>
               </div>
 
-              {/* Score */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-500 text-sm">امتیاز</span>
-                  <span className={`font-bold text-lg ${
-                    signal.total_score >= 80 ? 'text-emerald-500' :
-                    signal.total_score >= 65 ? 'text-sky-500' :
-                    signal.total_score >= 50 ? 'text-amber-500' : 'text-rose-500'
-                  }`}>
-                    {signal.total_score}/100
-                  </span>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${
-                      signal.total_score >= 80 ? 'bg-emerald-500' :
-                      signal.total_score >= 65 ? 'bg-sky-500' :
-                      signal.total_score >= 50 ? 'bg-amber-500' : 'bg-rose-500'
-                    }`}
-                    style={{ width: `${signal.total_score}%` }}
-                  />
-                </div>
+              {/* Price grid */}
+              <div className="flex gap-4 text-xs">
+                {[
+                  { label: "ورود", value: s.entry_price, color: "var(--gv-text-primary)" },
+                  { label: "SL",   value: s.stop_loss,   color: "#ef4444" },
+                  { label: "TP1",  value: s.take_profit_1, color: "#10b981" },
+                  { label: "R:R",  value: `1:${s.risk_reward_ratio}`, color: "#00d4ff" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="text-center">
+                    <div className="font-mono font-bold" style={{ color }}>{value}</div>
+                    <div style={{ color: "var(--gv-text-muted)" }}>{label}</div>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* Levels */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div className="text-center p-2 bg-slate-700/30 rounded">
-                  <p className="text-slate-500 text-xs mb-1">ورود</p>
-                  <p className="text-slate-200 text-sm font-medium">{signal.entry_price}</p>
-                </div>
-                <div className="text-center p-2 bg-slate-700/30 rounded">
-                  <p className="text-slate-500 text-xs mb-1">حد ضرر</p>
-                  <p className="text-rose-400 text-sm font-medium">{signal.stop_loss}</p>
-                </div>
-                <div className="text-center p-2 bg-slate-700/30 rounded">
-                  <p className="text-slate-500 text-xs mb-1">حد سود</p>
-                  <p className="text-emerald-400 text-sm font-medium">{signal.take_profit}</p>
-                </div>
+            {/* Confidence + context */}
+            <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--gv-border)" }}>
+              <div className="flex items-center gap-4 mb-2">
+                <span className="text-xs" style={{ color: "var(--gv-text-muted)" }}>امتیاز اطمینان:</span>
+                <div className="flex-1 max-w-xs"><ConfidenceBar score={s.confidence_score} /></div>
               </div>
-
-              {/* Time */}
-              <div className="flex items-center justify-between text-slate-500 text-sm border-t border-slate-700/50 pt-3">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  <span>{formatRelativeTime(signal.generated_at)}</span>
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-xs flex-1" style={{ color: "var(--gv-text-secondary)" }}>
+                  <span className="font-medium" style={{ color: "var(--gv-accent)" }}>{s.smc_details}</span>
+                  {" · "}
+                  <span>{s.pa_pattern}</span>
+                  {" · "}
+                  <span>{s.context_explanation}</span>
                 </div>
-                {signal.reason && (
-                  <span className="text-xs text-slate-600 truncate max-w-[150px]">
-                    {signal.reason}
-                  </span>
+                {s.status === "ACTIVE" && (
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleExecute(s.id)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{ background:"rgba(16,185,129,0.15)", color:"#10b981", border:"1px solid rgba(16,185,129,0.3)" }}
+                    >
+                      <CheckCircle size={12} /> اجرا
+                    </button>
+                    <button
+                      onClick={() => handleCancel(s.id)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                      style={{ background:"rgba(239,68,68,0.15)", color:"#ef4444", border:"1px solid rgba(239,68,68,0.3)" }}
+                    >
+                      <XCircle size={12} /> لغو
+                    </button>
+                  </div>
                 )}
               </div>
-
-              {/* Actions (only for pending) */}
-              {signal.status === 'generated' && (
-                <div className="flex gap-2 mt-3 pt-3 border-t border-slate-700/50">
-                  <button className="flex-1 bg-emerald-500/20 text-emerald-400 py-2 rounded-lg text-sm font-medium hover:bg-emerald-500/30 transition-colors">
-                    اجرا
-                  </button>
-                  <button className="flex-1 bg-slate-700/50 text-slate-300 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors">
-                    رد
-                  </button>
-                </div>
-              )}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
