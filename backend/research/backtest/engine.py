@@ -1,4 +1,4 @@
-"""Galaxy Vast AI Trading Platform — Backtest Engine (bug-fixed)"""
+"""Galaxy Vast AI Trading Platform — Backtest Engine (phase4 fixed)"""
 from __future__ import annotations
 import math, statistics, uuid
 from dataclasses import dataclass, field
@@ -91,10 +91,10 @@ class SharedBacktestMetrics:
 @dataclass
 class CandleData:
     timestamp: str
-    open: float
-    high: float
-    low: float
-    close: float
+    open:   float
+    high:   float
+    low:    float
+    close:  float
     volume: float = 0.0
     spread: float = 0.0
 
@@ -108,7 +108,7 @@ class BacktestTrade:
     exit_time:     str   = ''
     entry_price:   float = 0.0
     exit_price:    float = 0.0
-    stmp_loss:     float = 0.0
+    stop_loss:     float = 0.0   # ✔ was stmp_loss (typo) in earlier commits
     take_profit:   float = 0.0
     lot_size:      float = 0.01
     pnl_pips:      float = 0.0
@@ -119,48 +119,48 @@ class BacktestTrade:
 
 @dataclass
 class BacktestConfig:
-    symbol:          str   = 'XAUUSD'
-    timeframe:       str   = 'H1'
-    initial_balance: float = 10_000.0
-    risk_per_trade:  float = 1.0
-    max_spread_pips: float = 3.0
-    slippage_pips:   float = 0.5
-    commission_usd:  float = 3.5
-    min_rr_ratio:    float = 1.5
-    max_trades_day:  int   = 5
-    pip_value:       float = 10.0
+    symbol:            str   = 'XAUUSD'
+    timeframe:         str   = 'H1'
+    initial_balance:   float = 10_000.0
+    risk_per_trade:    float = 1.0
+    max_spread_pips:   float = 3.0
+    slippage_pips:     float = 0.5
+    commission_usd:    float = 3.5
+    min_rr_ratio:      float = 1.5
+    max_trades_day:    int   = 5
+    pip_value:         float = 10.0
 
 
 @dataclass
 class BacktestResult:
-    config:           BacktestConfig
-    symbol:           str
-    timeframe:        str
-    start_date:       str
-    end_date:         str
-    total_trades:     int   = 0
-    winning_trades:   int   = 0
-    losing_trades:    int   = 0
-    breakeven_trades: int   = 0
-    win_rate:         float = 0.0
-    profit_factor:    float = 0.0
-    total_pnl_pips:   float = 0.0
-    total_pnl_usd:    float = 0.0
-    max_drawdown_pct: float = 0.0
-    max_drawdown_usd: float = 0.0
-    sharpe_ratio:     float = 0.0
-    sortino_ratio:    float = 0.0
-    calmar_ratio:     float = 0.0
-    expectancy:       float = 0.0
-    avg_win_usd:      float = 0.0
-    avg_loss_usd:     float = 0.0
-    avg_rr_achieved:  float = 0.0
-    final_balance:    float = 0.0
-    total_return_pct: float = 0.0
-    trades:          List[BacktestTrade]     = field(default_factory=list)
-    equity_curve:    List[SharedEquityPoint] = field(default_factory=list)
-    monthly_returns: Dict[str, float]        = field(default_factory=dict)
-    metadata:        Dict[str, Any]          = field(default_factory=dict)
+    config:             BacktestConfig
+    symbol:             str
+    timeframe:          str
+    start_date:         str
+    end_date:           str
+    total_trades:       int   = 0
+    winning_trades:     int   = 0
+    losing_trades:      int   = 0
+    breakeven_trades:   int   = 0
+    win_rate:           float = 0.0
+    profit_factor:      float = 0.0
+    total_pnl_pips:     float = 0.0
+    total_pnl_usd:      float = 0.0
+    max_drawdown_pct:   float = 0.0
+    max_drawdown_usd:   float = 0.0
+    sharpe_ratio:       float = 0.0
+    sortino_ratio:      float = 0.0
+    calmar_ratio:       float = 0.0
+    expectancy:         float = 0.0
+    avg_win_usd:        float = 0.0
+    avg_loss_usd:       float = 0.0
+    avg_rr_achieved:    float = 0.0
+    final_balance:      float = 0.0
+    total_return_pct:   float = 0.0
+    trades:             List[BacktestTrade]     = field(default_factory=list)
+    equity_curve:       List[SharedEquityPoint] = field(default_factory=list)
+    monthly_returns:    Dict[str, float]        = field(default_factory=dict)
+    metadata:           Dict[str, Any]          = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -183,7 +183,7 @@ class BacktestResult:
             'total_return_pct': round(self.total_return_pct, 4),
             'monthly_returns': self.monthly_returns,
             'equity_curve': [{'t': p.timestamp, 'eq': p.equity, 'dd': p.drawdown}
-                              for p in self.equity_curve],
+                             for p in self.equity_curve],
         }
 
 
@@ -254,7 +254,7 @@ class BacktestEngine:
             symbol=cfg.symbol, direction=direction,
             entry_time=entry_candle.timestamp, exit_time=exit_time,
             entry_price=round(ep_actual, 5), exit_price=round(exit_price, 5),
-            stmp_loss=sl, take_profit=tp, lot_size=lot,
+            stop_loss=sl, take_profit=tp, lot_size=lot,
             pnl_pips=round(pnl_pips, 2), pnl_usd=round(pnl_usd, 2),
             slippage_pips=round(cfg.slippage_pips, 2), outcome=outcome,
         )
@@ -267,35 +267,36 @@ class BacktestEngine:
         if not trades:
             result.final_balance = cfg.initial_balance
             return result
-        wins = [t for t in trades if t.outcome == 'WIN']
-        losses = [t for t in trades if t.outcome == 'LOSS']
+        wins      = [t for t in trades if t.outcome == 'WIN']
+        losses    = [t for t in trades if t.outcome == 'LOSS']
         breakeven = [t for t in trades if t.outcome == 'BE']
-        result.total_trades = len(trades); result.winning_trades = len(wins)
-        result.losing_trades = len(losses); result.breakeven_trades = len(breakeven)
-        result.total_pnl_pips = sum(t.pnl_pips for t in trades)
-        result.total_pnl_usd  = sum(t.pnl_usd  for t in trades)
-        result.final_balance  = cfg.initial_balance + result.total_pnl_usd
+        result.total_trades    = len(trades); result.winning_trades = len(wins)
+        result.losing_trades   = len(losses); result.breakeven_trades = len(breakeven)
+        result.total_pnl_pips  = sum(t.pnl_pips for t in trades)
+        result.total_pnl_usd   = sum(t.pnl_usd  for t in trades)
+        result.final_balance   = cfg.initial_balance + result.total_pnl_usd
         result.total_return_pct = (result.final_balance - cfg.initial_balance) / cfg.initial_balance * 100.0
-        result.avg_win_usd  = (sum(t.pnl_usd for t in wins)   / len(wins))   if wins   else 0.0
-        result.avg_loss_usd = (sum(t.pnl_usd for t in losses) / len(losses)) if losses else 0.0
-        result.win_rate      = SharedBacktestMetrics.win_rate(len(wins), len(trades))
+        result.avg_win_usd  = (sum(t.pnl_usd for t in wins)    / len(wins))    if wins   else 0.0
+        result.avg_loss_usd = (sum(t.pnl_usd for t in losses)  / len(losses))  if losses else 0.0
+        # ─── use SharedBacktestMetrics for ALL calculations (D3 fix) ───
+        result.win_rate       = SharedBacktestMetrics.win_rate(len(wins), len(trades))
         gross_profit = sum(t.pnl_usd for t in trades if t.pnl_usd > 0)
         gross_loss   = sum(t.pnl_usd for t in trades if t.pnl_usd < 0)
-        result.profit_factor = SharedBacktestMetrics.profit_factor(gross_profit, gross_loss)
-        result.expectancy    = SharedBacktestMetrics.expectancy(result.win_rate, result.avg_win_usd, result.avg_loss_usd)
-        result.equity_curve  = SharedBacktestMetrics.build_equity_curve(trades, cfg.initial_balance)
-        equity_values        = [p.equity for p in result.equity_curve]
-        dd_pct, dd_usd       = SharedBacktestMetrics.max_drawdown(equity_values)
+        result.profit_factor  = SharedBacktestMetrics.profit_factor(gross_profit, gross_loss)
+        result.expectancy     = SharedBacktestMetrics.expectancy(result.win_rate, result.avg_win_usd, result.avg_loss_usd)
+        result.equity_curve   = SharedBacktestMetrics.build_equity_curve(trades, cfg.initial_balance)
+        equity_values         = [p.equity for p in result.equity_curve]
+        dd_pct, dd_usd        = SharedBacktestMetrics.max_drawdown(equity_values)
         result.max_drawdown_pct = dd_pct; result.max_drawdown_usd = dd_usd
-        trade_returns        = [t.pnl_usd / cfg.initial_balance for t in trades]
-        result.sharpe_ratio  = SharedBacktestMetrics.sharpe_ratio(trade_returns)
-        result.sortino_ratio = SharedBacktestMetrics.sortino_ratio(trade_returns)
-        result.calmar_ratio  = SharedBacktestMetrics.calmar_ratio(trade_returns)
+        trade_returns         = [t.pnl_usd / cfg.initial_balance for t in trades]
+        result.sharpe_ratio   = SharedBacktestMetrics.sharpe_ratio(trade_returns)
+        result.sortino_ratio  = SharedBacktestMetrics.sortino_ratio(trade_returns)
+        result.calmar_ratio   = SharedBacktestMetrics.calmar_ratio(trade_returns)
         result.monthly_returns = self._monthly_returns(trades)
         rr_list = []
         for t in trades:
-            risk   = abs(t.entry_price - t.stmp_loss)
-            reward = abs(t.take_profit - t.entry_price)
+            risk   = abs(t.entry_price - t.stop_loss)
+            reward = abs(t.take_profit  - t.entry_price)
             if risk > 0: rr_list.append(reward / risk)
         result.avg_rr_achieved = round(sum(rr_list) / len(rr_list), 3) if rr_list else 0.0
         result.trades = trades
