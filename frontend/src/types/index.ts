@@ -1,15 +1,16 @@
-// ============================================================
-// Galaxy Vast — Central Type Definitions
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// Galaxy Vast AI Trading Platform — Central Type Definitions v3
+// ═══════════════════════════════════════════════════════════════
 
-export type TradingMode = "SIGNAL_ONLY" | "SEMI_AUTO" | "FULL_AUTO";
-export type TradeDirection = "BUY" | "SELL";
-export type TradeStatus = "OPEN" | "CLOSED" | "CANCELLED";
-export type SignalStatus = "ACTIVE" | "EXECUTED" | "EXPIRED" | "CANCELLED";
-export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-export type BotStatus = "RUNNING" | "PAUSED" | "STOPPED";
+export type TradingMode     = "SIGNAL_ONLY" | "SEMI_AUTO" | "FULL_AUTO";
+export type TradeDirection  = "BUY" | "SELL";
+export type TradeStatus     = "OPEN" | "CLOSED" | "CANCELLED";
+export type SignalStatus    = "ACTIVE" | "EXECUTED" | "EXPIRED" | "CANCELLED";
+export type RiskLevel       = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type BotStatus       = "RUNNING" | "PAUSED" | "STOPPED";
+export type ModelStatus     = "ACTIVE" | "TRAINING" | "DEPRECATED" | "ROLLBACK";
 
-// ── Dashboard Stats ─────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────
 export interface DashboardStats {
   balance: number;
   equity: number;
@@ -32,9 +33,11 @@ export interface DashboardStats {
   trading_mode: TradingMode;
   active_trades_count: number;
   active_signals_count: number;
+  expectancy: number;
+  max_drawdown: number;
 }
 
-// ── Trade ───────────────────────────────────────────────────
+// ── Trade ──────────────────────────────────────────────────────
 export interface Trade {
   id: string;
   symbol: string;
@@ -57,9 +60,12 @@ export interface Trade {
   smc_score: number;
   pa_score: number;
   session: string;
+  duration_minutes?: number;
+  mae?: number;
+  mfe?: number;
 }
 
-// ── Signal ──────────────────────────────────────────────────
+// ── Signal ─────────────────────────────────────────────────────
 export interface Signal {
   id: string;
   symbol: string;
@@ -78,9 +84,25 @@ export interface Signal {
   smc_details: string;
   pa_pattern: string;
   session: string;
+  ai_probability?: number;
+  ai_confidence?: number;
 }
 
-// ── Portfolio Risk ───────────────────────────────────────────
+// ── AI Prediction ──────────────────────────────────────────────
+export interface AIPrediction {
+  symbol: string;
+  direction: TradeDirection;
+  probability: number;
+  confidence: number;
+  risk: RiskLevel;
+  model_auc: number;
+  is_tradeable: boolean;
+  reason: string;
+  features_used: number;
+  predicted_at: string;
+}
+
+// ── Portfolio Risk ─────────────────────────────────────────────
 export interface PortfolioRisk {
   total_risk_percent: number;
   max_allowed_percent: number;
@@ -88,6 +110,12 @@ export interface PortfolioRisk {
   open_positions: PositionRisk[];
   currency_exposure: Record<string, number>;
   correlation_risk: number;
+  daily_loss_percent: number;
+  weekly_loss_percent: number;
+  equity_drawdown: number;
+  halt_active: boolean;
+  daily_trades_used: number;
+  daily_trades_max: number;
 }
 
 export interface PositionRisk {
@@ -98,15 +126,60 @@ export interface PositionRisk {
   correlation_group: string;
 }
 
-// ── Equity Curve Point ───────────────────────────────────────
+// ── Equity Curve ───────────────────────────────────────────────
 export interface EquityPoint {
   date: string;
   equity: number;
   balance: number;
   drawdown: number;
+  pnl: number;
 }
 
-// ── ML Weights ───────────────────────────────────────────────
+// ── Analytics ─────────────────────────────────────────────────
+export interface AnalyticsMetrics {
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  calmar_ratio: number;
+  profit_factor: number;
+  recovery_factor: number;
+  expectancy: number;
+  expectancy_r: number;
+  max_drawdown_pct: number;
+  win_rate: number;
+  avg_rr: number;
+  cagr: number;
+  total_trades: number;
+  net_profit: number;
+  gross_profit: number;
+  gross_loss: number;
+  max_consecutive_wins: number;
+  max_consecutive_losses: number;
+  avg_trade_duration_hours: number;
+}
+
+export interface BreakdownItem {
+  label: string;
+  trades: number;
+  win_rate: number;
+  profit_factor: number;
+  net_pnl: number;
+}
+
+// ── Model Performance ─────────────────────────────────────────
+export interface ModelVersion {
+  version: string;
+  symbol: string;
+  status: ModelStatus;
+  auc_score: number;
+  train_auc: number;
+  test_auc: number;
+  samples: number;
+  features: number;
+  created_at: string;
+  is_current: boolean;
+  performance_7d?: number;
+}
+
 export interface MLWeights {
   bos_weight: number;
   choch_weight: number;
@@ -122,7 +195,7 @@ export interface MLWeights {
   model_accuracy: number;
 }
 
-// ── Backtest Result ──────────────────────────────────────────
+// ── Backtest ───────────────────────────────────────────────────
 export interface BacktestResult {
   symbol: string;
   start_date: string;
@@ -138,9 +211,35 @@ export interface BacktestResult {
   initial_balance: number;
   final_balance: number;
   equity_curve: EquityPoint[];
+  monte_carlo?: MonteCarloResult;
 }
 
-// ── System Settings ──────────────────────────────────────────
+export interface MonteCarloResult {
+  simulations: number;
+  probability_profit: number;
+  median_final_balance: number;
+  var_95: number;
+  worst_max_drawdown: number;
+  risk_of_ruin: number;
+}
+
+// ── WebSocket ─────────────────────────────────────────────────
+export type WSMessageType =
+  | "EQUITY_UPDATE"
+  | "NEW_SIGNAL"
+  | "TRADE_OPENED"
+  | "TRADE_CLOSED"
+  | "RISK_ALERT"
+  | "BOT_STATUS"
+  | "PREDICTION";
+
+export interface WSMessage<T = unknown> {
+  type: WSMessageType;
+  data: T;
+  timestamp: string;
+}
+
+// ── System Settings ───────────────────────────────────────────
 export interface SystemSettings {
   trading_mode: TradingMode;
   risk_per_trade_percent: number;
@@ -159,7 +258,7 @@ export interface SystemSettings {
   allowed_symbols: string[];
 }
 
-// ── API Response Wrapper ─────────────────────────────────────
+// ── API Response ───────────────────────────────────────────────
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
