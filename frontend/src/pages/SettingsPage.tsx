@@ -1,155 +1,113 @@
-import { useState } from "react";
-import { Settings, Save, ToggleLeft, ToggleRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, RefreshCw } from "lucide-react";
 import { settingsApi } from "../utils/api";
-import type { SystemSettings, TradingMode } from "../types";
+import type { SystemSettings } from "../types";
 
-const DEFAULT_SETTINGS: SystemSettings = {
-  trading_mode:"FULL_AUTO",
-  risk_per_trade_percent:1.0,
-  max_portfolio_risk_percent:5.0,
-  max_daily_trades:5,
-  max_daily_loss_percent:3.0,
-  max_weekly_loss_percent:7.0,
-  max_monthly_drawdown_percent:15.0,
-  min_confidence_score:80.0,
-  max_spread_points:30,
-  enable_smc_engine:true,
-  enable_pa_engine:true,
-  enable_ml_learning:true,
-  enable_news_filter:false,
-  allowed_sessions:["London","NewYork"],
-  allowed_symbols:["XAUUSD","EURUSD","GBPUSD"],
-};
-
-function Toggle({ value, onChange }: { value:boolean; onChange:(v:boolean)=>void }) {
-  return (
-    <button onClick={()=>onChange(!value)} className="flex items-center gap-2 text-sm transition-colors"
-      style={{ color: value ? "#10b981" : "var(--gv-text-muted)" }}
-    >
-      {value ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-      <span className="text-xs">{value ? "فعال" : "غیرفعال"}</span>
-    </button>
-  );
-}
-
-function NumberInput({ label, value, onChange, min, max, step, suffix }:
-  { label:string; value:number; onChange:(v:number)=>void; min?:number; max?:number; step?:number; suffix?:string }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl"
-      style={{ background:"var(--gv-bg-secondary)", border:"1px solid var(--gv-border)" }}
-    >
-      <span className="text-sm" style={{ color:"var(--gv-text-secondary)" }}>{label}</span>
-      <div className="flex items-center gap-2">
-        <input
-          type="number" min={min} max={max} step={step} value={value}
-          onChange={(e)=>onChange(+e.target.value)}
-          className="w-20 px-2 py-1 rounded-lg text-sm text-center outline-none font-mono"
-          style={{ background:"var(--gv-bg-card)", color:"var(--gv-accent)", border:"1px solid var(--gv-border)" }}
-        />
-        {suffix && <span className="text-xs" style={{ color:"var(--gv-text-muted)" }}>{suffix}</span>}
-      </div>
-    </div>
-  );
-}
+const MODES = [
+  { value: "SIGNAL_ONLY", label: "فقط سیگنال", desc: "سیگنال تولید می‌شود اما معامله نمی‌شود" },
+  { value: "SEMI_AUTO",   label: "نیمه خودکار", desc: "تأیید تلگرام قبل از معامله" },
+  { value: "FULL_AUTO",   label: "تمام خودکار", desc: "معامله خودکار بدون نیاز به تأیید" },
+];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
 
-  const update = <K extends keyof SystemSettings>(key:K, value:SystemSettings[K]) => {
-    setSettings(s=>({...s,[key]:value}));
-    setSaved(false);
-  };
+  useEffect(() => {
+    settingsApi.get().then(r => { if (r.success) setSettings(r.data); });
+  }, []);
 
   const handleSave = async () => {
+    if (!settings) return;
+    setSaving(true);
     await settingsApi.update(settings);
-    setSaved(true);
-    setTimeout(()=>setSaved(false), 3000);
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
-  const MODES: { value:TradingMode; label:string; desc:string }[] = [
-    { value:"SIGNAL_ONLY", label:"فقط سیگنال",  desc:"فقط تحلیل و سیگنال — بدون اجرا" },
-    { value:"SEMI_AUTO",   label:"نیمه خودکار", desc:"نیاز به تأیید کاربر قبل از اجرا" },
-    { value:"FULL_AUTO",   label:"تمام خودکار", desc:"اجرای کامل بدون دخالت" },
-  ];
+  if (!settings) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-[#f0f6ff] text-2xl font-bold">تنظیمات</h1><p className="text-[#475569] text-sm mt-1">Galaxy Vast AI Trading Platform</p></div>
+        <button onClick={handleSave} disabled={saving}
+          className={`px-5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${saved ? "bg-[#10b981] text-white" : "bg-[#00d4ff] text-[#070b12] hover:bg-[#0ea5e9]"} disabled:opacity-50`}>
+          {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+          {saved ? "ذخیره شد ✓" : "ذخیره"}
+        </button>
+      </div>
 
-      {/* Trading mode */}
+      {/* Trading Mode */}
       <div className="gv-card p-5">
-        <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color:"var(--gv-text-primary)" }}>
-          <Settings size={16} style={{ color:"var(--gv-accent)" }} />
-          حالت معاملاتی
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {MODES.map((m) => (
-            <button
-              key={m.value}
-              onClick={()=>update("trading_mode",m.value)}
-              className="p-4 rounded-xl text-right transition-all"
-              style={{
-                background: settings.trading_mode===m.value ? "rgba(0,212,255,0.1)" : "var(--gv-bg-secondary)",
-                border:`1px solid ${settings.trading_mode===m.value ? "rgba(0,212,255,0.4)" : "var(--gv-border)"}`,
-              }}
-            >
-              <div className="font-semibold text-sm mb-1" style={{ color: settings.trading_mode===m.value ? "var(--gv-accent)" : "var(--gv-text-primary)" }}>
-                {m.label}
+        <h2 className="text-[#f0f6ff] font-semibold mb-4">حالت معاملاتی</h2>
+        <div className="space-y-3">
+          {MODES.map(m => (
+            <label key={m.value} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${settings.trading_mode === m.value ? "border-[#00d4ff]/40 bg-[#00d4ff]/5" : "border-[#1e2d40] hover:border-[#2a3f58]"}`}>
+              <input type="radio" name="mode" value={m.value} checked={settings.trading_mode === m.value as SystemSettings["trading_mode"]}
+                onChange={() => setSettings(s => s ? { ...s, trading_mode: m.value as SystemSettings["trading_mode"] } : s)}
+                className="mt-1 accent-[#00d4ff]" />
+              <div>
+                <div className="text-[#f0f6ff] font-medium">{m.label}</div>
+                <div className="text-[#475569] text-sm">{m.desc}</div>
               </div>
-              <div className="text-xs" style={{ color:"var(--gv-text-muted)" }}>{m.desc}</div>
-            </button>
+            </label>
           ))}
         </div>
       </div>
 
-      {/* Risk settings */}
+      {/* Risk Settings */}
       <div className="gv-card p-5">
-        <h3 className="font-semibold mb-4" style={{ color:"var(--gv-text-primary)" }}>تنظیمات ریسک</h3>
-        <div className="space-y-3">
-          <NumberInput label="ریسک هر معامله"        value={settings.risk_per_trade_percent}      onChange={v=>update("risk_per_trade_percent",v)}      min={0.1} max={5}   step={0.1} suffix="%" />
-          <NumberInput label="حداکثر ریسک پرتفولیو"  value={settings.max_portfolio_risk_percent}   onChange={v=>update("max_portfolio_risk_percent",v)}  min={1}   max={20}  step={0.5} suffix="%" />
-          <NumberInput label="حداکثر معاملات روزانه" value={settings.max_daily_trades}            onChange={v=>update("max_daily_trades",v)}            min={1}   max={20}  step={1} suffix="معامله" />
-          <NumberInput label="حداکثر ضرر روزانه"     value={settings.max_daily_loss_percent}      onChange={v=>update("max_daily_loss_percent",v)}      min={0.5} max={10}  step={0.5} suffix="%" />
-          <NumberInput label="حداکثر ضرر هفتگی"      value={settings.max_weekly_loss_percent}     onChange={v=>update("max_weekly_loss_percent",v)}     min={1}   max={20}  step={0.5} suffix="%" />
-          <NumberInput label="حداکثر Drawdown ماهانه" value={settings.max_monthly_drawdown_percent} onChange={v=>update("max_monthly_drawdown_percent",v)} min={2} max={30} step={1} suffix="%" />
-          <NumberInput label="حداقل امتیاز سیگنال"  value={settings.min_confidence_score}        onChange={v=>update("min_confidence_score",v)}        min={50}  max={99}  step={1} suffix="%" />
-          <NumberInput label="حداکثر اسپرد"          value={settings.max_spread_points}           onChange={v=>update("max_spread_points",v)}           min={5}   max={100} step={5} suffix="پیپ" />
-        </div>
-      </div>
-
-      {/* Module toggles */}
-      <div className="gv-card p-5">
-        <h3 className="font-semibold mb-4" style={{ color:"var(--gv-text-primary)" }}>ماژول‌های فعال</h3>
-        <div className="space-y-3">
+        <h2 className="text-[#f0f6ff] font-semibold mb-4">تنظیمات ریسک</h2>
+        <div className="grid grid-cols-2 gap-4">
           {[
-            { key:"enable_smc_engine",  label:"موتور SMC (Smart Money Concepts)" },
-            { key:"enable_pa_engine",   label:"موتور Price Action" },
-            { key:"enable_ml_learning", label:"سیستم یادگیری ML" },
-            { key:"enable_news_filter", label:"فیلتر اخبار (News Filter)" },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between p-3 rounded-xl"
-              style={{ background:"var(--gv-bg-secondary)", border:"1px solid var(--gv-border)" }}
-            >
-              <span className="text-sm" style={{ color:"var(--gv-text-secondary)" }}>{label}</span>
-              <Toggle value={(settings as any)[key]} onChange={(v)=>update(key as any, v)} />
+            { key: "risk_per_trade_percent",       label: "ریسک هر معامله (%)",     min: 0.1, max: 5,   step: 0.1 },
+            { key: "max_portfolio_risk_percent",   label: "حداکثر ریسک پرتفولیو (%)", min: 1, max: 10,   step: 0.5 },
+            { key: "max_daily_trades",             label: "حداکثر معاملات روزانه",  min: 1,  max: 20,   step: 1   },
+            { key: "max_daily_loss_percent",       label: "حداکثر ضرر روزانه (%)", min: 0.5, max: 10,  step: 0.5 },
+            { key: "max_weekly_loss_percent",      label: "حداکثر ضرر هفتگی (%)", min: 1,   max: 20,   step: 0.5 },
+            { key: "min_confidence_score",         label: "حداقل امتیاز اطمینان", min: 50, max: 95,    step: 5   },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-[#94a3b8] text-xs block mb-1">{f.label}</label>
+              <div className="flex items-center gap-2">
+                <input type="range" min={f.min} max={f.max} step={f.step}
+                  value={(settings as Record<string, unknown>)[f.key] as number}
+                  onChange={e => setSettings(s => s ? { ...s, [f.key]: parseFloat(e.target.value) } : s)}
+                  className="flex-1 accent-[#00d4ff]" />
+                <span className="font-mono text-[#00d4ff] text-sm w-10 text-right">
+                  {((settings as Record<string, unknown>)[f.key] as number).toFixed(f.step < 1 ? 1 : 0)}
+                </span>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Save button */}
-      <button
-        onClick={handleSave}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold transition-all"
-        style={{
-          background: saved ? "rgba(16,185,129,0.2)" : "rgba(0,212,255,0.15)",
-          color: saved ? "#10b981" : "var(--gv-accent)",
-          border:`1px solid ${saved ? "rgba(16,185,129,0.4)" : "rgba(0,212,255,0.3)"}`,
-        }}
-      >
-        <Save size={16} />
-        {saved ? "✅ تنظیمات ذخیره شد" : "ذخیره تنظیمات"}
-      </button>
+      {/* Module Toggles */}
+      <div className="gv-card p-5">
+        <h2 className="text-[#f0f6ff] font-semibold mb-4">ماژول‌ها</h2>
+        <div className="space-y-3">
+          {[
+            { key: "enable_smc_engine",   label: "موتور SMC",          desc: "BOS + CHOCH + OB + FVG" },
+            { key: "enable_pa_engine",    label: "موتور Price Action",  desc: "الگوهای کندل" },
+            { key: "enable_ml_learning",  label: "یادگیری ماشین",      desc: "XGBoost Auto-Retrain" },
+            { key: "enable_news_filter",  label: "فیلتر اخبار",        desc: "NFP + FOMC + CPI" },
+          ].map(m => (
+            <div key={m.key} className="flex items-center justify-between p-3 bg-[#111827] rounded-xl border border-[#1e2d40]">
+              <div>
+                <div className="text-[#f0f6ff] text-sm font-medium">{m.label}</div>
+                <div className="text-[#475569] text-xs">{m.desc}</div>
+              </div>
+              <button onClick={() => setSettings(s => s ? { ...s, [m.key]: !(s as Record<string,unknown>)[m.key] } : s)}
+                className={`relative w-12 h-6 rounded-full transition-all ${(settings as Record<string,unknown>)[m.key] ? "bg-[#00d4ff]" : "bg-[#1e2d40]"}`}>
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${(settings as Record<string,unknown>)[m.key] ? "right-0.5" : "left-0.5"}`} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
