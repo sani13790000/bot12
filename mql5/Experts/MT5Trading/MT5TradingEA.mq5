@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                                MT5TradingEA.mq5   |
 //|                                    MT5 Trading System             |
-//|                                    اکسپرت ادوایزر اصلی            |
+//|                                    Ø§Ú©Ø³Ù¾Ø±Øª Ø§Ø¯ÙØ§ÛØ²Ø± Ø§ØµÙÛ            |
 //+------------------------------------------------------------------+
 #property copyright "MT5 Trading Team"
 #property link      "https://mt5trading.com"
@@ -19,21 +19,21 @@
 #include <MT5Trading/DecisionConnector.mqh>
 
 //+
-// متغیرهای گلوبال
+// ÙØªØºÛØ±ÙØ§Û Ú¯ÙÙØ¨Ø§Ù
 //+
 
-// مدیریت
+// ÙØ¯ÛØ±ÛØª
 CRiskManager *g_riskManager = NULL;
 CTradeManager *g_tradeManager = NULL;
 CPositionManager *g_positionManager = NULL;
 CDecisionConnector *g_decisionConnector = NULL;
 CLicenseChecker *g_licenseChecker = NULL;
 
-// تحلیلگرها
+// ØªØ­ÙÛÙÚ¯Ø±ÙØ§
 CSMCAnalyzer *g_smcAnalyzer = NULL;
 CPAAnalyzer *g_paAnalyzer = NULL;
 
-// وضعیت
+// ÙØ¶Ø¹ÛØª
 datetime g_lastAnalysisTime = 0;
 int g_analysisInterval = 60;
 datetime g_lastLicenseCheck = 0;
@@ -43,52 +43,52 @@ bool g_tradeEnabled = true;
 bool g_licenseValid = false;
 bool g_emergencyStopActive = false;
 
-// آمار
+// Ø¢ÙØ§Ø±
 int g_dailyTrades = 0;
 double g_dailyPnL = 0;
 datetime g_dayStart = 0;
 
 //+
-// تابع initialization
+// ØªØ§Ø¨Ø¹ initialization
 //+
 int OnInit() {
-   // بررسی نماد
+   // Ø¨Ø±Ø±Ø³Û ÙÙØ§Ø¯
    if(Symbol() == "") {
-      Print("خطا: نماد تعیین نشده");
+       LogMessage("خطا: نماد تعیین نشده", "ERROR");
       return INIT_PARAMETERS_INCORRECT;
    }
 
-   // ایجاد مدیریت ریسک
+   // Ø§ÛØ¬Ø§Ø¯ ÙØ¯ÛØ±ÛØª Ø±ÛØ³Ú©
    g_riskManager = new CRiskManager(Symbol());
 
    if(g_riskManager == NULL) {
-      Print("خطا: ایجاد مدیر ریسک ناموفق");
+       LogMessage("خطا: ایجاد مدیر ریسک ناموفق", "ERROR");
       return INIT_FAILED;
    }
 
-   // ایجاد مدیر معاملات
+   // Ø§ÛØ¬Ø§Ø¯ ÙØ¯ÛØ± ÙØ¹Ø§ÙÙØ§Øª
    g_tradeManager = new CTradeManager(Symbol(), g_riskManager);
 
    if(g_tradeManager == NULL) {
-      Print("خطا: ایجاد مدیر معاملات ناموفق");
+       LogMessage("خطا: ایجاد مدیر معاملات ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
 
-   // ایجاد مدیر پوزیشن
+   // Ø§ÛØ¬Ø§Ø¯ ÙØ¯ÛØ± Ù¾ÙØ²ÛØ´Ù
    g_positionManager = new CPositionManager(Symbol());
 
    if(g_positionManager == NULL) {
-      Print("خطا: ایجاد مدیر پوزیشن ناموفق");
+       LogMessage("خطا: ایجاد مدیر پوزیشن ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
 
-   // ایجاد اتصال به Decision Engine
+   // Ø§ÛØ¬Ø§Ø¯ Ø§ØªØµØ§Ù Ø¨Ù Decision Engine
    g_decisionConnector = new CDecisionConnector();
 
    if(g_decisionConnector == NULL) {
-      Print("خطا: ایجاد Decision Connector ناموفق");
+       LogMessage("خطا: ایجاد Decision Connector ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
@@ -96,20 +96,20 @@ int OnInit() {
    g_decisionConnector.SetApiUrl(ApiBaseUrl);
    g_decisionConnector.SetTimeout(ApiTimeout);
 
-   // ایجاد بررسی لایسنس
+   // Ø§ÛØ¬Ø§Ø¯ Ø¨Ø±Ø±Ø³Û ÙØ§ÛØ³ÙØ³
    g_licenseChecker = new CLicenseChecker();
 
    if(g_licenseChecker == NULL) {
-      Print("خطا: ایجاد بررسی لایسنس ناموفق");
+       LogMessage("خطا: ایجاد بررسی لایسنس ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
 
-   // ایجاد تحلیلگرها
+   // Ø§ÛØ¬Ø§Ø¯ ØªØ­ÙÛÙÚ¯Ø±ÙØ§
    g_smcAnalyzer = new CSMCAnalyzer(Symbol(), PERIOD_CURRENT);
 
    if(g_smcAnalyzer == NULL) {
-      Print("خطا: ایجاد تحلیلگر SMC ناموفق");
+       LogMessage("خطا: ایجاد تحلیلگر SMC ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
@@ -117,22 +117,22 @@ int OnInit() {
    g_paAnalyzer = new CPAAnalyzer(Symbol(), PERIOD_CURRENT);
 
    if(g_paAnalyzer == NULL) {
-      Print("خطا: ایجاد تحلیلگر PA ناموفق");
+       LogMessage("خطا: ایجاد تحلیلگر PA ناموفق", "ERROR");
       CleanupOnInit();
       return INIT_FAILED;
    }
 
-   // بررسی اولیه لایسنس
+   // Ø¨Ø±Ø±Ø³Û Ø§ÙÙÛÙ ÙØ§ÛØ³ÙØ³
    if(!CheckLicense()) {
-      Print("هشدار: لایسنس معتبر نیست");
+       LogMessage("هشدار: لایسنس معتبر نیست", "WARN");
    }
 
-   // راه‌اندازی متغیرها
+   // Ø±Ø§ÙâØ§ÙØ¯Ø§Ø²Û ÙØªØºÛØ±ÙØ§
    g_dayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
    g_lastLicenseCheck = TimeCurrent();
 
-   // لاگ راه‌اندازی
-   LogMessage(StringFormat("اکسپرت راه‌اندازی شد | نماد: %s | تایم‌فریم: %s | نسخه: %s",
+   // ÙØ§Ú¯ Ø±Ø§ÙâØ§ÙØ¯Ø§Ø²Û
+   LogMessage(StringFormat("Ø§Ú©Ø³Ù¾Ø±Øª Ø±Ø§ÙâØ§ÙØ¯Ø§Ø²Û Ø´Ø¯ | ÙÙØ§Ø¯: %s | ØªØ§ÛÙâÙØ±ÛÙ: %s | ÙØ³Ø®Ù: %s",
       Symbol(), EnumToString(Period()), VERSION));
 
    PrintStatus();
@@ -141,7 +141,7 @@ int OnInit() {
 }
 
 //+
-// پاکسازی در OnInit
+// Ù¾Ø§Ú©Ø³Ø§Ø²Û Ø¯Ø± OnInit
 //+
 void CleanupOnInit() {
    if(g_riskManager) delete g_riskManager;
@@ -154,10 +154,10 @@ void CleanupOnInit() {
 }
 
 //+
-// تابع deinitialization
+// ØªØ§Ø¨Ø¹ deinitialization
 //+
 void OnDeinit(const int reason) {
-   // حذف آبجکت‌ها
+   // Ø­Ø°Ù Ø¢Ø¨Ø¬Ú©ØªâÙØ§
    if(g_riskManager) delete g_riskManager;
    if(g_tradeManager) delete g_tradeManager;
    if(g_positionManager) delete g_positionManager;
@@ -166,38 +166,38 @@ void OnDeinit(const int reason) {
    if(g_smcAnalyzer) delete g_smcAnalyzer;
    if(g_paAnalyzer) delete g_paAnalyzer;
 
-   LogMessage("اکسپرت متوقف شد | دلیل: " + GetDeinitReason(reason));
+   LogMessage("Ø§Ú©Ø³Ù¾Ø±Øª ÙØªÙÙÙ Ø´Ø¯ | Ø¯ÙÛÙ: " + GetDeinitReason(reason));
 }
 
 //+
-// دریافت دلیل توقف
+// Ø¯Ø±ÛØ§ÙØª Ø¯ÙÛÙ ØªÙÙÙ
 //+
 string GetDeinitReason(const int reason) {
    switch(reason) {
-      case REASON_PROGRAM:     return "برنامه";
-      case REASON_REMOVE:      return "حذف";
-      case REASON_RECOMPILE:   return "کامپایل مجدد";
-      case REASON_CHARTCHANGE: return "تغییر چارت";
-      case REASON_CHARTCLOSE:  return "بستن چارت";
-      case REASON_PARAMETERS:  return "تغییر پارامتر";
-      case REASON_ACCOUNT:     return "تغییر حساب";
+      case REASON_PROGRAM:     return "Ø¨Ø±ÙØ§ÙÙ";
+      case REASON_REMOVE:      return "Ø­Ø°Ù";
+      case REASON_RECOMPILE:   return "Ú©Ø§ÙÙ¾Ø§ÛÙ ÙØ¬Ø¯Ø¯";
+      case REASON_CHARTCHANGE: return "ØªØºÛÛØ± ÚØ§Ø±Øª";
+      case REASON_CHARTCLOSE:  return "Ø¨Ø³ØªÙ ÚØ§Ø±Øª";
+      case REASON_PARAMETERS:  return "ØªØºÛÛØ± Ù¾Ø§Ø±Ø§ÙØªØ±";
+      case REASON_ACCOUNT:     return "ØªØºÛÛØ± Ø­Ø³Ø§Ø¨";
       default: return IntegerToString(reason);
    }
 }
 
 //+
-// بررسی لایسنس
+// Ø¨Ø±Ø±Ø³Û ÙØ§ÛØ³ÙØ³
 //+
 bool CheckLicense() {
    if(g_licenseChecker == NULL) return false;
 
-   // بررسی دوره‌ای
+   // Ø¨Ø±Ø±Ø³Û Ø¯ÙØ±ÙâØ§Û
    if(TimeCurrent() - g_lastLicenseCheck > g_licenseCheckInterval) {
       g_lastLicenseCheck = TimeCurrent();
 
       if(!g_licenseChecker.Verify()) {
          g_licenseValid = false;
-         LogMessage("لایسنس نامعتبر", "ERROR");
+         LogMessage("ÙØ§ÛØ³ÙØ³ ÙØ§ÙØ¹ØªØ¨Ø±", "ERROR");
          return false;
       }
    }
@@ -207,55 +207,55 @@ bool CheckLicense() {
 }
 
 //+
-// تابع اصلی تیک
+// ØªØ§Ø¨Ø¹ Ø§ØµÙÛ ØªÛÚ©
 //+
 void OnTick() {
-   // بررسی روز جدید
+   // Ø¨Ø±Ø±Ø³Û Ø±ÙØ² Ø¬Ø¯ÛØ¯
    CheckNewDay();
 
-   // بررسی اتصال
+   // Ø¨Ø±Ø±Ø³Û Ø§ØªØµØ§Ù
    if(!TerminalInfoInteger(TERMINAL_CONNECTED)) {
-      LogMessage("عدم اتصال به سرور", "WARNING");
+      LogMessage("Ø¹Ø¯Ù Ø§ØªØµØ§Ù Ø¨Ù Ø³Ø±ÙØ±", "WARNING");
       return;
    }
 
-   // بررسی لایسنس
+   // Ø¨Ø±Ø±Ø³Û ÙØ§ÛØ³ÙØ³
    if(!g_licenseValid && !CheckLicense()) {
-      // ادامه بدون معامله
+      // Ø§Ø¯Ø§ÙÙ Ø¨Ø¯ÙÙ ÙØ¹Ø§ÙÙÙ
       ManageExistingPositions();
       return;
    }
 
-   // بررسی توقف اضطراری
+   // Ø¨Ø±Ø±Ø³Û ØªÙÙÙ Ø§Ø¶Ø·Ø±Ø§Ø±Û
    if(g_emergencyStopActive || g_riskManager.IsEmergencyStop()) {
       g_tradeEnabled = false;
       ManageExistingPositions();
       return;
    }
 
-   // به‌روزرسانی پوزیشن‌ها
+   // Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ù¾ÙØ²ÛØ´ÙâÙØ§
    g_positionManager.UpdatePositions();
 
-   // بررسی محدودیت‌های ریسک روزانه
+   // Ø¨Ø±Ø±Ø³Û ÙØ­Ø¯ÙØ¯ÛØªâÙØ§Û Ø±ÛØ³Ú© Ø±ÙØ²Ø§ÙÙ
    if(g_riskManager.IsDailyLossLimitReached()) {
-      LogMessage("حد ضرر روزانه رسید", "WARNING");
+      LogMessage("Ø­Ø¯ Ø¶Ø±Ø± Ø±ÙØ²Ø§ÙÙ Ø±Ø³ÛØ¯", "WARNING");
       g_tradeEnabled = false;
    }
 
-   // مدیریت پوزیشن‌های موجود
+   // ÙØ¯ÛØ±ÛØª Ù¾ÙØ²ÛØ´ÙâÙØ§Û ÙÙØ¬ÙØ¯
    ManageExistingPositions();
 
-   // تحلیل و معامله (در کندل جدید)
+   // ØªØ­ÙÛÙ Ù ÙØ¹Ø§ÙÙÙ (Ø¯Ø± Ú©ÙØ¯Ù Ø¬Ø¯ÛØ¯)
    if(g_tradeEnabled && IsNewBar()) {
       AnalyzeAndTrade();
    }
 
-   // به‌روزرسانی آمار
+   // Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ø¢ÙØ§Ø±
    UpdateDailyStats();
 }
 
 //+
-// بررسی روز جدید
+// Ø¨Ø±Ø±Ø³Û Ø±ÙØ² Ø¬Ø¯ÛØ¯
 //+
 void CheckNewDay() {
    datetime todayStart = StringToTime(TimeToString(TimeCurrent(), TIME_DATE));
@@ -265,15 +265,15 @@ void CheckNewDay() {
       g_dailyTrades = 0;
       g_dailyPnL = 0;
 
-      // بازنشانی آمار ریسک
+      // Ø¨Ø§Ø²ÙØ´Ø§ÙÛ Ø¢ÙØ§Ø± Ø±ÛØ³Ú©
       g_riskManager.ResetDailyStats();
 
-      // بازنشانی لایسنس چک
+      // Ø¨Ø§Ø²ÙØ´Ø§ÙÛ ÙØ§ÛØ³ÙØ³ ÚÚ©
       g_licenseCheckInterval = 3600;
 
-      LogMessage("روز جدید شروع شد", "INFO");
+      LogMessage("Ø±ÙØ² Ø¬Ø¯ÛØ¯ Ø´Ø±ÙØ¹ Ø´Ø¯", "INFO");
 
-      // فعال‌سازی مجدد
+      // ÙØ¹Ø§ÙâØ³Ø§Ø²Û ÙØ¬Ø¯Ø¯
       if(!g_riskManager.IsEmergencyStop()) {
          g_tradeEnabled = true;
       }
@@ -281,7 +281,7 @@ void CheckNewDay() {
 }
 
 //+
-// به‌روزرسانی آمار روزانه
+// Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ø¢ÙØ§Ø± Ø±ÙØ²Ø§ÙÙ
 //+
 void UpdateDailyStats() {
    g_dailyPnL = g_riskManager.GetDailyPnL();
@@ -289,7 +289,7 @@ void UpdateDailyStats() {
 }
 
 //+
-// بررسی کندل جدید
+// Ø¨Ø±Ø±Ø³Û Ú©ÙØ¯Ù Ø¬Ø¯ÛØ¯
 //+
 bool IsNewBar() {
    static datetime lastBarTime = 0;
@@ -305,63 +305,63 @@ bool IsNewBar() {
 }
 
 //+
-// تحلیل و معامله
+// ØªØ­ÙÛÙ Ù ÙØ¹Ø§ÙÙÙ
 //+
 void AnalyzeAndTrade() {
    if(g_tradeManager == NULL || g_riskManager == NULL) {
       return;
    }
 
-   // بررسی فیلتر زمانی
+   // Ø¨Ø±Ø±Ø³Û ÙÛÙØªØ± Ø²ÙØ§ÙÛ
    if(UseTimeFilter && !IsTradingTime()) {
-      LogMessage("خارج از زمان معاملاتی", "INFO");
+      LogMessage("Ø®Ø§Ø±Ø¬ Ø§Ø² Ø²ÙØ§Ù ÙØ¹Ø§ÙÙØ§ØªÛ", "INFO");
       return;
    }
 
-   // تحلیل SMC
+   // ØªØ­ÙÛÙ SMC
    SMCData smcData;
    ZeroMemory(smcData);
 
    if(EnableSMC && g_smcAnalyzer != NULL) {
       if(!g_smcAnalyzer.Analyze(smcData)) {
-         LogMessage("تحلیل SMC ناموفق", "WARNING");
+         LogMessage("ØªØ­ÙÛÙ SMC ÙØ§ÙÙÙÙ", "WARNING");
       }
    }
 
-   // تحلیل Price Action
+   // ØªØ­ÙÛÙ Price Action
    PAData paData;
    ZeroMemory(paData);
 
    if(EnablePA && g_paAnalyzer != NULL) {
       if(!g_paAnalyzer.Analyze(paData)) {
-         LogMessage("تحلیل PA ناموفق", "WARNING");
+         LogMessage("ØªØ­ÙÛÙ PA ÙØ§ÙÙÙÙ", "WARNING");
       }
    }
 
-   // دریافت تصمیم از API
+   // Ø¯Ø±ÛØ§ÙØª ØªØµÙÛÙ Ø§Ø² API
    DecisionResponse decision = GetDecisionFromAPI(smcData, paData);
 
-   // اعتبارسنجی تصمیم
+   // Ø§Ø¹ØªØ¨Ø§Ø±Ø³ÙØ¬Û ØªØµÙÛÙ
    if(!g_decisionConnector.ValidateDecision(decision)) {
       return;
    }
 
-   // ساخت سیگنال
+   // Ø³Ø§Ø®Øª Ø³ÛÚ¯ÙØ§Ù
    TradeSignal signal;
    BuildSignalFromDecision(decision, signal);
 
-   // لاگ تحلیل
-   LogMessage(StringFormat("تصمیم: %s | امتیاز: %d | جهت: %s",
+   // ÙØ§Ú¯ ØªØ­ÙÛÙ
+   LogMessage(StringFormat("ØªØµÙÛÙ: %s | Ø§ÙØªÛØ§Ø²: %d | Ø¬ÙØª: %s",
       decision.decision, decision.confidenceScore, decision.direction));
 
-   // بررسی و اجرا
+   // Ø¨Ø±Ø±Ø³Û Ù Ø§Ø¬Ø±Ø§
    if(decision.allowed && decision.decision != "NO_TRADE") {
       ExecuteTrade(signal);
    }
 }
 
 //+
-// دریافت تصمیم از API
+// Ø¯Ø±ÛØ§ÙØª ØªØµÙÛÙ Ø§Ø² API
 //+
 DecisionResponse GetDecisionFromAPI(SMCData &smcData, PAData &paData) {
    DecisionRequest request;
@@ -398,7 +398,7 @@ DecisionResponse GetDecisionFromAPI(SMCData &smcData, PAData &paData) {
 }
 
 //+
-// ساخت سیگنال از تصمیم
+// Ø³Ø§Ø®Øª Ø³ÛÚ¯ÙØ§Ù Ø§Ø² ØªØµÙÛÙ
 //+
 void BuildSignalFromDecision(DecisionResponse &decision, TradeSignal &signal) {
    ZeroMemory(signal);
@@ -415,7 +415,7 @@ void BuildSignalFromDecision(DecisionResponse &decision, TradeSignal &signal) {
 }
 
 //+
-// جلسه فعلی
+// Ø¬ÙØ³Ù ÙØ¹ÙÛ
 //+
 string GetCurrentSession() {
    int hour = (int)TimeCurrent() % 86400 / 3600;
@@ -436,17 +436,17 @@ string GetCurrentSession() {
 }
 
 //+
-// اجرای معامله
+// Ø§Ø¬Ø±Ø§Û ÙØ¹Ø§ÙÙÙ
 //+
 void ExecuteTrade(TradeSignal &signal) {
    if(g_tradeManager == NULL) return;
 
-   // بررسی محدودیت ریسک
+   // Ø¨Ø±Ø±Ø³Û ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú©
    RiskCheckResult riskCheck = g_riskManager.CheckRiskBeforeTrade(
       signal.direction == "buy" ? POSITION_TYPE_BUY : POSITION_TYPE_SELL);
 
    if(!riskCheck.allowed) {
-      LogMessage("تصمیم رد شد: " + riskCheck.reason, "WARNING");
+      LogMessage("ØªØµÙÛÙ Ø±Ø¯ Ø´Ø¯: " + riskCheck.reason, "WARNING");
       return;
    }
 
@@ -455,63 +455,63 @@ void ExecuteTrade(TradeSignal &signal) {
    if(result.success) {
       g_dailyTrades++;
 
-      LogMessage(StringFormat("معامله باز شد: #%I64u | %.2f @ %.5f",
+      LogMessage(StringFormat("ÙØ¹Ø§ÙÙÙ Ø¨Ø§Ø² Ø´Ø¯: #%I64u | %.2f @ %.5f",
          result.positionTicket, result.executedVolume, result.executedPrice), "TRADE");
 
-      // ارسال اعلان
+      // Ø§Ø±Ø³Ø§Ù Ø§Ø¹ÙØ§Ù
       if(EnableTelegram) {
          SendTelegramNotification(signal, result);
       }
    } else {
-      LogMessage("خطا در معامله: " + result.errorMessage, "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± ÙØ¹Ø§ÙÙÙ: " + result.errorMessage, "ERROR");
    }
 }
 
 //+
-// مدیریت پوزیشن‌های موجود
+// ÙØ¯ÛØ±ÛØª Ù¾ÙØ²ÛØ´ÙâÙØ§Û ÙÙØ¬ÙØ¯
 //+
 void ManageExistingPositions() {
    if(g_positionManager == NULL) return;
 
-   // به‌روزرسانی پوزیشن‌ها
+   // Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ Ù¾ÙØ²ÛØ´ÙâÙØ§
    g_positionManager.UpdatePositions();
 
-   // تریلینگ استاپ
+   // ØªØ±ÛÙÛÙÚ¯ Ø§Ø³ØªØ§Ù¾
    if(TrailingStop > 0) {
       g_positionManager.ProcessTrailingStops(TrailingStop, TrailingStep);
    }
 
-   // انتقال به BE
+   // Ø§ÙØªÙØ§Ù Ø¨Ù BE
    if(BreakEvenTrigger > 0) {
       g_positionManager.ProcessBreakeven(BreakEvenTrigger);
    }
 
-   // بستن جزئی
+   // Ø¨Ø³ØªÙ Ø¬Ø²Ø¦Û
    if(PartialCloseRR > 0 && PartialClosePercent > 0) {
       g_positionManager.ProcessPartialClose(PartialCloseRR, PartialClosePercent);
    }
 
-   // به‌روزرسانی peak balance
+   // Ø¨ÙâØ±ÙØ²Ø±Ø³Ø§ÙÛ peak balance
    g_riskManager.UpdatePeakBalance();
 }
 
 //+
-// ارسال اعلان تلگرام
+// Ø§Ø±Ø³Ø§Ù Ø§Ø¹ÙØ§Ù ØªÙÚ¯Ø±Ø§Ù
 //+
 void SendTelegramNotification(TradeSignal &signal, OrderResult &result) {
-   string directionStr = signal.direction == "buy" ? "خرید" : "فروش";
-   string directionEmoji = signal.direction == "buy" ? "🟢" : "🔴";
+   string directionStr = signal.direction == "buy" ? "Ø®Ø±ÛØ¯" : "ÙØ±ÙØ´";
+   string directionEmoji = signal.direction == "buy" ? "ð¢" : "ð´";
 
    string message = StringFormat(
-      "🔔 معامله جدید\n\n" +
-      "📈 نماد: %s\n" +
-      "🎯 جهت: %s %s\n" +
-      "📊 امتیاز: %d\n\n" +
-      "📍 ورود: %.5f\n" +
-      "🛡 حد ضرر: %.5f\n" +
-      "🎯 حد سود: %.5f\n\n" +
-      "📝 Ticket: #%I64u\n" +
-      "⏰ %s",
+      "ð ÙØ¹Ø§ÙÙÙ Ø¬Ø¯ÛØ¯\n\n" +
+      "ð ÙÙØ§Ø¯: %s\n" +
+      "ð¯ Ø¬ÙØª: %s %s\n" +
+      "ð Ø§ÙØªÛØ§Ø²: %d\n\n" +
+      "ð ÙØ±ÙØ¯: %.5f\n" +
+      "ð¡ Ø­Ø¯ Ø¶Ø±Ø±: %.5f\n" +
+      "ð¯ Ø­Ø¯ Ø³ÙØ¯: %.5f\n\n" +
+      "ð Ticket: #%I64u\n" +
+      "â° %s",
       signal.symbol,
       directionStr, directionEmoji,
       signal.totalScore,
@@ -526,7 +526,7 @@ void SendTelegramNotification(TradeSignal &signal, OrderResult &result) {
 }
 
 //+
-// ارسال درخواست API
+// Ø§Ø±Ø³Ø§Ù Ø¯Ø±Ø®ÙØ§Ø³Øª API
 //+
 void SendApiRequest(const string endpoint, const string method, const string body) {
    string url = ApiBaseUrl + endpoint;
@@ -540,25 +540,25 @@ void SendApiRequest(const string endpoint, const string method, const string bod
    int res = WebRequest(method, url, headers, ApiTimeout / 1000, data, result, headers);
 
    if(res == -1) {
-      LogMessage("خطا در ارسال درخواست API: " + IntegerToString(GetLastError()), "ERROR");
+      LogMessage("Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±Ø³Ø§Ù Ø¯Ø±Ø®ÙØ§Ø³Øª API: " + IntegerToString(GetLastError()), "ERROR");
    }
 }
 
 //+
-// چاپ وضعیت
+// ÚØ§Ù¾ ÙØ¶Ø¹ÛØª
 //+
 void PrintStatus() {
-   Print("═══════════════════════════════════");
-   Print("    MT5 Trading System v" + VERSION);
-   Print("═══════════════════════════════════");
-   Print("نماد: " + Symbol());
-   Print("تایم‌فریم: " + EnumToString(Period()));
-   Print("Magic: " + MagicNumber);
-   Print("═══════════════════════════════════");
+   LogMessage("═══════════════════════════════════════", "INFO");
+   LogMessage("    MT5 Trading System v" + VERSION, "INFO");
+   LogMessage("═══════════════════════════════════════", "INFO");
+   LogMessage("نماد: " + Symbol(), "INFO");
+   LogMessage("تایم‌فریم: " + EnumToString(Period()), "INFO");
+   LogMessage(StringFormat("Magic: %d", MagicNumber), "INFO");
+   LogMessage("═══════════════════════════════════════", "INFO");
 }
 
 //+
-// دستورات دکمه‌ای
+// Ø¯Ø³ØªÙØ±Ø§Øª Ø¯Ú©ÙÙâØ§Û
 //+
 void OnChartEvent(
    const int id,
@@ -567,37 +567,37 @@ void OnChartEvent(
    const string &sparam
 ) {
    if(id == CHARTEVENT_CUSTOM + 1) {
-      // دستور بستن همه
+      // Ø¯Ø³ØªÙØ± Ø¨Ø³ØªÙ ÙÙÙ
       g_tradeManager.CloseAllTrades();
    }
 
    if(id == CHARTEVENT_CUSTOM + 2) {
-      // دستور توقف اضطراری
+      // Ø¯Ø³ØªÙØ± ØªÙÙÙ Ø§Ø¶Ø·Ø±Ø§Ø±Û
       g_riskManager.TriggerEmergencyStop();
       g_tradeEnabled = false;
    }
 
    if(id == CHARTEVENT_CUSTOM + 3) {
-      // گزارش
+      // Ú¯Ø²Ø§Ø±Ø´
       PrintReport();
    }
 }
 
 //+
-// چاپ گزارش
+// ÚØ§Ù¾ Ú¯Ø²Ø§Ø±Ø´
 //+
 void PrintReport() {
-   Print(g_riskManager.GetRiskReport());
-   Print(g_tradeManager.GetTradeReport());
-   Print(g_positionManager.GetPositionReport());
-   Print(g_decisionConnector.GetConnectorReport());
+   LogMessage(g_riskManager.GetRiskReport(), "INFO");
+   LogMessage(g_tradeManager.GetTradeReport(), "INFO");
+   LogMessage(g_positionManager.GetPositionReport(), "INFO");
+   LogMessage(g_decisionConnector.GetConnectorReport(), "INFO");
 }
 
 //+
-// تابع تست
+// ØªØ§Ø¨Ø¹ ØªØ³Øª
 //+
 void OnTester() {
-   // گزارش نهایی تستر
+   // Ú¯Ø²Ø§Ø±Ø´ ÙÙØ§ÛÛ ØªØ³ØªØ±
    PrintReport();
 }
 //+------------------------------------------------------------------+
