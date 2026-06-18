@@ -1,71 +1,55 @@
 """
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FastAPI Application Entry Point — v4.0.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FastAPI Application Entry Point
+
+Routers registered:
+  /api/v1/signals       - Signal generation
+  /api/v1/trades        - Trade management
+  /api/v1/risk          - Risk management v2
+  /api/v1/agents        - Multi-agent voting engine
+  /api/v1/intelligence  - ML learning system
+  /api/v1/self-learning - Self-learning + retraining
+  /api/v1/analytics     - Professional analytics (Sharpe/Sortino/...)
+  /api/v1/research      - Research (backtest/replay/walk-forward)
+  /api/v1/ai            - AI prediction (XGBoost)
+  /api/v1/backtest      - Institutional backtesting engine (NEW)
 """
-
-from __future__ import annotations
-
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger("galaxy_vast.api")
+logger = logging.getLogger(__name__)
 
-# ── Routers ──────────────────────────────────────────────────────────────────
-from backend.api.routes.agents                import router as agents_router
-from backend.api.routes.ai_prediction         import router as ai_prediction_router
-from backend.api.routes.self_learning         import router as self_learning_router
-from backend.api.routes.research              import router as research_router
-from backend.api.routes.risk                  import router as risk_router
-from backend.api.routes.analytics             import router as analytics_router
-from backend.api.routes.institutional_backtest import router as institutional_backtest_router
-
-
-# ── Services ─────────────────────────────────────────────────────────────────
-from backend.self_learning.retraining_service import RetrainingService
-_retraining_service: RetrainingService = RetrainingService()
-
-from backend.analytics import AnalyticsService
-_analytics_service: AnalyticsService = AnalyticsService(db_pool=None)
-
-
-# ── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🌌 Galaxy Vast AI Trading Platform v4.0.0 — starting up")
-
-    await _retraining_service.start()
-    logger.info("✅ RetrainingService started")
-    logger.info("✅ AnalyticsService ready")
-    logger.info("✅ Institutional Backtest Engine ready")
-
+    logger.info("🌌 Galaxy Vast AI Trading Platform — Starting...")
     yield
+    logger.info("🌌 Galaxy Vast AI Trading Platform — Shutdown complete.")
 
-    await _retraining_service.stop()
-    logger.info("🌌 Galaxy Vast — shutdown complete")
-
-
-# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Galaxy Vast AI Trading Platform",
     description=(
-        "Institutional-Grade AI Trading Intelligence System — v4.0.0\n\n"
-        "Modules: SMC Engine · Price Action · Multi-Agent Voting · "
-        "Portfolio Risk · Institutional Backtest · Walk-Forward · "
-        "Monte Carlo · ML Learning · Analytics · Risk Management"
+        "Institutional-Grade AI Trading Ecosystem\n\n"
+        "Features: SMC Analysis · AI Prediction · Multi-Agent Voting · "
+        "Portfolio Risk · Self-Learning · Analytics · "
+        "Institutional Backtest Engine · Market Replay · Walk-Forward"
     ),
-    version="4.0.0",
+    version="2.0.0",
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan,
+    contact={"name": "Galaxy Vast Support", "url": "https://t.me/GalaxyVast_Support"},
+    license_info={"name": "Galaxy Vast Enterprise License"},
 )
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -74,50 +58,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # ── Global error handler ──────────────────────────────────────────────────────
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=500,
-        content={"success": False, "error": str(exc), "brand": "Galaxy Vast"},
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error", "brand": "Galaxy Vast"},
     )
 
+# ── Register routers ──────────────────────────────────────────────────────────
+def _register_routers():
+    registered = []
+    failed = []
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+    router_map = {
+        "signals":      ("backend.api.routes.signals",      None),
+        "trades":       ("backend.api.routes.trades",       None),
+        "risk":         ("backend.api.routes.risk",         None),
+        "agents":       ("backend.api.routes.agents",       None),
+        "intelligence": ("backend.api.routes.intelligence", None),
+        "self_learning":("backend.api.routes.self_learning",None),
+        "analytics":    ("backend.api.routes.analytics",    None),
+        "research":     ("backend.api.routes.research",     None),
+        "ai_prediction":("backend.api.routes.ai_prediction",None),
+        "backtest":     ("backend.api.routes.backtest_engine", None),  # NEW
+    }
 
-app.include_router(agents_router)
-app.include_router(ai_prediction_router)
-app.include_router(self_learning_router)
-app.include_router(research_router)
-app.include_router(risk_router)
-app.include_router(analytics_router)
-app.include_router(institutional_backtest_router)
+    for name, (module_path, _) in router_map.items():
+        try:
+            import importlib
+            mod = importlib.import_module(module_path)
+            app.include_router(mod.router)
+            registered.append(name)
+        except ImportError as e:
+            failed.append(f"{name}: {e}")
+        except Exception as e:
+            failed.append(f"{name}: {e}")
 
+    if registered:
+        logger.info(f"✅ Routers registered: {registered}")
+    if failed:
+        logger.warning(f"⚠️ Routers failed: {failed}")
+
+_register_routers()
 
 # ── Health ────────────────────────────────────────────────────────────────────
-
-@app.get("/health")
-async def health():
+@app.get("/", tags=["Health"])
+async def root():
     return {
-        "status": "healthy",
-        "brand":  "Galaxy Vast AI Trading Platform",
-        "version":"4.0.0",
+        "brand":   "Galaxy Vast AI Trading Platform",
+        "version": "2.0.0",
+        "status":  "online",
         "modules": [
-            "agents", "ai_prediction", "self_learning",
-            "research", "risk", "analytics",
-            "institutional_backtest",
+            "signals", "trades", "risk_v2", "multi_agent",
+            "intelligence", "self_learning", "analytics",
+            "research", "ai_prediction", "institutional_backtest",
         ],
     }
 
-
-@app.get("/")
-async def root():
-    return {
-        "brand":       "🌌 Galaxy Vast AI Trading Platform",
-        "version":     "4.0.0",
-        "description": "Institutional-Grade AI Trading Intelligence System",
-        "docs":        "/docs",
-    }
+@app.get("/health", tags=["Health"])
+async def health():
+    return {"status": "healthy", "brand": "Galaxy Vast"}
