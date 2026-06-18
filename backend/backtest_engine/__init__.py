@@ -1,23 +1,13 @@
 """
 Galaxy Vast AI Trading Platform
-Institutional Backtesting Engine — Package
+Institutional Backtesting Engine
 """
-
 from .multi_symbol_engine import MultiSymbolBacktestEngine, MultiSymbolConfig, MultiSymbolResult
 from .parameter_optimizer import ParameterOptimizer, OptimizationConfig, OptimizationResult
-from .performance_report import PerformanceReportGenerator
-from .risk_report import RiskReportGenerator
-from .data_provider import CandleDataProvider, CandleBar
+from .report_generator import BacktestReportGenerator
 
 __all__ = [
-    "MultiSymbolBacktestEngine",
-    "MultiSymbolConfig",
-    "MultiSymbolResult",
-    "ParameterOptimizer",
-    "OptimizationConfig",
-    "OptimizationResult",
-    "PerformanceReportGenerator",
-    "RiskReportGenerator",
-    "CandleDataProvider",
-    "CandleBar",
+    "MultiSymbolBacktestEngine", "MultiSymbolConfig", "MultiSymbolResult",
+    "ParameterOptimizer", "OptimizationConfig", "OptimizationResult",
+    "BacktestReportGenerator",
 ]
