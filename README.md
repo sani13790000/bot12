@@ -1,112 +1,201 @@
 # 🌌 Galaxy Vast AI Trading Platform
 
-<div align="center">
+**Institutional-grade AI trading framework** for XAUUSD and multi-asset markets.
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green)
-![MQL5](https://img.shields.io/badge/MQL5-MetaTrader5-orange)
-![License](https://img.shields.io/badge/License-Commercial-red)
-
-**سیستم هوشمند معامله‌گری نهادی — سطح Hedge Fund**
-
-*Smart Money Concept × Price Action × AI Decision Engine × Telegram Control*
-
-</div>
+[![CI](https://github.com/sani13790000/bot12/actions/workflows/ci.yml/badge.svg)](https://github.com/sani13790000/bot12/actions)
 
 ---
 
-## 🎯 معرفی سیستم
-
-Galaxy Vast یک پلتفرم کامل معامله‌گری هوشمند است که:
-
-- **تحلیل می‌کند** — SMC + Price Action + Multi-Timeframe
-- **تصمیم می‌گیرد** — Decision Engine با امتیازدهی چندلایه
-- **معامله می‌کند** — اجرای خودکار در MetaTrader 5
-- **گزارش می‌دهد** — همه چیز از طریق تلگرام
-- **یاد می‌گیرد** — آمار و بهبود مستمر
-
----
-
-## 🏗️ معماری سیستم
+## 🏛 Architecture
 
 ```
-Telegram Bot ←→ FastAPI ←→ SMC Engine
-                    ↓           ↓
-              Decision Engine ←→ PA Engine
-                    ↓
-              MQL5 EA (MT5) ←→ Broker
-                    ↓
-              Supabase DB + Audit Logs
+FastAPI + Streamlit + PostgreSQL/Superbase + Redis + Docker + MetaTrader5 + XGBoost + Reinforcement Learning
 ```
 
 ---
 
-## ⚡ راه‌اندازی سریع (Docker)
+## ✨ What It Does
+
+Galaxy Vast is a fully automated, institutional-grade trading system that:
+
+- **Analyzes** XAUUSD (and other symbols) using 7 parallel AI agents
+- **Decides** when to BUY, SELL, or stay out via a voting engine
+- **Manages risk** with VaR, CVaR, Kelly sizing, and drawdown circuit breakers
+- **Executes** trades through MetaTrader 5
+- **Learns** continuously with XGBoost + Walk-Forward validation + Concept Drift detection
+- **Replays** historical markets candle-by-candle
+- **Backtests** tick-level strategies across multiple symbols and timeframes
+- **Optimizes** parameters with Walk-Forward Analysis
+- **Reports** everything through a Streamlit dashboard and Telegram
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone
 
 ```bash
-git clone https://github.com/sani13790000/bot12 galaxy-vast
-cd galaxy-vast
+git clone https://github.com/sani13790000/bot12.git
+cd bot12
+```
+
+### 2. Environment
+
+```bash
 cp .env.example .env
-# ویرایش .env با مقادیر واقعی
-nano .env
-docker compose up -d
+# Edit .env with your Supabase, Telegram, and MT5 credentials
 ```
 
-> 📖 راهنمای کامل: [SETUP.md](./SETUP.md)
+### 3. Run with Docker
 
----
-
-## 📱 دستورات تلگرام
-
-| دستور | کار | سطح دسترسی |
-|---|---|---|
-| `/start_bot` | روشن کردن ربات | OPERATOR+ |
-| `/stop_bot` | خاموش کردن ربات | OPERATOR+ |
-| `/pause_bot` | مکث موقت | OPERATOR+ |
-| `/close_all` | بستن همه معاملات | TRADER+ |
-| `/report_daily` | گزارش امروز | USER+ |
-| `/winrate` | نرخ موفقیت | USER+ |
-| `/add_user` | اضافه کردن کاربر | ADMIN+ |
-| `/settings` | تنظیمات | ADMIN+ |
-
----
-
-## 🔐 سطوح دسترسی
-
+```bash
+docker compose up -d --build
 ```
-OWNER(6) → SUPER(5) → ADMIN(4) → TRADER(3) → OPERATOR(2) → USER(1) → VIEWER(0)
+
+Services:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| FastAPI | http://localhost:8000 | Trading API + research endpoints |
+| Streamlit | http://localhost:8501 | Interactive dashboard |
+| Telegram Bot | — | Control and alerts |
+
+### 4. Health Check
+
+```bash
+curl http://localhost:8000/health
 ```
 
 ---
 
-## 📊 قابلیت‌های تحلیل
+## 📦 Modules
 
-**Smart Money Concept:**
-BOS · CHOCH · MSS · Order Block · Breaker Block · FVG · IFVG
-· Liquidity Sweep · Internal/External Liquidity
-· Premium/Discount · Kill Zones
+### 1. Market Replay Engine
+- Candle-by-candle playback
+- Play / Pause / Stop / Step forward / Step backward
+- Speed: x1, x2, x4, x10
+- Trade entry/exit markers
+- Signal overlay
 
-**Price Action:**
-Pin Bar · Engulfing · Fakey · Inside Bar · Outside Bar
-· Morning/Evening Star · Three Soldiers/Crows
-· Breakout · Retest · Compression · Expansion
+### 2. Tick-Level Backtest Engine
+- Simulates bid/ask/last ticks inside OHLC candles
+- Spread, slippage, and commission modeling
+- Multi-symbol and multi-timeframe support
+- Market / Limit / Stop orders
+
+### 3. Walk-Forward Optimization
+- Train / Validation / Test periods
+- Automatic parameter grid search
+- Robustness score and recommendation
+
+### 4. Performance Metrics
+- Win rate, profit factor, Sharpe, Sortino, Calmar
+- Max drawdown (pct & USD)
+- Recovery factor, expectancy, average R:R
+- CAGR, volatility, Ulcer index, skewness, kurtosis
+
+### 5. Streamlit Dashboard
+- Market Replay page
+- Backtest page with equity curve
+- Portfolio allocation
+- Correlation heatmap
+- AI explainability
+- RL agent training/prediction
+
+### 6. AI Explainability
+- BOS / CHOCH detection
+- Order Block count
+- Fair Value Gap count
+- Liquidity sweep detection
+- Premium / Discount / Equilibrium zone
+- Per-agent confidence scores
+
+### 7. Reinforcement Learning Agent
+- Custom Gymnasium trading environment
+- Stable-Baselines3 PPO
+- Train / predict / persist
+
+### 8. Portfolio Management
+- Equal weight, risk parity, minimum variance, Kelly criterion
+- Risk-capped position sizing
+- Multi-symbol allocation
+
+### 9. Correlation Engine
+- Cross-asset correlation matrix
+- Cointegration testing
+- Conflicting signal filtering
+
+### 10. Monte Carlo Simulation
+- 1,000+ equity-path simulations
+- Probability of ruin
+- Drawdown distribution
+- Confidence intervals
+
+### 11. Institutional Risk Engine
+- VaR (95% / 99%) and CVaR
+- Recommended position size
+- Drawdown circuit breaker
+- Exposure limits
+
+### 12. Data Persistence
+- All trades saved to PostgreSQL / Supabase
+- Backtest results, replay sessions, and RL models persisted
+- Row-Level Security per user
 
 ---
 
-## 🛡️ امنیت
+## 🧪 Testing
 
-- JWT RS256 + Refresh Tokens
-- Rate Limiting (100 req/min)
-- RBAC — 7 نقش + 56 Permission
-- Audit Log کامل
-- License Validation آنلاین
+```bash
+pytest backend/tests/ -v --asyncio-mode=auto --cov=backend --cov-report=html
+```
 
 ---
 
-## 📞 پشتیبانی
+## 🛠 Tech Stack
 
-- تلگرام: @GalaxyVast_Support
+| Layer | Technology |
+|-------|------------|
+| API | FastAPI, Uvicorn |
+| Dashboard | Streamlit, Plotly |
+| Database | PostgreSQL, Supabase, SQLAlchemy, Alembic |
+| Cache | Redis |
+| ML | scikit-learn, XGBoost, Stable-Baselines3, PyTorch |
+| Data | pandas, yfinance, pandas-ta |
+| Execution | MetaTrader 5 |
+| Ops | Docker, Docker Compose, Sentry, Prometheus |
 
 ---
 
-*Galaxy Vast AI Trading Platform v2.0.0 — نسخه تجاری*
+## 📂 Repository Structure
+
+```
+backend/
+  agents/              # SMC, PA, ML, Risk, News, Liquidity agents
+  analysis/            # SMC engine + decision engine
+  api/                 # FastAPI app and routes
+  backtest_engine/     # Multi-symbol + walk-forward
+  database/            # Supabase/PostgreSQL connection
+  execution/           # MT5 connector + order state machine
+  institutional/       # ⭐ New institutional modules
+  ml_engine.py         # XGBoost + drift detection
+  risk/                # Risk orchestrator
+  telegram/            # Telegram bot
+  tests/               # Test suite
+
+dashboard/             # Streamlit app + pages
+supabase/migrations/   # Database migrations
+mql5/                  # MetaTrader 5 EA and libraries
+```
+
+---
+
+## ⚠️ Disclaimer
+
+This software is for educational and research purposes. Trading financial instruments involves substantial risk. Past performance does not guarantee future results. Always test thoroughly on a demo account before deploying live capital.
+
+---
+
+## 📄 License
+
+Proprietary — Galaxy Vast AI Trading Team.

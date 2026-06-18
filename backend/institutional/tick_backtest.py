@@ -120,7 +120,7 @@ class TickSimulator:
         spread = max(symbol_config.spread_pips * symbol_config.pip_size, symbol_config.tick_size)
         half_spread = spread / 2.0
 
-        rng = np.random.default_rng(seed=int(candle.timestamp.timestamp()) % 2**31)
+        rng = np.random.default_rng(seed=int(datetime.fromisoformat(candle.timestamp).timestamp()) % 2**31)
         points = [candle.open]
         for _ in range(ticks_per_candle - 2):
             val = candle.low + (candle.high - candle.low) * rng.beta(2, 2)
@@ -133,9 +133,10 @@ class TickSimulator:
             points[ticks_per_candle // 3] = candle.low
 
         ticks = []
+        base_ts = datetime.fromisoformat(candle.timestamp)
         for i, price in enumerate(points):
             ticks.append(TickData(
-                timestamp=candle.timestamp + i * dt,
+                timestamp=base_ts + i * dt,
                 bid=price - half_spread,
                 ask=price + half_spread,
                 last=price,
@@ -172,9 +173,15 @@ class TickBacktestEngine:
         }
 
     def _default_symbol_config(self, symbol: str) -> SymbolConfig:
-        pip_size = 0.1 if "XAU" in symbol.upper() or "JPY" not in symbol.upper() and len(symbol) == 6 else 0.01
-        if len(symbol) == 6 and "JPY" in symbol.upper():
+        symbol_upper = symbol.upper()
+        if "XAU" in symbol_upper or "XAG" in symbol_upper:
+            pip_size = 0.1
+        elif "JPY" in symbol_upper:
             pip_size = 0.01
+        elif len(symbol) == 6:
+            pip_size = 0.0001
+        else:
+            pip_size = 1.0
         return SymbolConfig(
             symbol=symbol,
             pip_size=pip_size,
@@ -183,7 +190,7 @@ class TickBacktestEngine:
             spread_pips=self.config.spread_pips,
             commission_per_lot=self.config.commission_per_lot,
             slippage_pips=self.config.slippage_pips,
-            point_value=10.0,
+            point_value=10.0 if "XAU" in symbol_upper else 1.0,
         )
 
     def run(
@@ -228,7 +235,7 @@ class TickBacktestEngine:
 
             if self._signal_fn and daily_trade_count < self.config.max_trades_per_day:
                 candles = self._candles_by_symbol.get(sym, [])
-                history = [c for c in candles if c.timestamp <= ts][-100:]
+                history = [c for c in candles if c.timestamp <= ts.isoformat()][-100:]
                 signal = self._signal_fn(sym, tick, history)
                 if signal and self._is_valid_signal(signal):
                     self._open_order(sym, signal, tick, ts)
@@ -248,10 +255,10 @@ class TickBacktestEngine:
         ep = float(signal.get("entry_price", 0.0))
         sl = float(signal.get("stop_loss", 0.0))
         tp = float(signal.get("take_profit", 0.0))
-        if ep <= 0 or sl <= 0 or tp <= 0:
+        if sl <= 0 or tp <= 0:
             return False
-        risk = abs(ep - sl)
-        reward = abs(tp - ep)
+        risk = abs(ep - sl) if ep > 0 else abs(tp - sl)
+        reward = abs(tp - ep) if ep > 0 else abs(tp - sl)
         if risk <= 0 or reward / risk < self.config.min_rr_ratio:
             return False
         return True

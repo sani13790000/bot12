@@ -9,6 +9,7 @@ Features:
 from __future__ import annotations
 
 import itertools
+import math
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -114,10 +115,13 @@ class WalkForwardOptimizer:
         if not candles_by_symbol:
             raise ValueError("No candle data provided")
 
-        # Date range inference
         all_timestamps = [c.timestamp for clist in candles_by_symbol.values() for c in clist]
         start = start_date or min(all_timestamps)
         end = end_date or max(all_timestamps)
+        if isinstance(start, str):
+            start = datetime.fromisoformat(start)
+        if isinstance(end, str):
+            end = datetime.fromisoformat(end)
 
         windows = self.generate_windows(start, end)
         if not windows:
@@ -129,14 +133,12 @@ class WalkForwardOptimizer:
             )
             w.best_params = best_params
 
-            # In-sample result
             is_result = self._run_backtest(
                 candles_by_symbol, signal_generator, best_params,
                 w.train_start, w.train_end,
             )
             w.is_metrics = is_result.get("metrics", {})
 
-            # Out-of-sample result
             oos_result = self._run_backtest(
                 candles_by_symbol, signal_generator, best_params,
                 w.test_start, w.test_end,
@@ -188,7 +190,7 @@ class WalkForwardOptimizer:
         end: datetime,
     ) -> Dict[str, Any]:
         filtered = {
-            sym: [c for c in clist if start <= c.timestamp <= end]
+            sym: [c for c in clist if start <= datetime.fromisoformat(c.timestamp) <= end]
             for sym, clist in candles_by_symbol.items()
         }
         config = TickBacktestConfig(
@@ -237,6 +239,3 @@ class WalkForwardOptimizer:
             "recommendation": recommendation,
             "windows": [w.to_dict() for w in windows],
         }
-
-
-import math
