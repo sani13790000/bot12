@@ -1,6 +1,6 @@
 """
 faz F+G+H+I - Main FastAPI application
-Sentry + RateLimit + CircuitBreaker + Observability + Health
+Sentry + RateLimit + CircuitBreaker + Observability + Security + Health
 """
 from __future__ import annotations
 
@@ -39,7 +39,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging(level=log_level, json_format=json_logs)
     logger.info("Galaxy Vast AI Trading Bot starting", version="1.0.0")
 
-    # 2. Sentry
+    # 2. Secret validation (faz 10)
+    try:
+        from backend.middleware.secret_manager import validate_secrets
+        result = validate_secrets()
+        if not result.ok:
+            logger.error("SECRET VALIDATION FAILED", missing=result.missing_required)
+        else:
+            logger.info("All required secrets present")
+    except Exception as e:
+        logger.warning(f"Secret validation skipped: {e}")
+
+    # 3. Sentry
     dsn = os.getenv("SENTRY_DSN", "")
     if dsn and _SENTRY_OK:
         sentry_sdk.init(
@@ -51,7 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         logger.info("Sentry initialized")
 
-    # 3. Database pool monitor
+    # 4. Database pool monitor
     try:
         from backend.database.connection_pool_monitor import pool_monitor
         await pool_monitor.start()
@@ -59,14 +70,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"DB pool monitor skipped: {e}")
 
-    # 4. Circuit breaker patch
+    # 5. Circuit breaker patch
     try:
         from backend.analysis import decision_engine_patch  # noqa: F401
         logger.info("Decision engine patch applied")
     except Exception as e:
         logger.warning(f"Decision engine patch skipped: {e}")
 
-    # 5. Alert manager - register Telegram if available
+    # 6. Alert manager - register Telegram if available
     try:
         from backend.telegram.bot import send_admin_message
         alert_manager.register_telegram(send_admin_message)
@@ -74,7 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"Alert manager Telegram skipped: {e}")
 
-    # 6. Register Sentry for alerts
+    # 7. Register Sentry for alerts
     if _SENTRY_OK and dsn:
         alert_manager.register_sentry(sentry_sdk.capture_exception)
 
@@ -113,7 +124,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Observability middleware (faz 9) - FIRST
+# Security middleware (faz 10) - FIRST
+try:
+    from backend.middleware.security import SecurityMiddleware
+    app.add_middleware(SecurityMiddleware)
+except Exception as e:
+    logger.warning(f"SecurityMiddleware skipped: {e}")
+
+# Observability middleware (faz 9)
 from backend.middleware.observability import ObservabilityMiddleware
 app.add_middleware(ObservabilityMiddleware)
 
@@ -202,6 +220,13 @@ async def health_check() -> dict:
     except Exception:
         pool_status = {}
 
+    # Secret validation status
+    try:
+        from backend.middleware.secret_manager import validate_secrets
+        secret_status = validate_secrets().summary()
+    except Exception:
+        secret_status = {}
+
     overall = "healthy" if db_ok else "degraded"
 
     return {
@@ -212,6 +237,7 @@ async def health_check() -> dict:
         },
         "circuit_breakers": circuit_breakers,
         "pool": pool_status,
+        "secrets": secret_status,
         "metrics": {
             "http_requests": metrics_snap["counters"].get("http_requests_total", 0),
             "http_errors": metrics_snap["counters"].get("http_errors_total", 0),
