@@ -1,8 +1,12 @@
 """
-ØªÙØ¸ÛÙØ§Øª ÙØ±Ú©Ø²Û Ø³ÛØ³ØªÙ
+تنظیمات مرکزی سیستم — Galaxy Vast AI Trading Platform
 
-Ø§ÛÙ ÙØ§ÛÙ ØªÙØ§Ù ØªÙØ¸ÛÙØ§Øª ÙØ§Ø¨Ù Ù¾ÛÚ©Ø±Ø¨ÙØ¯Û Ø±Ø§ ÙØ¯ÛØ±ÛØª ÙÛâÚ©ÙØ¯.
-ØªÙØ¸ÛÙØ§Øª Ø§Ø² ÙØªØºÛØ±ÙØ§Û ÙØ­ÛØ·Û (environment variables) Ø®ÙØ§ÙØ¯Ù ÙÛâØ´ÙÙØ¯.
+این فایل تمام تنظیمات قابل پیکربندی را مدیریت می‌کند.
+تنظیمات از متغیرهای محیطی (environment variables) خوانده می‌شوند.
+هیچ مقدار حساسی نباید در کد hardcode شود.
+
+نویسنده: Galaxy Vast Team
+نسخه: 2.0.0
 """
 
 import os
@@ -13,28 +17,31 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     """
-    ØªÙØ¸ÛÙØ§Øª Ø§ØµÙÛ Ø³ÛØ³ØªÙ
+    تنظیمات اصلی سیستم Galaxy Vast
 
-    ØªÙØ§Ù ØªÙØ¸ÛÙØ§Øª Ø§Ø² ÙØ§ÛÙ .env ÛØ§ ÙØªØºÛØ±ÙØ§Û ÙØ­ÛØ·Û Ø®ÙØ§ÙØ¯Ù ÙÛâØ´ÙÙØ¯.
+    تمام تنظیمات از فایل .env یا متغیرهای محیطی خوانده می‌شوند.
     """
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª Ø¹ÙÙÙÛ
+    # برند و هویت سیستم
     # =====================================================
-    APP_NAME: str = "MT5 Trading Ecosystem"
-    APP_VERSION: str = "1.0.0"
+    APP_NAME: str = "Galaxy Vast AI Trading Platform"
+    APP_VERSION: str = "2.0.0"
+    APP_BRAND: str = "Galaxy Vast"
+    APP_DESCRIPTION: str = "سیستم هوشمند معامله‌گری نهادی — Galaxy Vast"
+    APP_SUPPORT_USERNAME: str = "GalaxyVast_Support"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª API
+    # تنظیمات API Gateway
     # =====================================================
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     API_PREFIX: str = "/api/v1"
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª Supabase (Ø¯ÛØªØ§Ø¨ÛØ³)
+    # تنظیمات Supabase (دیتابیس)
     # =====================================================
     SUPABASE_URL: str = Field(..., env="SUPABASE_URL")
     SUPABASE_ANON_KEY: str = Field(..., env="SUPABASE_ANON_KEY")
@@ -42,7 +49,7 @@ class Settings(BaseSettings):
     SUPABASE_DB_URL: str = Field(..., env="SUPABASE_DB_URL")
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª JWT
+    # تنظیمات JWT
     # =====================================================
     JWT_SECRET_KEY: str = Field(..., env="JWT_SECRET_KEY")
     JWT_ALGORITHM: str = "HS256"
@@ -50,72 +57,82 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª ØªÙÚ¯Ø±Ø§Ù
+    # تنظیمات تلگرام
     # =====================================================
     TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None, env="TELEGRAM_BOT_TOKEN")
     TELEGRAM_ADMIN_IDS: List[int] = Field(default_factory=list)
+    TELEGRAM_BOT_NAME: str = "Galaxy Vast Bot"
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª ÙØ§ÛØ³ÙØ³
+    # تنظیمات لایسنس
     # =====================================================
     LICENSE_ENCRYPTION_KEY: str = Field(..., env="LICENSE_ENCRYPTION_KEY")
     LICENSE_SIGNATURE_KEY: str = Field(..., env="LICENSE_SIGNATURE_KEY")
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª ØªØ­ÙÛÙ Ø¨Ø§Ø²Ø§Ø±
+    # تنظیمات تحلیل بازار
     # =====================================================
     SYMBOLS_SUPPORTED: List[str] = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"]
     DEFAULT_SYMBOL: str = "XAUUSD"
     DEFAULT_TIMEFRAMES: List[str] = ["M15", "H1", "H4", "D1"]
 
-    # Ø§ÙØªÛØ§Ø²Ø¯ÙÛ
+    # آستانه‌های امتیازدهی
     MIN_ENTRY_SCORE: float = 65.0
     EXCELLENT_SCORE: float = 85.0
     GOOD_SCORE: float = 75.0
     MODERATE_SCORE: float = 65.0
 
-    # ÙØ²ÙâÙØ§Û Ø§ÙØªÛØ§Ø²Ø¯ÙÛ
-    SMC_WEIGHT: float = 0.30
+    # وزن‌های امتیازدهی تحلیل
+    SMC_WEIGHT: float = 0.40
     PRICE_ACTION_WEIGHT: float = 0.25
-    LIQUIDITY_WEIGHT: float = 0.15
-    MTF_WEIGHT: float = 0.10
+    HTF_WEIGHT: float = 0.20
     SESSION_WEIGHT: float = 0.10
-    VOLATILITY_WEIGHT: float = 0.10
+    LTF_WEIGHT: float = 0.05
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª Ø±ÛØ³Ú©
+    # تنظیمات مدیریت ریسک
     # =====================================================
-    MAX_RISK_PER_TRADE: float = 10.0  # Ø¯Ø±ØµØ¯
-    MAX_DAILY_RISK: float = 20.0  # Ø¯Ø±ØµØ¯
-    MAX_DAILY_TRADES: int = 50
-    MAX_DRAWDOWN: float = 30.0  # Ø¯Ø±ØµØ¯
+    MAX_RISK_PER_TRADE: float = 2.0     # درصد از موجودی
+    MAX_DAILY_RISK: float = 5.0         # درصد از موجودی
+    MAX_DAILY_TRADES: int = 10
+    MAX_DRAWDOWN: float = 15.0          # درصد — حد ضرر کل
+    MAX_PORTFOLIO_RISK: float = 5.0     # درصد — ریسک کل پرتفولیو
+    MAX_SPREAD_POINTS: int = 30         # حداکثر اسپرد مجاز
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª Ø³Ø´ÙâÙØ§Û ÙØ¹Ø§ÙÙØ§ØªÛ
+    # تنظیمات سشن‌های Kill Zone
     # =====================================================
     KILLZONE_LONDON_START: str = "08:00"
-    KILLZONE_LONDON_END: str = "11:00"
-    KILLZONE_NEWYORK_START: str = "13:30"
-    KILLZONE_NEWYORK_END: str = "16:00"
-    KILLZONE_TOKYO_START: str = "00:30"
-    KILLZONE_TOKYO_END: str = "02:00"
+    KILLZONE_LONDON_END: str = "10:00"
+    KILLZONE_NEWYORK_START: str = "13:00"
+    KILLZONE_NEWYORK_END: str = "15:00"
+    KILLZONE_TOKYO_START: str = "00:00"
+    KILLZONE_TOKYO_END: str = "04:00"
+    KILLZONE_LONDON_CLOSE_START: str = "15:00"
+    KILLZONE_LONDON_CLOSE_END: str = "16:00"
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª ÙØ§Ú¯
+    # تنظیمات لاگ
     # =====================================================
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    LOG_FILE: Optional[str] = None
+    LOG_FILE: Optional[str] = "logs/galaxy_vast.log"
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª Redis (Ø§Ø®ØªÛØ§Ø±Û)
+    # تنظیمات Redis (اختیاری)
     # =====================================================
     REDIS_URL: Optional[str] = Field(default=None, env="REDIS_URL")
 
     # =====================================================
-    # ØªÙØ¸ÛÙØ§Øª CORS
+    # تنظیمات CORS
     # =====================================================
-    CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
+    CORS_ORIGINS: List[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://galaxyvast.com",
+        ]
+    )
 
     class Config:
         env_file = ".env"
@@ -126,16 +143,16 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     """
-    Ø¯Ø±ÛØ§ÙØª ØªÙØ¸ÛÙØ§Øª (Ú©Ø´ Ø´Ø¯Ù)
+    دریافت تنظیمات (کش شده)
 
-    Ø§ÛÙ ØªØ§Ø¨Ø¹ Ø§Ø² lru_cache Ø§Ø³ØªÙØ§Ø¯Ù ÙÛâÚ©ÙØ¯ ØªØ§ ØªÙØ¸ÛÙØ§Øª ÙÙØ·
-    ÛÚ© Ø¨Ø§Ø± Ø®ÙØ§ÙØ¯Ù Ø´ÙÙØ¯ Ù Ø¯Ø± Ø­Ø§ÙØ¸Ù Ø°Ø®ÛØ±Ù Ø´ÙÙØ¯.
+    این تابع از lru_cache استفاده می‌کند تا تنظیمات فقط
+    یک بار خوانده شود و در حافظه ذخیره شود.
 
     Returns:
-        Settings: Ø´ÛØ¡ ØªÙØ¸ÛÙØ§Øª
+        Settings: شیء تنظیمات
     """
     return Settings()
 
 
-# ÙÙÙÙÙ Ú¯ÙÙØ¨Ø§Ù Ø§Ø² ØªÙØ¸ÛÙØ§Øª
+# نمونه گلوبال از تنظیمات
 settings = get_settings()
