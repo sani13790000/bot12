@@ -1,16 +1,11 @@
 """
 Galaxy Vast AI Trading Platform
-Multi-Symbol Multi-Timeframe Backtesting Engine
-
-Features:
-  - Multi-symbol parallel backtesting
-  - Multi-timeframe analysis
-  - Realistic slippage and spread modeling
-  - Correlation-aware portfolio simulation
-  - Equity curve generation
-  - Drawdown calculation
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ماژول: MultiSymbolBacktestEngine
 """
+
 from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -29,7 +24,6 @@ class Timeframe(str, Enum):
     H1  = "H1"
     H4  = "H4"
     D1  = "D1"
-    W1  = "W1"
 
 
 @dataclass
@@ -40,22 +34,19 @@ class Candle:
     low: float
     close: float
     volume: float = 0.0
-    spread: float = 0.0
-    symbol: str = ""
-    timeframe: Timeframe = Timeframe.H1
+    spread: float = 2.0
 
 
 @dataclass
 class BacktestSignal:
     symbol: str
-    direction: str               # BUY / SELL
+    timeframe: Timeframe
+    direction: str          # BUY / SELL
     entry_price: float
     stop_loss: float
     take_profit: float
-    lot_size: float = 0.01
-    confidence: float = 80.0
-    timeframe: Timeframe = Timeframe.H1
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    confidence: float       # 0-100
+    time: datetime
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -68,8 +59,8 @@ class BacktestTrade:
     exit_price: Optional[float] = None
     pnl: float = 0.0
     pnl_pct: float = 0.0
-    result: str = "OPEN"         # WIN / LOSS / BE / OPEN
-    exit_reason: str = ""        # TP / SL / TIMEOUT / FORCED
+    result: str = "OPEN"
+    exit_reason: str = ""
     max_favorable: float = 0.0
     max_adverse: float = 0.0
     duration_minutes: int = 0
@@ -101,24 +92,21 @@ class TimeframeResult:
 @dataclass
 class SymbolResult:
     symbol: str
-    timeframe_results: List[TimeframeResult]
-    combined_trades: List[BacktestTrade]
-    equity_curve: List[EquityPoint]
     total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
     win_rate: float = 0.0
     profit_factor: float = 0.0
     net_pnl: float = 0.0
-    max_drawdown_pct: float = 0.0
-    sharpe_ratio: float = 0.0
-    sortino_ratio: float = 0.0
-    calmar_ratio: float = 0.0
-    recovery_factor: float = 0.0
-    expectancy: float = 0.0
+    gross_profit: float = 0.0
+    gross_loss: float = 0.0
     avg_win: float = 0.0
     avg_loss: float = 0.0
-    avg_rr: float = 0.0
-    max_consecutive_wins: int = 0
-    max_consecutive_losses: int = 0
+    expectancy: float = 0.0
+    sharpe_ratio: float = 0.0
+    sortino_ratio: float = 0.0
+    max_drawdown_pct: float = 0.0
+    timeframe_results: Dict[str, TimeframeResult] = field(default_factory=dict)
 
 
 @dataclass
@@ -147,38 +135,28 @@ class MultiSymbolResult:
     symbol_results: Dict[str, SymbolResult]
     portfolio_equity: List[EquityPoint]
     all_trades: List[BacktestTrade]
-    # Portfolio metrics
     total_trades: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
     win_rate: float = 0.0
     profit_factor: float = 0.0
     net_pnl: float = 0.0
-    net_pnl_pct: float = 0.0
+    gross_profit: float = 0.0
+    gross_loss: float = 0.0
     max_drawdown_pct: float = 0.0
     max_drawdown_amount: float = 0.0
     sharpe_ratio: float = 0.0
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0
-    recovery_factor: float = 0.0
-    expectancy: float = 0.0
-    cagr: float = 0.0
-    avg_trade_duration_minutes: int = 0
-    start_time: datetime = field(default_factory=datetime.utcnow)
-    end_time: datetime = field(default_factory=datetime.utcnow)
-    duration_seconds: float = 0.0
+    final_balance: float = 0.0
+    total_return_pct: float = 0.0
+    annualized_return_pct: float = 0.0
+    avg_trade_duration_min: float = 0.0
+    total_commission: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "config": {
-                "symbols": self.config.symbols,
-                "timeframes": [tf.value for tf in self.config.timeframes],
-                "start_date": self.config.start_date.isoformat(),
-                "end_date": self.config.end_date.isoformat(),
-                "initial_balance": self.config.initial_balance,
-                "risk_per_trade_pct": self.config.risk_per_trade_pct,
-                "name": self.config.name,
-            },
+            "config": {"name": self.config.name, "symbols": self.config.symbols},
             "portfolio": {
                 "total_trades": self.total_trades,
                 "winning_trades": self.winning_trades,
@@ -186,18 +164,17 @@ class MultiSymbolResult:
                 "win_rate": round(self.win_rate, 4),
                 "profit_factor": round(self.profit_factor, 4),
                 "net_pnl": round(self.net_pnl, 2),
-                "net_pnl_pct": round(self.net_pnl_pct, 4),
                 "max_drawdown_pct": round(self.max_drawdown_pct, 4),
                 "max_drawdown_amount": round(self.max_drawdown_amount, 2),
                 "sharpe_ratio": round(self.sharpe_ratio, 4),
                 "sortino_ratio": round(self.sortino_ratio, 4),
                 "calmar_ratio": round(self.calmar_ratio, 4),
-                "recovery_factor": round(self.recovery_factor, 4),
-                "expectancy": round(self.expectancy, 4),
-                "cagr": round(self.cagr, 4),
-                "avg_trade_duration_minutes": self.avg_trade_duration_minutes,
+                "final_balance": round(self.final_balance, 2),
+                "total_return_pct": round(self.total_return_pct, 4),
+                "annualized_return_pct": round(self.annualized_return_pct, 4),
+                "total_commission": round(self.total_commission, 2),
             },
-            "per_symbol": {
+            "symbols": {
                 sym: {
                     "total_trades": r.total_trades,
                     "win_rate": round(r.win_rate, 4),
@@ -205,234 +182,112 @@ class MultiSymbolResult:
                     "net_pnl": round(r.net_pnl, 2),
                     "max_drawdown_pct": round(r.max_drawdown_pct, 4),
                     "sharpe_ratio": round(r.sharpe_ratio, 4),
-                    "calmar_ratio": round(r.calmar_ratio, 4),
-                    "expectancy": round(r.expectancy, 4),
-                } for sym, r in self.symbol_results.items()
+                }
+                for sym, r in self.symbol_results.items()
             },
-            "equity_curve": [
-                {"time": p.time.isoformat(), "equity": round(p.equity, 2),
-                 "drawdown_pct": round(p.drawdown_pct, 4)}
-                for p in self.portfolio_equity[::max(1, len(self.portfolio_equity)//200)]
-            ],
-            "execution": {
-                "duration_seconds": round(self.duration_seconds, 2),
-                "start_time": self.start_time.isoformat(),
-                "end_time": self.end_time.isoformat(),
-            }
         }
 
 
-# ─── Pip value helper ─────────────────────────────────────────────────────────
-_PIP_VALUES: Dict[str, float] = {
-    "XAUUSD": 1.0, "XAGUSD": 50.0,
-    "EURUSD": 10.0, "GBPUSD": 10.0, "AUDUSD": 10.0,
-    "NZDUSD": 10.0, "USDCAD": 10.0, "USDCHF": 10.0,
-    "USDJPY": 0.09, "EURJPY": 0.09, "GBPJPY": 0.09,
-    "US30": 1.0, "NAS100": 1.0, "SP500": 1.0,
-}
-
-def _pip_value(symbol: str) -> float:
-    for k, v in _PIP_VALUES.items():
-        if k in symbol.upper():
-            return v
-    return 10.0
-
-def _pip_size(symbol: str) -> float:
-    if "JPY" in symbol.upper():
-        return 0.01
-    if "XAU" in symbol.upper() or "XAG" in symbol.upper():
-        return 0.1
-    return 0.0001
-
-
-# ─── Correlation matrix (simplified) ──────────────────────────────────────────
-_CORRELATIONS: Dict[Tuple[str,str], float] = {
-    ("EURUSD","GBPUSD"): 0.85, ("EURUSD","AUDUSD"): 0.72,
-    ("EURUSD","NZDUSD"): 0.68, ("GBPUSD","AUDUSD"): 0.65,
-    ("XAUUSD","XAGUSD"): 0.92, ("XAUUSD","EURUSD"): 0.45,
-    ("USDJPY","USDCHF"): 0.75, ("US30","NAS100"):  0.88,
-}
-
-def _correlation(a: str, b: str) -> float:
-    key = (a, b) if (a, b) in _CORRELATIONS else (b, a)
-    return _CORRELATIONS.get(key, 0.0)
-
-
-# ─── Core engine ──────────────────────────────────────────────────────────────
 class MultiSymbolBacktestEngine:
-    """
-    Institutional-grade multi-symbol, multi-timeframe backtesting engine.
-    Simulates realistic portfolio execution with correlation filtering,
-    equity curve generation, and comprehensive performance metrics.
-    """
+    """موتور بک‌تست چندنماد Galaxy Vast."""
 
     def __init__(self) -> None:
+        self._trades: List[BacktestTrade] = []
+        self._equity: List[EquityPoint] = []
+        self._balance: float = 0.0
+        self._peak: float = 0.0
         self._open_trades: List[BacktestTrade] = []
-        self._closed_trades: List[BacktestTrade] = []
-        self._equity_curve: List[EquityPoint] = []
-        self._balance: float = 10_000.0
-        self._peak_equity: float = 10_000.0
 
-    # ── Public API ────────────────────────────────────────────────────────────
     async def run(
         self,
         config: MultiSymbolConfig,
-        candle_data: Dict[str, Dict[Timeframe, List[Candle]]],
-        signal_generator: Callable[[str, Timeframe, List[Candle]], List[BacktestSignal]],
+        signal_provider: Callable[[str, Timeframe, datetime, datetime], List[BacktestSignal]],
+        candle_provider: Callable[[str, Timeframe, datetime, datetime], List[Candle]],
     ) -> MultiSymbolResult:
-        """
-        Run full multi-symbol, multi-timeframe backtest.
-
-        Args:
-            config: Backtest configuration
-            candle_data: {symbol: {timeframe: [candles]}}
-            signal_generator: Callable that returns signals given candles
-        """
-        start_time = datetime.utcnow()
         self._reset(config.initial_balance)
 
-        symbol_results: Dict[str, SymbolResult] = {}
+        symbol_results: Dict[str, SymbolResult] = {sym: SymbolResult(sym) for sym in config.symbols}
 
-        # Run each symbol concurrently
-        tasks = [
-            self._backtest_symbol(symbol, config, candle_data.get(symbol, {}), signal_generator)
-            for symbol in config.symbols
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=False)
+        for symbol in config.symbols:
+            for tf in config.timeframes:
+                candles = candle_provider(symbol, tf, config.start_date, config.end_date)
+                signals = signal_provider(symbol, tf, config.start_date, config.end_date)
 
-        for sym, res in zip(config.symbols, results):
-            symbol_results[sym] = res
+                if not candles:
+                    candles = self._generate_synthetic_candles(symbol, tf, config.start_date, config.end_date)
 
-        # Merge all trades into portfolio timeline
-        all_trades = sorted(
-            [t for r in symbol_results.values() for t in r.combined_trades],
-            key=lambda t: t.entry_time,
-        )
+                await self._simulate(symbol, tf, candles, signals, config, symbol_results[symbol])
+                await asyncio.sleep(0)
 
-        # Build portfolio equity curve
-        portfolio_equity = self._build_portfolio_equity(all_trades, config.initial_balance)
-
-        # Compute portfolio-level metrics
         result = MultiSymbolResult(
             config=config,
             symbol_results=symbol_results,
-            portfolio_equity=portfolio_equity,
-            all_trades=all_trades,
+            portfolio_equity=self._equity,
+            all_trades=self._trades,
         )
+
         self._fill_portfolio_metrics(result, config)
-        result.start_time = start_time
-        result.end_time = datetime.utcnow()
-        result.duration_seconds = (result.end_time - result.start_time).total_seconds()
+        for sym, sr in symbol_results.items():
+            self._fill_symbol_metrics(sr, config.initial_balance / len(config.symbols))
+
         return result
 
-    # ── Per-symbol logic ──────────────────────────────────────────────────────
-    async def _backtest_symbol(
-        self,
-        symbol: str,
-        config: MultiSymbolConfig,
-        tf_candles: Dict[Timeframe, List[Candle]],
-        signal_generator: Callable,
-    ) -> SymbolResult:
-        tf_results: List[TimeframeResult] = []
-        all_trades: List[BacktestTrade] = []
-
-        for tf in config.timeframes:
-            candles = tf_candles.get(tf, [])
-            if not candles:
-                candles = self._generate_synthetic_candles(symbol, tf, config.start_date, config.end_date)
-
-            trades = await self._simulate_timeframe(symbol, tf, candles, config, signal_generator)
-            all_trades.extend(trades)
-
-            tf_result = self._compute_tf_metrics(symbol, tf, trades, config.initial_balance / len(config.symbols))
-            tf_results.append(tf_result)
-
-        equity_curve = self._build_symbol_equity(all_trades, config.initial_balance / len(config.symbols))
-        sym_result = SymbolResult(
-            symbol=symbol,
-            timeframe_results=tf_results,
-            combined_trades=all_trades,
-            equity_curve=equity_curve,
-        )
-        self._fill_symbol_metrics(sym_result, config.initial_balance / len(config.symbols))
-        return sym_result
-
-    async def _simulate_timeframe(
+    async def _simulate(
         self,
         symbol: str,
         tf: Timeframe,
         candles: List[Candle],
+        signals: List[BacktestSignal],
         config: MultiSymbolConfig,
-        signal_generator: Callable,
-    ) -> List[BacktestTrade]:
-        trades: List[BacktestTrade] = []
-        balance = config.initial_balance / len(config.symbols) / len(config.timeframes)
+        sym_result: SymbolResult,
+    ) -> None:
         open_trades: List[BacktestTrade] = []
 
-        for i, candle in enumerate(candles[20:], start=20):  # warm-up 20 candles
-            # Check open trades for exits
-            still_open: List[BacktestTrade] = []
-            for trade in open_trades:
+        for candle in candles:
+            for trade in list(open_trades):
                 if self._check_exit(trade, candle):
-                    balance += trade.pnl
-                    trades.append(trade)
-                else:
-                    still_open.append(trade)
-            open_trades = still_open
+                    open_trades.remove(trade)
 
-            # Max simultaneous check
-            if len(open_trades) >= config.max_simultaneous_trades:
-                continue
+            eligible = [
+                s for s in signals
+                if s.timeframe == tf
+                and s.time <= candle.time
+                and s.confidence >= config.min_confidence
+            ]
 
-            # Get signals from generator
-            past_candles = candles[max(0, i-100):i+1]
-            try:
-                signals = signal_generator(symbol, tf, past_candles)
-            except Exception:
-                signals = []
-
-            for sig in signals:
-                if sig.confidence < config.min_confidence:
-                    continue
-                # Portfolio risk check
-                if len(open_trades) >= config.max_simultaneous_trades:
+            for sig in eligible:
+                if len(self._open_trades) >= config.max_simultaneous_trades:
                     break
-                # Correlation check
-                if config.correlation_filter and self._is_correlated(sig, open_trades, config.max_correlation):
+                if config.correlation_filter and self._is_correlated(sig, self._open_trades, config.max_correlation):
                     continue
-                # Apply slippage
+
                 entry = self._apply_slippage(sig.entry_price, sig.direction, config.slippage_pips, symbol)
-                # Compute lot size
-                lot = self._compute_lot(balance, config.risk_per_trade_pct, entry, sig.stop_loss, symbol)
-                # Commission
+                lot = self._compute_lot(self._balance, config.risk_per_trade_pct, entry, sig.stop_loss, symbol)
                 commission = lot * config.commission_per_lot
-                balance -= commission
 
                 trade = BacktestTrade(
                     signal=sig,
                     entry_time=candle.time,
                     entry_price=entry,
+                    commission=commission,
                 )
-                trade.signal.lot_size = lot
-                trade.commission = commission
                 open_trades.append(trade)
+                self._open_trades.append(trade)
+                self._trades.append(trade)
+                sym_result.total_trades += 1
+                self._balance -= commission
+                sym_result.total_trades = sym_result.total_trades
 
-        # Force close remaining
-        if candles:
-            last = candles[-1]
-            for trade in open_trades:
-                trade.exit_time = last.time
-                trade.exit_price = last.close
-                trade.result = "TIMEOUT"
-                trade.exit_reason = "PERIOD_END"
-                pnl = self._calc_pnl(trade, last.close, symbol)
-                trade.pnl = pnl
-                balance += pnl
-                trades.append(trade)
+            ep = EquityPoint(
+                time=candle.time,
+                equity=self._balance,
+                drawdown=max(0, self._peak - self._balance),
+                drawdown_pct=max(0, (self._peak - self._balance) / self._peak * 100) if self._peak > 0 else 0,
+                peak=self._peak,
+                symbol=symbol,
+            )
+            self._equity.append(ep)
 
-        return trades
-
-    # ── Trade helpers ─────────────────────────────────────────────────────────
     def _check_exit(self, trade: BacktestTrade, candle: Candle) -> bool:
         sig = trade.signal
         if sig.direction == "BUY":
@@ -449,251 +304,271 @@ class MultiSymbolBacktestEngine:
             if candle.low <= sig.take_profit:
                 self._close_trade(trade, sig.take_profit, candle.time, "TP")
                 return True
-        # Track MAE/MFE
-        if sig.direction == "BUY":
-            trade.max_favorable = max(trade.max_favorable, candle.high - trade.entry_price)
-            trade.max_adverse  = min(trade.max_adverse,  candle.low  - trade.entry_price)
-        else:
-            trade.max_favorable = max(trade.max_favorable, trade.entry_price - candle.low)
-            trade.max_adverse  = min(trade.max_adverse,  trade.entry_price - candle.high)
+        trade.max_favorable = max(trade.max_favorable, candle.high - trade.entry_price if sig.direction == "BUY" else trade.entry_price - candle.low)
+        trade.max_adverse = max(trade.max_adverse, trade.entry_price - candle.low if sig.direction == "BUY" else candle.high - trade.entry_price)
         return False
 
     def _close_trade(self, trade: BacktestTrade, exit_price: float, exit_time: datetime, reason: str) -> None:
-        trade.exit_price  = exit_price
-        trade.exit_time   = exit_time
+        trade.exit_price = exit_price
+        trade.exit_time = exit_time
         trade.exit_reason = reason
-        duration = (exit_time - trade.entry_time).total_seconds() / 60
-        trade.duration_minutes = int(duration)
-        pnl = self._calc_pnl(trade, exit_price, trade.signal.symbol)
-        trade.pnl = pnl - trade.commission
-        initial = 10_000.0
-        trade.pnl_pct = trade.pnl / initial
-        if reason == "TP":
-            trade.result = "WIN"
-        elif reason == "SL":
-            trade.result = "LOSS"
-        else:
-            trade.result = "BE"
+        trade.pnl = self._calc_pnl(trade, exit_price, trade.signal.symbol)
+        trade.result = "WIN" if trade.pnl > 0 else "LOSS" if trade.pnl < 0 else "BE"
+        trade.duration_minutes = int((exit_time - trade.entry_time).total_seconds() / 60)
+        self._balance += trade.pnl
+        if self._balance > self._peak:
+            self._peak = self._balance
+        if trade in self._open_trades:
+            self._open_trades.remove(trade)
 
     def _calc_pnl(self, trade: BacktestTrade, exit_price: float, symbol: str) -> float:
-        pip_sz  = _pip_size(symbol)
-        pip_val = _pip_value(symbol)
-        lot = trade.signal.lot_size
-        if pip_sz == 0:
-            return 0.0
+        pip_size = 0.01 if "XAU" in symbol else 0.0001
+        pip_value = 10.0 if "XAU" not in symbol else 1.0
         if trade.signal.direction == "BUY":
-            pips = (exit_price - trade.entry_price) / pip_sz
+            pips = (exit_price - trade.entry_price) / pip_size
         else:
-            pips = (trade.entry_price - exit_price) / pip_sz
-        return pips * pip_val * lot
+            pips = (trade.entry_price - exit_price) / pip_size
+        lot = self._compute_lot(self._balance, 1.0, trade.entry_price, trade.signal.stop_loss, symbol)
+        return pips * pip_value * lot - trade.commission
 
     def _apply_slippage(self, price: float, direction: str, slippage: float, symbol: str) -> float:
-        pip = _pip_size(symbol)
-        slip = slippage * pip
+        pip_size = 0.01 if "XAU" in symbol else 0.0001
+        slip = slippage * pip_size
         return price + slip if direction == "BUY" else price - slip
 
     def _compute_lot(self, balance: float, risk_pct: float, entry: float, sl: float, symbol: str) -> float:
+        pip_size = 0.01 if "XAU" in symbol else 0.0001
+        pip_value = 1.0 if "XAU" in symbol else 10.0
         risk_amount = balance * (risk_pct / 100)
-        pip_sz  = _pip_size(symbol)
-        pip_val = _pip_value(symbol)
-        if pip_sz == 0 or pip_val == 0:
+        sl_pips = abs(entry - sl) / pip_size
+        if sl_pips <= 0 or pip_value <= 0:
             return 0.01
-        sl_pips = abs(entry - sl) / pip_sz
-        if sl_pips == 0:
-            return 0.01
-        lot = risk_amount / (sl_pips * pip_val)
-        return max(0.01, min(round(lot, 2), 100.0))
+        return round(max(0.01, min(risk_amount / (sl_pips * pip_value), 10.0)), 2)
 
     def _is_correlated(self, sig: BacktestSignal, open_trades: List[BacktestTrade], max_corr: float) -> bool:
         for trade in open_trades:
-            corr = _correlation(sig.symbol, trade.signal.symbol)
-            if corr >= max_corr and sig.direction == trade.signal.direction:
+            if trade.signal.symbol == sig.symbol and trade.signal.direction == sig.direction:
                 return True
         return False
 
-    # ── Equity curve ──────────────────────────────────────────────────────────
     def _build_portfolio_equity(self, trades: List[BacktestTrade], initial: float) -> List[EquityPoint]:
         equity = initial
-        peak   = initial
-        points = [EquityPoint(time=datetime.utcnow() - timedelta(days=365), equity=initial, drawdown=0, drawdown_pct=0, peak=initial)]
-        for t in trades:
+        peak = initial
+        curve = []
+        for t in sorted(trades, key=lambda x: x.exit_time or datetime.utcnow()):
             if t.exit_time and t.pnl != 0:
                 equity += t.pnl
-                peak = max(peak, equity)
+                if equity > peak:
+                    peak = equity
                 dd = peak - equity
-                dd_pct = dd / peak if peak > 0 else 0
-                points.append(EquityPoint(time=t.exit_time, equity=equity, drawdown=dd, drawdown_pct=dd_pct, peak=peak))
-        return points
+                curve.append(EquityPoint(
+                    time=t.exit_time, equity=equity,
+                    drawdown=dd, drawdown_pct=(dd / peak * 100) if peak > 0 else 0,
+                    peak=peak,
+                ))
+        return curve
 
     def _build_symbol_equity(self, trades: List[BacktestTrade], initial: float) -> List[EquityPoint]:
         return self._build_portfolio_equity(trades, initial)
 
-    # ── Metrics ───────────────────────────────────────────────────────────────
     def _compute_tf_metrics(self, symbol: str, tf: Timeframe, trades: List[BacktestTrade], initial: float) -> TimeframeResult:
-        closed = [t for t in trades if t.result in ("WIN","LOSS","BE")]
-        total = len(closed)
-        if total == 0:
+        pnl = [t.pnl for t in trades if t.result != "OPEN"]
+        total = len(pnl)
+        if not total:
             return TimeframeResult(tf, symbol, 0, 0, 0, 0, 0, 0)
-        wins   = [t for t in closed if t.result == "WIN"]
-        losses = [t for t in closed if t.result == "LOSS"]
-        win_rate = len(wins) / total
-        gp = sum(t.pnl for t in wins)
-        gl = abs(sum(t.pnl for t in losses))
+        wins = [p for p in pnl if p > 0]
+        losses = [p for p in pnl if p < 0]
+        wr = len(wins) / total
+        gp = sum(wins)
+        gl = abs(sum(losses))
         pf = gp / gl if gl > 0 else (gp if gp > 0 else 0)
-        net = sum(t.pnl for t in closed)
-        # Sharpe (simplified daily return approximation)
-        returns = [t.pnl / initial for t in closed]
-        sr = self._sharpe(returns)
-        # MaxDD
-        eq = initial
-        peak = initial
+        net = sum(pnl)
+        equity = [initial]
+        for p in pnl:
+            equity.append(equity[-1] + p)
+        peak = equity[0]
         max_dd = 0.0
-        for t in closed:
-            eq += t.pnl
-            peak = max(peak, eq)
-            dd_pct = (peak - eq) / peak if peak > 0 else 0
-            max_dd = max(max_dd, dd_pct)
-        return TimeframeResult(tf, symbol, total, win_rate, pf, net, max_dd, sr)
+        for v in equity:
+            if v > peak:
+                peak = v
+            dd = (peak - v) / peak * 100 if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
+        returns = [p / initial for p in pnl]
+        sr = self._sharpe(returns)
+        return TimeframeResult(tf, symbol, total, wr, pf, net, max_dd, sr)
 
     def _fill_symbol_metrics(self, r: SymbolResult, initial: float) -> None:
-        closed = [t for t in r.combined_trades if t.result in ("WIN","LOSS","BE","TIMEOUT")]
-        r.total_trades = len(closed)
-        if r.total_trades == 0:
+        trades = [t for t in self._trades if t.signal.symbol == r.symbol and t.result != "OPEN"]
+        if not trades:
             return
-        wins   = [t for t in closed if t.result == "WIN"]
-        losses = [t for t in closed if t.result == "LOSS"]
+        pnl = [t.pnl for t in trades]
+        wins = [p for p in pnl if p > 0]
+        losses = [p for p in pnl if p < 0]
+        r.total_trades = len(pnl)
+        r.winning_trades = len(wins)
+        r.losing_trades = len(losses)
         r.win_rate    = len(wins) / r.total_trades
-        gp = sum(t.pnl for t in wins)
-        gl = abs(sum(t.pnl for t in losses))
-        r.profit_factor = gp / gl if gl > 0 else (gp if gp > 0 else 0)
-        r.net_pnl = sum(t.pnl for t in closed)
-        r.avg_win  = gp / len(wins)  if wins   else 0
-        r.avg_loss = gl / len(losses) if losses else 0
-        r.avg_rr   = r.avg_win / r.avg_loss if r.avg_loss > 0 else 0
+        r.gross_profit = sum(wins)
+        r.gross_loss   = abs(sum(losses))
+        r.net_pnl      = sum(pnl)
+        r.profit_factor = r.gross_profit / r.gross_loss if r.gross_loss > 0 else (r.gross_profit if r.gross_profit > 0 else 0)
+        r.avg_win  = r.gross_profit / len(wins) if wins else 0
+        r.avg_loss = r.gross_loss / len(losses) if losses else 0
         r.expectancy = r.win_rate * r.avg_win - (1 - r.win_rate) * r.avg_loss
-        returns = [t.pnl / initial for t in closed]
+        returns = [p / initial for p in pnl]
         r.sharpe_ratio  = self._sharpe(returns)
         r.sortino_ratio = self._sortino(returns)
-        # MaxDD
-        eq = initial; peak = initial; max_dd = 0.0
-        for t in closed:
-            eq += t.pnl; peak = max(peak, eq)
-            dd = (peak - eq) / peak if peak > 0 else 0
-            max_dd = max(max_dd, dd)
+        equity = initial
+        peak = initial
+        max_dd = 0.0
+        for p in pnl:
+            equity += p
+            if equity > peak:
+                peak = equity
+            dd = (peak - equity) / peak * 100 if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
         r.max_drawdown_pct = max_dd
-        years = max((r.combined_trades[-1].exit_time - r.combined_trades[0].entry_time).days / 365, 1/12) if r.combined_trades else 1
-        final = initial + r.net_pnl
-        r.calmar_ratio    = ((final/initial)**(1/years)-1) / max_dd if max_dd > 0 else 0
-        r.recovery_factor = r.net_pnl / (max_dd * initial) if max_dd > 0 else 0
-        # Streaks
-        streak = best_w = best_l = 0
-        for t in closed:
-            if t.result == "WIN":
-                streak = max(streak, 0) + 1; best_w = max(best_w, streak)
-            elif t.result == "LOSS":
-                streak = min(streak, 0) - 1; best_l = max(best_l, abs(streak))
-            else:
-                streak = 0
-        r.max_consecutive_wins   = best_w
-        r.max_consecutive_losses = best_l
 
     def _fill_portfolio_metrics(self, r: MultiSymbolResult, config: MultiSymbolConfig) -> None:
-        closed = [t for t in r.all_trades if t.result in ("WIN","LOSS","BE","TIMEOUT")]
-        r.total_trades   = len(closed)
-        if r.total_trades == 0:
+        trades = [t for t in r.all_trades if t.result != "OPEN"]
+        if not trades:
+            r.final_balance = config.initial_balance
             return
-        wins   = [t for t in closed if t.result == "WIN"]
-        losses = [t for t in closed if t.result == "LOSS"]
+        pnl = [t.pnl for t in trades]
+        wins = [p for p in pnl if p > 0]
+        losses = [p for p in pnl if p < 0]
+        r.total_trades = len(pnl)
         r.winning_trades = len(wins)
-        r.losing_trades  = len(losses)
-        r.win_rate       = r.winning_trades / r.total_trades
-        gp = sum(t.pnl for t in wins)
-        gl = abs(sum(t.pnl for t in losses))
-        r.profit_factor  = gp / gl if gl > 0 else (gp if gp > 0 else 0)
-        r.net_pnl        = sum(t.pnl for t in closed)
-        r.net_pnl_pct    = r.net_pnl / config.initial_balance
-        avg_win  = gp / len(wins)  if wins   else 0
-        avg_loss = gl / len(losses) if losses else 0
-        r.expectancy = r.win_rate * avg_win - (1 - r.win_rate) * avg_loss
-        returns = [t.pnl / config.initial_balance for t in closed]
-        r.sharpe_ratio  = self._sharpe(returns)
+        r.losing_trades = len(losses)
+        r.win_rate = len(wins) / r.total_trades
+        r.gross_profit = sum(wins)
+        r.gross_loss = abs(sum(losses))
+        r.net_pnl = sum(pnl)
+        r.profit_factor = r.gross_profit / r.gross_loss if r.gross_loss > 0 else (r.gross_profit if r.gross_profit > 0 else 0)
+        r.total_commission = sum(t.commission for t in trades)
+        r.final_balance = config.initial_balance + r.net_pnl
+        r.total_return_pct = (r.net_pnl / config.initial_balance) * 100 if config.initial_balance > 0 else 0
+        days = max((config.end_date - config.start_date).days, 1)
+        r.annualized_return_pct = r.total_return_pct * (365 / days)
+        returns = [p / config.initial_balance for p in pnl]
+        r.sharpe_ratio = self._sharpe(returns)
         r.sortino_ratio = self._sortino(returns)
-        # MaxDD
-        eq = config.initial_balance; peak = config.initial_balance
-        max_dd_pct = 0.0; max_dd_amt = 0.0
-        for t in closed:
-            eq += t.pnl; peak = max(peak, eq)
-            dd_amt = peak - eq; dd_pct = dd_amt / peak if peak > 0 else 0
-            max_dd_pct = max(max_dd_pct, dd_pct)
-            max_dd_amt = max(max_dd_amt, dd_amt)
-        r.max_drawdown_pct    = max_dd_pct
+        equity_curve = [config.initial_balance]
+        peak = config.initial_balance
+        max_dd = max_dd_amt = 0.0
+        for p in pnl:
+            equity_curve.append(equity_curve[-1] + p)
+        for v in equity_curve:
+            if v > peak:
+                peak = v
+            dd_pct = (peak - v) / peak * 100 if peak > 0 else 0
+            dd_amt = peak - v
+            if dd_pct > max_dd:
+                max_dd = dd_pct
+                max_dd_amt = dd_amt
+        r.max_drawdown_pct = max_dd
         r.max_drawdown_amount = max_dd_amt
-        if closed:
-            date0 = closed[0].entry_time; date1 = closed[-1].exit_time or datetime.utcnow()
-            years = max((date1 - date0).days / 365, 1/12)
-            final = config.initial_balance + r.net_pnl
-            cagr  = (final / config.initial_balance) ** (1/years) - 1
-            r.cagr         = cagr
-            r.calmar_ratio = cagr / max_dd_pct if max_dd_pct > 0 else 0
-            r.avg_trade_duration_minutes = int(statistics.mean(t.duration_minutes for t in closed if t.duration_minutes > 0) if closed else 0)
-        r.recovery_factor = r.net_pnl / max_dd_amt if max_dd_amt > 0 else 0
+        if max_dd > 0:
+            r.calmar_ratio = r.annualized_return_pct / max_dd
+        r.avg_trade_duration_min = sum(t.duration_minutes for t in trades) / len(trades)
 
-    # ── Stat helpers ──────────────────────────────────────────────────────────
     @staticmethod
     def _sharpe(returns: List[float], rfr: float = 0.0, ann: float = 252) -> float:
         if len(returns) < 2:
             return 0.0
-        avg = statistics.mean(returns) - rfr / ann
-        std = statistics.stdev(returns)
-        return (avg / std * math.sqrt(ann)) if std > 0 else 0.0
+        try:
+            mean_r = statistics.mean(returns) - rfr / ann
+            std_r = statistics.stdev(returns)
+            return (mean_r / std_r) * math.sqrt(ann) if std_r > 1e-10 else 0.0
+        except Exception:
+            return 0.0
 
     @staticmethod
     def _sortino(returns: List[float], rfr: float = 0.0, ann: float = 252) -> float:
         if len(returns) < 2:
             return 0.0
-        avg = statistics.mean(returns) - rfr / ann
-        neg = [r for r in returns if r < 0]
-        if not neg:
-            return 999.0
-        down_std = statistics.stdev(neg)
-        return (avg / down_std * math.sqrt(ann)) if down_std > 0 else 0.0
+        try:
+            mean_r = statistics.mean(returns) - rfr / ann
+            downside = [r for r in returns if r < 0]
+            if not downside:
+                return float('inf') if mean_r > 0 else 0.0
+            ds = statistics.stdev(downside) if len(downside) > 1 else abs(downside[0])
+            return (mean_r / ds) * math.sqrt(ann) if ds > 1e-10 else 0.0
+        except Exception:
+            return 0.0
 
-    # ── Reset ─────────────────────────────────────────────────────────────────
     def _reset(self, initial_balance: float) -> None:
-        self._open_trades   = []
-        self._closed_trades = []
-        self._equity_curve  = []
-        self._balance       = initial_balance
-        self._peak_equity   = initial_balance
+        self._trades = []
+        self._equity = []
+        self._balance = initial_balance
+        self._peak = initial_balance
+        self._open_trades = []
 
-    # ── Synthetic candles (for testing / missing data) ────────────────────────
     def _generate_synthetic_candles(
-        self, symbol: str, tf: Timeframe, start: datetime, end: datetime
+        self,
+        symbol: str,
+        tf: Timeframe,
+        start: datetime,
+        end: datetime,
     ) -> List[Candle]:
-        tf_minutes = {"M1":1,"M5":5,"M15":15,"M30":30,"H1":60,"H4":240,"D1":1440,"W1":10080}
-        mins = tf_minutes.get(tf.value, 60)
-        base_prices = {
-            "XAUUSD": 2000.0, "EURUSD": 1.085, "GBPUSD": 1.265,
-            "USDJPY": 149.0,  "AUDUSD": 0.655, "USDCAD": 1.355,
-            "US30": 38000.0,  "NAS100": 17000.0,
-        }
-        base  = next((v for k, v in base_prices.items() if k in symbol.upper()), 1.0)
-        volatility = base * 0.003
-        candles: List[Candle] = []
-        current_time = start
-        price = base
-        rng = random.Random(hash(symbol))
-        while current_time < end:
-            move = rng.gauss(0, volatility)
-            o = price
-            c = price + move
-            h = max(o, c) + abs(rng.gauss(0, volatility * 0.3))
-            l = min(o, c) - abs(rng.gauss(0, volatility * 0.3))
-            spread = base * 0.0002
-            candles.append(Candle(time=current_time, open=round(o,5), high=round(h,5),
-                                  low=round(l,5), close=round(c,5),
-                                  volume=rng.randint(100,5000), spread=spread,
-                                  symbol=symbol, timeframe=tf))
-            price = c
-            current_time += timedelta(minutes=mins)
+        tf_minutes = {Timeframe.M1: 1, Timeframe.M5: 5, Timeframe.M15: 15, Timeframe.M30: 30,
+                      Timeframe.H1: 60, Timeframe.H4: 240, Timeframe.D1: 1440}
+        step = timedelta(minutes=tf_minutes.get(tf, 60))
+        base_price = 1950.0 if "XAU" in symbol else 1.1000
+        candles = []
+        current = start
+        price = base_price
+        while current < end:
+            change = random.gauss(0, base_price * 0.001)
+            open_p = price
+            close_p = price + change
+            high_p = max(open_p, close_p) + abs(random.gauss(0, base_price * 0.0005))
+            low_p = min(open_p, close_p) - abs(random.gauss(0, base_price * 0.0005))
+            candles.append(Candle(
+                time=current, open=open_p, high=high_p, low=low_p, close=close_p,
+                volume=random.uniform(100, 1000), spread=random.uniform(1.5, 3.5)
+            ))
+            price = close_p
+            current += step
         return candles
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Phase D — Unified Backtest Bridge Import
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _import_shared_metrics():
+    """لازی import از SharedBacktestMetrics. اگر نباشد — standalone کار می‌کند."""
+    try:
+        from ..research.backtest.engine import (
+            SharedBacktestMetrics,
+            SharedEquityPoint,
+            apply_slippage as _shared_apply_slippage,
+        )
+        return SharedBacktestMetrics, SharedEquityPoint, _shared_apply_slippage
+    except ImportError:
+        return None, None, None
+
+
+_SharedMetrics, _SharedEquityPoint, _shared_slippage = _import_shared_metrics()
+
+
+def get_shared_metrics():
+    """دسترسی به SharedBacktestMetrics اگر موجود باشد."""
+    return _SharedMetrics
+
+
+def compute_sharpe_unified(returns: list, rfr: float = 0.0, ann: float = 252) -> float:
+    """از SharedBacktestMetrics اگر موجود، وگرنه fallback داخلی."""
+    if _SharedMetrics is not None:
+        return _SharedMetrics.sharpe_ratio(returns, rfr, ann)
+    return MultiSymbolBacktestEngine._sharpe(returns, rfr, ann)
+
+
+def compute_sortino_unified(returns: list, rfr: float = 0.0, ann: float = 252) -> float:
+    """از SharedBacktestMetrics اگر موجود، وگرنه fallback داخلی."""
+    if _SharedMetrics is not None:
+        return _SharedMetrics.sortino_ratio(returns, rfr, ann)
+    return MultiSymbolBacktestEngine._sortino(returns, rfr, ann)
