@@ -75,6 +75,10 @@ class VotingEngine:
     1. اگر هر Agent با status=ERROR و score=0 باشد → BLOCKED
     2. اگر weighted_score < threshold → NO_TRADE
     3. اگر weighted_score >= threshold → BUY یا SELL
+
+    C4 FIX: هر agent در یک try/except جداگانه اجرا می‌شود.
+    crash یک agent → آن agent به AgentStatus.ERROR تبدیل می‌شود،
+    بقیه agents ادامه می‌دهند و سیستم crash نمی‌کند.
     """
 
     def __init__(
@@ -90,23 +94,56 @@ class VotingEngine:
         self.run_parallel             = run_parallel
         self._logger                  = get_logger("agents.voting_engine")
 
+    # ── C4 FIX: isolated per-agent runner ───────────────────────
+    async def _run_agent_safe(
+        self, agent: BaseAgent, context: Dict[str, Any]
+    ) -> AgentResult:
+        """
+        اجرای ایزوله یک agent.
+        اگر exception رخ دهد، یک AgentResult با status=ERROR برمی‌گرداند
+        و کل voting را crash نمی‌کند.
+        """
+        try:
+            return await agent.run(context)
+        except Exception as exc:  # noqa: BLE001
+            self._logger.error(
+                f"Agent '{agent.name}' raised an exception — degrading gracefully: {exc}",
+                exc_info=True,
+            )
+            # ساخت یک AgentResult خطا بدون crash
+            error_vote = AgentVote(
+                score=50.0,          # neutral — نه block، نه تقویت
+                confidence=0.0,
+                direction=None,
+                status=AgentStatus.ERROR,
+                reason=f"Agent exception: {type(exc).__name__}: {exc}",
+            )
+            return AgentResult(
+                agent_name=agent.name,
+                vote=error_vote,
+                elapsed_ms=0.0,
+                raw_data={"exception": str(exc)},
+            )
+
     async def vote(self, context: Dict[str, Any]) -> VoteResult:
         """اجرای همه Agentها و محاسبه رأی نهایی."""
 
-        # اجرای موازی یا ترتیبی
+        # C4 FIX: همه agents را با _run_agent_safe اجرا می‌کنیم
         if self.run_parallel:
             results = await asyncio.gather(
-                *[agent.run(context) for agent in self.agents],
+                *[self._run_agent_safe(agent, context) for agent in self.agents],
                 return_exceptions=False,
             )
         else:
             results = []
             for agent in self.agents:
-                results.append(await agent.run(context))
+                results.append(await self._run_agent_safe(agent, context))
 
         agent_results: List[AgentResult] = list(results)
 
         # بررسی Blocking Agents
+        # C4 FIX: فقط score=0 همراه با status=ERROR → BLOCKED
+        # یک agent با ERROR ولی score=50 → SKIP (degraded) نه block
         blocking_agents = [
             r.agent_name for r in agent_results
             if r.vote.status == AgentStatus.ERROR and r.vote.score == 0.0
@@ -145,7 +182,8 @@ class VotingEngine:
             agent  = next((a for a in self.agents if a.name == result.agent_name), None)
             weight = agent.weight if agent else 1.0
 
-            if vote.status == AgentStatus.SKIP:
+            # C4 FIX: agents با status=ERROR و score=50 (degraded) → SKIP در محاسبه
+            if vote.status in (AgentStatus.SKIP, AgentStatus.ERROR):
                 continue
 
             conf_factor = vote.confidence / 100.0
