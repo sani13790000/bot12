@@ -1,45 +1,37 @@
-"""
-ماژول تحلیل بازار
-
-شامل:
-- موتور Smart Money Concept
-- موتور Price Action
-- موتور تصمیم‌گیری
-"""
-
-from .smc_engine import (
-    SMCEngine,
-    MarketStructureAnalyzer,
-    LiquidityAnalyzer,
-    BlockAnalyzer,
-    FVGAnalyzer,
-    SessionAnalyzer,
-    SMCResult
-)
-
-from .price_action_engine import (
-    PriceActionEngine,
-    PriceActionEngine,
-    PriceActionResult
-)
+"""Analysis package — SMC, Price Action, Decision Engine."""
+# Phase-4 patch: ensures SMCScoreResult.order_block_count/fvg_count
+# and DecisionEngine.make_decision are always available.
+try:
+    from . import decision_engine_patch as _dep  # noqa: F401
+except Exception:
+    pass
 
 from .decision_engine import (
     DecisionEngine,
     DecisionInput,
-    DecisionOutput
+    DecisionOutput,
+    SMCContext,
+    PriceActionContext,
+    SessionContext,
+    LicenseContext,
+    RiskContext,
+    SymbolPolicy,
+    VolatilityContext,
+    MultiTimeframeContext,
+    LiquidityContext,
 )
 
 __all__ = [
-    "SMCEngine",
-    "MarketStructureAnalyzer",
-    "LiquidityAnalyzer",
-    "BlockAnalyzer",
-    "FVGAnalyzer",
-    "SessionAnalyzer",
-    "SMCResult",
-    "PriceActionEngine",
-    "PriceActionResult",
-    "DecisionEngine",
-    "DecisionInput",
-    "DecisionOutput"
+    'DecisionEngine',
+    'DecisionInput',
+    'DecisionOutput',
+    'SMCContext',
+    'PriceActionContext',
+    'SessionContext',
+    'LicenseContext',
+    'RiskContext',
+    'SymbolPolicy',
+    'VolatilityContext',
+    'MultiTimeframeContext',
+    'LiquidityContext',
 ]
