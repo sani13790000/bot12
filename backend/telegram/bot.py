@@ -1,9 +1,9 @@
 """
-ربات تلگرام MT5 Trading
+ربات تلگرام Galaxy Vast
 
 کلاس اصلی ربات با پشتیبانی RBAC و Authorization.
 
-نویسنده: MT5 Trading Team
+نویسنده: Galaxy Vast Team
 """
 
 import asyncio
