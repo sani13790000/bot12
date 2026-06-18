@@ -2,16 +2,11 @@ import { createContext, useContext, ReactNode } from "react";
 import { useWebSocket } from "../hooks/useWebSocket";
 
 type WSContextType = ReturnType<typeof useWebSocket>;
-
 const WebSocketContext = createContext<WSContextType | null>(null);
 
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const ws = useWebSocket();
-  return (
-    <WebSocketContext.Provider value={ws}>
-      {children}
-    </WebSocketContext.Provider>
-  );
+  return <WebSocketContext.Provider value={ws}>{children}</WebSocketContext.Provider>;
 }
 
 export function useWS() {
