@@ -1,363 +1,407 @@
 """
 ================================================================================
 Galaxy Vast AI Trading Platform
-موتور ریپلی بازار — Market Replay Engine
+موتور Replay بازار تاریخی — Market Replay Engine
+================================================================================
+این ماژول امکان پخش مجدد بازار تاریخی را با کنترل کامل فراهم می‌کند.
 
-این ماژول امکان پخش مجدد تاریخچه بازار را فراهم می‌کند.
-ویژگی‌ها:
-- بازگشت به هر تاریخ دلخواه
-- پخش کندل به کندل (step-by-step)
-- سرعت‌های مختلف (آهسته/معمولی/سریع)
-- مکث و ادامه
-- مقایسه پیش‌بینی با نتیجه واقعی
+قابلیت‌ها:
+  - برگشت به هر تاریخ در گذشته (۱ روز تا ۱ سال)
+  - پخش کندل به کندل با کنترل سرعت
+  - مقایسه پیش‌بینی سیستم با نتیجه واقعی
+  - Pause / Resume / Fast Forward / Slow Motion
+  - اجرای تحلیل در لحظه برای هر کندل
 
-نسخه: 3.0.0
+نویسنده: Galaxy Vast AI Engine
 ================================================================================
 """
 
 from __future__ import annotations
 
 import asyncio
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from ...core.logger import get_logger
+from ..backtest.engine import CandleData
 
 logger = get_logger("research.replay.engine")
 
 
-class ReplaySpeed(str, Enum):
-    """سرعت پخش ریپلی"""
-    SLOW    = "SLOW"    # ۲ ثانیه بین کندل‌ها
-    NORMAL  = "NORMAL"  # ۱ ثانیه
-    FAST    = "FAST"    # ۰.۳ ثانیه
-    INSTANT = "INSTANT" # بدون تاخیر
-
-
-class ReplayStatus(str, Enum):
-    """وضعیت ریپلی"""
-    IDLE     = "IDLE"
-    RUNNING  = "RUNNING"
-    PAUSED   = "PAUSED"
+class ReplayStatus(Enum):
+    """وضعیت موتور Replay"""
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
     FINISHED = "FINISHED"
-    ERROR    = "ERROR"
+    ERROR = "ERROR"
 
 
-@dataclass
-class ReplayCandle:
-    """کندل در جریان ریپلی — شامل اطلاعات تحلیل"""
-    index       : int
-    timestamp   : datetime
-    open        : float
-    high        : float
-    low         : float
-    close       : float
-    volume      : float
-    # اطلاعات تحلیل (اختیاری — پر می‌شود اگر signal_generator موجود باشد)
-    signal      : Optional[Dict[str, Any]] = None
-    smc_zones   : Optional[List[Dict]]     = None
-    pa_patterns : Optional[List[Dict]]     = None
+class ReplaySpeed(Enum):
+    """سرعت پخش Replay"""
+    SLOW = 0.25      # ۴ برابر کندتر
+    NORMAL = 1.0     # سرعت عادی
+    FAST = 4.0       # ۴ برابر سریع‌تر
+    VERY_FAST = 16.0 # ۱۶ برابر سریع‌تر
+    INSTANT = 0.0    # بدون تأخیر
 
 
 @dataclass
 class ReplayConfig:
-    """
-    تنظیمات ریپلی
+    """تنظیمات موتور Replay"""
+    symbol: str = "XAUUSD"
+    start_date: Optional[datetime] = None
+    days_back: int = 2              # چند روز به عقب برگردیم
+    speed: ReplaySpeed = ReplaySpeed.NORMAL
+    candle_delay_ms: int = 500      # تأخیر بین کندل‌ها (میلی‌ثانیه)
+    run_analysis: bool = True       # اجرای تحلیل روی هر کندل
+    show_predictions: bool = True   # نمایش پیش‌بینی قبل از نتیجه واقعی
 
-    تمام پارامترهای پخش مجدد بازار از طریق این کلاس تعریف می‌شوند.
+
+@dataclass
+class ReplayFrame:
     """
-    symbol              : str
-    start_date          : datetime
-    end_date            : Optional[datetime] = None
-    speed               : ReplaySpeed        = ReplaySpeed.NORMAL
-    run_analysis        : bool               = True   # آیا تحلیل SMC/PA اجرا شود؟
-    window_size         : int                = 50     # تعداد کندل تاریخی برای تحلیل
+    یک فریم در Replay
+
+    اطلاعات هر کندل به همراه تحلیل سیستم و نتیجه واقعی.
+    """
+    frame_index: int
+    candle: CandleData
+    candles_so_far: int
+
+    # تحلیل سیستم در لحظه‌ای که این کندل باز بود
+    system_prediction: Optional[Dict[str, Any]] = None
+
+    # نتیجه واقعی (از کندل بعدی به بعد مشخص می‌شود)
+    actual_outcome: Optional[str] = None   # "TP_HIT" / "SL_HIT" / "PENDING"
+
+    # مقایسه
+    prediction_correct: Optional[bool] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """تبدیل به dictionary برای ارسال به frontend"""
+        return {
+            "index": self.frame_index,
+            "candle": self.candle.to_dict(),
+            "candles_count": self.candles_so_far,
+            "prediction": self.system_prediction,
+            "outcome": self.actual_outcome,
+            "correct": self.prediction_correct,
+        }
 
 
 @dataclass
 class ReplayState:
-    """
-    وضعیت لحظه‌ای ریپلی
+    """وضعیت فعلی موتور Replay"""
+    status: ReplayStatus = ReplayStatus.IDLE
+    current_index: int = 0
+    total_candles: int = 0
+    current_candle: Optional[CandleData] = None
+    start_date: Optional[datetime] = None
+    current_date: Optional[datetime] = None
+    frames_played: int = 0
+    correct_predictions: int = 0
+    total_predictions: int = 0
+    speed: ReplaySpeed = ReplaySpeed.NORMAL
 
-    این کلاس وضعیت فعلی پخش را نمایش می‌دهد.
-    """
-    replay_id       : str
-    status          : ReplayStatus
-    current_index   : int
-    total_candles   : int
-    current_candle  : Optional[ReplayCandle]
-    progress_pct    : float              # ۰ تا ۱۰۰
-    elapsed_seconds : float
-    config          : ReplayConfig
+    @property
+    def progress(self) -> float:
+        """پیشرفت Replay (0.0 تا 1.0)"""
+        if self.total_candles == 0:
+            return 0.0
+        return self.current_index / self.total_candles
+
+    @property
+    def accuracy(self) -> float:
+        """دقت پیش‌بینی‌ها (درصد)"""
+        if self.total_predictions == 0:
+            return 0.0
+        return (self.correct_predictions / self.total_predictions) * 100
 
     def to_dict(self) -> Dict[str, Any]:
-        """تبدیل به دیکشنری برای API/WebSocket"""
-        candle_dict = None
-        if self.current_candle:
-            c = self.current_candle
-            candle_dict = {
-                "index"     : c.index,
-                "timestamp" : c.timestamp.isoformat(),
-                "open"      : c.open,
-                "high"      : c.high,
-                "low"       : c.low,
-                "close"     : c.close,
-                "volume"    : c.volume,
-                "signal"    : c.signal,
-            }
+        """تبدیل به dictionary"""
         return {
-            "replay_id"      : self.replay_id,
-            "status"         : self.status.value,
-            "current_index"  : self.current_index,
-            "total_candles"  : self.total_candles,
-            "progress_pct"   : round(self.progress_pct, 1),
-            "elapsed_seconds": round(self.elapsed_seconds, 1),
-            "current_candle" : candle_dict,
+            "status": self.status.value,
+            "current_index": self.current_index,
+            "total_candles": self.total_candles,
+            "progress": round(self.progress * 100, 1),
+            "current_date": self.current_date.isoformat() if self.current_date else None,
+            "frames_played": self.frames_played,
+            "accuracy": round(self.accuracy, 1),
+            "speed": self.speed.value,
         }
 
 
 class ReplayEngine:
     """
-    موتور ریپلی بازار Galaxy Vast
+    موتور Replay بازار تاریخی Galaxy Vast
 
-    امکان پخش مجدد تاریخچه بازار با قابلیت تحلیل زنده را فراهم می‌کند.
+    این کلاس اجازه می‌دهد بازار تاریخی را مثل یک فیلم پخش کنید
+    و ببینید سیستم در آن لحظه‌ها چه پیش‌بینی می‌کرد.
 
     نحوه استفاده:
         engine = ReplayEngine()
-        await engine.load(config, candles, signal_generator)
-        await engine.play(on_candle_callback)
+        config = ReplayConfig(symbol="XAUUSD", days_back=2)
+        await engine.load(candles, config)
+        await engine.play(on_frame=my_callback)
     """
 
-    # نگاشت سرعت به تاخیر (ثانیه)
-    _SPEED_DELAY: Dict[ReplaySpeed, float] = {
-        ReplaySpeed.SLOW    : 2.0,
-        ReplaySpeed.NORMAL  : 1.0,
-        ReplaySpeed.FAST    : 0.3,
-        ReplaySpeed.INSTANT : 0.0,
-    }
-
     def __init__(self) -> None:
-        """مقداردهی اولیه موتور ریپلی"""
-        self._replay_id       : Optional[str]            = None
-        self._candles         : List[ReplayCandle]       = []
-        self._config          : Optional[ReplayConfig]   = None
-        self._status          : ReplayStatus             = ReplayStatus.IDLE
-        self._current_index   : int                      = 0
-        self._signal_generator: Optional[Any]            = None
-        self._start_time      : Optional[datetime]       = None
-        self._pause_event     : asyncio.Event            = asyncio.Event()
-        self._stop_event      : asyncio.Event            = asyncio.Event()
-        self._pause_event.set()  # در ابتدا pause نیست
-        logger.info("▶️ Galaxy Vast Market Replay Engine آماده شد")
-
-    async def load(
-        self,
-        config           : ReplayConfig,
-        candles          : List[Any],     # لیست Candle از backtest engine
-        signal_generator : Optional[Any] = None,
-    ) -> str:
-        """
-        بارگذاری داده برای ریپلی
-
-        پارامترها:
-            config: تنظیمات ریپلی
-            candles: لیست کندل‌های تاریخی
-            signal_generator: تابع اختیاری برای تحلیل زنده
-
-        خروجی:
-            replay_id — شناسه یکتای این ریپلی
-        """
-        self._replay_id        = str(uuid.uuid4())
-        self._config           = config
-        self._signal_generator = signal_generator
-        self._current_index    = 0
-        self._status           = ReplayStatus.IDLE
-        self._stop_event.clear()
-        self._pause_event.set()
-
-        # ── فیلتر کندل‌ها بر اساس تاریخ ──────────────────────────────────────
-        end = config.end_date or datetime.now(timezone.utc)
-        filtered = [
-            c for c in candles
-            if config.start_date <= c.timestamp <= end
-        ]
-
-        # ── تبدیل به ReplayCandle ─────────────────────────────────────────────
-        self._candles = [
-            ReplayCandle(
-                index     = i,
-                timestamp = c.timestamp,
-                open      = c.open,
-                high      = c.high,
-                low       = c.low,
-                close     = c.close,
-                volume    = c.volume,
-            )
-            for i, c in enumerate(filtered)
-        ]
-
-        logger.info(
-            f"📂 ریپلی بارگذاری شد | ID: {self._replay_id[:8]} | "
-            f"نماد: {config.symbol} | کندل‌ها: {len(self._candles)}"
-        )
-        return self._replay_id
-
-    async def play(
-        self,
-        on_candle: Callable[[ReplayCandle, ReplayState], None],
-    ) -> None:
-        """
-        شروع یا ادامه پخش ریپلی
-
-        پارامترها:
-            on_candle: callback که برای هر کندل فراخوانی می‌شود
-        """
-        if not self._candles:
-            logger.error("❌ ریپلی بارگذاری نشده — ابتدا load() را فراخوانی کنید")
-            return
-
-        self._status     = ReplayStatus.RUNNING
-        self._start_time = datetime.now(timezone.utc)
-        delay            = self._SPEED_DELAY[self._config.speed]
-
-        logger.info(f"▶️ پخش ریپلی شروع شد | سرعت: {self._config.speed.value}")
-
-        while self._current_index < len(self._candles):
-            # ── بررسی توقف ──────────────────────────────────────────────────
-            if self._stop_event.is_set():
-                self._status = ReplayStatus.IDLE
-                logger.info("⏹️ ریپلی متوقف شد")
-                break
-
-            # ── بررسی مکث ───────────────────────────────────────────────────
-            await self._pause_event.wait()
-
-            candle = self._candles[self._current_index]
-
-            # ── اجرای تحلیل اگر فعال است ─────────────────────────────────────
-            if self._config.run_analysis and self._signal_generator:
-                window_start = max(0, self._current_index - self._config.window_size)
-                window       = self._candles[window_start : self._current_index + 1]
-                raw_candles  = [
-                    type('C', (), {
-                        'timestamp': c.timestamp, 'open': c.open, 'high': c.high,
-                        'low': c.low, 'close': c.close, 'volume': c.volume,
-                    })()
-                    for c in window
-                ]
-                try:
-                    signal = await self._signal_generator(raw_candles, self._config.symbol)
-                    candle.signal = signal
-                except Exception as exc:
-                    logger.debug(f"تحلیل ریپلی: {exc}")
-
-            # ── ساخت وضعیت فعلی ──────────────────────────────────────────────
-            elapsed = (datetime.now(timezone.utc) - self._start_time).total_seconds()
-            state   = ReplayState(
-                replay_id       = self._replay_id,
-                status          = self._status,
-                current_index   = self._current_index,
-                total_candles   = len(self._candles),
-                current_candle  = candle,
-                progress_pct    = self._current_index / len(self._candles) * 100,
-                elapsed_seconds = elapsed,
-                config          = self._config,
-            )
-
-            # ── فراخوانی callback ─────────────────────────────────────────────
-            try:
-                if asyncio.iscoroutinefunction(on_candle):
-                    await on_candle(candle, state)
-                else:
-                    on_candle(candle, state)
-            except Exception as exc:
-                logger.error(f"⚠️ خطا در on_candle callback: {exc}")
-
-            self._current_index += 1
-
-            # ── تاخیر بین کندل‌ها ────────────────────────────────────────────
-            if delay > 0:
-                await asyncio.sleep(delay)
-
-        # ── پایان ریپلی ───────────────────────────────────────────────────────
-        if self._current_index >= len(self._candles):
-            self._status = ReplayStatus.FINISHED
-            logger.info(
-                f"✅ ریپلی کامل شد | {len(self._candles)} کندل پخش شد"
-            )
-
-    def pause(self) -> None:
-        """مکث ریپلی"""
-        if self._status == ReplayStatus.RUNNING:
-            self._status = ReplayStatus.PAUSED
-            self._pause_event.clear()
-            logger.info("⏸️ ریپلی متوقف شد")
-
-    def resume(self) -> None:
-        """ادامه ریپلی بعد از مکث"""
-        if self._status == ReplayStatus.PAUSED:
-            self._status = ReplayStatus.RUNNING
-            self._pause_event.set()
-            logger.info("▶️ ریپلی ادامه یافت")
-
-    def stop(self) -> None:
-        """توقف کامل ریپلی"""
-        self._stop_event.set()
-        self._pause_event.set()  # از مکث خارج شو تا loop پایان یابد
-        logger.info("⏹️ دستور توقف ریپلی صادر شد")
-
-    def jump_to(self, bar_index: int) -> None:
-        """
-        پرش به کندل مشخص
-
-        پارامترها:
-            bar_index: شماره کندل (از ۰ شروع می‌شود)
-        """
-        if 0 <= bar_index < len(self._candles):
-            self._current_index = bar_index
-            logger.info(f"⏩ پرش به کندل {bar_index}")
-        else:
-            logger.warning(f"⚠️ شاخص کندل {bar_index} معتبر نیست")
-
-    def jump_to_date(self, target_date: datetime) -> None:
-        """
-        پرش به تاریخ مشخص
-
-        پارامترها:
-            target_date: تاریخ هدف
-        """
-        for i, candle in enumerate(self._candles):
-            if candle.timestamp >= target_date:
-                self._current_index = i
-                logger.info(f"⏩ پرش به تاریخ {target_date.date()} (کندل {i})")
-                return
-        logger.warning(f"⚠️ تاریخ {target_date.date()} در داده‌ها یافت نشد")
-
-    def set_speed(self, speed: ReplaySpeed) -> None:
-        """تغییر سرعت پخش در حین ریپلی"""
-        if self._config:
-            self._config.speed = speed
-            logger.info(f"⚡ سرعت ریپلی تغییر کرد: {speed.value}")
+        """مقداردهی اولیه موتور Replay"""
+        self._candles: List[CandleData] = []
+        self._state = ReplayState()
+        self._pause_event = asyncio.Event()
+        self._stop_event = asyncio.Event()
+        self._frames: List[ReplayFrame] = []
+        self._signal_generator: Optional[Callable] = None
+        logger.info("موتور Replay Galaxy Vast راه‌اندازی شد")
 
     @property
     def state(self) -> ReplayState:
-        """وضعیت فعلی ریپلی"""
-        current = self._candles[self._current_index] if self._candles and self._current_index < len(self._candles) else None
-        elapsed = (datetime.now(timezone.utc) - self._start_time).total_seconds() if self._start_time else 0
-        return ReplayState(
-            replay_id       = self._replay_id or "",
-            status          = self._status,
-            current_index   = self._current_index,
-            total_candles   = len(self._candles),
-            current_candle  = current,
-            progress_pct    = self._current_index / len(self._candles) * 100 if self._candles else 0,
-            elapsed_seconds = elapsed,
-            config          = self._config,
+        """وضعیت فعلی موتور"""
+        return self._state
+
+    def set_signal_generator(self, generator: Callable) -> None:
+        """
+        تنظیم موتور تولید سیگنال برای تحلیل در Replay
+
+        Args:
+            generator: تابع async که کندل‌ها را دریافت و سیگنال تولید می‌کند
+        """
+        self._signal_generator = generator
+        logger.info("Signal generator به Replay متصل شد")
+
+    async def load(
+        self,
+        candles: List[CandleData],
+        config: ReplayConfig,
+    ) -> None:
+        """
+        بارگذاری داده‌های تاریخی برای Replay
+
+        Args:
+            candles: تمام کندل‌های موجود
+            config: تنظیمات Replay
+        """
+        if self._state.status == ReplayStatus.RUNNING:
+            raise RuntimeError("Replay در حال اجرا است — ابتدا متوقف کنید")
+
+        # ─── فیلتر کندل‌ها ───
+        if config.start_date:
+            start = config.start_date
+        else:
+            if not candles:
+                raise ValueError("داده‌ای برای Replay وجود ندارد")
+            start = candles[-1].timestamp - timedelta(days=config.days_back)
+
+        self._candles = [c for c in candles if c.timestamp >= start]
+
+        if len(self._candles) < 10:
+            raise ValueError(
+                f"داده کافی برای Replay وجود ندارد: {len(self._candles)} کندل"
+            )
+
+        # ─── مقداردهی state ───
+        self._state = ReplayState(
+            status=ReplayStatus.IDLE,
+            total_candles=len(self._candles),
+            start_date=self._candles[0].timestamp,
+            speed=config.speed,
+        )
+        self._pause_event.set()
+        self._stop_event.clear()
+        self._frames = []
+
+        logger.info(
+            f"Replay بارگذاری شد | نماد: {config.symbol} | "
+            f"کندل‌ها: {len(self._candles)} | "
+            f"از: {self._candles[0].timestamp.date()}"
         )
 
+    async def play(
+        self,
+        on_frame: Optional[Callable[[ReplayFrame], None]] = None,
+        config: Optional[ReplayConfig] = None,
+    ) -> None:
+        """
+        شروع یا ادامه پخش Replay
 
-# ─── نمونه singleton ──────────────────────────────────────────────────────────
-replay_engine = ReplayEngine()
+        Args:
+            on_frame: callback که برای هر فریم فراخوانی می‌شود
+            config: تنظیمات (اختیاری — از load استفاده می‌شود)
+        """
+        if not self._candles:
+            raise RuntimeError("ابتدا candles را با load() بارگذاری کنید")
+
+        run_analysis = config.run_analysis if config else True
+        candle_delay = config.candle_delay_ms / 1000 if config else 0.5
+        speed_factor = config.speed.value if config else 1.0
+        actual_delay = candle_delay / speed_factor if speed_factor > 0 else 0
+
+        self._state.status = ReplayStatus.RUNNING
+        logger.info(
+            f"Replay شروع شد | "
+            f"از index: {self._state.current_index} | "
+            f"سرعت: {speed_factor}x"
+        )
+
+        start_idx = self._state.current_index
+
+        try:
+            for i in range(start_idx, len(self._candles)):
+                # ─── بررسی Stop ───
+                if self._stop_event.is_set():
+                    self._state.status = ReplayStatus.IDLE
+                    logger.info("Replay متوقف شد")
+                    break
+
+                # ─── بررسی Pause ───
+                await self._pause_event.wait()
+
+                candle = self._candles[i]
+                historical = self._candles[max(0, i - 100):i]
+
+                # ─── تولید پیش‌بینی ───
+                prediction = None
+                if run_analysis and self._signal_generator and len(historical) >= 20:
+                    try:
+                        prediction = await self._signal_generator(historical, candle)
+                    except Exception as e:
+                        logger.warning(f"خطا در تولید پیش‌بینی: {e}")
+
+                # ─── مقایسه با نتیجه واقعی ───
+                outcome = None
+                correct = None
+                if prediction and i + 1 < len(self._candles):
+                    outcome, correct = self._evaluate_prediction(
+                        prediction, self._candles[i + 1 :][:10]
+                    )
+                    if correct is not None:
+                        self._state.total_predictions += 1
+                        if correct:
+                            self._state.correct_predictions += 1
+
+                # ─── ساخت فریم ───
+                frame = ReplayFrame(
+                    frame_index=i,
+                    candle=candle,
+                    candles_so_far=i + 1,
+                    system_prediction=prediction,
+                    actual_outcome=outcome,
+                    prediction_correct=correct,
+                )
+                self._frames.append(frame)
+
+                # ─── به‌روزرسانی state ───
+                self._state.current_index = i + 1
+                self._state.current_candle = candle
+                self._state.current_date = candle.timestamp
+                self._state.frames_played += 1
+
+                # ─── فراخوانی callback ───
+                if on_frame:
+                    try:
+                        if asyncio.iscoroutinefunction(on_frame):
+                            await on_frame(frame)
+                        else:
+                            on_frame(frame)
+                    except Exception as e:
+                        logger.warning(f"خطا در on_frame callback: {e}")
+
+                # ─── تأخیر بین کندل‌ها ───
+                if actual_delay > 0:
+                    await asyncio.sleep(actual_delay)
+                else:
+                    await asyncio.sleep(0)
+
+            else:
+                self._state.status = ReplayStatus.FINISHED
+                logger.info(
+                    f"Replay کامل شد | "
+                    f"دقت پیش‌بینی: {self._state.accuracy:.1f}%"
+                )
+
+        except Exception as e:
+            self._state.status = ReplayStatus.ERROR
+            logger.error(f"خطا در Replay: {e}", exc_info=True)
+            raise
+
+    def pause(self) -> None:
+        """توقف موقت Replay"""
+        if self._state.status == ReplayStatus.RUNNING:
+            self._pause_event.clear()
+            self._state.status = ReplayStatus.PAUSED
+            logger.info("Replay pause شد")
+
+    def resume(self) -> None:
+        """ادامه Replay بعد از pause"""
+        if self._state.status == ReplayStatus.PAUSED:
+            self._pause_event.set()
+            self._state.status = ReplayStatus.RUNNING
+            logger.info("Replay resume شد")
+
+    def stop(self) -> None:
+        """توقف کامل Replay"""
+        self._stop_event.set()
+        self._pause_event.set()  # رفع block در صورت pause
+        logger.info("Replay stop درخواست شد")
+
+    def set_speed(self, speed: ReplaySpeed) -> None:
+        """تغییر سرعت Replay در حال اجرا"""
+        self._state.speed = speed
+        logger.info(f"سرعت Replay تغییر کرد: {speed.value}x")
+
+    def jump_to(self, index: int) -> None:
+        """
+        پرش به یک index خاص
+
+        Args:
+            index: شماره کندل مقصد
+        """
+        if index < 0 or index >= len(self._candles):
+            raise ValueError(f"index نامعتبر: {index} (کل: {len(self._candles)})")
+        self._state.current_index = index
+        logger.info(f"Replay jump به index: {index}")
+
+    def get_frames(self) -> List[ReplayFrame]:
+        """دریافت تمام فریم‌های پخش‌شده"""
+        return self._frames.copy()
+
+    def _evaluate_prediction(
+        self,
+        prediction: Dict[str, Any],
+        future_candles: List[CandleData],
+    ) -> tuple:
+        """
+        ارزیابی دقت پیش‌بینی بر اساس کندل‌های آینده
+
+        بررسی می‌کند آیا قیمت به TP یا SL رسیده است.
+
+        Returns:
+            Tuple[str, bool]: (نتیجه واقعی، درستی پیش‌بینی)
+        """
+        if not future_candles or "direction" not in prediction:
+            return None, None
+
+        direction = prediction.get("direction")
+        tp1 = prediction.get("take_profit_1")
+        sl = prediction.get("stop_loss")
+
+        if not tp1 or not sl:
+            return None, None
+
+        for candle in future_candles:
+            if direction == "BUY":
+                if candle.high >= tp1:
+                    return "TP_HIT", True
+                if candle.low <= sl:
+                    return "SL_HIT", False
+            elif direction == "SELL":
+                if candle.low <= tp1:
+                    return "TP_HIT", True
+                if candle.high >= sl:
+                    return "SL_HIT", False
+
+        return "PENDING", None
