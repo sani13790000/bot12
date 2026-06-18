@@ -1,4 +1,4 @@
-"""Galaxy Vast AI Trading Platform — Backtest Engine (phase4 fixed)"""
+"""Galaxy Vast AI Trading Platform — Backtest Engine (phase6 lookahead fix)"""
 from __future__ import annotations
 import math, statistics, uuid
 from dataclasses import dataclass, field
@@ -157,10 +157,10 @@ class BacktestResult:
     avg_rr_achieved:    float = 0.0
     final_balance:      float = 0.0
     total_return_pct:   float = 0.0
-    trades:             List[BacktestTrade]     = field(default_factory=list)
+    trades:             List[BacktestTrade]    = field(default_factory=list)
     equity_curve:       List[SharedEquityPoint] = field(default_factory=list)
-    monthly_returns:    Dict[str, float]        = field(default_factory=dict)
-    metadata:           Dict[str, Any]          = field(default_factory=dict)
+    monthly_returns:    Dict[str, float]       = field(default_factory=dict)
+    metadata:           Dict[str, Any]         = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -196,7 +196,11 @@ class BacktestEngine:
         trades = []; balance = cfg.initial_balance; history = []
         for i, candle in enumerate(candles):
             try:
-                sig = signal_fn(candle, history[-50:]) if history else None
+                # Phase-6 lookahead bias fix:
+                # Pass history BEFORE appending current candle.
+                # signal_fn only sees closed candles, not the candle being processed.
+                past = history[-50:] if history else []
+                sig = signal_fn(candle, past)
             except Exception:
                 sig = None
             if sig and self._is_valid_signal(sig, cfg):
@@ -204,7 +208,7 @@ class BacktestEngine:
                 if trade:
                     trades.append(trade)
                     balance += trade.pnl_usd
-            history.append(candle)
+            history.append(candle)  # append AFTER signal generation
         return self._build_result(trades, cfg, candles)
 
     @staticmethod
@@ -276,8 +280,8 @@ class BacktestEngine:
         result.total_pnl_usd   = sum(t.pnl_usd  for t in trades)
         result.final_balance   = cfg.initial_balance + result.total_pnl_usd
         result.total_return_pct = (result.final_balance - cfg.initial_balance) / cfg.initial_balance * 100.0
-        result.avg_win_usd  = (sum(t.pnl_usd for t in wins)    / len(wins))    if wins   else 0.0
-        result.avg_loss_usd = (sum(t.pnl_usd for t in losses)  / len(losses))  if losses else 0.0
+        result.avg_win_usd  = (sum(t.pnl_usd for t in wins)   / len(wins))   if wins   else 0.0
+        result.avg_loss_usd = (sum(t.pnl_usd for t in losses) / len(losses)) if losses else 0.0
         # ─── use SharedBacktestMetrics for ALL calculations (D3 fix) ───
         result.win_rate       = SharedBacktestMetrics.win_rate(len(wins), len(trades))
         gross_profit = sum(t.pnl_usd for t in trades if t.pnl_usd > 0)
@@ -322,7 +326,7 @@ def compute_sortino_unified(returns, risk_free=0.0, periods=252):
     return SharedBacktestMetrics.sortino_ratio(returns, risk_free, periods)
 
 
-def apply_slippage(price, direction, slippage_pips, symbol='XAUUSD'):
-    pip_size = 0.01 if 'XAU' in symbol.upper() else 0.0001
-    slip = slippage_pips * pip_size
-    return price + slip if direction.upper() == 'BUY' else price - slip
+def apply_slippage(price: float, direction: str, slippage_pips: float, symbol: str = 'XAUUSD') -> float:
+    pip = 0.1 if 'JPY' in symbol else 0.0001 if symbol not in ('XAUUSD', 'XAGUSD') else 0.1
+    slip_price = slippage_pips * pip
+    return price + slip_price if direction.upper() == 'BUY' else price - slip_price
