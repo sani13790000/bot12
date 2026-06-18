@@ -1,194 +1,142 @@
-"""
-Galaxy Vast AI Trading Platform
-FastAPI Application Entry Point
-
-F4 FIX:
-  - Rate limiting middleware (RateLimitMiddleware)
-  - Sentry monitoring (SENTRY_DSN env var)
-  - /health endpoint with DB + circuit breaker status
-  - Structured startup logging
-
-C8 FIX:
-  - CORS origins from ALLOWED_ORIGINS env var
-  - No more allow_origins=['*']
-"""
-import logging
 import os
+import sys
+import sentry_sdk
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
+from backend.core.config import settings
+from backend.core.logger import get_logger
+from backend.middleware.rate_limit import RateLimitMiddleware
+from backend.database.connection_pool_monitor import pool_monitor
+from backend.database.connection_health import get_db_health
+from backend.circuit_breaker import get_breaker_status
 
+# Import routes
+from backend.api.routes import (
+    auth,
+    users,
+    trades,
+    signals,
+    analysis,
+    ai_prediction,
+    analytics,
+    backtest_engine,
+    decision,
+    research,
+    intelligence,
+    self_learning,
+    agents,
+    risk,
+    dashboard,
+    reports,
+    license,
+    trade_report,
+    institutional_backtest,
+)
 
-def _get_allowed_origins() -> list:
-    raw = os.getenv('ALLOWED_ORIGINS', '')
-    if raw.strip():
-        origins = [o.strip() for o in raw.split(',') if o.strip()]
-        logger.info(f'CORS: {len(origins)} origin(s) from environment')
-        return origins
-    dev_origins = [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://localhost:8080',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:5173',
-    ]
-    logger.warning('CORS: ALLOWED_ORIGINS not set -- allowing localhost only.')
-    return dev_origins
+logger = get_logger("api.main")
+
+# Sentry
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        environment=settings.ENVIRONMENT,
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info('Galaxy Vast AI Trading Platform -- Starting...')
-
-    # F4: Sentry initialization
-    sentry_dsn = os.getenv('SENTRY_DSN', '')
-    if sentry_dsn:
-        try:
-            import sentry_sdk
-            sentry_sdk.init(
-                dsn=sentry_dsn,
-                traces_sample_rate=float(os.getenv('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
-                profiles_sample_rate=float(os.getenv('SENTRY_PROFILES_SAMPLE_RATE', '0.0')),
-                environment=os.getenv('ENVIRONMENT', 'production'),
-            )
-            logger.info('Sentry monitoring initialized')
-        except Exception as exc:
-            logger.warning(f'Sentry init failed: {exc}')
-
-    # F4: initialize rate limiter singleton
-    try:
-        from ..middleware.rate_limit import _get_limiter
-        await _get_limiter()
-        logger.info('RateLimit limiter initialized')
-    except Exception as exc:
-        logger.warning(f'Rate limiter init failed: {exc}')
-
-    logger.info('Galaxy Vast AI Trading Platform -- Ready')
+    """Application lifespan: start background monitors."""
+    logger.info("Starting Galaxy Vast AI API...")
+    await pool_monitor.start()
+    logger.info("ConnectionPoolMonitor started")
     yield
-    logger.info('Galaxy Vast AI Trading Platform -- Shutdown complete.')
+    logger.info("Shutting down Galaxy Vast AI API...")
+    await pool_monitor.stop()
 
 
 app = FastAPI(
-    title='Galaxy Vast AI Trading Platform',
-    description=(
-        'Institutional-Grade AI Trading Ecosystem\n\n'
-        'Features: SMC Analysis, AI Prediction, Multi-Agent Voting, '
-        'Portfolio Risk, Self-Learning, Analytics, '
-        'Institutional Backtest Engine, Market Replay, Walk-Forward'
-    ),
-    version='2.1.0-F',
+    title="Galaxy Vast AI Trading API",
+    description="AI-driven trading analysis and execution API",
+    version="2.0.0",
     lifespan=lifespan,
-    docs_url='/docs',
-    redoc_url='/redoc',
-    contact={'name': 'Galaxy Vast Support', 'url': 'https://t.me/GalaxyVast_Support'},
-    license_info={'name': 'Galaxy Vast Enterprise License'},
 )
 
-# C8 FIX: CORS whitelist from environment
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_get_allowed_origins(),
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allow_headers=['Authorization', 'Content-Type', 'X-License-Key', 'X-Request-ID'],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# F4: Rate limiting middleware
-try:
-    from ..middleware.rate_limit import RateLimitMiddleware
-    app.add_middleware(RateLimitMiddleware)
-    logger.info('RateLimit middleware registered')
-except Exception as exc:
-    logger.warning(f'RateLimit middleware registration failed: {exc}')
+# Rate limiting
+app.add_middleware(
+    RateLimitMiddleware,
+    redis_url=settings.REDIS_URL,
+    default_limit=100,
+    default_window=60,
+)
+
+# Routers
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(trades.router, prefix="/api/trades", tags=["trades"])
+app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
+app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
+app.include_router(ai_prediction.router, prefix="/api/ai", tags=["ai_prediction"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(backtest_engine.router, prefix="/api/backtest", tags=["backtest"])
+app.include_router(decision.router, prefix="/api/decision", tags=["decision"])
+app.include_router(research.router, prefix="/api/research", tags=["research"])
+app.include_router(intelligence.router, prefix="/api/intelligence", tags=["intelligence"])
+app.include_router(self_learning.router, prefix="/api/learning", tags=["self_learning"])
+app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(license.router, prefix="/api/license", tags=["license"])
+app.include_router(trade_report.router, prefix="/api/trade-report", tags=["trade_report"])
+app.include_router(institutional_backtest.router, prefix="/api/institutional", tags=["institutional"])
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception('Unhandled exception', extra={'path': request.url.path})
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=500,
         content={
-            'success': False,
-            'error': {
-                'code': 'INTERNAL_SERVER_ERROR',
-                'message': 'Internal server error. Technical team has been notified.',
-                'path': request.url.path,
-            }
-        }
+            "detail": "خطای داخلی سرور رخ داد. تیم فنی مطلع شد.",
+            "detail_en": "Internal server error. The technical team has been notified.",
+            "path": str(request.url),
+        },
     )
 
 
-def _register_routers():
-    registered = []
-    failed = []
-    router_map = {
-        'signals':       ('backend.api.routes.signals',       None),
-        'trades':        ('backend.api.routes.trades',        None),
-        'risk':          ('backend.api.routes.risk',          None),
-        'agents':        ('backend.api.routes.agents',        None),
-        'intelligence':  ('backend.api.routes.intelligence',  None),
-        'self_learning': ('backend.api.routes.self_learning', None),
-        'analytics':     ('backend.api.routes.analytics',     None),
-        'research':      ('backend.api.routes.research',      None),
-        'ai_prediction': ('backend.api.routes.ai_prediction', None),
-        'backtest':      ('backend.api.routes.backtest_engine', None),
-    }
-    for name, (module_path, _) in router_map.items():
-        try:
-            import importlib
-            mod = importlib.import_module(module_path)
-            app.include_router(mod.router)
-            registered.append(name)
-        except ImportError as e:
-            failed.append(f'{name}: {e}')
-        except Exception as e:
-            failed.append(f'{name}: {e}')
-    if registered:
-        logger.info(f'Routers registered: {registered}')
-    if failed:
-        logger.warning(f'Routers failed: {failed}')
-
-_register_routers()
-
-
-@app.get('/', tags=['Health'])
-async def root():
-    return {
-        'brand':   'Galaxy Vast AI Trading Platform',
-        'version': '2.1.0-F',
-        'status':  'online',
-        'modules': [
-            'signals', 'trades', 'risk_v2', 'multi_agent',
-            'intelligence', 'self_learning', 'analytics',
-            'research', 'ai_prediction', 'institutional_backtest',
-        ],
-    }
-
-
-@app.get('/health', tags=['Health'])
+@app.get("/health")
 async def health_check():
-    try:
-        from ..circuit_breaker import _BREAKERS
-        circuits = {name: b.to_dict() for name, b in _BREAKERS.items()}
-    except Exception:
-        circuits = {}
-    try:
-        from ..database.connection_health import get_connection_status
-        db_status = await get_connection_status()
-    except Exception as exc:
-        db_status = {'connected': False, 'status': f'error: {exc}'}
+    """Comprehensive health endpoint."""
+    db_report = await get_db_health()
+    breakers = get_breaker_status()
 
-    overall = 'healthy' if db_status.get('connected') else 'degraded'
-    return JSONResponse(
-        status_code=200 if overall == 'healthy' else 503,
-        content={
-            'status': overall,
-            'version': '2.1.0-F',
-            'database': db_status,
-            'circuits': circuits,
-        }
+    overall_healthy = (
+        db_report.get("database", {}).get("healthy", False)
+        and db_report.get("pool", {}).get("is_healthy", False)
     )
+
+    return {
+        "status": "healthy" if overall_healthy else "degraded",
+        "version": "2.0.0",
+        "database": db_report,
+        "circuit_breakers": breakers,
+    }
+
+
+@app.get("/")
+async def root():
+    return {"message": "Galaxy Vast AI Trading API", "version": "2.0.0"}
