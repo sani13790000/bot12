@@ -1,32 +1,11 @@
-"""
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: ModelManager
-
-وظیفه:
-  مدیریت کامل چرخه عمر مدل‌های XGBoost:
-  • ذخیره و بارگذاری مدل‌ها
-  • versioning (هر آموزش یک version جدید)
-  • نگه‌داری بهترین مدل (best model)
-  • پاکسازی مدل‌های قدیمی
-  • متادیتا برای هر مدل
-
-ساختار پوشه:
-  models/
-    galaxy_vast_XAUUSD_v1_20240115_143022.pkl
-    galaxy_vast_XAUUSD_v2_20240120_091500.pkl
-    galaxy_vast_best_XAUUSD.pkl   ← لینک به بهترین مدل
-    metadata.json                 ← اطلاعات همه مدل‌ها
-"""
-
 from __future__ import annotations
 
 import json
 import os
 import pickle
-import shutil
+from collections import OrderedDict
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from ..core.logger import get_logger
@@ -37,37 +16,44 @@ logger = get_logger("ai_prediction.model_manager")
 
 @dataclass
 class ModelMetadata:
-    """
-    متادیتای یک مدل ذخیره‌شده.
-    """
-    model_id:       str
-    symbol:         str
-    version:        int
-    file_path:      str
-    trained_at:     str          # ISO format
-    auc_roc:        float
-    accuracy:       float
-    f1_score:       float
-    n_samples:      int
-    win_rate:       float
-    is_best:        bool = False
+    model_id:   str
+    symbol:     str
+    version:    int
+    file_path:  str
+    trained_at: str
+    auc_roc:    float
+    accuracy:   float
+    f1_score:   float
+    n_samples:  int
+    win_rate:   float
+    is_best:    bool = False
 
     def to_dict(self) -> Dict:
         return asdict(self)
 
+    @property
+    def trained_at_dt(self) -> datetime:
+        try:
+            return datetime.fromisoformat(self.trained_at).replace(tzinfo=timezone.utc)
+        except Exception:
+            return datetime.now(timezone.utc)
+
+
+@dataclass
+class _CacheEntry:
+    model:        Any
+    loaded_at:    datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    access_count: int = 0
+
 
 class ModelManager:
-    """
-    مدیریت‌کننده مدل‌های XGBoost.
-
-    یک instance برای کل سیستم — singleton pattern.
-    """
-
     _instance: Optional["ModelManager"] = None
 
-    MODELS_DIR:    str = "models"
-    METADATA_FILE: str = "models/metadata.json"
-    MAX_MODELS_PER_SYMBOL: int = 5   # نگه‌داشتن حداکثر ۵ مدل per symbol
+    MODELS_DIR:              str = "models"
+    METADATA_FILE:           str = "models/metadata.json"
+    MAX_MODELS_PER_SYMBOL:   int = 5
+    MAX_CACHED_MODELS:       int = 3
+    DEFAULT_STALENESS_HOURS: int = 24
 
     def __new__(cls) -> "ModelManager":
         if cls._instance is None:
@@ -80,38 +66,24 @@ class ModelManager:
             return
         os.makedirs(self.MODELS_DIR, exist_ok=True)
         self._metadata: Dict[str, List[ModelMetadata]] = {}
-        self._loaded_models: Dict[str, Any] = {}   # symbol → model object
+        self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
+        self._staleness_hours = self.DEFAULT_STALENESS_HOURS
         self._load_metadata()
         self._initialized = True
         logger.info("ModelManager initialized — models_dir=%s", self.MODELS_DIR)
 
-    # ─── public API ───────────────────────────────────────────────────────────
-
     def save_model(
         self,
-        result:   TrainingResult,
-        symbol:   str,
+        result:    TrainingResult,
+        symbol:    str,
         n_samples: int,
         win_rate:  float,
     ) -> ModelMetadata:
-        """
-        ذخیره مدل جدید و ثبت متادیتا.
-
-        Args:
-            result:    نتیجه آموزش
-            symbol:    نماد معاملاتی (مثل XAUUSD)
-            n_samples: تعداد نمونه‌های آموزشی
-            win_rate:  نرخ موفقیت در dataset
-
-        Returns:
-            ModelMetadata: اطلاعات مدل ذخیره‌شده
-        """
         version   = self._next_version(symbol)
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         model_id  = f"galaxy_vast_{symbol}_v{version}_{timestamp}"
         file_path = os.path.join(self.MODELS_DIR, f"{model_id}.pkl")
 
-        # ذخیره مدل
         with open(file_path, "wb") as f:
             pickle.dump(result.model, f, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -120,7 +92,7 @@ class ModelManager:
             symbol     = symbol,
             version    = version,
             file_path  = file_path,
-            trained_at = datetime.utcnow().isoformat(),
+            trained_at = datetime.now(timezone.utc).isoformat(),
             auc_roc    = result.auc_roc,
             accuracy   = result.accuracy,
             f1_score   = result.f1_score,
@@ -128,36 +100,40 @@ class ModelManager:
             win_rate   = win_rate,
         )
 
-        # ثبت در metadata
         if symbol not in self._metadata:
             self._metadata[symbol] = []
         self._metadata[symbol].append(metadata)
 
-        # به‌روزرسانی best model
         self._update_best(symbol)
-
-        # پاکسازی مدل‌های قدیمی
         self._cleanup_old_models(symbol)
-
         self._save_metadata()
+        self.invalidate_cache(symbol)
+
         logger.info("model saved — %s (AUC=%.3f)", model_id, result.auc_roc)
         return metadata
 
     def load_best_model(self, symbol: str) -> Optional[Any]:
-        """
-        بارگذاری بهترین مدل برای یک نماد.
-
-        Returns:
-            مدل XGBoost یا None اگر مدلی وجود نداشته باشد
-        """
-        if symbol in self._loaded_models:
-            return self._loaded_models[symbol]
+        if symbol in self._cache:
+            entry = self._cache[symbol]
+            age_hours = (
+                datetime.now(timezone.utc) - entry.loaded_at
+            ).total_seconds() / 3600.0
+            if age_hours < self._staleness_hours:
+                self._cache.move_to_end(symbol)
+                entry.access_count += 1
+                logger.debug(
+                    "model cache hit for %s (age=%.1fh, accesses=%d)",
+                    symbol, age_hours, entry.access_count,
+                )
+                return entry.model
+            else:
+                logger.info("model stale for %s (age=%.1fh) — reloading", symbol, age_hours)
+                del self._cache[symbol]
 
         best = self._get_best_metadata(symbol)
         if best is None:
             logger.warning("no model found for symbol %s", symbol)
             return None
-
         if not os.path.exists(best.file_path):
             logger.error("model file not found: %s", best.file_path)
             return None
@@ -165,30 +141,54 @@ class ModelManager:
         with open(best.file_path, "rb") as f:
             model = pickle.load(f)
 
-        self._loaded_models[symbol] = model
-        logger.info("best model loaded for %s — v%d (AUC=%.3f)", symbol, best.version, best.auc_roc)
+        self._add_to_cache(symbol, model)
+        logger.info(
+            "best model loaded for %s — v%d (AUC=%.3f)",
+            symbol, best.version, best.auc_roc,
+        )
         return model
 
     def get_best_metadata(self, symbol: str) -> Optional[ModelMetadata]:
-        """متادیتای بهترین مدل برای یک نماد."""
         return self._get_best_metadata(symbol)
 
     def list_models(self, symbol: Optional[str] = None) -> List[ModelMetadata]:
-        """لیست همه مدل‌ها (یا برای یک نماد خاص)."""
         if symbol:
             return self._metadata.get(symbol, [])
         return [m for models in self._metadata.values() for m in models]
 
     def invalidate_cache(self, symbol: str) -> None:
-        """پاک کردن مدل cache‌شده (بعد از آموزش جدید)."""
-        self._loaded_models.pop(symbol, None)
-        logger.debug("model cache invalidated for %s", symbol)
+        if symbol in self._cache:
+            del self._cache[symbol]
+            logger.debug("model cache invalidated for %s", symbol)
 
     def has_model(self, symbol: str) -> bool:
-        """آیا مدل آموزش‌دیده‌ای برای این نماد وجود دارد؟"""
         return bool(self._metadata.get(symbol))
 
-    # ─── private ──────────────────────────────────────────────────────────────
+    def get_staleness_info(self) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        info = {}
+        for symbol, entry in self._cache.items():
+            age_hours = (now - entry.loaded_at).total_seconds() / 3600.0
+            info[symbol] = {
+                "loaded_at":    entry.loaded_at.isoformat(),
+                "age_hours":    round(age_hours, 2),
+                "is_stale":     age_hours >= self._staleness_hours,
+                "access_count": entry.access_count,
+            }
+        return {
+            "cached_models":   list(self._cache.keys()),
+            "cache_size":      len(self._cache),
+            "max_cache_size":  self.MAX_CACHED_MODELS,
+            "staleness_hours": self._staleness_hours,
+            "models_detail":   info,
+        }
+
+    def _add_to_cache(self, symbol: str, model: Any) -> None:
+        while len(self._cache) >= self.MAX_CACHED_MODELS:
+            evicted, _ = self._cache.popitem(last=False)
+            logger.info("LRU evict: model for %s removed from RAM cache", evicted)
+        self._cache[symbol] = _CacheEntry(model=model)
+        self._cache.move_to_end(symbol)
 
     def _next_version(self, symbol: str) -> int:
         models = self._metadata.get(symbol, [])
@@ -201,7 +201,6 @@ class ModelManager:
         return max(models, key=lambda m: m.auc_roc)
 
     def _update_best(self, symbol: str) -> None:
-        """علامت‌گذاری بهترین مدل."""
         models = self._metadata.get(symbol, [])
         if not models:
             return
@@ -210,20 +209,15 @@ class ModelManager:
             m.is_best = (m.model_id == best.model_id)
 
     def _cleanup_old_models(self, symbol: str) -> None:
-        """حذف مدل‌های قدیمی‌تر از حد مجاز."""
         models = self._metadata.get(symbol, [])
         if len(models) <= self.MAX_MODELS_PER_SYMBOL:
             return
-
-        # مرتب‌سازی از قدیم به جدید — حذف قدیمی‌ترها
         sorted_models = sorted(models, key=lambda m: m.trained_at)
         to_delete = sorted_models[: len(models) - self.MAX_MODELS_PER_SYMBOL]
-
         for m in to_delete:
             if not m.is_best and os.path.exists(m.file_path):
                 os.remove(m.file_path)
                 logger.debug("old model deleted: %s", m.file_path)
-
         self._metadata[symbol] = [
             m for m in models if m not in to_delete or m.is_best
         ]
