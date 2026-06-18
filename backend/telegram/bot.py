@@ -40,6 +40,13 @@ class TelegramBot:
     async def initialize(self):
         """
         راه‌اندازی اولیه ربات
+
+        مراحل:
+        1. ایجاد Bot و Dispatcher
+        2. ثبت Authorization Middleware
+        3. ثبت تمام هندلرها
+        4. ثبت هندلر خطا
+        5. ایجاد AlertsHandler برای ارسال هشدارهای proactive
         """
         if not settings.TELEGRAM_BOT_TOKEN:
             logger.warning("توکن ربات تلگرام تنظیم نشده است")
@@ -55,7 +62,7 @@ class TelegramBot:
         self.dp.message.middleware.register(authorization_middleware)
         self.dp.callback_query.middleware.register(authorization_middleware)
 
-        # ثبت هندلرها
+        # ثبت هندلرها (شامل control، alerts، admin_users)
         setup_handlers(self.dp)
 
         # ثبت هندلر خطا
@@ -64,7 +71,52 @@ class TelegramBot:
         # ثبت هندلر not_found
         self.dp.message.register(self._unknown_command_handler)
 
-        logger.info("ربات تلگرام راه‌اندازی شد با پشتیبانی RBAC")
+        # --- ایجاد AlertsHandler با bot instance ---
+        # این هندلر برای ارسال proactive alerts (trade/session/system) استفاده می‌شود
+        from .handlers.alerts import AlertsHandler
+        self._alerts_handler = AlertsHandler(bot=self.bot)
+
+        logger.info("ربات تلگرام راه‌اندازی شد با پشتیبانی RBAC + AlertsHandler")
+
+    def get_alerts_handler(self):
+        """
+        دریافت AlertsHandler برای ارسال هشدارهای proactive
+
+        این متد توسط SessionAlertService و سایر سرویس‌ها استفاده می‌شود
+        تا بتوانند هشدارها را به تلگرام ارسال کنند.
+        """
+        if not hasattr(self, '_alerts_handler') or self._alerts_handler is None:
+            logger.error("AlertsHandler راه‌اندازی نشده — initialize() را صدا بزنید")
+            return None
+        return self._alerts_handler
+
+    async def send_trade_open_alert(self, trade_data: dict):
+        """
+        ارسال هشدار باز شدن معامله به تمام کاربران مجاز
+
+        این متد از خارج ربات (مثلاً از TradeService) فراخوانی می‌شود.
+        """
+        handler = self.get_alerts_handler()
+        if handler:
+            await handler.send_trade_open_alert(trade_data)
+
+    async def send_trade_close_alert(self, trade_data: dict):
+        """ارسال هشدار بسته شدن معامله"""
+        handler = self.get_alerts_handler()
+        if handler:
+            await handler.send_trade_close_alert(trade_data)
+
+    async def send_sl_hit_alert(self, trade_data: dict):
+        """ارسال هشدار زده شدن Stop Loss"""
+        handler = self.get_alerts_handler()
+        if handler:
+            await handler.send_sl_hit_alert(trade_data)
+
+    async def send_tp_hit_alert(self, trade_data: dict):
+        """ارسال هشدار رسیدن به Take Profit"""
+        handler = self.get_alerts_handler()
+        if handler:
+            await handler.send_tp_hit_alert(trade_data)
 
     async def start(self):
         """
