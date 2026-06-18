@@ -1,28 +1,17 @@
 import { useWS } from "../../contexts/WebSocketContext";
-import { Wifi, WifiOff } from "lucide-react";
 
 export function WSIndicator() {
-  const { connected, lastPing } = useWS();
+  const { connected, reconnecting, latency } = useWS();
+  if (reconnecting) return (
+    <div className="flex items-center gap-1.5 text-xs text-[#f59e0b]">
+      <span className="w-2 h-2 rounded-full bg-[#f59e0b] animate-pulse" />
+      اتصال مجدد...
+    </div>
+  );
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0d1420] border border-[#1e2d40]">
-      {connected ? (
-        <>
-          <span className="w-2 h-2 rounded-full bg-[#10b981] pulse-dot" />
-          <Wifi size={13} className="text-[#10b981]" />
-          <span className="text-[10px] text-[#10b981] font-mono">LIVE</span>
-        </>
-      ) : (
-        <>
-          <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-          <WifiOff size={13} className="text-[#ef4444]" />
-          <span className="text-[10px] text-[#ef4444] font-mono">OFF</span>
-        </>
-      )}
-      {lastPing && (
-        <span className="text-[9px] text-[#475569] font-mono hidden sm:block">
-          {lastPing.toLocaleTimeString("fa")}
-        </span>
-      )}
+    <div className={`flex items-center gap-1.5 text-xs ${connected ? "text-[#10b981]" : "text-[#ef4444]"}`}>
+      <span className={`w-2 h-2 rounded-full ${connected ? "bg-[#10b981]" : "bg-[#ef4444]"} ${connected ? "animate-pulse" : ""}`} />
+      {connected ? `Live${latency > 0 ? ` · ${latency}ms` : ""}` : "آفلاین"}
     </div>
   );
 }
