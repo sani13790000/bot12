@@ -1,7 +1,7 @@
 {
   "name": "galaxy-vast-dashboard",
-  "version": "2.0.0",
-  "description": "Galaxy Vast AI Trading Platform — Enterprise Dashboard",
+  "version": "3.0.0",
+  "description": "Galaxy Vast AI Trading Platform — Enterprise Dashboard v3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
-    "recharts": "^2.12.0"
+    "recharts": "^2.12.0",
+    "date-fns": "^3.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
