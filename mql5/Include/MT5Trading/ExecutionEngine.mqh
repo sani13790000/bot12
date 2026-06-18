@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
 //|                                              ExecutionEngine.mqh |
-//|                         موتور اجرای مرکزی سیستم معاملاتی حرفه‌ای |
+//|                         ÙÙØªÙØ± Ø§Ø¬Ø±Ø§Û ÙØ±Ú©Ø²Û Ø³ÛØ³ØªÙ ÙØ¹Ø§ÙÙØ§ØªÛ Ø­Ø±ÙÙâØ§Û |
 //|                                                                  |
-//| این فایل هسته اجرایی سیستم است که تمام ماژول‌ها را به هم وصل    |
-//| می‌کند. وظیفه هماهنگی بین SMC، Price Action، Decision، Risk،    |
-//| Trade و Notification را دارد. تمام چرخه معاملاتی از تحلیل تا   |
-//| اجرا و مدیریت پوزیشن در اینجا کنترل می‌شود.                    |
+//| Ø§ÛÙ ÙØ§ÛÙ ÙØ³ØªÙ Ø§Ø¬Ø±Ø§ÛÛ Ø³ÛØ³ØªÙ Ø§Ø³Øª Ú©Ù ØªÙØ§Ù ÙØ§ÚÙÙâÙØ§ Ø±Ø§ Ø¨Ù ÙÙ ÙØµÙ    |
+//| ÙÛâÚ©ÙØ¯. ÙØ¸ÛÙÙ ÙÙØ§ÙÙÚ¯Û Ø¨ÛÙ SMCØ Price ActionØ DecisionØ RiskØ    |
+//| Trade Ù Notification Ø±Ø§ Ø¯Ø§Ø±Ø¯. ØªÙØ§Ù ÚØ±Ø®Ù ÙØ¹Ø§ÙÙØ§ØªÛ Ø§Ø² ØªØ­ÙÛÙ ØªØ§   |
+//| Ø§Ø¬Ø±Ø§ Ù ÙØ¯ÛØ±ÛØª Ù¾ÙØ²ÛØ´Ù Ø¯Ø± Ø§ÛÙØ¬Ø§ Ú©ÙØªØ±Ù ÙÛâØ´ÙØ¯.                    |
 //+------------------------------------------------------------------+
 #pragma once
 #include "Config.mqh"
@@ -21,32 +21,32 @@
 #include "PAAnalyzer.mqh"
 #include "Helpers.mqh"
 
-//--- ثابت‌های موتور اجرا
+//--- Ø«Ø§Ø¨ØªâÙØ§Û ÙÙØªÙØ± Ø§Ø¬Ø±Ø§
 #define ENGINE_VERSION      "2.0.0"
 #define ENGINE_TICK_MIN_MS  100
 #define ENGINE_MAX_ERRORS   10
 
-//--- حالت‌های موتور
+//--- Ø­Ø§ÙØªâÙØ§Û ÙÙØªÙØ±
 enum ENUM_ENGINE_STATE {
-   ENGINE_STOPPED = 0,      // متوقف
-   ENGINE_RUNNING = 1,      // در حال اجرا
-   ENGINE_PAUSED  = 2,      // مکث
-   ENGINE_ERROR   = 3       // خطا
+   ENGINE_STOPPED = 0,      // ÙØªÙÙÙ
+   ENGINE_RUNNING = 1,      // Ø¯Ø± Ø­Ø§Ù Ø§Ø¬Ø±Ø§
+   ENGINE_PAUSED  = 2,      // ÙÚ©Ø«
+   ENGINE_ERROR   = 3       // Ø®Ø·Ø§
 };
 
-//--- نتیجه یک چرخه اجرا
+//--- ÙØªÛØ¬Ù ÛÚ© ÚØ±Ø®Ù Ø§Ø¬Ø±Ø§
 struct EngineTickResult {
-   bool              analysisRun;      // آیا تحلیل انجام شد؟
-   bool              decisionMade;     // آیا تصمیم گرفته شد؟
-   bool              tradeOpened;      // آیا معامله باز شد؟
-   bool              positionsManaged; // آیا پوزیشن‌ها مدیریت شدند؟
-   string            decisionReason;   // دلیل تصمیم
-   double            finalScore;       // امتیاز نهایی
-   datetime          tickTime;         // زمان تیک
+   bool              analysisRun;      // Ø¢ÛØ§ ØªØ­ÙÛÙ Ø§ÙØ¬Ø§Ù Ø´Ø¯Ø
+   bool              decisionMade;     // Ø¢ÛØ§ ØªØµÙÛÙ Ú¯Ø±ÙØªÙ Ø´Ø¯Ø
+   bool              tradeOpened;      // Ø¢ÛØ§ ÙØ¹Ø§ÙÙÙ Ø¨Ø§Ø² Ø´Ø¯Ø
+   bool              positionsManaged; // Ø¢ÛØ§ Ù¾ÙØ²ÛØ´ÙâÙØ§ ÙØ¯ÛØ±ÛØª Ø´Ø¯ÙØ¯Ø
+   string            decisionReason;   // Ø¯ÙÛÙ ØªØµÙÛÙ
+   double            finalScore;       // Ø§ÙØªÛØ§Ø² ÙÙØ§ÛÛ
+   datetime          tickTime;         // Ø²ÙØ§Ù ØªÛÚ©
 };
 
 //+------------------------------------------------------------------+
-//| کلاس موتور اجرای مرکزی                                          |
+//| Ú©ÙØ§Ø³ ÙÙØªÙØ± Ø§Ø¬Ø±Ø§Û ÙØ±Ú©Ø²Û                                          |
 //+------------------------------------------------------------------+
 class CExecutionEngine {
 private:
@@ -122,16 +122,16 @@ CExecutionEngine::~CExecutionEngine() { Deinitialize(); }
 
 bool CExecutionEngine::Initialize(const string symbol, const ENUM_TIMEFRAMES tf) {
    m_symbol=symbol; m_primaryTF=tf; m_startTime=TimeCurrent();
-   Print("🚀 موتور اجرا در حال راه‌اندازی... نماد: ",symbol," تایم‌فریم: ",EnumToString(tf));
+   LogMessage(StringFormat("🚀 موتور اجرا در حال راه‌اندازی... نماد: %s تایم‌فریم: %s", symbol, EnumToString(tf)), "INFO");
    if(!InitializeModules()) { m_state=ENGINE_ERROR; return false; }
    m_initialized=true; m_state=ENGINE_STOPPED;
-   Print("✅ موتور اجرا با موفقیت راه‌اندازی شد.");
+   LogMessage("✅ موتور اجرا با موفقیت راه‌اندازی شد.", "INFO");
    return true;
 }
 
 bool CExecutionEngine::InitializeModules() {
    m_licenseChecker=new CLicenseChecker();
-   if(!m_licenseChecker.Validate()) { m_lastError="❌ لایسنس معتبر نیست"; Print(m_lastError); return false; }
+   if(!m_licenseChecker.Validate()) { m_lastError="❌ لایسنس معتبر نیست"; LogMessage(m_lastError, "ERROR"); return false; }
    m_riskManager=new CRiskManager(m_symbol);
    m_riskManager.InitializeATR(14,m_primaryTF);
    m_tradeManager=new CTradeManager(m_symbol);
@@ -157,37 +157,37 @@ bool CExecutionEngine::InitializeModules() {
 }
 
 bool CExecutionEngine::Start() {
-   if(!m_initialized) { m_lastError="موتور مقداردهی نشده"; return false; }
+   if(!m_initialized) { m_lastError="ÙÙØªÙØ± ÙÙØ¯Ø§Ø±Ø¯ÙÛ ÙØ´Ø¯Ù"; return false; }
    if(m_state==ENGINE_RUNNING) return true;
    m_state=ENGINE_RUNNING; m_enableAutoTrading=true;
-   Print("▶️ موتور اجرا شروع به کار کرد.");
+   LogMessage("▶️ موتور اجرا شروع به کار کرد.", "INFO");
    if(m_notificationManager!=NULL)
-      m_notificationManager.SendSystemAlert("▶️ ربات معاملاتی فعال شد\n📊 نماد: "+m_symbol);
+      m_notificationManager.SendSystemAlert("â¶ï¸ Ø±Ø¨Ø§Øª ÙØ¹Ø§ÙÙØ§ØªÛ ÙØ¹Ø§Ù Ø´Ø¯\nð ÙÙØ§Ø¯: "+m_symbol);
    return true;
 }
 
 void CExecutionEngine::Stop() {
    m_state=ENGINE_STOPPED; m_enableAutoTrading=false;
-   Print("⏹ موتور متوقف شد.");
+   LogMessage("⏹ موتور متوقف شد.", "INFO");
    if(m_notificationManager!=NULL)
-      m_notificationManager.SendSystemAlert("⏹ ربات معاملاتی متوقف شد");
+      m_notificationManager.SendSystemAlert("â¹ Ø±Ø¨Ø§Øª ÙØ¹Ø§ÙÙØ§ØªÛ ÙØªÙÙÙ Ø´Ø¯");
 }
 
 void CExecutionEngine::Pause() {
    if(m_state==ENGINE_RUNNING) {
       m_state=ENGINE_PAUSED;
-      Print("⏸ موتور در حالت مکث");
+      LogMessage("⏸ موتور در حالت مکث", "INFO");
       if(m_notificationManager!=NULL)
-         m_notificationManager.SendSystemAlert("⏸ ربات در حالت مکث قرار گرفت");
+         m_notificationManager.SendSystemAlert("â¸ Ø±Ø¨Ø§Øª Ø¯Ø± Ø­Ø§ÙØª ÙÚ©Ø« ÙØ±Ø§Ø± Ú¯Ø±ÙØª");
    }
 }
 
 void CExecutionEngine::Resume() {
    if(m_state==ENGINE_PAUSED) {
       m_state=ENGINE_RUNNING;
-      Print("▶️ موتور از مکث خارج شد");
+      LogMessage("▶️ موتور از مکث خارج شد", "INFO");
       if(m_notificationManager!=NULL)
-         m_notificationManager.SendSystemAlert("▶️ ربات از مکث خارج شد");
+         m_notificationManager.SendSystemAlert("â¶ï¸ Ø±Ø¨Ø§Øª Ø§Ø² ÙÚ©Ø« Ø®Ø§Ø±Ø¬ Ø´Ø¯");
    }
 }
 
@@ -247,13 +247,13 @@ bool CExecutionEngine::RunDecisionCycle(EngineTickResult &result) {
 
 bool CExecutionEngine::RunTradingCycle(EngineTickResult &result) {
    if(m_tradeManager==NULL||m_riskManager==NULL) return false;
-   if(!m_riskManager.CanOpenTrade()) { result.decisionReason+=" | محدودیت ریسک فعال"; return false; }
+   if(!m_riskManager.CanOpenTrade()) { result.decisionReason+=" | ÙØ­Ø¯ÙØ¯ÛØª Ø±ÛØ³Ú© ÙØ¹Ø§Ù"; return false; }
    TradeSignal signal=m_decisionConnector.GetTradeSignal();
    string errMsg;
    bool ok=m_tradeManager.OpenTrade(signal,errMsg);
    if(ok && m_notificationManager!=NULL) {
       m_notificationManager.SendTradeEntry(
-         signal.direction==POSITION_TYPE_BUY?"خرید":"فروش",
+         signal.direction==POSITION_TYPE_BUY?"Ø®Ø±ÛØ¯":"ÙØ±ÙØ´",
          m_symbol, signal.entryPrice, signal.stopLoss, signal.takeProfit,
          signal.volume, result.finalScore
       );
@@ -263,8 +263,8 @@ bool CExecutionEngine::RunTradingCycle(EngineTickResult &result) {
 
 void CExecutionEngine::UpdateStats(const EngineTickResult &result) {
    if(m_totalTicks%1000==0)
-      Print("📊 آمار موتور: تیک=",m_totalTicks," | تحلیل=",m_totalAnalyses,
-            " | تصمیم=",m_totalDecisions," | معامله=",m_totalTradesOpened);
+      LogMessage(StringFormat("📊 آمار موتور: تیک=%I64d | تحلیل=%I64d | تصمیم=%I64d | معاملون=%I64d",
+            m_totalTicks, m_totalAnalyses, m_totalDecisions, m_totalTradesOpened), "INFO");
 }
 
 void CExecutionEngine::Deinitialize() {
@@ -280,27 +280,27 @@ void CExecutionEngine::Deinitialize() {
    if(m_smcAnalyzer)         { delete m_smcAnalyzer;         m_smcAnalyzer=NULL; }
    if(m_paAnalyzer)          { delete m_paAnalyzer;          m_paAnalyzer=NULL; }
    m_initialized=false;
-   Print("🔴 موتور اجرا آزادسازی شد.");
+   LogMessage("🔴 موتور اجرا آزادسازی شد.", "INFO");
 }
 
 string CExecutionEngine::GetStatusReport() {
-   string states[]={"متوقف","در حال اجرا","مکث","خطا"};
-   string r="⚙️ وضعیت موتور اجرا\n";
-   r+="نسخه: "+ENGINE_VERSION+"\n";
-   r+="حالت: "+states[(int)m_state]+"\n";
-   r+="نماد: "+m_symbol+" | تایم‌فریم: "+EnumToString(m_primaryTF)+"\n";
+   string states[]={"ÙØªÙÙÙ","Ø¯Ø± Ø­Ø§Ù Ø§Ø¬Ø±Ø§","ÙÚ©Ø«","Ø®Ø·Ø§"};
+   string r="âï¸ ÙØ¶Ø¹ÛØª ÙÙØªÙØ± Ø§Ø¬Ø±Ø§\n";
+   r+="ÙØ³Ø®Ù: "+ENGINE_VERSION+"\n";
+   r+="Ø­Ø§ÙØª: "+states[(int)m_state]+"\n";
+   r+="ÙÙØ§Ø¯: "+m_symbol+" | ØªØ§ÛÙâÙØ±ÛÙ: "+EnumToString(m_primaryTF)+"\n";
    if(m_riskManager!=NULL) r+=m_riskManager.GetRiskReport();
    return r;
 }
 
 string CExecutionEngine::GetStatisticsReport() {
-   string r="📈 آمار موتور\n";
-   r+=StringFormat("کل تیک: %I64d\n",m_totalTicks);
-   r+=StringFormat("کل تحلیل: %I64d\n",m_totalAnalyses);
-   r+=StringFormat("کل تصمیم: %I64d\n",m_totalDecisions);
-   r+=StringFormat("کل معامله: %I64d\n",m_totalTradesOpened);
+   string r="ð Ø¢ÙØ§Ø± ÙÙØªÙØ±\n";
+   r+=StringFormat("Ú©Ù ØªÛÚ©: %I64d\n",m_totalTicks);
+   r+=StringFormat("Ú©Ù ØªØ­ÙÛÙ: %I64d\n",m_totalAnalyses);
+   r+=StringFormat("Ú©Ù ØªØµÙÛÙ: %I64d\n",m_totalDecisions);
+   r+=StringFormat("Ú©Ù ÙØ¹Ø§ÙÙÙ: %I64d\n",m_totalTradesOpened);
    long uptime=(long)(TimeCurrent()-m_startTime);
-   r+=StringFormat("آپ‌تایم: %d:%02d:%02d\n",(int)(uptime/3600),(int)((uptime%3600)/60),(int)(uptime%60));
+   r+=StringFormat("Ø¢Ù¾âØªØ§ÛÙ: %d:%02d:%02d\n",(int)(uptime/3600),(int)((uptime%3600)/60),(int)(uptime%60));
    return r;
 }
 //+------------------------------------------------------------------+
