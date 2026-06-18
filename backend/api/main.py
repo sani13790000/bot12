@@ -1,7 +1,7 @@
 """
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FastAPI Application Entry Point — v3.0.0
+FastAPI Application Entry Point — v4.0.0
 """
 
 from __future__ import annotations
@@ -16,12 +16,13 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger("galaxy_vast.api")
 
 # ── Routers ──────────────────────────────────────────────────────────────────
-from backend.api.routes.agents        import router as agents_router
-from backend.api.routes.ai_prediction import router as ai_prediction_router
-from backend.api.routes.self_learning import router as self_learning_router
-from backend.api.routes.research      import router as research_router
-from backend.api.routes.risk          import router as risk_router
-from backend.api.routes.analytics     import router as analytics_router
+from backend.api.routes.agents                import router as agents_router
+from backend.api.routes.ai_prediction         import router as ai_prediction_router
+from backend.api.routes.self_learning         import router as self_learning_router
+from backend.api.routes.research              import router as research_router
+from backend.api.routes.risk                  import router as risk_router
+from backend.api.routes.analytics             import router as analytics_router
+from backend.api.routes.institutional_backtest import router as institutional_backtest_router
 
 
 # ── Services ─────────────────────────────────────────────────────────────────
@@ -29,7 +30,6 @@ from backend.self_learning.retraining_service import RetrainingService
 _retraining_service: RetrainingService = RetrainingService()
 
 from backend.analytics import AnalyticsService
-from backend.api.routes.analytics import get_analytics_service
 _analytics_service: AnalyticsService = AnalyticsService(db_pool=None)
 
 
@@ -37,18 +37,15 @@ _analytics_service: AnalyticsService = AnalyticsService(db_pool=None)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("🌌 Galaxy Vast AI Trading Platform — starting up")
+    logger.info("🌌 Galaxy Vast AI Trading Platform v4.0.0 — starting up")
 
-    # Self-Learning weekly scheduler
     await _retraining_service.start()
     logger.info("✅ RetrainingService started")
-
-    # Analytics service ready
     logger.info("✅ AnalyticsService ready")
+    logger.info("✅ Institutional Backtest Engine ready")
 
     yield
 
-    # Shutdown
     await _retraining_service.stop()
     logger.info("🌌 Galaxy Vast — shutdown complete")
 
@@ -58,11 +55,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Galaxy Vast AI Trading Platform",
     description=(
-        "Institutional-Grade AI Trading Intelligence System.\n\n"
+        "Institutional-Grade AI Trading Intelligence System — v4.0.0\n\n"
         "Modules: SMC Engine · Price Action · Multi-Agent Voting · "
-        "Portfolio Risk · Backtest · Replay · ML Learning · Analytics"
+        "Portfolio Risk · Institutional Backtest · Walk-Forward · "
+        "Monte Carlo · ML Learning · Analytics · Risk Management"
     ),
-    version="3.0.0",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -95,30 +93,31 @@ app.include_router(ai_prediction_router)
 app.include_router(self_learning_router)
 app.include_router(research_router)
 app.include_router(risk_router)
-app.include_router(analytics_router)          # ← NEW: Analytics Module
+app.include_router(analytics_router)
+app.include_router(institutional_backtest_router)
 
 
-@app.get("/", tags=["Health"])
-async def root():
+# ── Health ────────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
     return {
-        "platform": "Galaxy Vast AI Trading Platform",
-        "version":  "3.0.0",
-        "status":   "operational",
+        "status": "healthy",
+        "brand":  "Galaxy Vast AI Trading Platform",
+        "version":"4.0.0",
         "modules": [
-            "SMC Engine",
-            "Price Action Engine",
-            "Multi-Agent Voting",
-            "Portfolio Risk Manager",
-            "Backtest Engine",
-            "Market Replay",
-            "Walk-Forward Analysis",
-            "Self-Learning System",
-            "AI Prediction (XGBoost)",
-            "Professional Analytics",      # ← NEW
+            "agents", "ai_prediction", "self_learning",
+            "research", "risk", "analytics",
+            "institutional_backtest",
         ],
     }
 
 
-@app.get("/health", tags=["Health"])
-async def health():
-    return {"status": "healthy", "brand": "Galaxy Vast AI Trading Platform"}
+@app.get("/")
+async def root():
+    return {
+        "brand":       "🌌 Galaxy Vast AI Trading Platform",
+        "version":     "4.0.0",
+        "description": "Institutional-Grade AI Trading Intelligence System",
+        "docs":        "/docs",
+    }
