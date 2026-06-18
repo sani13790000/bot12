@@ -1,135 +1,132 @@
-import { useState, useEffect } from "react";
-import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
-} from "recharts";
+import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { analyticsApi } from "../utils/api";
+import { StatCard } from "../components/common/StatCard";
 import type { EquityPoint } from "../types";
+import {
+  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine, Brush
+} from "recharts";
 
-const PERIODS = [
-  { label: "۷ روز",   value: 7  },
-  { label: "۳۰ روز",  value: 30 },
-  { label: "۹۰ روز",  value: 90 },
-  { label: "۱ سال",   value: 365 },
-];
+type Range = "7d" | "30d" | "90d" | "all";
 
 export default function EquityCurvePage() {
-  const [equity, setEquity] = useState<EquityPoint[]>([]);
-  const [period, setPeriod] = useState(30);
+  const [data,    setData]    = useState<EquityPoint[]>([]);
+  const [range,   setRange]   = useState<Range>("30d");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setLoading(true);
-    analyticsApi.getEquity().then(r => {
-      if (r.success) setEquity(r.data.points ?? []);
-      setLoading(false);
-    });
-  }, [period]);
+  const RANGE_DAYS: Record<Range, number> = { "7d": 7, "30d": 30, "90d": 90, "all": 365 };
 
-  const maxDD  = Math.min(...equity.map(e => e.drawdown));
-  const finalEq = equity.at(-1)?.equity ?? 0;
-  const firstEq = equity.at(0)?.equity ?? finalEq;
-  const totalReturn = firstEq > 0 ? ((finalEq - firstEq) / firstEq * 100) : 0;
-  const positive = totalReturn >= 0;
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const r = await analyticsApi.getEquityCurve(RANGE_DAYS[range]);
+      if (r.success) setData(r.data?.points ?? []);
+      setLoading(false);
+    })();
+  }, [range]);
+
+  const last = data[data.length - 1];
+  const first = data[0];
+  const totalReturn = first && last ? ((last.equity - first.equity) / first.equity * 100) : 0;
+  const maxDD = data.reduce((acc, d) => Math.max(acc, d.drawdown), 0);
+  const maxEquity = data.reduce((acc, d) => Math.max(acc, d.equity), 0);
+
+  const RANGES: Range[] = ["7d", "30d", "90d", "all"];
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[#f0f6ff] text-2xl font-bold">منحنی سرمایه</h1>
-          <p className="text-[#475569] text-sm mt-1">
-            بازده کل:&nbsp;
-            <span className={positive ? "text-[#10b981]" : "text-[#ef4444]"}>
-              {positive ? "+" : ""}{totalReturn.toFixed(2)}%
-            </span>
-            &nbsp;|&nbsp; حداکثر Drawdown: <span className="text-[#ef4444]">{maxDD.toFixed(2)}%</span>
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-center justify-center">
+            <TrendingUp size={20} className="text-[#10b981]" />
+          </div>
+          <div>
+            <h1 className="text-[#f0f6ff] text-xl font-bold">منحنی Equity</h1>
+            <p className="text-[#475569] text-sm">{data.length} نقطه داده</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          {PERIODS.map(p => (
-            <button key={p.value} onClick={() => setPeriod(p.value)}
-              className={`px-3 py-1.5 rounded-xl text-xs transition-all ${period === p.value ? "bg-[#00d4ff] text-[#070b12] font-bold" : "bg-[#111827] border border-[#1e2d40] text-[#94a3b8] hover:border-[#00d4ff]/30"}`}>
-              {p.label}
+        <div className="flex gap-1 bg-[#111827] border border-[#1e2d40] rounded-xl p-1">
+          {RANGES.map(r => (
+            <button key={r} onClick={() => setRange(r)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${range === r ? "bg-[#00d4ff]/15 text-[#00d4ff] border border-[#00d4ff]/30" : "text-[#475569] hover:text-[#f0f6ff]"}`}>
+              {r}
             </button>
           ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" /></div>
-      ) : (
-        <>
-          {/* Equity + Balance Chart */}
-          <div className="gv-card p-5">
-            <h2 className="text-[#f0f6ff] font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp size={18} className="text-[#00d4ff]" /> Equity & Balance
-            </h2>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equity} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-                  <defs>
-                    <linearGradient id="gEq"  x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00d4ff" stopOpacity={0.3}/><stop offset="95%" stopColor="#00d4ff" stopOpacity={0}/></linearGradient>
-                    <linearGradient id="gBal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ background:"#111827", border:"1px solid #1e2d40", borderRadius:8, color:"#f0f6ff" }} formatter={(v:number) => [`$${v.toLocaleString()}`,""]} />
-                  <Area type="monotone" dataKey="equity"  stroke="#00d4ff" strokeWidth={2} fill="url(#gEq)"  dot={false} />
-                  <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={2} fill="url(#gBal)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Equity فعلی"  value={last?.equity    ?? 0} format="currency" color="accent" glow icon={<TrendingUp  size={18} />} />
+        <StatCard title="بازده کل"     value={totalReturn}          format="percent"  color={totalReturn >= 0 ? "green" : "red"} icon={totalReturn >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} />
+        <StatCard title="Max Drawdown" value={maxDD}                 format="percent"  color="red"    icon={<TrendingDown size={18} />} />
+        <StatCard title="اوج Equity"   value={maxEquity}            format="currency" color="gold"   icon={<TrendingUp  size={18} />} />
+      </div>
 
-          {/* Drawdown Chart */}
-          <div className="gv-card p-5">
-            <h2 className="text-[#f0f6ff] font-semibold mb-4 flex items-center gap-2">
-              <TrendingDown size={18} className="text-[#ef4444]" /> Drawdown
-            </h2>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equity} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-                  <defs>
-                    <linearGradient id="gDD" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v.toFixed(1)}%`} />
-                  <Tooltip contentStyle={{ background:"#111827", border:"1px solid #1e2d40", borderRadius:8, color:"#f0f6ff" }} formatter={(v:number) => [`${v.toFixed(2)}%`,""]} />
-                  <ReferenceLine y={0} stroke="#1e2d40" />
-                  <Area type="monotone" dataKey="drawdown" stroke="#ef4444" strokeWidth={2} fill="url(#gDD)" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      {/* Main chart */}
+      <div className="gv-card p-5">
+        <h2 className="text-[#f0f6ff] font-semibold mb-4 flex items-center gap-2">
+          منحنی Equity و Balance
+          <span className="flex items-center gap-3 mr-auto text-xs text-[#475569]">
+            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#00d4ff] inline-block" /> Equity</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#10b981] inline-block" /> Balance</span>
+          </span>
+        </h2>
+        {loading ? (
+          <div className="h-72 flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" /></div>
+        ) : (
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+                <defs>
+                  <linearGradient id="ecEquity"  x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#00d4ff" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#00d4ff" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="ecBalance" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1e2d40", borderRadius: 8, color: "#f0f6ff" }}
+                  formatter={(v: number) => [`$${v.toLocaleString()}`, ""]} />
+                <ReferenceLine y={first?.equity} stroke="#1e2d40" strokeDasharray="4 4" />
+                <Area type="monotone" dataKey="equity"  stroke="#00d4ff" strokeWidth={2} fill="url(#ecEquity)"  dot={false} />
+                <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={1.5} fill="url(#ecBalance)" dot={false} />
+                <Brush dataKey="date" height={20} stroke="#1e2d40" fill="#0d1420" travellerWidth={8}
+                  style={{ fontSize: 10, color: "#475569" }} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
+        )}
+      </div>
 
-          {/* Daily PnL */}
-          <div className="gv-card p-5">
-            <h2 className="text-[#f0f6ff] font-semibold mb-4">P&L روزانه</h2>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={equity} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill:"#475569", fontSize:11 }} axisLine={false} tickLine={false} tickFormatter={v=>`$${v}`} />
-                  <Tooltip contentStyle={{ background:"#111827", border:"1px solid #1e2d40", borderRadius:8, color:"#f0f6ff" }} formatter={(v:number) => [`$${v.toFixed(2)}`,""]} />
-                  <ReferenceLine y={0} stroke="#1e2d40" />
-                  <Bar dataKey="pnl" fill="#10b981" radius={[2,2,0,0]}
-                    label={false}
-                    background={false}
-                    shape={(props: Record<string,unknown>) => {
-                      const { x, y, width, height, value } = props as { x:number;y:number;width:number;height:number;value:number };
-                      return <rect x={x} y={y} width={width} height={height} fill={(value ?? 0) >= 0 ? "#10b981" : "#ef4444"} rx={2} />;
-                    }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Drawdown chart */}
+      <div className="gv-card p-5">
+        <h2 className="text-[#f0f6ff] font-semibold mb-4">Drawdown</h2>
+        <div className="h-44">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
+              <defs>
+                <linearGradient id="ecDD" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
+              <XAxis dataKey="date" tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v.toFixed(1)}%`} />
+              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1e2d40", borderRadius: 8, color: "#f0f6ff" }}
+                formatter={(v: number) => [`${v.toFixed(2)}%`, "Drawdown"]} />
+              <Area type="monotone" dataKey="drawdown" stroke="#ef4444" strokeWidth={1.5} fill="url(#ecDD)" dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
