@@ -1,29 +1,38 @@
 """
 ================================================================================
 Galaxy Vast AI Trading Platform
-تحلیل Walk-Forward حرفه‌ای — Professional Walk-Forward Analyzer
+آنالیز Walk-Forward — Walk-Forward Analyzer
+================================================================================
+این ماژول آنالیز Walk-Forward را برای ارزیابی واقعی استراتژی پیاده‌سازی می‌کند.
 
-این ماژول از overfitting جلوگیری می‌کند با تقسیم داده به سه بخش:
-- Training: آموزش و بهینه‌سازی استراتژی
-- Validation: اعتبارسنجی پارامترهای بهینه‌شده
-- Testing: تست نهایی روی داده‌های دست‌نخورده
+Walk-Forward چیست؟
+  به جای یک بک‌تست کلی، داده‌ها به پنجره‌های زمانی تقسیم می‌شوند.
+  هر پنجره شامل:
+    - Training: بهینه‌سازی پارامترها
+    - Validation: تست در‌جا
+    - Testing: ارزیابی واقعی
 
-پنجره‌های rolling امکان آزمایش در شرایط مختلف بازار را می‌دهد.
+  این روش از Overfitting جلوگیری می‌کند.
 
-نسخه: 3.0.0
+نویسنده: Galaxy Vast AI Engine
 ================================================================================
 """
 
 from __future__ import annotations
 
 import asyncio
-import statistics
+import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from ...core.logger import get_logger
-from ..backtest.engine import BacktestEngine, BacktestConfig, BacktestResult
+from ..backtest.engine import (
+    BacktestConfig,
+    BacktestEngine,
+    BacktestMetrics,
+    CandleData,
+)
 
 logger = get_logger("research.walk_forward.analyzer")
 
@@ -31,349 +40,449 @@ logger = get_logger("research.walk_forward.analyzer")
 @dataclass
 class WalkForwardConfig:
     """
-    تنظیمات تحلیل Walk-Forward
+    تنظیمات Walk-Forward Analysis
 
-    نسبت‌های پیش‌فرض:
-    - Training: ۶۰٪ داده
-    - Validation: ۲۰٪ داده
-    - Testing: ۲۰٪ داده
+    پنجره‌های زمانی را و نحوه تقسیم داده‌ها تعریف می‌کند.
     """
-    symbol              : str
-    start_date          : datetime
-    end_date            : datetime
-    initial_balance     : float = 10_000.0
-    risk_per_trade_pct  : float = 1.0
-    min_confidence      : float = 80.0
-    # نسبت‌های تقسیم داده
-    train_ratio         : float = 0.60    # ۶۰٪ برای آموزش
-    validation_ratio    : float = 0.20    # ۲۰٪ برای اعتبارسنجی
-    test_ratio          : float = 0.20    # ۲۰٪ برای تست
-    # تنظیمات پنجره rolling
-    use_rolling_windows : bool  = True
-    window_count        : int   = 5       # تعداد پنجره‌ها
-    # تنظیمات بک‌تست
-    backtest_timeframe  : int   = 60      # دقیقه
-    pip_size            : float = 0.0001
-    pip_value           : float = 10.0
-    commission_per_lot  : float = 7.0
+    symbol: str = "XAUUSD"
+    total_start: Optional[datetime] = None
+    total_end: Optional[datetime] = None
+
+    # ─── اندازه پنجره‌ها ───
+    training_days: int = 90     # دوره آموزش: ۳ ماه
+    validation_days: int = 30   # دوره اعتبارسنجی: ۱ ماه
+    testing_days: int = 30      # دوره تست: ۱ ماه
+
+    # ─── rolling window ───
+    step_days: int = 30         # هر بار چقدر جلو برود
+
+    # ─── تنظیمات بک‌تست ───
+    initial_balance: float = 10000.0
+    risk_per_trade: float = 1.0
+    min_confidence: float = 70.0
 
 
 @dataclass
 class WindowResult:
-    """نتیجه یک پنجره Walk-Forward"""
-    window_id          : int
-    train_start        : datetime
-    train_end          : datetime
-    validation_start   : datetime
-    validation_end     : datetime
-    test_start         : datetime
-    test_end           : datetime
-    train_result       : Optional[BacktestResult]
-    validation_result  : Optional[BacktestResult]
-    test_result        : Optional[BacktestResult]
-    # معیارهای کلیدی تست
-    test_profit_pct    : float = 0.0
-    test_win_rate      : float = 0.0
-    test_profit_factor : float = 0.0
-    test_max_drawdown  : float = 0.0
-    passed             : bool  = False   # آیا معیارهای کیفیت را برآورد کرده؟
+    """
+    نتیجه یک پنجره Walk-Forward
+
+    شامل عملکرد در سه مرحله Training، Validation و Testing.
+    """
+    window_index: int
+    training_start: datetime
+    training_end: datetime
+    validation_start: datetime
+    validation_end: datetime
+    testing_start: datetime
+    testing_end: datetime
+
+    training_metrics: Optional[BacktestMetrics] = None
+    validation_metrics: Optional[BacktestMetrics] = None
+    testing_metrics: Optional[BacktestMetrics] = None
+
+    # آیا این پنجره قبول است؟ (اگر validation خوب بود)
+    passed: bool = False
+    pass_reason: str = ""
+    fail_reason: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """تبدیل به dictionary"""
+        return {
+            "window": self.window_index,
+            "training": {
+                "start": self.training_start.isoformat(),
+                "end": self.training_end.isoformat(),
+                "metrics": self.training_metrics.to_dict() if self.training_metrics else None,
+            },
+            "validation": {
+                "start": self.validation_start.isoformat(),
+                "end": self.validation_end.isoformat(),
+                "metrics": self.validation_metrics.to_dict() if self.validation_metrics else None,
+            },
+            "testing": {
+                "start": self.testing_start.isoformat(),
+                "end": self.testing_end.isoformat(),
+                "metrics": self.testing_metrics.to_dict() if self.testing_metrics else None,
+            },
+            "passed": self.passed,
+            "reason": self.pass_reason if self.passed else self.fail_reason,
+        }
 
 
 @dataclass
 class WalkForwardResult:
     """
-    نتیجه کامل تحلیل Walk-Forward
+    نتیجه کامل Walk-Forward Analysis
 
-    شامل نتایج تمام پنجره‌ها و خلاصه آماری است.
+    خلاصه عملکرد در تمام پنجره‌های زمانی.
     """
-    config              : WalkForwardConfig
-    windows             : List[WindowResult]
-    # معیارهای تجمیعی
-    avg_test_profit     : float    # میانگین سود تست در همه پنجره‌ها
-    avg_win_rate        : float    # میانگین win rate
-    avg_profit_factor   : float    # میانگین profit factor
-    avg_max_drawdown    : float    # میانگین drawdown
-    consistency_score   : float    # ۰-۱۰۰ — ثبات عملکرد در پنجره‌های مختلف
-    pass_rate           : float    # درصد پنجره‌هایی که معیار کیفیت را برآورد کردند
-    recommendation      : str      # توصیه نهایی: ROBUST / ACCEPTABLE / OVERFITTED
-    summary             : str
+    config: WalkForwardConfig
+    windows: List[WindowResult]
 
-    def to_dict(self) -> Dict:
+    # ─── آمار کلی ───
+    total_windows: int = 0
+    passed_windows: int = 0
+    failed_windows: int = 0
+
+    # ─── میانگین‌های testing ───
+    avg_win_rate: float = 0.0
+    avg_profit_factor: float = 0.0
+    avg_sharpe_ratio: float = 0.0
+    avg_max_drawdown: float = 0.0
+    avg_return: float = 0.0
+
+    # ─── ثبات استراتژی ───
+    consistency_score: float = 0.0   # ۰ تا ۱۰۰ — هر چه بالاتر بهتر
+    is_robust: bool = False          # آیا استراتژی robust است؟
+    robustness_notes: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """تبدیل به dictionary"""
         return {
-            "windows_count"      : len(self.windows),
-            "avg_test_profit"    : round(self.avg_test_profit, 2),
-            "avg_win_rate"       : round(self.avg_win_rate * 100, 2),
-            "avg_profit_factor"  : round(self.avg_profit_factor, 2),
-            "avg_max_drawdown"   : round(self.avg_max_drawdown, 2),
-            "consistency_score"  : round(self.consistency_score, 1),
-            "pass_rate"          : round(self.pass_rate * 100, 1),
-            "recommendation"     : self.recommendation,
-            "summary"            : self.summary,
-            "windows"            : [
-                {
-                    "id"                : w.window_id,
-                    "test_start"        : w.test_start.isoformat(),
-                    "test_end"          : w.test_end.isoformat(),
-                    "test_profit_pct"   : round(w.test_profit_pct, 2),
-                    "test_win_rate"     : round(w.test_win_rate * 100, 2),
-                    "test_profit_factor": round(w.test_profit_factor, 2),
-                    "test_max_drawdown" : round(w.test_max_drawdown, 2),
-                    "passed"            : w.passed,
-                }
-                for w in self.windows
-            ],
+            "summary": {
+                "total_windows": self.total_windows,
+                "passed_windows": self.passed_windows,
+                "failed_windows": self.failed_windows,
+                "pass_rate": round(
+                    (self.passed_windows / self.total_windows * 100)
+                    if self.total_windows > 0 else 0, 1
+                ),
+            },
+            "performance": {
+                "avg_win_rate": round(self.avg_win_rate, 1),
+                "avg_profit_factor": round(self.avg_profit_factor, 2),
+                "avg_sharpe_ratio": round(self.avg_sharpe_ratio, 3),
+                "avg_max_drawdown": round(self.avg_max_drawdown, 1),
+                "avg_return": round(self.avg_return, 2),
+            },
+            "robustness": {
+                "score": round(self.consistency_score, 1),
+                "is_robust": self.is_robust,
+                "notes": self.robustness_notes,
+            },
+            "windows": [w.to_dict() for w in self.windows],
         }
 
 
 class WalkForwardAnalyzer:
     """
-    تحلیلگر Walk-Forward Galaxy Vast
+    آنالیزگر Walk-Forward Galaxy Vast
 
-    با اجرای بک‌تست روی پنجره‌های زمانی مجزا،
-    overfitting را شناسایی می‌کند و استحکام استراتژی را اندازه می‌گیرد.
+    این کلاس استراتژی را در شرایط واقعی و بدون Overfitting ارزیابی می‌کند.
+    با تقسیم داده‌ها به پنجره‌های rolling، اطمینان می‌دهد که
+    نتایج training و testing با هم فاصله مناسبی دارند.
+
+    نحوه استفاده:
+        analyzer = WalkForwardAnalyzer()
+        config = WalkForwardConfig(symbol="XAUUSD", training_days=90)
+        result = await analyzer.run(candles, config)
     """
 
     def __init__(self) -> None:
-        """مقداردهی اولیه تحلیلگر"""
+        """مقداردهی اولیه"""
         self._backtest_engine = BacktestEngine()
-        logger.info("🔬 Galaxy Vast Walk-Forward Analyzer آماده شد")
+        logger.info("Walk-Forward Analyzer راه‌اندازی شد")
 
-    async def analyze(
+    async def run(
         self,
-        config           : WalkForwardConfig,
-        candles          : List[Any],
-        signal_generator : Any,
+        candles: List[CandleData],
+        config: WalkForwardConfig,
+        signal_generator: Optional[Any] = None,
     ) -> WalkForwardResult:
         """
-        اجرای تحلیل Walk-Forward
+        اجرای کامل Walk-Forward Analysis
 
-        پارامترها:
-            config: تنظیمات تحلیل
-            candles: لیست کامل کندل‌ها
-            signal_generator: تابع تولید سیگنال
+        Args:
+            candles: تمام داده‌های تاریخی
+            config: تنظیمات
+            signal_generator: موتور تولید سیگنال
 
-        خروجی:
-            WalkForwardResult — نتیجه کامل با توصیه
+        Returns:
+            WalkForwardResult: نتیجه کامل
         """
+        if not candles:
+            raise ValueError("داده‌ای برای Walk-Forward وجود ندارد")
+
+        start = config.total_start or candles[0].timestamp
+        end = config.total_end or candles[-1].timestamp
+
         logger.info(
-            f"🔬 شروع Walk-Forward | نماد: {config.symbol} | "
-            f"پنجره‌ها: {config.window_count if config.use_rolling_windows else 1}"
+            f"Walk-Forward شروع شد | {config.symbol} | "
+            f"از: {start.date()} تا: {end.date()}"
         )
 
-        # ── فیلتر کندل‌ها ─────────────────────────────────────────────────────
-        candles_filtered = [
-            c for c in candles
-            if config.start_date <= c.timestamp <= config.end_date
-        ]
+        # ─── ساخت پنجره‌ها ───
+        windows_config = self._build_windows(start, end, config)
 
-        if len(candles_filtered) < 200:
-            logger.warning("⚠️ داده کافی برای Walk-Forward (حداقل ۲۰۰ کندل)")
-            return self._empty_result(config)
+        if not windows_config:
+            raise ValueError("داده کافی برای حتی یک پنجره وجود ندارد")
 
-        # ── ساخت پنجره‌ها ─────────────────────────────────────────────────────
-        windows_data = self._build_windows(candles_filtered, config)
+        logger.info(f"تعداد پنجره‌ها: {len(windows_config)}")
 
-        # ── اجرای بک‌تست برای هر پنجره ──────────────────────────────────────
+        # ─── اجرای بک‌تست برای هر پنجره ───
         window_results: List[WindowResult] = []
 
-        for idx, (train_c, val_c, test_c, dates) in enumerate(windows_data):
-            logger.info(f"  پنجره {idx+1}/{len(windows_data)} ...")
-
-            bt_config_base = BacktestConfig(
-                symbol             = config.symbol,
-                start_date         = dates["train_start"],
-                end_date           = dates["train_end"],
-                initial_balance    = config.initial_balance,
-                risk_per_trade_pct = config.risk_per_trade_pct,
-                min_confidence     = config.min_confidence,
-                pip_size           = config.pip_size,
-                pip_value          = config.pip_value,
-                commission_per_lot = config.commission_per_lot,
+        for idx, win_cfg in enumerate(windows_config):
+            logger.info(
+                f"پنجره {idx + 1}/{len(windows_config)} | "
+                f"Training: {win_cfg['training_start'].date()} - "
+                f"{win_cfg['training_end'].date()}"
             )
 
-            # Training
-            train_cfg    = self._make_config(bt_config_base, dates["train_start"], dates["train_end"])
-            train_result = await self._backtest_engine.run(train_cfg, train_c, signal_generator)
-
-            # Validation
-            val_cfg      = self._make_config(bt_config_base, dates["val_start"], dates["val_end"])
-            val_result   = await self._backtest_engine.run(val_cfg, val_c, signal_generator)
-
-            # Test
-            test_cfg     = self._make_config(bt_config_base, dates["test_start"], dates["test_end"])
-            test_result  = await self._backtest_engine.run(test_cfg, test_c, signal_generator)
-
-            # ── بررسی معیار کیفیت ─────────────────────────────────────────────
-            passed = (
-                test_result.profit_factor >= 1.2
-                and test_result.win_rate >= 0.45
-                and test_result.max_drawdown <= 15.0
+            win_result = await self._run_window(
+                idx, win_cfg, candles, config, signal_generator
             )
+            window_results.append(win_result)
+            await asyncio.sleep(0)
 
-            window_results.append(WindowResult(
-                window_id          = idx + 1,
-                train_start        = dates["train_start"],
-                train_end          = dates["train_end"],
-                validation_start   = dates["val_start"],
-                validation_end     = dates["val_end"],
-                test_start         = dates["test_start"],
-                test_end           = dates["test_end"],
-                train_result       = train_result,
-                validation_result  = val_result,
-                test_result        = test_result,
-                test_profit_pct    = test_result.net_profit_pct,
-                test_win_rate      = test_result.win_rate,
-                test_profit_factor = test_result.profit_factor,
-                test_max_drawdown  = test_result.max_drawdown,
-                passed             = passed,
-            ))
+        # ─── محاسبه آمار کلی ───
+        result = self._calculate_overall(window_results, config)
 
-        return self._aggregate_results(config, window_results)
+        logger.info(
+            f"Walk-Forward کامل | "
+            f"پنجره‌ها: {result.total_windows} | "
+            f"قبول: {result.passed_windows} | "
+            f"Consistency: {result.consistency_score:.1f}"
+        )
+
+        return result
 
     def _build_windows(
         self,
-        candles: List[Any],
-        config : WalkForwardConfig,
-    ) -> List[Tuple]:
+        start: datetime,
+        end: datetime,
+        config: WalkForwardConfig,
+    ) -> List[Dict[str, datetime]]:
         """
-        ساخت پنجره‌های rolling برای Walk-Forward
+        ساخت پنجره‌های زمانی Rolling
 
-        هر پنجره شامل سه بخش train/validation/test است.
+        هر پنجره به سه بخش تقسیم می‌شود:
+          Training → Validation → Testing
         """
-        n          = len(candles)
-        windows    = []
-        count      = config.window_count if config.use_rolling_windows else 1
-        step_size  = n // (count + 1)
+        windows = []
+        window_start = start
+        total_days = (config.training_days + config.validation_days + config.testing_days)
 
-        for i in range(count):
-            start_idx  = i * step_size
-            end_idx    = start_idx + step_size * 2
-            end_idx    = min(end_idx, n - 1)
-            window_len = end_idx - start_idx
+        while True:
+            train_start = window_start
+            train_end = train_start + timedelta(days=config.training_days)
+            val_start = train_end
+            val_end = val_start + timedelta(days=config.validation_days)
+            test_start = val_end
+            test_end = test_start + timedelta(days=config.testing_days)
 
-            t_end  = start_idx + int(window_len * config.train_ratio)
-            v_end  = t_end + int(window_len * config.validation_ratio)
-            te_end = min(v_end + int(window_len * config.test_ratio), n - 1)
+            if test_end > end:
+                break
 
-            train_c = candles[start_idx : t_end]
-            val_c   = candles[t_end      : v_end]
-            test_c  = candles[v_end      : te_end]
+            windows.append({
+                "training_start": train_start,
+                "training_end": train_end,
+                "validation_start": val_start,
+                "validation_end": val_end,
+                "testing_start": test_start,
+                "testing_end": test_end,
+            })
 
-            if len(train_c) < 50 or len(test_c) < 20:
-                continue
-
-            dates = {
-                "train_start": candles[start_idx].timestamp,
-                "train_end"  : candles[t_end - 1].timestamp,
-                "val_start"  : candles[t_end].timestamp,
-                "val_end"    : candles[v_end - 1].timestamp,
-                "test_start" : candles[v_end].timestamp,
-                "test_end"   : candles[te_end - 1].timestamp,
-            }
-            windows.append((train_c, val_c, test_c, dates))
+            window_start += timedelta(days=config.step_days)
 
         return windows
 
-    def _make_config(
+    def _filter_candles(
         self,
-        base      : BacktestConfig,
-        start_date: datetime,
-        end_date  : datetime,
-    ) -> BacktestConfig:
-        """ساخت BacktestConfig برای یک پنجره"""
-        from dataclasses import replace
-        return BacktestConfig(
-            symbol             = base.symbol,
-            start_date         = start_date,
-            end_date           = end_date,
-            initial_balance    = base.initial_balance,
-            risk_per_trade_pct = base.risk_per_trade_pct,
-            min_confidence     = base.min_confidence,
-            pip_size           = base.pip_size,
-            pip_value          = base.pip_value,
-            commission_per_lot = base.commission_per_lot,
+        candles: List[CandleData],
+        start: datetime,
+        end: datetime,
+    ) -> List[CandleData]:
+        """فیلتر کندل‌ها بر اساس بازه زمانی"""
+        return [c for c in candles if start <= c.timestamp < end]
+
+    async def _run_window(
+        self,
+        idx: int,
+        win_cfg: Dict[str, datetime],
+        all_candles: List[CandleData],
+        config: WalkForwardConfig,
+        signal_generator: Optional[Any],
+    ) -> WindowResult:
+        """
+        اجرای بک‌تست برای یک پنجره
+
+        هر سه مرحله Training، Validation و Testing را جداگانه اجرا می‌کند.
+        """
+        window = WindowResult(
+            window_index=idx,
+            training_start=win_cfg["training_start"],
+            training_end=win_cfg["training_end"],
+            validation_start=win_cfg["validation_start"],
+            validation_end=win_cfg["validation_end"],
+            testing_start=win_cfg["testing_start"],
+            testing_end=win_cfg["testing_end"],
         )
 
-    def _aggregate_results(
+        base_config = BacktestConfig(
+            symbol=config.symbol,
+            initial_balance=config.initial_balance,
+            risk_per_trade_percent=config.risk_per_trade,
+            min_confidence_score=config.min_confidence,
+            start_date=datetime.min,
+            end_date=datetime.max,
+        )
+
+        # ─── Training ───
+        try:
+            train_candles = self._filter_candles(
+                all_candles, win_cfg["training_start"], win_cfg["training_end"]
+            )
+            if len(train_candles) >= 50:
+                base_config.start_date = win_cfg["training_start"]
+                base_config.end_date = win_cfg["training_end"]
+                train_result = await self._backtest_engine.run(
+                    train_candles, base_config, signal_generator
+                )
+                window.training_metrics = train_result.metrics
+        except Exception as e:
+            logger.warning(f"خطا در Training پنجره {idx}: {e}")
+
+        # ─── Validation ───
+        try:
+            val_candles = self._filter_candles(
+                all_candles, win_cfg["validation_start"], win_cfg["validation_end"]
+            )
+            if len(val_candles) >= 20:
+                base_config.start_date = win_cfg["validation_start"]
+                base_config.end_date = win_cfg["validation_end"]
+                val_result = await self._backtest_engine.run(
+                    val_candles, base_config, signal_generator
+                )
+                window.validation_metrics = val_result.metrics
+        except Exception as e:
+            logger.warning(f"خطا در Validation پنجره {idx}: {e}")
+
+        # ─── Testing ───
+        try:
+            test_candles = self._filter_candles(
+                all_candles, win_cfg["testing_start"], win_cfg["testing_end"]
+            )
+            if len(test_candles) >= 20:
+                base_config.start_date = win_cfg["testing_start"]
+                base_config.end_date = win_cfg["testing_end"]
+                test_result = await self._backtest_engine.run(
+                    test_candles, base_config, signal_generator
+                )
+                window.testing_metrics = test_result.metrics
+        except Exception as e:
+            logger.warning(f"خطا در Testing پنجره {idx}: {e}")
+
+        # ─── قضاوت پنجره ───
+        window.passed, window.pass_reason, window.fail_reason = (
+            self._evaluate_window(window)
+        )
+
+        return window
+
+    def _evaluate_window(self, window: WindowResult) -> Tuple[bool, str, str]:
+        """
+        ارزیابی یک پنجره
+
+        پنجره قبول است اگر:
+          - Validation profit factor > 1.2
+          - Testing profit factor > 1.0
+          - Max drawdown در testing < 20%
+
+        Returns:
+            Tuple[bool, str, str]: (قبول شد، دلیل قبول، دلیل رد)
+        """
+        if not window.validation_metrics or not window.testing_metrics:
+            return False, "", "داده کافی وجود ندارد"
+
+        vm = window.validation_metrics
+        tm = window.testing_metrics
+
+        # ─── بررسی Validation ───
+        if vm.profit_factor < 1.2:
+            return False, "", f"Validation PF ضعیف: {vm.profit_factor:.2f}"
+
+        if vm.total_trades < 3:
+            return False, "", "تعداد معاملات Validation کم است"
+
+        # ─── بررسی Testing ───
+        if tm.profit_factor < 1.0:
+            return False, "", f"Testing PF منفی: {tm.profit_factor:.2f}"
+
+        if tm.max_drawdown_percent > 20.0:
+            return False, "", f"Testing Drawdown بالا: {tm.max_drawdown_percent:.1f}%"
+
+        reason = (
+            f"Val PF={vm.profit_factor:.2f}, "
+            f"Test PF={tm.profit_factor:.2f}, "
+            f"Test WR={tm.win_rate:.1f}%"
+        )
+        return True, reason, ""
+
+    def _calculate_overall(
         self,
-        config : WalkForwardConfig,
         windows: List[WindowResult],
+        config: WalkForwardConfig,
     ) -> WalkForwardResult:
         """
-        تجمیع نتایج تمام پنجره‌ها و محاسبه توصیه نهایی
+        محاسبه آمار کلی از تمام پنجره‌ها
+
+        معیار Consistency بر اساس ثبات نتایج در پنجره‌های مختلف محاسبه می‌شود.
         """
-        if not windows:
-            return self._empty_result(config)
+        result = WalkForwardResult(config=config, windows=windows)
+        result.total_windows = len(windows)
+        result.passed_windows = sum(1 for w in windows if w.passed)
+        result.failed_windows = result.total_windows - result.passed_windows
 
-        profits  = [w.test_profit_pct    for w in windows]
-        wr       = [w.test_win_rate      for w in windows]
-        pf       = [w.test_profit_factor for w in windows]
-        dd       = [w.test_max_drawdown  for w in windows]
-        passed   = [w.passed             for w in windows]
+        # ─── میانگین‌های testing ───
+        test_metrics = [w.testing_metrics for w in windows if w.testing_metrics]
+        if test_metrics:
+            result.avg_win_rate = sum(m.win_rate for m in test_metrics) / len(test_metrics)
+            result.avg_profit_factor = sum(m.profit_factor for m in test_metrics) / len(test_metrics)
+            result.avg_sharpe_ratio = sum(m.sharpe_ratio for m in test_metrics) / len(test_metrics)
+            result.avg_max_drawdown = sum(m.max_drawdown_percent for m in test_metrics) / len(test_metrics)
+            result.avg_return = sum(m.return_percent for m in test_metrics) / len(test_metrics)
 
-        avg_profit = statistics.mean(profits)
-        avg_wr     = statistics.mean(wr)
-        avg_pf     = statistics.mean(pf)
-        avg_dd     = statistics.mean(dd)
-        pass_rate  = sum(passed) / len(passed)
+        # ─── Consistency Score (0-100) ───
+        if result.total_windows > 0:
+            pass_rate = result.passed_windows / result.total_windows
 
-        # ── محاسبه consistency score ─────────────────────────────────────────
-        # بر اساس انحراف معیار نتایج — هر چه کمتر، ثبات بیشتر
-        if len(profits) > 1:
-            std_profit = statistics.stdev(profits)
-            consistency = max(0, 100 - std_profit * 5)
+            # ثبات Profit Factor در بین پنجره‌ها
+            pf_values = [m.profit_factor for m in test_metrics if m and m.total_trades > 0]
+            if len(pf_values) > 1:
+                pf_mean = sum(pf_values) / len(pf_values)
+                pf_var = sum((v - pf_mean) ** 2 for v in pf_values) / len(pf_values)
+                pf_std = math.sqrt(pf_var)
+                pf_cv = pf_std / pf_mean if pf_mean > 0 else 1.0  # Coefficient of Variation
+                stability_score = max(0, 1 - pf_cv)  # ۱ = کاملاً ثابت
+            else:
+                stability_score = 0.5
+
+            result.consistency_score = (pass_rate * 0.6 + stability_score * 0.4) * 100
+
+        # ─── تعیین Robust بودن ───
+        notes = []
+        if result.total_windows >= 3 and result.passed_windows / result.total_windows >= 0.6:
+            result.is_robust = True
+            notes.append("✅ بیش از ۶۰٪ پنجره‌ها قبول شدند")
         else:
-            consistency = 50.0
+            result.is_robust = False
+            notes.append("⚠️ کمتر از ۶۰٪ پنجره‌ها قبول شدند")
 
-        # ── توصیه نهایی ──────────────────────────────────────────────────────
-        if pass_rate >= 0.8 and avg_pf >= 1.5 and consistency >= 70:
-            recommendation = "ROBUST"
-            rec_fa = "✅ استراتژی قوی و قابل اعتماد — آماده معامله واقعی"
-        elif pass_rate >= 0.6 and avg_pf >= 1.2:
-            recommendation = "ACCEPTABLE"
-            rec_fa = "⚠️ استراتژی قابل قبول — نیاز به بهینه‌سازی بیشتر"
+        if result.avg_profit_factor >= 1.5:
+            notes.append("✅ Profit Factor میانگین مناسب است")
+        elif result.avg_profit_factor >= 1.2:
+            notes.append("⚠️ Profit Factor میانگین قابل قبول است")
         else:
-            recommendation = "OVERFITTED"
-            rec_fa = "❌ استراتژی احتمالاً بیش از حد بهینه‌شده — توصیه نمی‌شود"
+            notes.append("❌ Profit Factor میانگین ضعیف است")
 
-        summary = (
-            f"Walk-Forward ({len(windows)} پنجره) | "
-            f"سود میانگین: {avg_profit:.1f}٪ | "
-            f"PF: {avg_pf:.2f} | "
-            f"Pass Rate: {pass_rate*100:.0f}٪ | "
-            f"{rec_fa}"
-        )
+        if result.avg_max_drawdown <= 15:
+            notes.append("✅ Drawdown میانگین در محدوده امن است")
+        elif result.avg_max_drawdown <= 25:
+            notes.append("⚠️ Drawdown میانگین قابل توجه است")
+        else:
+            notes.append("❌ Drawdown میانگین بالا است")
 
-        logger.info(f"🔬 {summary}")
-
-        return WalkForwardResult(
-            config             = config,
-            windows            = windows,
-            avg_test_profit    = round(avg_profit, 2),
-            avg_win_rate       = round(avg_wr, 4),
-            avg_profit_factor  = round(avg_pf, 2),
-            avg_max_drawdown   = round(avg_dd, 2),
-            consistency_score  = round(consistency, 1),
-            pass_rate          = round(pass_rate, 4),
-            recommendation     = recommendation,
-            summary            = summary,
-        )
-
-    def _empty_result(self, config: WalkForwardConfig) -> WalkForwardResult:
-        """نتیجه خالی برای حالت خطا"""
-        return WalkForwardResult(
-            config             = config,
-            windows            = [],
-            avg_test_profit    = 0.0,
-            avg_win_rate       = 0.0,
-            avg_profit_factor  = 0.0,
-            avg_max_drawdown   = 0.0,
-            consistency_score  = 0.0,
-            pass_rate          = 0.0,
-            recommendation     = "INSUFFICIENT_DATA",
-            summary            = "داده کافی برای تحلیل وجود ندارد",
-        )
-
-
-# ─── نمونه singleton ──────────────────────────────────────────────────────────
-walk_forward_analyzer = WalkForwardAnalyzer()
+        result.robustness_notes = notes
+        return result
