@@ -1,12 +1,10 @@
-"""
-هسته اصلی سیستم معامله‌گری MT5
+"""Core package — config, logger, enums, unified_types."""
+from .logger import get_logger, setup_logger
+from .enums import TradeDirection, TradingSession
 
-این ماژول شامل:
-- تنظیمات مرکزی
-- لاگر
-- ثوابت و Enum‌ها
-- مدیریت رویدادها
-"""
-
-__version__ = "1.0.0"
-__author__ = "MT5 Trading Team"
+__all__ = [
+    "get_logger",
+    "setup_logger",
+    "TradeDirection",
+    "TradingSession",
+]

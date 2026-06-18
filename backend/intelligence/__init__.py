@@ -1,23 +1,14 @@
-"""
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: Intelligence (هوش مصنوعی)
-
-شامل:
-  • TradeMemory     ← حافظه معاملاتی per-trade context
-  • FailureAnalyzer ← تشخیص نقض قوانین vs زیان عادی
-  • MLEngine        ← XGBoost + LightGBM + CatBoost
-  • WeightAdjuster  ← تنظیم وزن اندیکاتورها
-"""
-
-from .trade_memory import TradeMemory, TradeContext, TradeOutcome
-from .failure_analyzer import FailureAnalyzer, FailureReport, FailureType
-from .ml_engine import MLEngine, MLPrediction, ModelType
-from .weight_adjuster import WeightAdjuster, WeightUpdate
+"""Intelligence package — ML Engine + patches."""
+from .ml_engine import MLEngine, MLPrediction, TrainingResult, ModelType, DriftStatus
+try:
+    from . import ml_engine_patch  # noqa: F401  — applies drift_status fix
+except Exception:
+    pass
 
 __all__ = [
-    "TradeMemory", "TradeContext", "TradeOutcome",
-    "FailureAnalyzer", "FailureReport", "FailureType",
-    "MLEngine", "MLPrediction", "ModelType",
-    "WeightAdjuster", "WeightUpdate",
+    "MLEngine",
+    "MLPrediction",
+    "TrainingResult",
+    "ModelType",
+    "DriftStatus",
 ]
