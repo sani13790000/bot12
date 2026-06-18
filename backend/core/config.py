@@ -6,7 +6,7 @@
 هیچ مقدار حساسی نباید در کد hardcode شود.
 
 نویسنده: Galaxy Vast Team
-نسخه: 2.0.0
+نسخه: 2.1.0 — فاز ۲: Portfolio Risk + Daily Limits + Semi-Auto
 """
 
 import os
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # برند و هویت سیستم
     # =====================================================
     APP_NAME: str = "Galaxy Vast AI Trading Platform"
-    APP_VERSION: str = "2.0.0"
+    APP_VERSION: str = "2.1.0"
     APP_BRAND: str = "Galaxy Vast"
     APP_DESCRIPTION: str = "سیستم هوشمند معامله‌گری نهادی — Galaxy Vast"
     APP_SUPPORT_USERNAME: str = "GalaxyVast_Support"
@@ -90,14 +90,31 @@ class Settings(BaseSettings):
     LTF_WEIGHT: float = 0.05
 
     # =====================================================
-    # تنظیمات مدیریت ریسک
+    # تنظیمات مدیریت ریسک — معامله تکی
     # =====================================================
-    MAX_RISK_PER_TRADE: float = 2.0     # درصد از موجودی
-    MAX_DAILY_RISK: float = 5.0         # درصد از موجودی
-    MAX_DAILY_TRADES: int = 10
-    MAX_DRAWDOWN: float = 15.0          # درصد — حد ضرر کل
-    MAX_PORTFOLIO_RISK: float = 5.0     # درصد — ریسک کل پرتفولیو
-    MAX_SPREAD_POINTS: int = 30         # حداکثر اسپرد مجاز
+    MAX_RISK_PER_TRADE: float = 2.0         # درصد از موجودی
+    MAX_SPREAD_POINTS: int = 30             # حداکثر اسپرد مجاز
+
+    # =====================================================
+    # تنظیمات ریسک پرتفولیو — فاز ۲ (جدید)
+    # =====================================================
+    MAX_PORTFOLIO_RISK_PERCENT: float = 5.0     # حداکثر ریسک کل همه معاملات باز
+    MAX_SINGLE_CURRENCY_EXPOSURE: float = 3.0   # حداکثر exposure یک ارز
+    CORRELATION_RISK_MULTIPLIER: float = 0.3    # ضریب جریمه همبستگی
+
+    # =====================================================
+    # محدودیت‌های زمانی — فاز ۲ (جدید)
+    # =====================================================
+    MAX_DAILY_TRADES: int = 5               # حداکثر معاملات در روز
+    MAX_DAILY_LOSS_PERCENT: float = 3.0     # حداکثر ضرر روزانه (درصد موجودی)
+    MAX_WEEKLY_LOSS_PERCENT: float = 7.0    # حداکثر ضرر هفتگی (درصد موجودی)
+    MAX_MONTHLY_DRAWDOWN_PERCENT: float = 15.0  # حداکثر drawdown ماهانه
+
+    # =====================================================
+    # تنظیمات Semi-Auto Mode — فاز ۲ (جدید)
+    # =====================================================
+    TRADING_MODE: str = "FULL_AUTO"         # SIGNAL_ONLY | SEMI_AUTO | FULL_AUTO
+    SEMI_AUTO_CONFIRMATION_TIMEOUT_SECONDS: int = 120  # ۲ دقیقه برای تأیید
 
     # =====================================================
     # تنظیمات سشن‌های Kill Zone
