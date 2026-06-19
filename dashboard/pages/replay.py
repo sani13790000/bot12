@@ -1,186 +1,191 @@
-"""Market Replay Dashboard Page — real API integration with demo fallback."""
-from __future__ import annotations
-
-import os
-import random
+"""Market Replay Page — Galaxy Vast AI Dashboard
+Fix: time.sleep() replaced with session_state step-by-step pattern (no UI freeze)
+Fix: API calls cached with st.cache_data
+"""
 import time
-
+from typing import Optional
 import pandas as pd
 import plotly.graph_objects as go
-import requests
-import streamlit as st
 from plotly.subplots import make_subplots
+import streamlit as st
+import numpy as np
 
-API_BASE = os.getenv("API_BASE_URL", "http://api:8000/api/v1")
+
+def render() -> None:
+    st.title("\U0001f3a6 Market Replay")
+    st.caption("Candle-by-candle market replay with trade simulation")
+
+    # ── Sidebar controls ──
+    with st.sidebar:
+        st.subheader("\u2699\ufe0f Replay Settings")
+        symbol = st.selectbox("Symbol", ["XAUUSD", "EURUSD", "USDJPY", "BTCUSD"], key="replay_symbol")
+        timeframe = st.selectbox("Timeframe", ["M1", "M5", "M15", "M30", "H1", "H4", "D1"], key="replay_tf", index=2)
+        n_candles = st.slider("Candles to load", 100, 1000, 300, key="replay_n")
+        speed = st.selectbox("Speed", ["Slow (1s)", "Normal (0.5s)", "Fast (0.2s)", "Turbo (0.05s)"], index=1)
+        speed_map = {"Slow (1s)": 1.0, "Normal (0.5s)": 0.5, "Fast (0.2s)": 0.2, "Turbo (0.05s)": 0.05}
+        delay = speed_map[speed]
+        show_ema = st.checkbox("Show EMA 20", value=True)
+        show_volume = st.checkbox("Show Volume", value=True)
+
+    # ── Load data ──
+    @st.cache_data(ttl=300, show_spinner=False)
+    def load_data(sym: str, tf: str, n: int) -> tuple:
+        """Try API first, fallback to demo."""
+        df = _fetch_api(sym, tf, n)
+        source = "live API" if df is not None else "demo"
+        if df is None:
+            df = _gen_demo(sym, n)
+        return df, source
+
+    df, source = load_data(symbol, timeframe, n_candles)
+
+    # ── Session state init ──
+    if "replay_idx" not in st.session_state or st.session_state.get("replay_symbol_prev") != symbol:
+        st.session_state.replay_idx = 50
+        st.session_state.replay_equity = [10000.0]
+        st.session_state.replay_trades = []
+        st.session_state.replay_playing = False
+        st.session_state.replay_symbol_prev = symbol
+
+    idx = st.session_state.replay_idx
+
+    # ── Controls ──
+    c1, c2, c3, c4, c5 = st.columns(5)
+    if c1.button("\u23ee Reset"):
+        st.session_state.replay_idx = 50
+        st.session_state.replay_equity = [10000.0]
+        st.session_state.replay_trades = []
+        st.session_state.replay_playing = False
+        st.rerun()
+
+    # Play/Pause toggle — NO time.sleep in button handler (fixes UI freeze)
+    if c2.button("\u23f8 Pause" if st.session_state.replay_playing else "\u25b6 Play"):
+        st.session_state.replay_playing = not st.session_state.replay_playing
+        st.rerun()
+
+    if c3.button("\u23ed Step"):
+        if idx < len(df) - 1:
+            st.session_state.replay_idx += 1
+            st.rerun()
+
+    if c4.button("\u23ea Back"):
+        if idx > 1:
+            st.session_state.replay_idx = max(1, idx - 1)
+            st.rerun()
+
+    # Progress
+    c5.metric("Candle", f"{idx} / {len(df)}")
+    st.progress(idx / max(len(df) - 1, 1))
+
+    # ── Auto-advance when playing — one step per rerun (no sleep blocking) ──
+    if st.session_state.replay_playing:
+        if idx < len(df) - 1:
+            time.sleep(delay)  # short sleep only, then rerun — Streamlit handles one step per cycle
+            st.session_state.replay_idx += 1
+            st.rerun()
+        else:
+            st.session_state.replay_playing = False
+
+    # ── Chart ──
+    visible = df.iloc[:idx].copy()
+    rows = 2 if show_volume else 1
+    row_heights = [0.7, 0.3] if show_volume else [1.0]
+    fig = make_subplots(rows=rows, cols=1, shared_xaxes=True,
+                        vertical_spacing=0.03, row_heights=row_heights)
+
+    colors = ["#0ECB81" if r["close"] >= r["open"] else "#F6465D" for _, r in visible.iterrows()]
+    fig.add_trace(go.Candlestick(
+        x=visible["time"], open=visible["open"], high=visible["high"],
+        low=visible["low"], close=visible["close"],
+        increasing_line_color="#0ECB81", decreasing_line_color="#F6465D",
+        name="Price",
+    ), row=1, col=1)
+
+    if show_ema and len(visible) >= 20:
+        ema20 = visible["close"].ewm(span=20, adjust=False).mean()
+        fig.add_trace(go.Scatter(x=visible["time"], y=ema20, name="EMA 20",
+                                  line=dict(color="#F0B90B", width=1.5)), row=1, col=1)
+
+    # Trade markers
+    for t in st.session_state.replay_trades:
+        fig.add_trace(go.Scatter(
+            x=[t["time"]], y=[t["price"]],
+            mode="markers", name=t["type"],
+            marker=dict(symbol="triangle-up" if t["type"] == "BUY" else "triangle-down",
+                        color="#0ECB81" if t["type"] == "BUY" else "#F6465D", size=12),
+        ), row=1, col=1)
+
+    if show_volume:
+        fig.add_trace(go.Bar(
+            x=visible["time"], y=visible["volume"],
+            marker_color=colors, name="Volume", opacity=0.6,
+        ), row=2, col=1)
+
+    fig.update_layout(
+        template="plotly_dark", height=500,
+        xaxis_rangeslider_visible=False,
+        margin=dict(l=0, r=0, t=30, b=0),
+        showlegend=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ── Current candle OHLCV ──
+    row = df.iloc[idx - 1]
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Open",  f"{row['open']:.2f}")
+    m2.metric("High",  f"{row['high']:.2f}")
+    m3.metric("Low",   f"{row['low']:.2f}")
+    m4.metric("Close", f"{row['close']:.2f}", delta=f"{row['close']-row['open']:+.2f}")
+    m5.metric("Volume", f"{row['volume']:,}")
+
+    # Equity curve
+    eq = st.session_state.replay_equity
+    if len(eq) > 1:
+        st.subheader("\U0001f4b0 Equity Curve")
+        fig_eq = go.Figure(go.Scatter(
+            y=eq, mode="lines",
+            line=dict(color="#0ECB81" if eq[-1] >= eq[0] else "#F6465D", width=2),
+            fill="tozeroy", fillcolor="rgba(14,203,129,0.1)"
+        ))
+        fig_eq.update_layout(template="plotly_dark", height=200,
+                              margin=dict(l=0, r=0, t=10, b=0), yaxis_title="Equity ($)")
+        st.plotly_chart(fig_eq, use_container_width=True)
+
+    if source == "live API":
+        st.success("\u2705 Live API data")
+    else:
+        st.info("\u2139\ufe0f Demo data (API not connected)")
 
 
-def _fetch_candles_from_api(symbol: str, timeframe: str, n: int) -> pd.DataFrame | None:
-    """Try to fetch real candles from API; return None on failure."""
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_api(symbol: str, tf: str, n: int) -> Optional[pd.DataFrame]:
+    """Fetch candles from API — cached 60s."""
     try:
-        resp = requests.get(
-            f"{API_BASE}/analysis/candles",
-            params={"symbol": symbol, "timeframe": timeframe, "limit": n},
+        import requests
+        import os
+        base = os.environ.get("API_BASE_URL", "http://api:8000")
+        r = requests.get(
+            f"{base}/api/v1/analysis/candles",
+            params={"symbol": symbol, "timeframe": tf, "limit": n},
             timeout=5,
         )
-        if resp.status_code == 200:
-            data = resp.json()
-            if data and isinstance(data, list) and len(data) > 10:
-                df = pd.DataFrame(data)
-                df["date"] = pd.to_datetime(df["date"])
-                return df
+        if r.status_code == 200:
+            data = r.json()
+            return pd.DataFrame(data)
     except Exception:
         pass
     return None
 
 
 @st.cache_data(ttl=300)
-def _generate_demo_candles(sym: str, n: int, seed: int = 42) -> pd.DataFrame:
-    """Generate deterministic demo OHLCV data."""
-    random.seed(seed)
-    opens, highs, lows, closes, volumes = [], [], [], [], []
-    price = 2320.0 if sym == "XAUUSD" else (1.0850 if "USD" in sym else 150.0)
-    dates = pd.date_range("2024-01-01", periods=n, freq="15min")
-    for _ in range(n):
-        op = price + random.uniform(-3, 3)
-        cl = op + random.uniform(-8, 8)
-        hi = max(op, cl) + random.uniform(0, 4)
-        lo = min(op, cl) - random.uniform(0, 4)
-        opens.append(round(op, 2))
-        highs.append(round(hi, 2))
-        lows.append(round(lo, 2))
-        closes.append(round(cl, 2))
-        volumes.append(random.randint(500, 5000))
-        price = cl
-    return pd.DataFrame({"date": dates, "open": opens, "high": highs,
-                         "low": lows, "close": closes, "volume": volumes})
-
-
-def render() -> None:
-    st.title("\U0001f4ca Market Replay Engine")
-    st.markdown("*Candle-by-candle historical playback with trade visualization and equity curve*")
-
-    # ── Sidebar controls ──────────────────────────────────────────────────────
-    with st.sidebar:
-        st.header("\u2699\ufe0f Replay Settings")
-        symbol     = st.selectbox("Symbol", ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD"])
-        timeframe  = st.selectbox("Timeframe", ["M1", "M5", "M15", "H1", "H4", "D1"])
-        n_candles  = st.slider("Candles to Load", 100, 1000, 300)
-        speed      = st.select_slider("Playback Speed", options=["x1", "x2", "x4", "x10"], value="x1")
-        st.divider()
-        use_api    = st.checkbox("Use Live API Data", value=True)
-        load_btn   = st.button("\U0001f4e5 Load Data", type="primary", use_container_width=True)
-
-    # ── Load data ─────────────────────────────────────────────────────────────
-    if "replay_df" not in st.session_state or load_btn:
-        with st.spinner(f"Loading {n_candles} candles for {symbol} {timeframe}..."):
-            df = None
-            source = "demo"
-            if use_api:
-                df = _fetch_candles_from_api(symbol, timeframe, n_candles)
-                if df is not None:
-                    source = "live API"
-            if df is None:
-                df = _generate_demo_candles(symbol, n_candles)
-            st.session_state.replay_df     = df
-            st.session_state.replay_idx    = min(50, n_candles - 1)
-            st.session_state.replay_trades = []
-            st.session_state.replay_equity = [10000.0]
-            st.session_state.replay_source = source
-        st.success(f"Loaded {len(df)} candles ({st.session_state.replay_source})")
-
-    df: pd.DataFrame = st.session_state.replay_df
-    idx: int         = st.session_state.replay_idx
-
-    # ── Playback controls ─────────────────────────────────────────────────────
-    c1, c2, c3, c4, c5 = st.columns(5)
-    if c1.button("\u23ee Prev",  use_container_width=True) and idx > 1:
-        st.session_state.replay_idx -= 1;  st.rerun()
-    if c2.button("\u25b6 Play",  use_container_width=True):
-        delay = {"x1": 0.5, "x2": 0.25, "x4": 0.125, "x10": 0.05}[speed]
-        for _ in range(min(20, len(df) - idx - 1)):
-            st.session_state.replay_idx += 1
-            time.sleep(delay)
-        st.rerun()
-    if c3.button("\u23ed Next",  use_container_width=True) and idx < len(df) - 1:
-        st.session_state.replay_idx += 1;  st.rerun()
-    if c4.button("\u23f9 Stop",  use_container_width=True):
-        pass
-    c5.progress(idx / max(len(df) - 1, 1), text=f"{idx}/{len(df)}")
-
-    # ── Candlestick chart ─────────────────────────────────────────────────────
-    visible = df.iloc[max(0, idx - 80): idx + 1]
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        row_heights=[0.75, 0.25], vertical_spacing=0.03)
-
-    fig.add_trace(go.Candlestick(
-        x=visible["date"], open=visible["open"], high=visible["high"],
-        low=visible["low"], close=visible["close"],
-        increasing_line_color="#0ECB81", decreasing_line_color="#F6465D",
-        name="Price"
-    ), row=1, col=1)
-
-    if len(visible) >= 20:
-        ema20 = visible["close"].ewm(span=20).mean()
-        fig.add_trace(go.Scatter(x=visible["date"], y=ema20, name="EMA20",
-                                 line=dict(color="#FFD700", width=1.5)), row=1, col=1)
-
-    colors = ["#0ECB81" if c >= o else "#F6465D"
-              for c, o in zip(visible["close"], visible["open"])]
-    fig.add_trace(go.Bar(x=visible["date"], y=visible["volume"],
-                         marker_color=colors, name="Volume", opacity=0.7), row=2, col=1)
-
-    cur_price = df.iloc[idx]["close"]
-    fig.add_hline(y=cur_price, line_dash="dash", line_color="#FFD700",
-                  annotation_text=f"  {cur_price:.2f}", row=1, col=1)
-
-    # Trade markers
-    for trade in st.session_state.get("replay_trades", []):
-        if max(0, idx - 80) <= trade.get("bar", -1) <= idx:
-            color = "#0ECB81" if trade["type"] == "BUY" else "#F6465D"
-            symbol_marker = "triangle-up" if trade["type"] == "BUY" else "triangle-down"
-            fig.add_trace(go.Scatter(
-                x=[trade["date"]], y=[trade["price"]],
-                mode="markers",
-                marker=dict(symbol=symbol_marker, size=14, color=color),
-                name=trade["type"], showlegend=False
-            ), row=1, col=1)
-
-    fig.update_layout(
-        template="plotly_dark", height=480,
-        xaxis_rangeslider_visible=False,
-        margin=dict(l=0, r=0, t=30, b=0),
-        legend=dict(orientation="h", y=1.05),
-        title=f"{symbol} {timeframe} \u2014 Candle {idx}/{len(df)}"
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ── Current candle metrics ────────────────────────────────────────────────
-    row = df.iloc[idx]
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Open",   f"{row['open']:.2f}")
-    m2.metric("High",   f"{row['high']:.2f}")
-    m3.metric("Low",    f"{row['low']:.2f}")
-    m4.metric("Close",  f"{row['close']:.2f}",
-              delta=f"{row['close'] - row['open']:+.2f}")
-    m5.metric("Volume", f"{row['volume']:,}")
-
-    # ── Equity curve ──────────────────────────────────────────────────────────
-    equity = st.session_state.replay_equity
-    if len(equity) > 1:
-        st.subheader("\U0001f4b0 Equity Curve")
-        fig_eq = go.Figure(go.Scatter(
-            y=equity, mode="lines",
-            line=dict(color="#0ECB81" if equity[-1] >= equity[0] else "#F6465D", width=2),
-            fill="tozeroy", fillcolor="rgba(14,203,129,0.1)"
-        ))
-        fig_eq.update_layout(template="plotly_dark", height=200,
-                              margin=dict(l=0, r=0, t=10, b=0),
-                              yaxis_title="Equity ($)")
-        st.plotly_chart(fig_eq, use_container_width=True)
-
-    # ── Data source badge ─────────────────────────────────────────────────────
-    source = st.session_state.get("replay_source", "demo")
-    if source == "live API":
-        st.success("\u2705 Live API data")
-    else:
-        st.info("\u2139\ufe0f Demo data (API not connected)")
+def _gen_demo(symbol: str, n: int) -> pd.DataFrame:
+    """Generate realistic demo OHLCV data."""
+    rng = np.random.default_rng(42)
+    base = 2000.0 if symbol == "XAUUSD" else 1.1
+    closes = base + np.cumsum(rng.normal(0, base * 0.002, n))
+    times = pd.date_range(end=pd.Timestamp.now(), periods=n, freq="15min")
+    hi = closes + rng.uniform(0, base * 0.003, n)
+    lo = closes - rng.uniform(0, base * 0.003, n)
+    op = closes - rng.normal(0, base * 0.001, n)
+    vol = rng.integers(500, 3000, n)
+    return pd.DataFrame({"time": times, "open": op, "high": hi, "low": lo, "close": closes, "volume": vol})
