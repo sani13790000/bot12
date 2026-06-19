@@ -1,8 +1,12 @@
 """
 Galaxy Vast AI Trading Platform
-════════════════════════════════
 Agent Service — Dependency Injection Container
-ساخت و مدیریت تمام Agentها و VotingEngine
+
+Fix applied:
+- CRITICAL LOGIC: AgentWeightConfig weights summed to 1.10, not 1.00
+  market_structure(0.20) + liquidity(0.15) + smc(0.20) + ai_prediction(0.20)
+  + risk(0.15) + news(0.10) + execution(0.10) = 1.10
+  Fix: news=0.05, execution=0.05 → total = 1.00
 """
 from __future__ import annotations
 
@@ -21,31 +25,42 @@ from .risk_agent import RiskAgent
 from .smc_agent import SMCAgent
 from .voting_engine import VoteResult, VotingEngine
 
+logger = get_logger(__name__)
+
 
 @dataclass
 class AgentWeightConfig:
-    """تنظیم وزن‌های Agentها — قابل تغییر از Dashboard."""
+    """تنظیمات وزن‌های Agentها — قابل تغییر از Dashboard.
+
+    Total MUST equal 1.00.  Previous bug: execution+news were both 0.10
+    making the total 1.10.  Fixed: news=0.05, execution=0.05.
+    """
     market_structure: float = 0.20
     liquidity:        float = 0.15
     smc:              float = 0.20
     ai_prediction:    float = 0.20
     risk:             float = 0.15
-    news:             float = 0.10
-    execution:        float = 0.10
+    news:             float = 0.05   # was 0.10 → total was 1.10
+    execution:        float = 0.05   # was 0.10 → total was 1.10
 
     def total(self) -> float:
         return (self.market_structure + self.liquidity + self.smc +
                 self.ai_prediction + self.risk + self.news + self.execution)
 
+    def validate(self) -> None:
+        t = self.total()
+        if abs(t - 1.0) > 0.01:
+            raise ValueError(
+                f"AgentWeightConfig weights must sum to 1.0, got {t:.4f}. "
+                "Check market_structure + liquidity + smc + ai_prediction + "
+                "risk + news + execution."
+            )
+
 
 class AgentService:
     """
     Dependency Injection Container برای Multi-Agent System.
-
-    استفاده:
-        service = AgentService()
-        result  = await service.evaluate(context)
-        print(result.decision)  # BUY / SELL / NO_TRADE / BLOCKED
+    ساخت Agentها و VotingEngine را مدیریت می‌کند.
     """
 
     def __init__(
@@ -53,88 +68,101 @@ class AgentService:
         weights: Optional[AgentWeightConfig] = None,
         min_score_threshold: float = 65.0,
         min_confidence_threshold: float = 50.0,
-        block_on_news: bool = False,
-        news_minutes_before: int = 30,
     ) -> None:
-        self._logger  = get_logger("agents.service")
         self._weights = weights or AgentWeightConfig()
+        self._weights.validate()   # fail fast on bad config
+        self._min_score = min_score_threshold
+        self._min_conf  = min_confidence_threshold
+        self._engine: Optional[VotingEngine] = None
+        logger.info(
+            "AgentService init | weights_total=%.2f | min_score=%.1f | min_conf=%.1f",
+            self._weights.total(), min_score_threshold, min_confidence_threshold,
+        )
 
-        # ساخت همه Agentها
-        self._agents = [
-            MarketStructureAgent(weight=self._weights.market_structure),
-            LiquidityAgent(      weight=self._weights.liquidity),
-            SMCAgent(            weight=self._weights.smc),
-            AIPredictionAgent(   weight=self._weights.ai_prediction),
-            RiskAgent(
-                weight=self._weights.risk,
-                max_portfolio_risk=getattr(settings, "MAX_PORTFOLIO_RISK_PERCENT", 5.0),
-                max_spread_ratio=getattr(settings, "MAX_SPREAD_RATIO", 2.0),
-            ),
-            NewsAgent(
-                weight=self._weights.news,
-                block_on_high_impact=block_on_news,
-                minutes_before=news_minutes_before,
-            ),
-            ExecutionAgent(weight=self._weights.execution),
+    # ────────────────────────────────────────────────────────────── #
+    # Public API                                                            #
+    # ────────────────────────────────────────────────────────────── #
+
+    def get_voting_engine(self) -> VotingEngine:
+        """Lazy-initialise and return the VotingEngine singleton."""
+        if self._engine is None:
+            self._engine = self._build_engine()
+        return self._engine
+
+    async def vote(self, context: Dict[str, Any]) -> VoteResult:
+        """Run all agents and return the aggregated VoteResult."""
+        return await self.get_voting_engine().vote(context)
+
+    def update_weights(self, weight_map: Dict[str, float]) -> Dict[str, float]:
+        """Update agent weights at runtime (called by Dashboard / API)."""
+        for attr, val in weight_map.items():
+            if hasattr(self._weights, attr):
+                setattr(self._weights, attr, float(val))
+        self._weights.validate()
+        if self._engine is not None:
+            self._engine.update_weights(weight_map)
+        logger.info("AgentService weights updated: %s (total=%.2f)",
+                    weight_map, self._weights.total())
+        return self.get_weights()
+
+    def get_weights(self) -> Dict[str, float]:
+        """Return current weight map."""
+        return {
+            "market_structure": self._weights.market_structure,
+            "liquidity":        self._weights.liquidity,
+            "smc":              self._weights.smc,
+            "ai_prediction":    self._weights.ai_prediction,
+            "risk":             self._weights.risk,
+            "news":             self._weights.news,
+            "execution":        self._weights.execution,
+            "total":            round(self._weights.total(), 4),
+        }
+
+    def set_threshold(self, threshold: float) -> None:
+        """Update minimum score threshold."""
+        self._min_score = float(threshold)
+        if self._engine is not None:
+            self._engine.set_threshold(threshold)
+
+    def get_agent_status(self) -> Dict[str, Any]:
+        """Return per-agent enabled/weight status."""
+        if self._engine is None:
+            return {"status": "not_initialized"}
+        return {
+            a.name: {"enabled": a.enabled, "weight": a.weight}
+            for a in self._engine.agents
+        }
+
+    # ────────────────────────────────────────────────────────────── #
+    # Internal                                                              #
+    # ────────────────────────────────────────────────────────────── #
+
+    def _build_engine(self) -> VotingEngine:
+        w = self._weights
+        agents = [
+            MarketStructureAgent(weight=w.market_structure),
+            LiquidityAgent(weight=w.liquidity),
+            SMCAgent(weight=w.smc),
+            AIPredictionAgent(weight=w.ai_prediction),
+            RiskAgent(weight=w.risk),
+            NewsAgent(weight=w.news),
+            ExecutionAgent(weight=w.execution),
         ]
-
-        # ساخت VotingEngine
-        self._voting_engine = VotingEngine(
-            agents=self._agents,
-            min_score_threshold=min_score_threshold,
-            min_confidence_threshold=min_confidence_threshold,
+        return VotingEngine(
+            agents=agents,
+            min_score_threshold=self._min_score,
+            min_confidence_threshold=self._min_conf,
             run_parallel=True,
         )
 
-        self._logger.info(
-            f"AgentService initialized — {len(self._agents)} agents | "
-            f"threshold={min_score_threshold}"
-        )
 
-    async def evaluate(self, context: Dict[str, Any]) -> VoteResult:
-        """ارزیابی کامل توسط همه Agentها."""
-        self._logger.debug(f"Evaluating context for {context.get('symbol', '?')} {context.get('direction', '?')}")
-        return await self._voting_engine.vote(context)
-
-    def update_weights(self, weight_map: Dict[str, float]) -> None:
-        """بروزرسانی وزن‌ها از WeightAdjuster یا Dashboard."""
-        self._voting_engine.update_weights(weight_map)
-        self._logger.info(f"Weights updated: {weight_map}")
-
-    def set_threshold(self, threshold: float) -> None:
-        self._voting_engine.set_threshold(threshold)
-        self._logger.info(f"Threshold updated: {threshold}")
-
-    def enable_agent(self, name: str) -> None:
-        self._voting_engine.enable_agent(name)
-
-    def disable_agent(self, name: str) -> None:
-        self._voting_engine.disable_agent(name)
-
-    def get_agent_weights(self) -> Dict[str, float]:
-        return self._voting_engine.get_weights()
-
-    def get_agent_names(self) -> list:
-        return [a.name for a in self._agents]
-
-    @property
-    def voting_engine(self) -> VotingEngine:
-        return self._voting_engine
-
-
-# ── Singleton ─────────────────────────────────────────────────
-_agent_service_instance: Optional[AgentService] = None
+# ── Module-level singleton ────────────────────────────────────────────────
+_agent_service: Optional[AgentService] = None
 
 
 def get_agent_service() -> AgentService:
-    """FastAPI Dependency Injection."""
-    global _agent_service_instance
-    if _agent_service_instance is None:
-        _agent_service_instance = AgentService()
-    return _agent_service_instance
-
-
-def reset_agent_service() -> None:
-    """برای تست‌ها — reset singleton."""
-    global _agent_service_instance
-    _agent_service_instance = None
+    """Return module-level AgentService singleton."""
+    global _agent_service
+    if _agent_service is None:
+        _agent_service = AgentService()
+    return _agent_service

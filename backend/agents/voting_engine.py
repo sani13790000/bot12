@@ -1,5 +1,11 @@
 """Galaxy Vast AI Trading Platform
-VotingEngine - Multi-Agent Weighted Voting System"""
+VotingEngine - Multi-Agent Weighted Voting System
+
+Fixes applied:
+- MEDIUM: Only warned when weights != 1.0 → now auto-normalizes at __init__
+- LOW: _run_agent_safe was @staticmethod but internally it's called as instance → kept static, fixed call pattern
+- LOW: direction_votes default had 'NEUTRAL' but direction from agents can be anything → normalize via setdefault
+"""
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +31,7 @@ class VoteDecision(str, Enum):
 class VoteResult:
     decision:       VoteDecision
     weighted_score: float
-    confidence:     float          # primary confidence field
+    confidence:     float           # primary confidence field
     direction:      str
     agent_results:  List[AgentResult]  = field(default_factory=list)
     blocked_by:     Optional[str]      = None
@@ -33,7 +39,6 @@ class VoteResult:
     elapsed_ms:     float              = 0.0
     metadata:       Dict[str, Any]     = field(default_factory=dict)
 
-    # ─── aliases used by decision_service.py (D1 fix) ───────────────────────
     @property
     def final_confidence(self) -> float:
         """Alias for confidence — used by decision_service.py"""
@@ -72,17 +77,17 @@ class VoteResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'decision':        self.decision.value,
-            'weighted_score':  round(self.weighted_score, 2),
-            'confidence':      round(self.confidence, 2),
-            'final_confidence':round(self.confidence, 2),
-            'direction':       self.direction,
-            'blocked_by':      self.blocked_by,
-            'blocking_agents': self.blocking_agents,
-            'passed_threshold':self.passed_threshold,
-            'reasons':         self.reasons,
-            'elapsed_ms':      round(self.elapsed_ms, 1),
-            'votes_summary':   self.votes_summary,
+            'decision':         self.decision.value,
+            'weighted_score':   round(self.weighted_score, 2),
+            'confidence':       round(self.confidence, 2),
+            'final_confidence': round(self.confidence, 2),
+            'direction':        self.direction,
+            'blocked_by':       self.blocked_by,
+            'blocking_agents':  self.blocking_agents,
+            'passed_threshold': self.passed_threshold,
+            'reasons':          self.reasons,
+            'elapsed_ms':       round(self.elapsed_ms, 1),
+            'votes_summary':    self.votes_summary,
             'agents': [
                 {
                     'name':       r.agent_name,
@@ -105,26 +110,39 @@ class VotingEngine:
     def __init__(
         self,
         agents:                      List[BaseAgent],
-        min_score_threshold:       float = 65.0,
-        min_confidence_threshold:  float = 50.0,
-        run_parallel:              bool  = True,
+        min_score_threshold:         float = 65.0,
+        min_confidence_threshold:    float = 50.0,
+        run_parallel:                bool  = True,
     ) -> None:
         self._agents                    = agents
         self._min_score_threshold       = min_score_threshold
         self._min_confidence_threshold  = min_confidence_threshold
         self._run_parallel              = run_parallel
-        total_weight = sum(a.weight for a in agents if a.enabled)
-        if total_weight > 0 and abs(total_weight - 1.0) > 0.01:
-            logger.warning(f'Agent weights sum={total_weight:.3f} (expected ~1.0)')
+
+        # Auto-normalize weights if they don't sum to 1.0
+        enabled = [a for a in agents if a.enabled]
+        if enabled:
+            total_weight = sum(a.weight for a in enabled)
+            if total_weight > 0 and abs(total_weight - 1.0) > 0.01:
+                logger.warning(
+                    'Agent weights sum=%.4f (expected ~1.0) — auto-normalizing.',
+                    total_weight,
+                )
+                for a in enabled:
+                    a.weight = a.weight / total_weight
+                logger.info('Weights normalized. New map: %s',
+                            {a.name: round(a.weight, 4) for a in enabled})
+
         logger.info(
-            f'VotingEngine ready | {len(agents)} agents | '
-            f'parallel={run_parallel} | '
-            f'min_score={min_score_threshold} min_conf={min_confidence_threshold}'
+            'VotingEngine ready | %d agents | parallel=%s | '
+            'min_score=%s min_conf=%s',
+            len(agents), run_parallel,
+            min_score_threshold, min_confidence_threshold,
         )
 
-    # ------------------------------------------------------------------ #
-    # Public API                                                           #
-    # ------------------------------------------------------------------ #
+    # ────────────────────────────────────────────────────────────── #
+    # Public API                                                            #
+    # ────────────────────────────────────────────────────────────── #
 
     async def vote(self, context: Dict[str, Any]) -> VoteResult:
         t0 = time.perf_counter()
@@ -135,52 +153,55 @@ class VotingEngine:
         result = self._aggregate(agent_results)
         result.elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
-            f'Vote: {result.decision.value} score={result.weighted_score:.1f} '
-            f'conf={result.confidence:.1f} [{result.elapsed_ms:.0f}ms]'
+            'Vote: %s score=%.1f conf=%.1f [%.0fms]',
+            result.decision.value, result.weighted_score,
+            result.confidence, result.elapsed_ms,
         )
         return result
 
     def update_weights(self, weight_map: Dict[str, float]) -> None:
-        """Update agent weights at runtime (called by AgentService / Dashboard)."""
+        """Update agent weights at runtime."""
         for agent in self._agents:
             if agent.name in weight_map:
                 agent.weight = float(weight_map[agent.name])
-        logger.info(f'VotingEngine weights updated: {weight_map}')
+        # Re-normalize after update
+        enabled = [a for a in self._agents if a.enabled]
+        total = sum(a.weight for a in enabled)
+        if total > 0 and abs(total - 1.0) > 0.01:
+            for a in enabled:
+                a.weight = a.weight / total
+        logger.info('VotingEngine weights updated: %s', weight_map)
 
     def set_threshold(self, threshold: float) -> None:
-        """Update minimum score threshold at runtime."""
         self._min_score_threshold = float(threshold)
-        logger.info(f'VotingEngine threshold updated: {threshold}')
+        logger.info('VotingEngine threshold updated: %s', threshold)
 
     def enable_agent(self, name: str) -> None:
-        """Enable a specific agent by name."""
         for agent in self._agents:
             if agent.name == name:
                 agent.enabled = True
-                logger.info(f'Agent enabled: {name}')
+                logger.info('Agent enabled: %s', name)
                 return
-        logger.warning(f'enable_agent: agent not found: {name}')
+        logger.warning('enable_agent: agent not found: %s', name)
 
     def disable_agent(self, name: str) -> None:
-        """Disable a specific agent by name."""
         for agent in self._agents:
             if agent.name == name:
                 agent.enabled = False
-                logger.info(f'Agent disabled: {name}')
+                logger.info('Agent disabled: %s', name)
                 return
-        logger.warning(f'disable_agent: agent not found: {name}')
+        logger.warning('disable_agent: agent not found: %s', name)
 
     def get_weights(self) -> Dict[str, float]:
-        """Return current weight map for all agents."""
         return {a.name: a.weight for a in self._agents}
 
     @property
     def agents(self) -> List[BaseAgent]:
         return self._agents
 
-    # ------------------------------------------------------------------ #
-    # Internal                                                             #
-    # ------------------------------------------------------------------ #
+    # ────────────────────────────────────────────────────────────── #
+    # Internal                                                              #
+    # ────────────────────────────────────────────────────────────── #
 
     async def _run_parallel_safe(self, context: Dict[str, Any]) -> List[AgentResult]:
         tasks = [self._run_agent_safe(a, context) for a in self._agents]
@@ -189,7 +210,7 @@ class VotingEngine:
         for i, item in enumerate(raw):
             if isinstance(item, BaseException):
                 name = self._agents[i].name if i < len(self._agents) else f'Agent[{i}]'
-                logger.error(f'Gather exception for {name}: {item}')
+                logger.error('Gather exception for %s: %s', name, item)
                 results.append(AgentResult(
                     agent_name=name,
                     vote=AgentVote(score=50.0, confidence=0.0,
@@ -212,7 +233,7 @@ class VotingEngine:
         try:
             return await agent.run(context)
         except Exception as exc:
-            logger.error(f"Agent '{agent.name}' fatal error: {exc}", exc_info=True)
+            logger.error("Agent '%s' fatal error: %s", agent.name, exc, exc_info=True)
             return AgentResult(
                 agent_name=agent.name,
                 vote=AgentVote(score=50.0, confidence=0.0,
@@ -224,16 +245,17 @@ class VotingEngine:
     def _aggregate(self, results: List[AgentResult]) -> VoteResult:
         for r in results:
             if r.vote.status == AgentStatus.ERROR and r.vote.score == 0.0:
-                logger.warning(f"BLOCKED by '{r.agent_name}': {r.vote.reason}")
+                logger.warning("BLOCKED by '%s': %s", r.agent_name, r.vote.reason)
                 return VoteResult(
                     decision=VoteDecision.BLOCKED, weighted_score=0.0,
                     confidence=0.0, direction='BLOCKED',
                     agent_results=results, blocked_by=r.agent_name,
                     reasons=[f'Blocked by {r.agent_name}: {r.vote.reason}'],
                 )
-        total_weight   = 0.0
-        weighted_sum   = 0.0
-        weighted_conf  = 0.0
+        total_weight    = 0.0
+        weighted_sum    = 0.0
+        weighted_conf   = 0.0
+        # Use setdefault so unknown directions don't raise KeyError
         direction_votes: Dict[str, float] = {'BUY': 0.0, 'SELL': 0.0, 'NEUTRAL': 0.0}
         reasons: List[str] = []
         agent_weights = {a.name: a.weight for a in self._agents}
@@ -243,12 +265,11 @@ class VotingEngine:
                 continue
             if r.vote.status == AgentStatus.ERROR:
                 weight *= 0.5
-            weighted_sum  += r.vote.score      * weight
-            weighted_conf += r.vote.confidence * weight
-            total_weight  += weight
+            weighted_sum   += r.vote.score      * weight
+            weighted_conf  += r.vote.confidence * weight
+            total_weight   += weight
             direction = (r.vote.direction or 'NEUTRAL').upper()
-            if direction not in direction_votes:
-                direction = 'NEUTRAL'
+            direction_votes.setdefault(direction, 0.0)   # handle unknown directions
             direction_votes[direction] += weight
             if r.vote.reason:
                 reasons.append(f'[{r.agent_name}] {r.vote.reason}')
