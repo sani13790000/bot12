@@ -1,478 +1,362 @@
-"""
-backend/api/routes/analytics.py
-Phase-8 (existing) + Phase-11 (security dashboard metrics) — complete merged file.
-
-Endpoints added in Phase-11:
-  GET /api/v1/analytics/security/metrics        → live dashboard metrics
-  GET /api/v1/analytics/security/report         → generate + return report (was Phase-8)
-  GET /api/v1/analytics/security/score/history  → score timeline
-  GET /api/v1/analytics/security/events         → recent security events
-  GET /api/v1/analytics/security/dashboard      → single payload for frontend
-
-All previous endpoints are UNCHANGED.
-"""
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from backend.analytics import AnalyticsService, TradeRecord, ReportGenerator
+try:
+    from backend.security_reporting.security_score_engine import security_score_engine
+    HAS_SCORE = True
+except ImportError:
+    HAS_SCORE = False
+
+try:
+    from backend.agents.security_ai_agent import security_ai_agent
+    HAS_AGENT = True
+except ImportError:
+    HAS_AGENT = False
+
+try:
+    from backend.security_reporting.security_report_service import SecurityReportService
+    from backend.security_reporting.report_exporter import ReportExporter
+    _report_svc = SecurityReportService()
+    _report_exp = ReportExporter()
+    HAS_REPORTS = True
+except ImportError:
+    HAS_REPORTS = False
+
+try:
+    from backend.services.threat_intelligence_service import threat_intel_service
+    HAS_THREAT = True
+except ImportError:
+    HAS_THREAT = False
+
+try:
+    from backend.database.connection import get_db_client
+    HAS_DB = True
+except ImportError:
+    HAS_DB = False
+
+try:
+    from backend.core.deps import require_admin, get_current_user
+    HAS_AUTH = True
+except ImportError:
+    async def require_admin():
+        return None
+    async def get_current_user():
+        return None
+    HAS_AUTH = False
 
 log = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
-
-_service: Optional[AnalyticsService] = None
-_reporter = ReportGenerator()
-
-
-def _get_score_engine():
-    try:
-        from backend.security_reporting.security_score_engine import security_score_engine
-        return security_score_engine
-    except Exception:
-        return None
-
-
-def _get_report_service():
-    try:
-        from backend.security_reporting.security_report_service import SecurityReportService
-        return SecurityReportService()
-    except Exception:
-        return None
-
-
-def _get_ai_agent():
-    try:
-        from backend.agents.security_ai_agent import security_ai_agent
-        return security_ai_agent
-    except Exception:
-        return None
-
-
-def get_analytics_service() -> AnalyticsService:
-    global _service
-    if _service is None:
-        _service = AnalyticsService(db_pool=None)
-    return _service
-
-
-class TradeRecordIn(BaseModel):
-    ticket:           int
-    symbol:           str
-    direction:        str       = Field(..., pattern="^(BUY|SELL)$")
-    entry_price:      float
-    exit_price:       float
-    stop_loss:        float     = 0.0
-    lot_size:         float     = 0.01
-    profit_loss:      float
-    pips:             float     = 0.0
-    risk_amount:      float     = 0.0
-    reward_amount:    float     = 0.0
-    confidence_score: float     = Field(0.0, ge=0, le=100)
-    session:          str       = "UNKNOWN"
-    strategy_tags:    List[str] = []
-    open_time:        datetime
-    close_time:       datetime
-
-
-class SecurityReportMeta(BaseModel):
-    report_id:          str
-    generated_at:       str
-    period_hours:       int
-    period_days:        float
-    score:              float
-    score_trend:        str
-    total_attacks:      int
-    blocked_ips:        int
-    high_risk_accounts: int
-    failed_logins:      int
-    json_path:          Optional[str]
-    html_path:          Optional[str]
-    pdf_path:           Optional[str]
+router = APIRouter(tags=["analytics"])
+_REPORTS_DIR = os.getenv("SECURITY_REPORTS_DIR", "/reports/security")
 
 
 class SecurityMetricsResponse(BaseModel):
-    security_score:     float
-    score_level:        str
-    score_trend:        str
-    anomaly_rate:       float
-    blocked_ips:        int
-    active_threats:     int
-    failed_logins_1h:   int
-    suspicious_trades:  int
-    model_accuracy:     float
-    last_retrain:       Optional[str]
-    circuit_breaker:    bool
-    dimensions:         List[Dict[str, Any]] = []
-    top_risks:          List[str]     = []
-    generated_at:       str           = ""
-
-
-# ── Existing endpoints (UNCHANGED) ──────────────────────────────────────────
-
-@router.get("/summary")
-async def get_summary(
-    symbol: Optional[str]    = Query(None),
-    period: str              = Query("MONTH"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    summary = await svc.get_summary(symbol=symbol, period=period)
-    return {"success": True, "data": summary, "symbol": symbol or "ALL", "period": period}
-
-
-@router.get("/full")
-async def get_full_analytics(
-    symbol:          Optional[str]    = Query(None),
-    period:          str              = Query("MONTH"),
-    initial_balance: float            = Query(10_000.0),
-    risk_free_rate:  float            = Query(0.05),
-    svc:             AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(
-        symbol=symbol, period=period,
-        initial_balance=initial_balance, risk_free_rate=risk_free_rate,
+    security_score:          float
+    score_level:             str
+    score_trend:             str
+    score_delta_1h:          Optional[float] = None
+    anomaly_rate:            float
+    anomalies_last_1h:       int   = 0
+    anomalies_last_24h:      int   = 0
+    critical_anomalies_24h:  int   = 0
+    blocked_ips:             int
+    blocked_ips_24h:         int   = 0
+    recent_security_events:  List[Dict[str, Any]] = Field(default_factory=list)
+    failed_logins_1h:        int   = 0
+    suspicious_accounts:     int   = 0
+    threat_intel_hits_24h:   int   = 0
+    model_trained:           bool  = False
+    model_samples:           int   = 0
+    last_retrain:            Optional[str] = None
+    generated_at:            str   = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
-    return {"success": True, "data": result.to_dict()}
 
 
-@router.get("/metrics")
-async def get_key_metrics(
-    symbol: Optional[str]    = Query(None),
-    period: str              = Query("MONTH"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(symbol=symbol, period=period)
-    return {
-        "success": True, "symbol": symbol or "ALL", "period": period,
-        "metrics": {
-            "sharpe_ratio":     round(result.sharpe_ratio,  4),
-            "sortino_ratio":    round(result.sortino_ratio, 4),
-            "calmar_ratio":     round(result.calmar_ratio,  4),
-            "profit_factor":    round(result.profit_factor, 4),
-            "recovery_factor":  round(result.recovery_factor, 4)
-                                if result.recovery_factor != float("inf") else 9999,
-            "expectancy_r":     round(result.expectancy_r, 4),
-            "max_drawdown_pct": round(result.max_drawdown_pct * 100, 4),
-            "win_rate_pct":     round(result.win_rate * 100, 2),
-            "net_profit":       round(result.net_profit, 2),
-            "cagr_pct":         round(result.cagr * 100, 2),
-        },
-    }
+@router.get("/analytics/security/metrics", response_model=SecurityMetricsResponse,
+            summary="Phase-11: Real-time security metrics for dashboard")
+async def get_security_metrics() -> SecurityMetricsResponse:
+    score     = 75.0
+    score_lvl = "moderate"
+    trend     = "stable"
+    delta_1h  = None
+    model_ok  = False
+    model_n   = 0
+    last_rt: Optional[str] = None
 
+    if HAS_SCORE:
+        try:
+            snap = security_score_engine.current_sync()
+            if snap:
+                score     = snap.score
+                score_lvl = snap.level.value if hasattr(snap.level, "value") else str(snap.level)
+                trend     = snap.trend
+                delta_1h  = snap.delta_1h
+        except Exception:
+            pass
 
-@router.get("/equity-curve")
-async def get_equity_curve(
-    symbol:          Optional[str]    = Query(None),
-    period:          str              = Query("ALL"),
-    initial_balance: float            = Query(10_000.0),
-    svc:             AnalyticsService = Depends(get_analytics_service),
-):
-    curve = await svc.get_equity_curve(
-        symbol=symbol, period=period, initial_balance=initial_balance
+    if HAS_AGENT:
+        try:
+            stats    = security_ai_agent.get_stats()
+            model_ok = stats.get("model_trained", False)
+            model_n  = stats.get("training_samples", 0)
+            last_rt  = stats.get("last_retrain")
+        except Exception:
+            pass
+
+    anomalies_1h  = 0
+    anomalies_24h = 0
+    critical_24h  = 0
+    blocked_now   = 0
+    blocked_24h   = 0
+    failed_1h     = 0
+    suspicious    = 0
+    threat_hits   = 0
+    recent_events: List[Dict[str, Any]] = []
+
+    if HAS_DB:
+        db  = get_db_client()
+        now = datetime.now(timezone.utc)
+        h1  = (now - timedelta(hours=1)).isoformat()
+        h24 = (now - timedelta(hours=24)).isoformat()
+
+        async def _q(coro):
+            try:
+                return await asyncio.wait_for(coro, timeout=3.0)
+            except Exception:
+                return None
+
+        results = await asyncio.gather(
+            _q(db.table("security_ai_analysis").select("id", count="exact").gte("created_at", h1).execute()),
+            _q(db.table("security_ai_analysis").select("id", count="exact").gte("created_at", h24).execute()),
+            _q(db.table("security_ai_analysis").select("id", count="exact").gte("created_at", h24).eq("risk_level", "critical").execute()),
+            _q(db.table("security_blocked_ips").select("id", count="exact").or_(f"expires_at.is.null,expires_at.gt.{now.isoformat()}").execute()),
+            _q(db.table("security_blocked_ips").select("id", count="exact").gte("created_at", h24).execute()),
+            _q(db.table("security_audit_logs").select("id", count="exact").eq("event_type", "login_failed").gte("created_at", h1).execute()),
+            _q(db.table("users").select("id", count="exact").eq("is_flagged", True).execute()),
+            _q(db.table("threat_intel_cache").select("id", count="exact").gte("queried_at", h24).gt("risk_score", 50).execute()),
+            _q(db.table("security_ai_analysis").select("id,event_type,risk_level,ip_address,created_at").order("created_at", desc=True).limit(10).execute()),
+            return_exceptions=False,
+        )
+
+        def _c(r) -> int:
+            if r and hasattr(r, "count") and r.count is not None:
+                return int(r.count)
+            if r and hasattr(r, "data") and r.data:
+                return len(r.data)
+            return 0
+
+        anomalies_1h  = _c(results[0])
+        anomalies_24h = _c(results[1])
+        critical_24h  = _c(results[2])
+        blocked_now   = _c(results[3])
+        blocked_24h   = _c(results[4])
+        failed_1h     = _c(results[5])
+        suspicious    = _c(results[6])
+        threat_hits   = _c(results[7])
+        if results[8] and results[8].data:
+            recent_events = [
+                {"id": e.get("id"), "event_type": e.get("event_type"),
+                 "risk_level": e.get("risk_level"),
+                 "ip_address": str(e.get("ip_address", ""))[:15],
+                 "created_at": e.get("created_at")}
+                for e in results[8].data
+            ]
+
+    total_req_1h = max(anomalies_1h * 10, 100)
+    anomaly_rate = round((anomalies_1h / total_req_1h) * 1_000, 2)
+
+    return SecurityMetricsResponse(
+        security_score=round(score, 2),
+        score_level=score_lvl,
+        score_trend=trend,
+        score_delta_1h=delta_1h,
+        anomaly_rate=anomaly_rate,
+        anomalies_last_1h=anomalies_1h,
+        anomalies_last_24h=anomalies_24h,
+        critical_anomalies_24h=critical_24h,
+        blocked_ips=blocked_now,
+        blocked_ips_24h=blocked_24h,
+        recent_security_events=recent_events,
+        failed_logins_1h=failed_1h,
+        suspicious_accounts=suspicious,
+        threat_intel_hits_24h=threat_hits,
+        model_trained=model_ok,
+        model_samples=model_n,
+        last_retrain=last_rt,
     )
-    return {"success": True, "count": len(curve), "curve": curve}
 
 
-@router.get("/drawdown")
-async def get_drawdown_curve(
-    symbol: Optional[str]    = Query(None),
-    period: str              = Query("ALL"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(symbol=symbol, period=period)
-    return {
-        "success":             True,
-        "max_drawdown_pct":    round(result.max_drawdown_pct * 100, 4),
-        "max_drawdown_amount": round(result.max_drawdown_amount, 2),
-        "avg_drawdown_pct":    round(result.avg_drawdown_pct * 100, 4),
-        "curve":               result.drawdown_curve,
-    }
+@router.get("/analytics/security/score/history",
+            summary="Phase-11: 24h score history (288 points)")
+async def get_score_history() -> JSONResponse:
+    if not HAS_SCORE:
+        return JSONResponse({"points": [], "interval_minutes": 5})
+    hist = security_score_engine.history()
+    return JSONResponse({
+        "points": [{"score": round(s.score, 2), "level": s.level.value,
+                    "timestamp": s.timestamp.isoformat()} for s in hist],
+        "interval_minutes": 5, "total": len(hist),
+    })
 
 
-@router.get("/compare")
-async def compare_periods(
-    symbol:  str            = Query("XAUUSD"),
-    periods: Optional[str] = Query("WEEK,MONTH,YEAR"),
-    svc:     AnalyticsService = Depends(get_analytics_service),
-):
-    period_list = [p.strip() for p in (periods or "WEEK,MONTH,YEAR").split(",")]
-    comparison  = await svc.get_metrics_comparison(symbol=symbol, periods=period_list)
-    return {"success": True, "symbol": symbol, "comparison": comparison}
+@router.get("/analytics/security/score/dimensions",
+            summary="Phase-11: Per-dimension breakdown")
+async def get_score_dimensions() -> JSONResponse:
+    if not HAS_SCORE:
+        return JSONResponse({"dimensions": []})
+    snap = security_score_engine.current_sync()
+    if snap is None:
+        return JSONResponse({"dimensions": []})
+    return JSONResponse({"score": round(snap.score, 2), "level": snap.level.value,
+                         "dimensions": [d.to_dict() for d in snap.dimensions]})
 
 
-@router.get("/breakdown/symbol")
-async def breakdown_by_symbol(
-    period: str              = Query("MONTH"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(period=period)
-    return {"success": True, "period": period, "by_symbol": result.by_symbol}
-
-
-@router.get("/breakdown/session")
-async def breakdown_by_session(
-    period: str              = Query("MONTH"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(period=period)
-    return {"success": True, "period": period, "by_session": result.by_session}
-
-
-@router.get("/breakdown/weekday")
-async def breakdown_by_weekday(
-    period: str              = Query("MONTH"),
-    svc:    AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(period=period)
-    return {"success": True, "period": period, "by_weekday": result.by_weekday}
-
-
-@router.post("/trades/add")
-async def add_trade(
-    trade: TradeRecordIn,
-    svc:   AnalyticsService = Depends(get_analytics_service),
-):
-    record = TradeRecord(**trade.model_dump())
-    await svc.add_trade(record)
-    return {"success": True, "message": "Trade added"}
-
-
-@router.get("/performance")
-async def get_performance(
-    symbol:  Optional[str] = Query(None),
-    period:  str           = Query("MONTH"),
-    svc:     AnalyticsService = Depends(get_analytics_service),
-):
-    result = await svc.get_analytics(symbol=symbol, period=period)
-    return {
-        "success": True,
-        "data": {
-            "total_trades":       result.total_trades,
-            "win_rate":           round(result.win_rate, 4),
-            "profit_factor":      round(result.profit_factor, 4),
-            "net_profit":         round(result.net_profit, 2),
-            "sharpe_ratio":       round(result.sharpe_ratio, 4),
-            "max_drawdown_pct":   round(result.max_drawdown_pct * 100, 2),
-            "consecutive_wins":   result.consecutive_wins,
-            "consecutive_losses": result.consecutive_losses,
-        },
-    }
-
-
-# ── Phase-8: Security Report ──────────────────────────────────────────────────
-
-@router.get("/security/report", response_model=SecurityReportMeta)
-async def get_security_report(
-    days:   int = Query(30, ge=1, le=365),
-    format: str = Query("json", pattern="^(json|html|pdf)$"),
-) -> SecurityReportMeta:
-    svc = _get_report_service()
-    if svc is None:
-        raise HTTPException(status_code=503, detail="Security reporting service unavailable")
+@router.get("/analytics/security/anomalies",
+            summary="Phase-11: Paginated anomaly feed")
+async def get_anomaly_feed(
+    limit:  int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    risk:   Optional[str] = Query(None),
+    hours:  int = Query(24, ge=1, le=168),
+) -> JSONResponse:
+    if not HAS_DB:
+        return JSONResponse({"items": [], "total": 0})
+    db    = get_db_client()
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     try:
-        report = await asyncio.wait_for(svc.generate_report(period_hours=days * 24), timeout=60.0)
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Report generation timed out")
+        q = (db.table("security_ai_analysis")
+               .select("id,event_type,risk_level,risk_score,ip_address,user_id,metadata,created_at",
+                       count="exact")
+               .gte("created_at", since)
+               .order("created_at", desc=True)
+               .range(offset, offset + limit - 1))
+        if risk:
+            q = q.eq("risk_level", risk)
+        r = await asyncio.wait_for(q.execute(), timeout=3.0)
+        return JSONResponse({"items": r.data or [], "total": r.count or 0,
+                             "limit": limit, "offset": offset})
     except Exception as exc:
-        log.error("Security report error: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail="Report generation failed")
+        log.warning("anomaly_feed error: %s", exc)
+        return JSONResponse({"items": [], "total": 0})
+
+
+@router.get("/analytics/security/blocked-ips",
+            summary="Phase-11: Active blocked IPs")
+async def get_blocked_ips(
+    limit:  int  = Query(50, ge=1, le=200),
+    active: bool = Query(True),
+) -> JSONResponse:
+    if not HAS_DB:
+        return JSONResponse({"items": [], "total": 0})
+    db  = get_db_client()
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        q = (db.table("security_blocked_ips")
+               .select("ip_address,reason,expires_at,auto_blocked,created_at", count="exact")
+               .order("created_at", desc=True).limit(limit))
+        if active:
+            q = q.or_(f"expires_at.is.null,expires_at.gt.{now}")
+        r = await asyncio.wait_for(q.execute(), timeout=3.0)
+        return JSONResponse({"items": r.data or [], "total": r.count or 0})
+    except Exception as exc:
+        log.warning("blocked_ips error: %s", exc)
+        return JSONResponse({"items": [], "total": 0})
+
+
+@router.get("/analytics/security/threat-intel/{ip}",
+            summary="Phase-11: Threat intel for IP")
+async def get_threat_intel_for_ip(ip: str) -> JSONResponse:
+    if not HAS_THREAT:
+        return JSONResponse({"ip": ip, "available": False})
+    try:
+        report = await asyncio.wait_for(threat_intel_service.check_ip(ip), timeout=6.0)
+        return JSONResponse(report.__dict__ if hasattr(report, "__dict__") else report)
+    except Exception as exc:
+        return JSONResponse({"ip": ip, "error": str(exc), "available": False})
+
+
+class ReportMetaResponse(BaseModel):
+    report_id:    str
+    generated_at: str
+    period_days:  float
+    score:        Optional[float] = None
+    score_trend:  Optional[str]   = None
+    total_attacks: int            = 0
+    blocked_ips:  int             = 0
+    json_path:    Optional[str]   = None
+    html_path:    Optional[str]   = None
+    pdf_path:     Optional[str]   = None
+
+
+@router.get("/analytics/security/report", response_model=ReportMetaResponse,
+            summary="Phase-8: Generate security report")
+async def generate_security_report(
+    days: int = Query(30, ge=1, le=365),
+) -> ReportMetaResponse:
+    if not HAS_REPORTS:
+        raise HTTPException(503, "Security reporting module not available.")
+    try:
+        report = await asyncio.wait_for(_report_svc.generate(days=days), timeout=30.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Report generation timed out.")
+    except Exception as exc:
+        log.error("report generation failed: %s", exc)
+        raise HTTPException(500, "Report generation failed.")
 
     json_path = html_path = pdf_path = None
     try:
-        from backend.security_reporting.report_exporter import ReportExporter
-        exporter  = ReportExporter()
-        json_path = await exporter.export_json(report)
-        if format in ("html", "pdf"):
-            html_path = await exporter.export_html(report)
-        if format == "pdf":
-            pdf_path = await exporter.export_pdf(report)
+        paths = await _report_exp.export_all(report, output_dir=_REPORTS_DIR)
+        json_path = paths.get("json")
+        html_path = paths.get("html")
+        pdf_path  = paths.get("pdf")
     except Exception as exc:
-        log.warning("Report export error: %s", exc)
+        log.warning("export failed: %s", exc)
 
-    snap = _get_score_engine()
-    snap = snap.current() if snap else None
-    return SecurityReportMeta(
-        report_id          = report.report_id,
-        generated_at       = report.generated_at.isoformat(),
-        period_hours       = report.period_hours,
-        period_days        = round(report.period_hours / 24, 1),
-        score              = snap.score if snap else report.security_score,
-        score_trend        = snap.trend if snap else "stable",
-        total_attacks      = report.attack_stats.get("total", 0),
-        blocked_ips        = report.blocked_ips.get("total", 0),
-        high_risk_accounts = len(report.high_risk_accounts),
-        failed_logins      = report.total_failed_logins,
-        json_path          = json_path,
-        html_path          = html_path,
-        pdf_path           = pdf_path,
-    )
-
-
-# ── Phase-11: Security Dashboard Metrics ─────────────────────────────────────
-
-@router.get("/security/metrics", response_model=SecurityMetricsResponse)
-async def get_security_metrics() -> SecurityMetricsResponse:
-    """Live security metrics. Reads from in-memory cache — O(1), non-blocking."""
-    now          = datetime.now(timezone.utc).isoformat()
-    score_engine = _get_score_engine()
-    snap         = score_engine.current() if score_engine else None
-
-    security_score  = snap.score       if snap else 0.0
-    score_level     = snap.level.value if snap else "unknown"
-    score_trend     = snap.trend       if snap else "stable"
-    dimensions      = snap.to_dict().get("dimensions", []) if snap else []
-    top_risks       = snap.top_risks if snap else []
-    circuit_breaker = getattr(score_engine, "_breaker_open", False) if score_engine else False
-
-    agent       = _get_ai_agent()
-    agent_stats = agent.stats() if agent else {}
-    anomaly_rate      = float(agent_stats.get("anomaly_rate_1h", 0.0))
-    active_threats    = int(agent_stats.get("active_threats", 0))
-    model_accuracy    = float(agent_stats.get("model_accuracy", 0.0))
-    last_retrain      = agent_stats.get("last_retrain")
-    suspicious_trades = int(agent_stats.get("suspicious_trades", 0))
-
-    blocked_ips      = 0
-    failed_logins_1h = 0
-    try:
-        from backend.database.connection import get_db_client
-        from datetime import timedelta
-        db        = await get_db_client()
-        one_h_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-        res_b = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: db.table("security_blocked_ips")
-                           .select("ip_address", count="exact")
-                           .is_("expires_at", "null").execute()
-            ), timeout=2.0,
-        )
-        blocked_ips = res_b.count or 0
-        res_f = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: db.table("security_audit_logs")
-                           .select("id", count="exact")
-                           .eq("event_type", "login_failed")
-                           .gte("created_at", one_h_ago).execute()
-            ), timeout=2.0,
-        )
-        failed_logins_1h = res_f.count or 0
-    except Exception as exc:
-        log.debug("Security metrics DB error (non-fatal): %s", exc)
-
-    return SecurityMetricsResponse(
-        security_score    = round(security_score, 2),
-        score_level       = score_level,
-        score_trend       = score_trend,
-        anomaly_rate      = round(anomaly_rate, 4),
-        blocked_ips       = blocked_ips,
-        active_threats    = active_threats,
-        failed_logins_1h  = failed_logins_1h,
-        suspicious_trades = suspicious_trades,
-        model_accuracy    = round(model_accuracy, 4),
-        last_retrain      = last_retrain,
-        circuit_breaker   = circuit_breaker,
-        dimensions        = dimensions,
-        top_risks         = top_risks[:5],
-        generated_at      = now,
-    )
-
-
-@router.get("/security/score/history")
-async def get_score_history(
-    points: int = Query(288, ge=1, le=288),
-):
-    engine = _get_score_engine()
-    if engine is None:
-        return {"success": True, "points": 0, "history": []}
-    history = engine.history(points=points)
-    return {
-        "success":           True,
-        "points":            len(history),
-        "history":           history,
-        "alert_threshold":   float(os.getenv("SECURITY_SCORE_ALERT",   "65")),
-        "breaker_threshold": float(os.getenv("SECURITY_SCORE_BREAKER", "40")),
-    }
-
-
-@router.get("/security/events")
-async def get_recent_security_events(
-    limit:      int           = Query(20, ge=1, le=100),
-    min_risk:   float         = Query(0.0, ge=0.0, le=1.0),
-    event_type: Optional[str] = Query(None),
-) -> Dict[str, Any]:
-    events: List[Dict[str, Any]] = []
-    try:
-        from backend.database.connection import get_db_client
-        db    = await get_db_client()
-        query = (
-            db.table("security_ai_analysis")
-              .select("id,event_type,risk_score,user_id,ip_address,metadata,created_at")
-              .gte("risk_score", min_risk)
-              .order("created_at", desc=True)
-              .limit(limit)
-        )
-        if event_type:
-            query = query.eq("event_type", event_type)
-        res = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(None, query.execute), timeout=3.0
-        )
-        for row in (res.data or []):
-            meta = row.get("metadata") or {}
-            events.append({
-                "event_id":   str(row.get("id", "")),
-                "event_type": row.get("event_type", ""),
-                "risk_score": round(float(row.get("risk_score", 0)), 4),
-                "ip_address": row.get("ip_address"),
-                "user_id":    row.get("user_id"),
-                "summary":    str(meta.get("summary", row.get("event_type", "")))[:120],
-                "created_at": row.get("created_at", ""),
-            })
-    except Exception as exc:
-        log.debug("Security events DB error (non-fatal): %s", exc)
-    return {"success": True, "count": len(events), "events": events,
-            "filters": {"min_risk": min_risk, "event_type": event_type}}
-
-
-@router.get("/security/dashboard")
-async def get_security_dashboard(
-    history_points: int = Query(48, ge=1, le=288),
-    events_limit:   int = Query(10, ge=1, le=50),
-) -> Dict[str, Any]:
-    """Aggregated dashboard payload — all sub-calls concurrent."""
-    metrics_r, history_r, events_r = await asyncio.gather(
-        get_security_metrics(),
-        get_score_history(points=history_points),
-        get_recent_security_events(limit=events_limit),
-        return_exceptions=True,
-    )
-
-    def _safe(r, fb):
-        return fb if isinstance(r, Exception) else r
-
-    fb_metrics = SecurityMetricsResponse(
-        security_score=0.0, score_level="unknown", score_trend="stable",
-        anomaly_rate=0.0, blocked_ips=0, active_threats=0,
-        failed_logins_1h=0, suspicious_trades=0,
-        model_accuracy=0.0, last_retrain=None, circuit_breaker=False,
+    return ReportMetaResponse(
+        report_id=str(getattr(report, "report_id", uuid.uuid4())),
         generated_at=datetime.now(timezone.utc).isoformat(),
+        period_days=float(days),
+        score=getattr(report, "security_score", None),
+        score_trend=getattr(report, "score_trend", None),
+        total_attacks=(report.attack_stats.get("total", 0)
+                       if hasattr(report, "attack_stats") and report.attack_stats else 0),
+        blocked_ips=(report.blocked_ips.get("total_blocked", 0)
+                     if hasattr(report, "blocked_ips") and report.blocked_ips else 0),
+        json_path=json_path, html_path=html_path, pdf_path=pdf_path,
     )
-    metrics = _safe(metrics_r, fb_metrics)
-    return {
-        "success":    True,
-        "metrics":    metrics.model_dump() if hasattr(metrics, "model_dump") else metrics,
-        "history":    _safe(history_r, {}).get("history", []),
-        "events":     _safe(events_r,  {}).get("events",  []),
-        "thresholds": {
-            "alert":   float(os.getenv("SECURITY_SCORE_ALERT",   "65")),
-            "breaker": float(os.getenv("SECURITY_SCORE_BREAKER", "40")),
-        },
-    }
+
+
+@router.get("/analytics/security/report/{report_id}/html",
+            summary="Download HTML report", response_class=HTMLResponse)
+async def download_html_report(report_id: str) -> HTMLResponse:
+    import re
+    if not re.fullmatch(r"[0-9a-f\-]{36}", report_id):
+        raise HTTPException(400, "Invalid report ID.")
+    path = os.path.join(_REPORTS_DIR, f"{report_id}.html")
+    if not os.path.isfile(path):
+        raise HTTPException(404, "Report not found.")
+    with open(path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+
+@router.get("/analytics/security/report/{report_id}/json",
+            summary="Download JSON report")
+async def download_json_report(report_id: str) -> JSONResponse:
+    import json as _json, re
+    if not re.fullmatch(r"[0-9a-f\-]{36}", report_id):
+        raise HTTPException(400, "Invalid report ID.")
+    path = os.path.join(_REPORTS_DIR, f"{report_id}.json")
+    if not os.path.isfile(path):
+        raise HTTPException(404, "Report not found.")
+    with open(path, "r", encoding="utf-8") as f:
+        return JSONResponse(_json.load(f))
