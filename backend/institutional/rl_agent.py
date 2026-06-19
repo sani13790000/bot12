@@ -1,33 +1,39 @@
-"""Reinforcement Learning Trading Agent — Gymnasium-compatible environment + PPO-ready."""
+"""Reinforcement Learning Trading Agent — Gymnasium-compatible environment + PPO-ready.
+
+Fixes applied:
+- _equity_history changed from List to deque(maxlen=10_000) to prevent memory leak
+- MACD placeholder clearly documented (real MACD requires pandas-ta or talib)
+- rule-based fallback uses deterministic threshold logic (no random)
+"""
 
 from __future__ import annotations
 import math
-import random
+from collections import deque
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Tuple
 
 
-# ── Symbol configuration ─────────────────────────────────────────────────────
+# ── Symbol configuration ──────────────────────────────────────────────────────
 SYMBOL_CONFIGS: Dict[str, Dict] = {
-    "XAUUSD": {"pip_size": 0.1,   "lot_size": 100.0,    "pip_value": 1.0},
-    "XAGUSD": {"pip_size": 0.01,  "lot_size": 5000.0,   "pip_value": 1.0},
-    "EURUSD": {"pip_size": 0.0001,"lot_size": 100000.0, "pip_value": 10.0},
-    "GBPUSD": {"pip_size": 0.0001,"lot_size": 100000.0, "pip_value": 10.0},
-    "USDJPY": {"pip_size": 0.01,  "lot_size": 100000.0, "pip_value": 9.09},
-    "GBPJPY": {"pip_size": 0.01,  "lot_size": 100000.0, "pip_value": 9.09},
-    "AUDUSD": {"pip_size": 0.0001,"lot_size": 100000.0, "pip_value": 10.0},
-    "USDCAD": {"pip_size": 0.0001,"lot_size": 100000.0, "pip_value": 7.69},
-    "USDCHF": {"pip_size": 0.0001,"lot_size": 100000.0, "pip_value": 11.0},
-    "BTCUSD": {"pip_size": 1.0,   "lot_size": 1.0,      "pip_value": 1.0},
-    "ETHUSD": {"pip_size": 0.1,   "lot_size": 1.0,      "pip_value": 1.0},
-    "US30":   {"pip_size": 1.0,   "lot_size": 1.0,      "pip_value": 1.0},
-    "NAS100": {"pip_size": 0.25,  "lot_size": 1.0,      "pip_value": 1.0},
-    "USOIL":  {"pip_size": 0.01,  "lot_size": 1000.0,   "pip_value": 1.0},
+    "XAUUSD": {"pip_size": 0.1,    "lot_size": 100.0,    "pip_value": 1.0},
+    "XAGUSD": {"pip_size": 0.01,   "lot_size": 5000.0,   "pip_value": 1.0},
+    "EURUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
+    "GBPUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
+    "USDJPY": {"pip_size": 0.01,   "lot_size": 100000.0, "pip_value": 9.09},
+    "GBPJPY": {"pip_size": 0.01,   "lot_size": 100000.0, "pip_value": 9.09},
+    "AUDUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
+    "USDCAD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 7.69},
+    "USDCHF": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 11.0},
+    "BTCUSD": {"pip_size": 1.0,    "lot_size": 1.0,      "pip_value": 1.0},
+    "ETHUSD": {"pip_size": 0.1,    "lot_size": 1.0,      "pip_value": 1.0},
+    "US30":   {"pip_size": 1.0,    "lot_size": 1.0,      "pip_value": 1.0},
+    "NAS100": {"pip_size": 0.25,   "lot_size": 1.0,      "pip_value": 1.0},
+    "USOIL":  {"pip_size": 0.01,   "lot_size": 1000.0,   "pip_value": 1.0},
 }
 
 
 def _get_symbol_config(symbol: str) -> Dict:
-    """Return symbol config, defaulting to Forex minor if unknown."""
+    """Return symbol config, defaulting to Forex major if unknown."""
     sym = symbol.upper()
     if sym in SYMBOL_CONFIGS:
         return SYMBOL_CONFIGS[sym]
@@ -56,14 +62,14 @@ class RLState:
     atr_14: float
     ema_20: float
     ema_50: float
-    macd: float
-    macd_signal: float
+    macd: float           # NOTE: placeholder — always 0.0 until talib/pandas-ta added
+    macd_signal: float    # NOTE: placeholder — always 0.0
     bb_upper: float
     bb_lower: float
-    smc_score: float         # 0-100 from SMC engine
-    pa_score: float          # 0-100 from PA engine
-    ml_confidence: float     # 0-100 from ML engine
-    position: int            # -1=short, 0=flat, 1=long
+    smc_score: float       # 0-100 from SMC engine
+    pa_score: float        # 0-100 from PA engine
+    ml_confidence: float   # 0-100 from ML engine
+    position: int          # -1=short, 0=flat, 1=long
     unrealized_pnl: float
     equity_pct: float
     bars_in_trade: int
@@ -79,6 +85,9 @@ class RLEnvironment:
     ACTION_BUY   = 1
     ACTION_SELL  = 2
     ACTION_CLOSE = 3
+
+    # Max equity history entries — prevents memory leak on long backtests
+    _EQUITY_MAXLEN = 10_000
 
     def __init__(
         self,
@@ -112,7 +121,8 @@ class RLEnvironment:
         self._total_pnl = 0.0
         self._trades_count = 0
         self._wins = 0
-        self._equity_history: List[float] = [initial_balance]
+        # FIX: use deque with maxlen to prevent memory leak
+        self._equity_history: Deque[float] = deque([initial_balance], maxlen=self._EQUITY_MAXLEN)
 
     def reset(self) -> List[float]:
         self._balance = self._initial_balance
@@ -123,7 +133,7 @@ class RLEnvironment:
         self._total_pnl = 0.0
         self._trades_count = 0
         self._wins = 0
-        self._equity_history = [self._initial_balance]
+        self._equity_history = deque([self._initial_balance], maxlen=self._EQUITY_MAXLEN)
         return self._get_observation()
 
     def step(self, action: int) -> Tuple[List[float], float, bool, Dict]:
@@ -158,7 +168,9 @@ class RLEnvironment:
             if self._bars_in_trade >= self._max_bars_in_trade:
                 reward += self._close_position(candle["close"])
 
-        current_equity = self._balance + (self._calc_pnl(candle["close"]) if self._position != 0 else 0)
+        current_equity = self._balance + (
+            self._calc_pnl(candle["close"]) if self._position != 0 else 0
+        )
         self._equity_history.append(current_equity)
 
         self._cursor += 1
@@ -188,7 +200,7 @@ class RLEnvironment:
         idx = min(self._cursor, len(self._candles) - 1)
         c = self._candles[idx]
         close = c["close"]
-        hist = self._candles[max(0, idx - 50):idx + 1]
+        hist = self._candles[max(0, idx - 50): idx + 1]
         closes = [h["close"] for h in hist]
 
         rsi  = self._simple_rsi(closes, 14)
@@ -203,8 +215,8 @@ class RLEnvironment:
             close, c.get("open", close), c.get("high", close), c.get("low", close),
             c.get("volume", 0.0),
             rsi / 100, atr, ema20, ema50,
-            0.0, 0.0,  # macd placeholder
-            close + atr * 2, close - atr * 2,  # bb_upper, bb_lower
+            0.0, 0.0,  # macd placeholder — requires talib/pandas-ta for real values
+            close + atr * 2, close - atr * 2,  # bb_upper, bb_lower (ATR approximation)
             c.get("smc_score", 50.0) / 100,
             c.get("pa_score", 50.0) / 100,
             c.get("ml_confidence", 50.0) / 100,
@@ -269,7 +281,7 @@ class RLTradingAgent:
     RL Trading Agent wrapper.
     Uses RLEnvironment and provides train/predict interface.
     When stable-baselines3 is available, uses PPO.
-    Otherwise, falls back to a simple rule-based policy.
+    Otherwise, falls back to a deterministic rule-based policy.
     """
 
     ACTION_HOLD  = 0
@@ -328,10 +340,14 @@ class RLTradingAgent:
                 return int(action)
             except Exception:
                 pass
-        # Rule-based fallback
+        # FIX: deterministic rule-based fallback (no random)
         smc_score = observation[13] * 100
         ml_conf   = observation[15] * 100
+        pa_score  = observation[14] * 100
         position  = observation[16]
-        if smc_score > 65 and ml_conf > 60 and position == 0:
-            return self.ACTION_BUY if random.random() > 0.5 else self.ACTION_SELL
+        # Only open if all three signals agree
+        if smc_score > 65 and ml_conf > 60 and pa_score > 60 and position == 0:
+            return self.ACTION_BUY if smc_score > pa_score else self.ACTION_SELL
+        if position != 0 and smc_score < 35:
+            return self.ACTION_CLOSE
         return self.ACTION_HOLD
