@@ -1,12 +1,9 @@
-"""
-backend/core/security.py
-Central security utilities — JWT, password hashing, token validation.
+"""backend/core/security.py — production-hardened v3.
 
-Fixes applied:
-- Added decode_access_token as alias to maintain backward compatibility
-- hmac.new → hmac.new (Python stdlib correct call verified)
-- validate_access_token and validate_refresh_token always exported
-- JTI pattern enforced on every decode
+FIX-10 sign_payload(): guard against empty secret (silent HMAC bypass).
+FIX-11 hash_password(): enforce 72-byte bcrypt limit.
+FIX-2  verify_password(): wrapped in try/except, always returns bool.
+FIX-5  decode_access_token alias preserved for backward compatibility.
 """
 from __future__ import annotations
 
@@ -25,36 +22,40 @@ from backend.core.config import get_settings
 
 log = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Password hashing
-# ---------------------------------------------------------------------------
 _pwd_ctx = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__rounds=12,
 )
 
+_BCRYPT_MAX_BYTES: int = 72
+
 
 def hash_password(plain: str) -> str:
-    """Return bcrypt hash of plain text password."""
-    if not plain or len(plain) > 1024:
-        raise ValueError("Invalid password length")
+    """Return bcrypt hash. FIX-11: enforce 72-byte bcrypt hard limit."""
+    if not plain:
+        raise ValueError("Password cannot be empty")
+    encoded = plain.encode("utf-8")
+    if len(encoded) > _BCRYPT_MAX_BYTES:
+        raise ValueError(
+            f"Password too long (max {_BCRYPT_MAX_BYTES} bytes when UTF-8 encoded)"
+        )
     return _pwd_ctx.hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """Constant-time bcrypt verification. Returns False on any error."""
+    """FIX-2: always returns bool, never propagates passlib internals."""
+    if not plain or not hashed:
+        return False
     try:
-        return _pwd_ctx.verify(plain, hashed)
-    except Exception:
+        return bool(_pwd_ctx.verify(plain, hashed))
+    except Exception as exc:
+        log.warning("bcrypt verify error: %s", type(exc).__name__)
         return False
 
 
-# ---------------------------------------------------------------------------
-# JWT
-# ---------------------------------------------------------------------------
 _ALGORITHM = "HS256"
-_JTI_PATTERN = re.compile(r"^[0-9a-f]{64}$")  # 32-byte hex = 64 hex chars
+_JTI_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _secret() -> str:
@@ -69,19 +70,11 @@ def create_access_token(
     extra_claims: Optional[Dict[str, Any]] = None,
     expires_minutes: Optional[int] = None,
 ) -> str:
-    """
-    Create signed JWT access token.
-
-    Security:
-    - HS256 with secret >= 32 bytes
-    - jti = secrets.token_hex(32) — 256-bit entropy
-    - Reserved claims (sub, iat, exp, jti, type) cannot be overridden by caller
-    """
     s = get_settings()
     exp_minutes = expires_minutes or s.ACCESS_TOKEN_EXPIRE_MINUTES
     now = datetime.now(timezone.utc)
     jti = secrets.token_hex(32)
-
+    _RESERVED = {"sub", "iat", "exp", "jti", "type"}
     claims: Dict[str, Any] = {
         "sub": str(subject),
         "iat": now,
@@ -90,17 +83,11 @@ def create_access_token(
         "type": "access",
     }
     if extra_claims:
-        _RESERVED = {"sub", "iat", "exp", "jti", "type"}
         claims.update({k: v for k, v in extra_claims.items() if k not in _RESERVED})
-
     return jwt.encode(claims, _secret(), algorithm=_ALGORITHM)
 
 
 def create_refresh_token(subject: str) -> Tuple[str, str]:
-    """
-    Create signed JWT refresh token.
-    Returns (token, jti) — store jti in DB for revocation.
-    """
     s = get_settings()
     now = datetime.now(timezone.utc)
     jti = secrets.token_hex(32)
@@ -115,10 +102,6 @@ def create_refresh_token(subject: str) -> Tuple[str, str]:
 
 
 def decode_token(token: str) -> Dict[str, Any]:
-    """
-    Decode and validate JWT. Raises ValueError with safe message.
-    Never leaks cryptographic details to callers.
-    """
     try:
         payload = jwt.decode(
             token,
@@ -129,15 +112,12 @@ def decode_token(token: str) -> Dict[str, Any]:
     except JWTError as exc:
         log.warning("JWT decode failure: %s", type(exc).__name__)
         raise ValueError("Invalid or expired token") from exc
-
     if not _JTI_PATTERN.match(str(payload.get("jti", ""))):
         raise ValueError("Malformed token identifier")
-
     return payload
 
 
 def validate_access_token(token: str) -> Dict[str, Any]:
-    """Decode and assert type == 'access'."""
     payload = decode_token(token)
     if payload.get("type") != "access":
         raise ValueError("Not an access token")
@@ -145,30 +125,30 @@ def validate_access_token(token: str) -> Dict[str, Any]:
 
 
 def validate_refresh_token(token: str) -> Dict[str, Any]:
-    """Decode and assert type == 'refresh'."""
     payload = decode_token(token)
     if payload.get("type") != "refresh":
         raise ValueError("Not a refresh token")
     return payload
 
 
-# Backward-compatibility alias — deps.py and some routes imported this name
 decode_access_token = validate_access_token
 
 
-# ---------------------------------------------------------------------------
-# HMAC signature helpers for webhook / MQL5 payloads
-# ---------------------------------------------------------------------------
 def sign_payload(payload: bytes, secret: str) -> str:
-    """Return hex HMAC-SHA256 signature."""
-    return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    """FIX-10: guard against empty secret."""
+    if not secret:
+        raise ValueError("HMAC secret must not be empty")
+    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
 
 def verify_signature(payload: bytes, secret: str, provided_sig: str) -> bool:
-    """Constant-time signature verification."""
-    return hmac.compare_digest(sign_payload(payload, secret), provided_sig)
+    if not secret or not provided_sig:
+        return False
+    try:
+        return hmac.compare_digest(sign_payload(payload, secret), provided_sig)
+    except Exception:
+        return False
 
 
 def generate_secure_token(nbytes: int = 32) -> str:
-    """URL-safe random token for password reset, email verify, etc."""
     return secrets.token_urlsafe(nbytes)
