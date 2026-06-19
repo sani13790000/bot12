@@ -1,51 +1,27 @@
-"""
-Galaxy Vast Institutional Trading Framework.
+"""Institutional-grade trading modules for Galaxy Vast."""
 
-Provides institutional-grade modules:
-- Market Replay Engine
-- Tick-level Backtesting
-- Walk Forward Optimization
-- Performance Metrics
-- AI Explainability
-- Reinforcement Learning Agent
-- Portfolio Management
-- Correlation Engine
-- Monte Carlo Simulation
-- Risk Engine
-- Data persistence to PostgreSQL/Supabase
-"""
-
-from .market_replay import MarketReplay, ReplayState, ReplayConfig
-from .tick_backtest import TickBacktestEngine, TickBacktestConfig
-from .walk_forward import WalkForwardOptimizer, WalkForwardConfig
-from .performance_metrics import PerformanceMetrics, EquityCurve
-from .explainability import ExplainabilityEngine, SignalReason
-from .rl_agent import RLTradingAgent, RLAgentConfig
-from .portfolio import PortfolioManager, PortfolioAllocation
-from .correlation import CorrelationEngine
-from .monte_carlo import MonteCarloSimulator, MonteCarloConfig
-from .risk_engine import InstitutionalRiskEngine
+from .market_replay import MarketReplayEngine, ReplayState, ReplaySpeed
+from .tick_backtest import TickBacktestEngine, TickBacktestConfig, TickBacktestResult
+from .performance_metrics import PerformanceMetrics, PerformanceReport
+from .walk_forward_optimizer import WalkForwardOptimizer, WFOConfig, WFOResult
+from .ai_explainability import AIExplainabilityService, TradeExplanation
+from .rl_agent import RLTradingAgent, RLEnvironment
+from .portfolio_manager import PortfolioManager, PortfolioConfig, AllocationMethod
+from .correlation_engine import CorrelationEngine, CorrelationResult
+from .monte_carlo import MonteCarloSimulator, MonteCarloResult
+from .risk_engine import InstitutionalRiskEngine, RiskReport
 from .data_store import InstitutionalDataStore
 
 __all__ = [
-    "MarketReplay",
-    "ReplayState",
-    "ReplayConfig",
-    "TickBacktestEngine",
-    "TickBacktestConfig",
-    "WalkForwardOptimizer",
-    "WalkForwardConfig",
-    "PerformanceMetrics",
-    "EquityCurve",
-    "ExplainabilityEngine",
-    "SignalReason",
-    "RLTradingAgent",
-    "RLAgentConfig",
-    "PortfolioManager",
-    "PortfolioAllocation",
-    "CorrelationEngine",
-    "MonteCarloSimulator",
-    "MonteCarloConfig",
-    "InstitutionalRiskEngine",
+    "MarketReplayEngine", "ReplayState", "ReplaySpeed",
+    "TickBacktestEngine", "TickBacktestConfig", "TickBacktestResult",
+    "PerformanceMetrics", "PerformanceReport",
+    "WalkForwardOptimizer", "WFOConfig", "WFOResult",
+    "AIExplainabilityService", "TradeExplanation",
+    "RLTradingAgent", "RLEnvironment",
+    "PortfolioManager", "PortfolioConfig", "AllocationMethod",
+    "CorrelationEngine", "CorrelationResult",
+    "MonteCarloSimulator", "MonteCarloResult",
+    "InstitutionalRiskEngine", "RiskReport",
     "InstitutionalDataStore",
 ]
