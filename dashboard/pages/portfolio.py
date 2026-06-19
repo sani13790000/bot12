@@ -1,143 +1,149 @@
-"""Portfolio Management — multi-symbol allocation + correlation matrix."""
+"""Portfolio Management Dashboard Page"""
+from __future__ import annotations
+
 import random
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
+from plotly.subplots import make_subplots
 
-SYMBOLS = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "GBPJPY", "XAGUSD", "USDCAD"]
+st.set_page_config(page_title="Portfolio Management", layout="wide")
 
+st.title("💼 Portfolio Management")
+st.markdown("*Multi-symbol allocation with correlation analysis and risk-adjusted sizing*")
 
-def _compute_allocation(symbols, method, capital, max_pos_pct, seed=42):
-    rng = random.Random(seed)
-    n = len(symbols)
-    if method == "equal_weight":
-        weights = [1/n] * n
-    elif method == "risk_parity":
-        vols = [rng.uniform(0.01, 0.03) for _ in symbols]
-        inv_vols = [1/v for v in vols]
-        total = sum(inv_vols)
-        weights = [v/total for v in inv_vols]
-    elif method == "kelly":
-        wins = [rng.uniform(0.55, 0.70) for _ in symbols]
-        odds = [rng.uniform(1.5, 2.5) for _ in symbols]
-        kelly = [w - (1-w)/o for w, o in zip(wins, odds)]
-        kelly = [max(0, k) for k in kelly]
-        total = sum(kelly) or 1
-        weights = [k/total for k in kelly]
-    else:  # min_variance / max_sharpe
-        raw = [rng.uniform(0.1, 0.4) for _ in symbols]
-        total = sum(raw)
-        weights = [r/total for r in raw]
-    # Cap at max_pos_pct
-    weights = [min(w, max_pos_pct/100) for w in weights]
-    total = sum(weights)
-    weights = [w/total for w in weights]
-    return weights
-
-
-def _correlation_matrix(symbols, seed=42):
-    rng = np.random.default_rng(seed)
-    n = len(symbols)
-    raw = rng.uniform(-0.4, 0.9, (n, n))
-    corr = (raw + raw.T) / 2
-    np.fill_diagonal(corr, 1.0)
-    corr = np.clip(corr, -1, 1)
-    return pd.DataFrame(corr, index=symbols, columns=symbols).round(2)
-
-
-def render():
-    st.markdown('<h1 style="color:#FFD700">💼 Portfolio Manager</h1>', unsafe_allow_html=True)
-    st.caption("Multi-symbol allocation | Risk-Parity | Kelly | Min-Variance | Correlation filter")
-
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        symbols = st.multiselect("Symbols", SYMBOLS,
-                                 default=["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"])
-        method  = st.selectbox("Allocation Method",
-                               ["equal_weight", "risk_parity", "kelly", "min_variance", "max_sharpe"])
-    with c2:
-        capital      = st.number_input("Total Capital ($)", value=100000, step=10000)
-        max_pos      = st.slider("Max Position (%)", 5, 50, 30)
-        corr_thresh  = st.slider("Max Correlation", 0.50, 0.95, 0.80, 0.05)
-
-    if not symbols:
-        st.warning("Select at least 2 symbols."); return
-
-    if st.button("📈 Compute Allocations", type="primary", use_container_width=True):
-        weights  = _compute_allocation(symbols, method, capital, max_pos)
-        corr_df  = _correlation_matrix(symbols)
-        st.session_state["port_weights"] = weights
-        st.session_state["port_corr"]    = corr_df
-        st.session_state["port_symbols"] = symbols
-        st.session_state["port_capital"] = capital
-
-    if "port_weights" not in st.session_state:
-        st.info("▶️ Select symbols and click Compute."); return
-
-    weights  = st.session_state["port_weights"]
-    corr_df  = st.session_state["port_corr"]
-    symbols  = st.session_state["port_symbols"]
-    capital  = st.session_state["port_capital"]
-
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Portfolio Settings")
+    available_symbols = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "NZDUSD", "USDCAD"]
+    selected_symbols = st.multiselect("Active Symbols", available_symbols,
+                                      default=["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"])
+    capital = st.number_input("Total Capital ($)", min_value=1000, value=50000, step=1000)
+    max_risk_per_symbol = st.slider("Max Risk per Symbol (%)", 0.5, 5.0, 1.0, 0.1)
+    method = st.selectbox("Allocation Method", ["Risk Parity", "Equal Weight", "Kelly Criterion", "Min Variance"])
     st.divider()
-    # Summary metrics
-    high_corr = [(corr_df.columns[i], corr_df.columns[j])
-                 for i in range(len(symbols))
-                 for j in range(i+1, len(symbols))
-                 if corr_df.iloc[i, j] > corr_thresh]
-    div_score = round((1 - sum(w**2 for w in weights)) * 100, 1)
+    recalc = st.button("🔄 Recalculate", type="primary", use_container_width=True)
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Diversification Score", f"{div_score} / 100")
-    m2.metric("High Corr Pairs", len(high_corr))
-    m3.metric("Conflicts", len(high_corr))
-    m4.metric("Active Symbols", len(symbols))
+if not selected_symbols:
+    st.warning("Select at least one symbol.")
+    st.stop()
 
-    st.divider()
-    col_pie, col_alloc = st.columns([1, 2])
-
-    with col_pie:
-        st.subheader("🫖 Allocation")
-        fig = go.Figure(go.Pie(
-            labels=symbols,
-            values=[round(w*100, 2) for w in weights],
-            hole=0.4,
-            marker_colors=["#FFD700", "#F0B90B", "#0ECB81",
-                           "#2B92E4", "#F6465D", "#848E9C", "#C5AE73"]
-        ))
-        fig.update_layout(template="plotly_dark", height=350,
-                          margin=dict(l=0,r=0,t=10,b=0),
-                          paper_bgcolor="#1E2329")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_alloc:
-        st.subheader("📊 Allocation Table")
-        alloc_data = {
-            "Symbol":      symbols,
-            "Weight":      [f"{w*100:.1f}%" for w in weights],
-            "Capital ($)": [f"${w*capital:,.0f}" for w in weights],
-            "Max Lot":     [round(w*capital/100000, 2) for w in weights],
-            "Risk/Day":    [f"${w*capital*0.01:,.0f}" for w in weights],
-        }
-        st.dataframe(pd.DataFrame(alloc_data), use_container_width=True, hide_index=True)
-
-    # Correlation heatmap
-    st.subheader("🔥 Correlation Matrix")
-    fig2 = go.Figure(go.Heatmap(
-        z=corr_df.values, x=corr_df.columns, y=corr_df.index,
-        colorscale="RdYlGn", zmid=0, zmin=-1, zmax=1,
-        text=corr_df.values.round(2),
-        texttemplate="%{text}", showscale=True
-    ))
-    fig2.update_layout(template="plotly_dark", height=400,
-                       margin=dict(l=0,r=0,t=10,b=0),
-                       paper_bgcolor="#1E2329")
-    st.plotly_chart(fig2, use_container_width=True)
-
-    if high_corr:
-        st.warning(f"⚠️ High correlation pairs (>{corr_thresh}): " +
-                   ", ".join([f"{a}/{b}" for a, b in high_corr]))
+# ── Generate demo data ─────────────────────────────────────────────────────
+def gen_portfolio_data(symbols):
+    np.random.seed(42)
+    n = len(symbols)
+    returns = {s: np.random.normal(0.0008, 0.012, 252) for s in symbols}
+    returns_df = pd.DataFrame(returns)
+    vols = returns_df.std() * np.sqrt(252)
+    sharpes = returns_df.mean() / returns_df.std() * np.sqrt(252)
+    corr = returns_df.corr()
+    if method == "Risk Parity":
+        raw = 1.0 / vols
+        weights = (raw / raw.sum()).to_dict()
+    elif method == "Kelly Criterion":
+        raw = sharpes.clip(lower=0)
+        weights = (raw / raw.sum()).to_dict() if raw.sum() > 0 else {s: 1/n for s in symbols}
+    elif method == "Min Variance":
+        raw = 1.0 / (vols ** 2)
+        weights = (raw / raw.sum()).to_dict()
     else:
-        st.success("✅ No high-correlation conflicts detected.")
+        weights = {s: 1.0 / n for s in symbols}
+    rows = []
+    for s in symbols:
+        rows.append({
+            "Symbol": s,
+            "Weight": round(weights[s], 4),
+            "Allocation ($)": round(weights[s] * capital, 2),
+            "Annual Vol": round(float(vols[s]), 4),
+            "Sharpe": round(float(sharpes[s]), 3),
+            "Win Rate": round(random.uniform(0.52, 0.70), 3),
+            "Profit Factor": round(random.uniform(1.1, 2.2), 3),
+            "Max DD": round(random.uniform(0.03, 0.15), 3),
+            "Open Trades": random.randint(0, 2),
+            "Total Trades": random.randint(20, 150),
+        })
+    return pd.DataFrame(rows), corr, returns_df
+
+if "port_df" not in st.session_state or recalc:
+    st.session_state.port_df, st.session_state.corr, st.session_state.ret_df = gen_portfolio_data(selected_symbols)
+
+port_df = st.session_state.port_df
+corr = st.session_state.corr
+ret_df = st.session_state.ret_df
+
+# ── KPIs ───────────────────────────────────────────────────────────────────────
+st.subheader("📊 Portfolio Summary")
+port_sharpe = (port_df["Sharpe"] * port_df["Weight"]).sum()
+port_vol = (port_df["Annual Vol"] * port_df["Weight"]).sum()
+port_dd = (port_df["Max DD"] * port_df["Weight"]).sum()
+total_trades = port_df["Total Trades"].sum()
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Portfolio Sharpe", f"{port_sharpe:.3f}")
+c2.metric("Portfolio Volatility", f"{port_vol*100:.2f}%")
+c3.metric("Avg Max Drawdown", f"{port_dd*100:.2f}%")
+c4.metric("Total Trades", f"{total_trades:,}")
+c5.metric("Active Symbols", len(selected_symbols))
+
+st.divider()
+
+# ── Charts ─────────────────────────────────────────────────────────────────────
+col_l, col_r = st.columns(2)
+
+with col_l:
+    st.subheader("🥧 Allocation")
+    fig_pie = px.pie(
+        port_df, values="Weight", names="Symbol",
+        color_discrete_sequence=px.colors.sequential.Plasma,
+        hole=0.4,
+    )
+    fig_pie.update_traces(textposition="inside", textinfo="percent+label")
+    fig_pie.update_layout(template="plotly_dark", height=380,
+                          legend=dict(orientation="h", y=-0.15))
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+with col_r:
+    st.subheader("🔥 Correlation Heatmap")
+    fig_heat = px.imshow(
+        corr,
+        color_continuous_scale="RdBu_r",
+        zmin=-1, zmax=1,
+        text_auto=".2f",
+        aspect="auto",
+    )
+    fig_heat.update_layout(template="plotly_dark", height=380)
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+# ── Cumulative equity curves per symbol ───────────────────────────────────
+st.subheader("📈 Equity Curves")
+fig_eq = go.Figure()
+colors = px.colors.qualitative.Plotly
+for idx, sym in enumerate(selected_symbols):
+    cum = (1 + ret_df[sym]).cumprod() * 10000
+    fig_eq.add_trace(go.Scatter(
+        x=list(range(len(cum))), y=cum.values,
+        name=sym, line=dict(color=colors[idx % len(colors)], width=2),
+    ))
+fig_eq.update_layout(template="plotly_dark", xaxis_title="Day",
+                      yaxis_title="Equity ($, starting 10k)", height=350,
+                      legend=dict(orientation="h", y=1.1))
+st.plotly_chart(fig_eq, use_container_width=True)
+
+# ── Table ──────────────────────────────────────────────────────────────────────
+st.subheader("📝 Position Details")
+st.dataframe(
+    port_df.style.background_gradient(subset=["Sharpe", "Weight"], cmap="YlGn")
+                 .format({
+                     "Weight": "{:.2%}",
+                     "Allocation ($)": "${:,.0f}",
+                     "Annual Vol": "{:.2%}",
+                     "Sharpe": "{:.3f}",
+                     "Win Rate": "{:.1%}",
+                     "Profit Factor": "{:.3f}",
+                     "Max DD": "{:.2%}",
+                 }),
+    use_container_width=True,
+    height=280,
+)
