@@ -1,155 +1,140 @@
-"""Tick-Level Backtest Engine — full results with Plotly."""
+"""Backtest Dashboard Page."""
+from __future__ import annotations
+
 import random
-import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
+import time
+
 import numpy as np
-from datetime import date
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from plotly.subplots import make_subplots
 
 
-def _simulate_backtest(symbol, initial_balance, risk_pct, spread_mult,
-                       slippage, use_commission, n_trades=300, seed=42):
-    rng = random.Random(seed)
-    np.random.seed(seed)
-    equity = [initial_balance]
-    trades = []
-    balance = initial_balance
-    wins = 0
-    gross_profit = gross_loss = 0.0
+def render() -> None:
+    st.title("📈 Tick-Level Backtest Engine")
+    st.markdown("*Spread + Slippage + Commission simulation with full performance metrics*")
 
-    for i in range(n_trades):
-        lot = round(balance * (risk_pct / 100) / 100, 2)
-        direction = rng.choice(["BUY", "SELL"])
-        entry = round(rng.uniform(2280, 2380), 2)
-        tp_pips = rng.randint(80, 250)
-        sl_pips = rng.randint(40, 120)
-        spread_cost = round(spread_mult * 0.3 * lot * 10, 4)
-        slip_cost   = round(slippage * 0.1 * lot * 10, 4)
-        comm_cost   = round(7.0 * lot, 4) if use_commission else 0.0
-        is_win = rng.random() < 0.58
-        if is_win:
-            pnl = round(tp_pips * 0.01 * lot * 10 - spread_cost - slip_cost - comm_cost, 2)
-            gross_profit += pnl
-            wins += 1
-        else:
-            pnl = round(-sl_pips * 0.01 * lot * 10 - spread_cost - slip_cost - comm_cost, 2)
-            gross_loss += abs(pnl)
-        balance += pnl
-        equity.append(round(balance, 2))
-        trades.append({"#": i+1, "Symbol": symbol, "Direction": direction,
-                       "Entry": entry, "Lots": lot, "PnL": pnl,
-                       "Comm": comm_cost, "Spread": spread_cost,
-                       "Result": "WIN" if is_win else "LOSS"})
+    with st.sidebar:
+        st.header("⚙️ Backtest Settings")
+        symbol = st.selectbox("Symbol", ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"])
+        timeframe = st.selectbox("Timeframe", ["M5", "M15", "H1", "H4"])
+        initial_balance = st.number_input("Initial Balance ($)", 1000, 1_000_000, 10_000, 1000)
+        risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 1.0, 0.1)
+        spread = st.slider("Spread (pips)", 0.1, 5.0, 1.5, 0.1)
+        slippage = st.slider("Slippage (pips)", 0.0, 3.0, 0.5, 0.1)
+        commission = st.number_input("Commission ($/lot)", 0.0, 20.0, 7.0, 0.5)
+        n_candles = st.slider("Candles", 500, 5000, 1500, 100)
+        run_btn = st.button("🚀 Run Backtest", type="primary", use_container_width=True)
 
-    net_profit = balance - initial_balance
-    win_rate = wins / n_trades * 100
-    profit_factor = gross_profit / max(gross_loss, 0.01)
-    eq_arr = np.array(equity)
-    peak = np.maximum.accumulate(eq_arr)
-    drawdown = (peak - eq_arr) / peak * 100
-    max_dd = drawdown.max()
-    returns = np.diff(eq_arr) / eq_arr[:-1]
-    sharpe = (returns.mean() / (returns.std() + 1e-9)) * np.sqrt(252)
-    neg_ret = returns[returns < 0]
-    sortino = (returns.mean() / (neg_ret.std() + 1e-9)) * np.sqrt(252)
-    return {
-        "equity": equity, "trades": trades, "net_profit": net_profit,
-        "win_rate": win_rate, "profit_factor": profit_factor,
-        "max_drawdown": max_dd, "sharpe": sharpe, "sortino": sortino,
-        "total_trades": n_trades, "wins": wins
-    }
+    def generate_backtest(n, balance, risk, spread_p, slip_p, comm):
+        random.seed(42)
+        np.random.seed(42)
+        trades, equity, balance_cur = [], [balance], balance
+        wins = 0
+        for i in range(n):
+            if random.random() < 0.3:
+                direction = random.choice(["BUY", "SELL"])
+                sl_pips = random.uniform(10, 30)
+                tp_pips = sl_pips * random.uniform(1.5, 3.0)
+                lot = round((balance_cur * risk / 100) / (sl_pips * 10), 2)
+                lot = max(0.01, min(lot, 10.0))
+                total_spread = (spread_p + slip_p) * 10
+                gross_pnl = tp_pips * 10 * lot if random.random() < 0.55 else -sl_pips * 10 * lot
+                net_pnl = gross_pnl - total_spread * lot - comm * lot
+                balance_cur = max(0.01, balance_cur + net_pnl)
+                equity.append(balance_cur)
+                if net_pnl > 0:
+                    wins += 1
+                trades.append({"#": len(trades)+1, "Direction": direction,
+                               "SL (pips)": round(sl_pips, 1), "TP (pips)": round(tp_pips, 1),
+                               "Lot": lot, "Net P&L": round(net_pnl, 2),
+                               "Balance": round(balance_cur, 2)})
+        eq = np.array(equity)
+        dd = (np.maximum.accumulate(eq) - eq) / np.maximum.accumulate(eq)
+        max_dd = float(dd.max()) * 100
+        returns = np.diff(eq) / eq[:-1]
+        sharpe = (returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
+        downside = returns[returns < 0]
+        sortino = (returns.mean() / downside.std() * np.sqrt(252)) if len(downside) > 0 and downside.std() > 0 else 0
+        gross_profit = sum(t["Net P&L"] for t in trades if t["Net P&L"] > 0)
+        gross_loss = abs(sum(t["Net P&L"] for t in trades if t["Net P&L"] < 0))
+        pf = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+        win_rate = wins / len(trades) * 100 if trades else 0
+        recovery = (balance_cur - balance) / (max_dd / 100 * balance) if max_dd > 0 else 0
+        return trades, equity, max_dd, sharpe, sortino, pf, win_rate, recovery
 
+    if "bt_result" not in st.session_state or run_btn:
+        with st.spinner(f"Running backtest on {n_candles} candles..."):
+            time.sleep(0.8)
+            st.session_state.bt_result = generate_backtest(
+                n_candles, initial_balance, risk_pct, spread, slippage, commission)
 
-def render():
-    st.markdown('<h1 style="color:#FFD700">📈 Tick-Level Backtest Engine</h1>', unsafe_allow_html=True)
-    st.caption("Spread + Slippage + Commission simulation | Multi-symbol | No lookahead bias")
+    trades, equity, max_dd, sharpe, sortino, pf, win_rate, recovery = st.session_state.bt_result
+    if not trades:
+        st.warning("No trades generated. Try adjusting parameters.")
+        return
 
-    with st.expander("⚙️ Configuration", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            symbol        = st.selectbox("Symbol", ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"])
-            timeframe     = st.selectbox("Timeframe", ["M5", "M15", "M30", "H1", "H4"])
-            initial_bal   = st.number_input("Initial Balance ($)", value=10000, step=1000)
-        with c2:
-            risk_pct      = st.slider("Risk per Trade (%)", 0.1, 5.0, 1.0, 0.1)
-            spread_mult   = st.slider("Spread Multiplier", 0.5, 3.0, 1.0, 0.1)
-            slippage      = st.slider("Slippage (pips)", 0.0, 2.0, 0.5, 0.1)
-        with c3:
-            use_commission = st.toggle("Commission ($7/lot)", value=True)
-            start_date     = st.date_input("Start Date", date(2022, 1, 1))
-            end_date       = st.date_input("End Date",   date(2024, 12, 31))
-            n_trades       = st.slider("Simulated Trades", 50, 500, 300)
+    # KPIs
+    st.subheader("📊 Performance Summary")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Total Trades", len(trades))
+    c2.metric("Win Rate", f"{win_rate:.1f}%",
+              delta="✓ Good" if win_rate >= 55 else "⚠ Low",
+              delta_color="normal" if win_rate >= 55 else "inverse")
+    c3.metric("Profit Factor", f"{pf:.3f}",
+              delta="✓" if pf >= 1.3 else "⚠")
+    c4.metric("Sharpe Ratio", f"{sharpe:.3f}")
+    c5.metric("Sortino Ratio", f"{sortino:.3f}")
+    c6.metric("Max Drawdown", f"{max_dd:.2f}%",
+              delta_color="inverse")
 
-    if st.button("🚀 Run Backtest", type="primary", use_container_width=True):
-        with st.spinner("Running tick-level backtest..."):
-            result = _simulate_backtest(symbol, initial_bal, risk_pct, spread_mult,
-                                        slippage, use_commission, n_trades)
-            st.session_state["bt_result"] = result
-
-    result = st.session_state.get("bt_result")
-    if not result:
-        st.info("▶️ Configure and click Run Backtest to see results."); return
-
-    st.success("✅ Backtest complete!")
-    st.divider()
-
-    # Metrics
-    m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
-    m1.metric("Total Trades",   result["total_trades"])
-    m2.metric("Win Rate",       f"{result['win_rate']:.1f}%")
-    m3.metric("Profit Factor",  f"{result['profit_factor']:.2f}")
-    m4.metric("Sharpe Ratio",   f"{result['sharpe']:.2f}")
-    m5.metric("Sortino Ratio",  f"{result['sortino']:.2f}")
-    m6.metric("Max Drawdown",   f"-{result['max_drawdown']:.1f}%")
-    m7.metric("Net Profit",     f"${result['net_profit']:,.0f}",
-              delta=f"{result['net_profit']/initial_bal*100:+.1f}%")
+    net_profit = equity[-1] - equity[0]
+    c7, c8, c9 = st.columns(3)
+    c7.metric("Final Balance", f"${equity[-1]:,.2f}", delta=f"{net_profit:+,.2f}")
+    c8.metric("Recovery Factor", f"{recovery:.2f}")
+    c9.metric("Total Return", f"{(equity[-1]/equity[0]-1)*100:.2f}%")
 
     st.divider()
-    col_eq, col_dd = st.columns([3, 1])
 
-    with col_eq:
-        st.subheader("📉 Equity Curve")
-        eq = result["equity"]
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(y=eq, mode="lines", name="Equity",
-                                 line=dict(color="#FFD700", width=2),
-                                 fill="tozeroy", fillcolor="rgba(255,215,0,0.08)"))
-        fig.update_layout(template="plotly_dark", height=350,
-                          margin=dict(l=0,r=0,t=30,b=0),
-                          paper_bgcolor="#1E2329", plot_bgcolor="#1E2329",
-                          xaxis_title="Trade #", yaxis_title="Balance ($)")
-        st.plotly_chart(fig, use_container_width=True)
+    # Equity + Drawdown chart
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.subheader("💰 Equity Curve")
+        fig_eq = go.Figure()
+        fig_eq.add_trace(go.Scatter(
+            y=equity, mode="lines",
+            line=dict(color="#0ECB81", width=2),
+            fill="tozeroy", fillcolor="rgba(14,203,129,0.08)",
+            name="Equity"
+        ))
+        fig_eq.add_hline(y=equity[0], line_dash="dash",
+                         line_color="#FFD700", annotation_text="Start")
+        fig_eq.update_layout(template="plotly_dark", height=320,
+                             xaxis_title="Trade #", yaxis_title="Equity ($)",
+                             margin=dict(l=0, r=0, t=10, b=0))
+        st.plotly_chart(fig_eq, use_container_width=True)
 
-    with col_dd:
-        st.subheader("📄 P&L Distribution")
-        pnls = [t["PnL"] for t in result["trades"]]
-        fig2 = go.Figure(go.Histogram(x=pnls, nbinsx=30,
-                                      marker_color="#FFD700",
-                                      marker_line_color="#0E1117",
-                                      marker_line_width=1))
-        fig2.update_layout(template="plotly_dark", height=350,
-                           margin=dict(l=0,r=0,t=30,b=0),
-                           paper_bgcolor="#1E2329", plot_bgcolor="#1E2329")
-        st.plotly_chart(fig2, use_container_width=True)
+    with col_r:
+        st.subheader("📉 Drawdown")
+        eq_arr = np.array(equity)
+        dd_arr = (np.maximum.accumulate(eq_arr) - eq_arr) / np.maximum.accumulate(eq_arr) * 100
+        fig_dd = go.Figure(go.Scatter(
+            y=-dd_arr, mode="lines",
+            fill="tozeroy", fillcolor="rgba(244,67,54,0.15)",
+            line=dict(color="#F44336", width=1.5), name="Drawdown"
+        ))
+        fig_dd.update_layout(template="plotly_dark", height=320,
+                             xaxis_title="Trade #", yaxis_title="Drawdown (%)",
+                             margin=dict(l=0, r=0, t=10, b=0))
+        st.plotly_chart(fig_dd, use_container_width=True)
 
-    # Drawdown chart
-    st.subheader("🟥 Drawdown Chart")
-    eq_arr = np.array(result["equity"])
-    peak   = np.maximum.accumulate(eq_arr)
-    dd     = (peak - eq_arr) / peak * 100
-    fig3 = go.Figure(go.Scatter(y=-dd, fill="tozeroy",
-                                line_color="#F6465D",
-                                fillcolor="rgba(246,70,93,0.15)"))
-    fig3.update_layout(template="plotly_dark", height=200,
-                       margin=dict(l=0,r=0,t=10,b=0),
-                       paper_bgcolor="#1E2329", plot_bgcolor="#1E2329",
-                       yaxis_title="Drawdown (%)")
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # Trade log
-    st.subheader("📊 Trade Log")
-    df = pd.DataFrame(result["trades"][:50])
-    df["Result"] = df["Result"].apply(lambda x: "✅ WIN" if x == "WIN" else "❌ LOSS")
-    df["PnL"] = df["PnL"].apply(lambda x: f"{'+'if x>=0 else ''}${x:.2f}")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    # Trade history
+    st.subheader("📝 Trade History")
+    df = pd.DataFrame(trades)
+    st.dataframe(
+        df.style.applymap(lambda v: "color: #0ECB81" if isinstance(v, float) and v > 0
+                          else ("color: #F44336" if isinstance(v, float) and v < 0 else ""),
+                          subset=["Net P&L"]),
+        use_container_width=True, height=300
+    )
