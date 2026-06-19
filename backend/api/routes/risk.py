@@ -1,21 +1,26 @@
-"""
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""Galaxy Vast AI Trading Platform
 Risk Management API Routes — 10 endpoints
+
+Fix applied:
+- CRITICAL: Removed duplicate prefix from APIRouter.
+  router had prefix='/api/v1/risk' AND main.py mounted it on '/api/v1/risk'
+  → all endpoints were at /api/v1/risk/api/v1/risk/... → 404
+  Fix: router prefix now empty string; main.py prefix is the source of truth.
 """
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-from ...risk.risk_orchestrator  import get_risk_orchestrator, RiskInput
-from ...risk.exposure_control   import ExposurePosition
-from ...risk.lot_sizing         import LotSizingMethod, get_lot_sizer
-from ...risk.equity_protection  import get_equity_protection
-from ...risk.volatility_filter  import get_volatility_filter
+from ...risk.risk_orchestrator import get_risk_orchestrator, RiskInput
+from ...risk.exposure_control import ExposurePosition
+from ...risk.lot_sizing import LotSizingMethod, get_lot_sizer
+from ...risk.equity_protection import get_equity_protection
+from ...risk.volatility_filter import get_volatility_filter
 from ...risk.correlation_filter import get_correlation_filter
 
-router = APIRouter(prefix="/api/v1/risk", tags=["Risk Management"])
+# ✔ No prefix here — main.py mounts this router on '/api/v1/risk'
+router = APIRouter(tags=["Risk Management"])
 
 
 # ── Request / Response Models ────────────────────────────────────
@@ -74,7 +79,7 @@ class LotSizingConfigUpdate(BaseModel):
     max_lot: Optional[float] = None
 
 
-# ── Endpoints ────────────────────────────────────────────────────
+# ── Endpoints ───────────────────────────────────────────────────
 
 @router.post("/assess")
 async def assess_risk(req: RiskAssessRequest):
@@ -236,8 +241,8 @@ async def update_lot_sizing_config(req: LotSizingConfigUpdate):
 @router.get("/status")
 async def get_risk_status():
     """Overall risk system status."""
-    equity  = get_equity_protection()
-    sizer   = get_lot_sizer()
+    equity = get_equity_protection()
+    sizer = get_lot_sizer()
     s = equity.state
     return {
         "system": "Galaxy Vast Risk Management v2",
@@ -254,14 +259,17 @@ async def get_risk_status():
 @router.post("/reset/daily")
 async def reset_daily():
     """Reset daily counters — call at midnight."""
+    import datetime
     get_risk_orchestrator().reset_daily()
-    return {"reset": "daily", "timestamp": __import__("datetime").datetime.utcnow().isoformat()}
+    return {"reset": "daily", "timestamp": datetime.datetime.utcnow().isoformat()}
+
 
 @router.post("/reset/weekly")
 async def reset_weekly():
     """Reset weekly counters."""
     get_risk_orchestrator().reset_weekly()
     return {"reset": "weekly"}
+
 
 @router.post("/reset/monthly")
 async def reset_monthly():
