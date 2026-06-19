@@ -1,408 +1,302 @@
-"""
-backend/agents/security_ai_agent.py
-Phase-13: Hybrid Autonomous Security AI Agent
-"""
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import time
+import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-_RETRAIN_INTERVAL_SECONDS: int = 3_600
-_MIN_SAMPLES_FOR_TRAINING: int = 50
-_ANOMALY_SCORE_THRESHOLD: float = -0.15
-_FEATURE_DIM: int = 12
-_MAX_RECENT_EVENTS: int = 10_000
-_SELF_HEAL_BLOCK_THRESHOLD: float = -0.40
-_BLOCK_DURATION_SECONDS: int = 3_600
+_RETRAIN_INTERVAL_S: int   = 3_600
+_MIN_SAMPLES:        int   = 50
+_SCORE_THRESHOLD:    float = -0.15
+_BLOCK_THRESHOLD:    float = -0.40
+_BLOCK_DURATION_S:   int   = 3_600
+_FEATURE_DIM:        int   = 12
+_MAX_BUFFER:         int   = 10_000
+_DB_TIMEOUT:         float = 3.0
+_INFER_TIMEOUT_MS:   float = 10.0
 
 
 class RiskLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+    LOW      = "low"
+    MEDIUM   = "medium"
+    HIGH     = "high"
     CRITICAL = "critical"
 
 
 class EventType(str, Enum):
-    API_REQUEST = "api_request"
-    LOGIN_ATTEMPT = "login_attempt"
-    TRADE_ACTIVITY = "trade_activity"
+    API_REQUEST     = "api_request"
+    LOGIN_ATTEMPT   = "login_attempt"
+    TRADE_ACTIVITY  = "trade_activity"
     SESSION_ANOMALY = "session_anomaly"
-    WEBSOCKET = "websocket"
+    WEBSOCKET       = "websocket"
 
 
 @dataclass
 class SecurityEvent:
-    event_type: EventType
-    ip_address: str
-    user_id: Optional[str] = None
-    endpoint: str = ""
-    method: str = "GET"
-    status_code: int = 200
-    response_time_ms: float = 0.0
-    payload_size: int = 0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    extra: Dict[str, Any] = field(default_factory=dict)
+    event_type:       EventType
+    ip_address:       str
+    user_id:          Optional[str] = None
+    endpoint:         str           = ""
+    method:           str           = "GET"
+    status_code:      int           = 200
+    response_time_ms: float         = 0.0
+    payload_size:     int           = 0
+    timestamp:        datetime      = field(default_factory=lambda: datetime.now(timezone.utc))
+    extra: Dict[str, Any]           = field(default_factory=dict)
 
 
 @dataclass
 class AnomalyResult:
-    is_anomaly: bool
-    score: float
-    risk_level: RiskLevel
-    confidence: float
-    features: List[float]
-    explanation: List[str]
-    self_heal_action: Optional[str] = None
+    is_anomaly:        bool
+    score:             float
+    risk_level:        RiskLevel
+    confidence:        float
+    features:          List[float]
+    explanation:       List[str]
+    self_heal_action:  Optional[str] = None
+    inference_time_ms: float         = 0.0
 
 
 class _FeatureExtractor:
-    def __init__(self) -> None:
-        self._ip_req: Dict[str, deque] = defaultdict(lambda: deque())
-        self._ip_fail: Dict[str, deque] = defaultdict(lambda: deque())
-        self._ip_endpoints: Dict[str, set] = defaultdict(set)
+    _WINDOW_S = 60
 
-    def _prune(self, dq: deque, window_s: int = 60) -> None:
-        cutoff = time.monotonic() - window_s
+    def __init__(self) -> None:
+        self._req:  Dict[str, deque] = defaultdict(deque)
+        self._fail: Dict[str, deque] = defaultdict(deque)
+        self._eps:  Dict[str, set]   = defaultdict(set)
+        self._ev_count = 0
+        self._MAX_IPS  = 50_000
+
+    def _prune(self, dq: deque, cutoff: float) -> None:
         while dq and dq[0] < cutoff:
             dq.popleft()
 
-    def extract(self, event: SecurityEvent) -> List[float]:
-        now = time.monotonic()
-        ip = event.ip_address
-        self._ip_req[ip].append(now)
-        self._prune(self._ip_req[ip])
-        if event.status_code >= 400:
-            self._ip_fail[ip].append(now)
-            self._prune(self._ip_fail[ip])
-        self._ip_endpoints[ip].add(event.endpoint)
-        req_rate_1m = len(self._ip_req[ip])
-        fail_rate_1m = len(self._ip_fail[ip])
-        fail_ratio = fail_rate_1m / max(req_rate_1m, 1)
-        endpoint_count = len(self._ip_endpoints[ip])
-        is_auth_ep = 1.0 if "auth" in event.endpoint else 0.0
-        is_trade_ep = 1.0 if "trade" in event.endpoint or "order" in event.endpoint else 0.0
-        is_ws = 1.0 if "ws" in event.endpoint else 0.0
-        resp_time_norm = min(event.response_time_ms / 10_000.0, 1.0)
-        payload_norm = min(event.payload_size / 1_048_576.0, 1.0)
-        status_bucket = (event.status_code // 100) / 5.0
-        hour_of_day = datetime.now(timezone.utc).hour / 24.0
-        is_night = 1.0 if datetime.now(timezone.utc).hour in range(0, 6) else 0.0
+    def extract(self, ev: SecurityEvent) -> List[float]:
+        now = time.monotonic(); cut = now - self._WINDOW_S; ip = ev.ip_address
+        self._req[ip].append(now); self._prune(self._req[ip], cut)
+        if ev.status_code >= 400:
+            self._fail[ip].append(now); self._prune(self._fail[ip], cut)
+        self._eps[ip].add(ev.endpoint)
+        req = len(self._req[ip]); fail = len(self._fail[ip])
+        self._ev_count += 1
+        if self._ev_count % 1_000 == 0:
+            self._evict()
+        hr = datetime.now(timezone.utc).hour
         return [
-            req_rate_1m / 100.0,
-            fail_rate_1m / 50.0,
-            fail_ratio,
-            endpoint_count / 20.0,
-            is_auth_ep,
-            is_trade_ep,
-            is_ws,
-            resp_time_norm,
-            payload_norm,
-            status_bucket,
-            hour_of_day,
-            is_night,
+            min(req  / 100.0, 1.0),
+            min(fail / 50.0,  1.0),
+            fail / max(req, 1),
+            min(len(self._eps[ip]) / 20.0, 1.0),
+            1.0 if "auth"  in ev.endpoint else 0.0,
+            1.0 if "trade" in ev.endpoint or "order" in ev.endpoint else 0.0,
+            1.0 if "ws"    in ev.endpoint else 0.0,
+            min(ev.response_time_ms / 10_000.0, 1.0),
+            min(ev.payload_size     / 1_048_576.0, 1.0),
+            (ev.status_code // 100) / 5.0,
+            hr / 24.0,
+            1.0 if hr < 6 else 0.0,
         ]
 
+    def _evict(self) -> None:
+        if len(self._req) <= self._MAX_IPS:
+            return
+        stale = [ip for ip, dq in self._req.items() if not dq]
+        for ip in stale[: len(stale) // 2 + 1]:
+            self._req.pop(ip, None); self._fail.pop(ip, None); self._eps.pop(ip, None)
 
-class _IsolationForestModel:
+
+_HEURISTIC_RULES = [
+    (lambda f: f[0] > 0.8,             -0.6, "Very high request rate"),
+    (lambda f: f[2] > 0.5,             -0.5, "High failure ratio"),
+    (lambda f: f[3] > 0.7,             -0.4, "Abnormal endpoint diversity"),
+    (lambda f: f[4] > 0 and f[2] > 0.3,-0.5, "Auth + high failure"),
+    (lambda f: f[7] > 0.9,             -0.3, "Very high latency"),
+]
+
+
+def _heuristic_score(features: List[float]) -> Tuple[float, List[str]]:
+    score = 0.0; expl: List[str] = []
+    for rule, pen, label in _HEURISTIC_RULES:
+        try:
+            if rule(features): score += pen; expl.append(label)
+        except Exception: pass
+    return score, expl
+
+
+class _IFModel:
     def __init__(self) -> None:
-        self._model: Any = None
-        self._trained_at: Optional[float] = None
-        self._n_samples: int = 0
-        self._lock = asyncio.Lock()
+        self._model: Any  = None
+        self._trained     = False
+        self._n_samples   = 0
+        self._lock        = asyncio.Lock()
 
-    def is_trained(self) -> bool:
-        return self._model is not None
+    def _score_impl(self, x: List[float]) -> float:
+        if not self._trained or self._model is None: return 0.0
+        import numpy as _np
+        arr = _np.array(x, dtype=_np.float32).reshape(1, -1)
+        return float(self._model.score_samples(arr)[0])
 
-    async def train(self, X: List[List[float]]) -> bool:
-        if len(X) < _MIN_SAMPLES_FOR_TRAINING:
-            logger.warning("SecurityAI: only %d samples, need %d", len(X), _MIN_SAMPLES_FOR_TRAINING)
-            return False
+    async def score(self, x: List[float]) -> float:
+        if not self._trained: return 0.0
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._score_impl, x)
+
+    async def train(self, X: np.ndarray) -> None:
+        from sklearn.ensemble import IsolationForest
+        loop = asyncio.get_running_loop()
+        def _fit():
+            m = IsolationForest(n_estimators=200, contamination=0.05,
+                                max_features=_FEATURE_DIM, random_state=42, n_jobs=-1)
+            m.fit(X); return m
+        model = await loop.run_in_executor(None, _fit)
         async with self._lock:
-            try:
-                from sklearn.ensemble import IsolationForest
-                arr = np.array(X, dtype=np.float32)
-                model = IsolationForest(
-                    n_estimators=200,
-                    max_samples="auto",
-                    contamination=0.05,
-                    random_state=42,
-                    n_jobs=-1,
-                )
-                model.fit(arr)
-                self._model = model
-                self._trained_at = time.monotonic()
-                self._n_samples = len(X)
-                logger.info("SecurityAI: IsolationForest trained on %d samples", len(X))
-                return True
-            except Exception as exc:
-                logger.error("SecurityAI: training failed: %s", exc)
-                return False
+            self._model = model; self._trained = True; self._n_samples = len(X)
+        log.info("IsolationForest retrained on %d samples.", len(X))
 
-    def predict(self, features: List[float]) -> Tuple[float, bool]:
-        if self._model is None:
-            return 0.0, False
-        arr = np.array([features], dtype=np.float32)
-        score = float(self._model.score_samples(arr)[0])
-        return score, score < _ANOMALY_SCORE_THRESHOLD
-
-
-class _SelfHealingEngine:
-    def __init__(self) -> None:
-        self._blocked_ips: Dict[str, float] = {}
-        self._revoked_sessions: set = set()
-
-    def is_blocked(self, ip: str) -> bool:
-        if ip in self._blocked_ips:
-            if time.monotonic() < self._blocked_ips[ip]:
-                return True
-            del self._blocked_ips[ip]
-        return False
-
-    async def apply(self, event: SecurityEvent, result: AnomalyResult, db_client: Any) -> Optional[str]:
-        if not result.is_anomaly:
-            return None
-        if result.score >= _SELF_HEAL_BLOCK_THRESHOLD:
-            return None
-        ip = event.ip_address
-        self._blocked_ips[ip] = time.monotonic() + _BLOCK_DURATION_SECONDS
-        action = f"auto_block_ip:{ip}:1h"
-        logger.warning("SecurityAI: auto-blocked IP %s (score=%.3f)", ip, result.score)
-        if event.user_id:
-            self._revoked_sessions.add(event.user_id)
-            action += f"|revoke_sessions:{event.user_id}"
-            try:
-                await asyncio.get_running_loop().run_in_executor(
-                    None,
-                    lambda: db_client.table("revoked_tokens")
-                    .insert({"user_id": event.user_id, "reason": "security_ai_auto_revoke"})
-                    .execute(),
-                )
-            except Exception as exc:
-                logger.error("SecurityAI: failed to revoke sessions: %s", exc)
-        return action
+    @property
+    def trained(self) -> bool: return self._trained
+    @property
+    def n_samples(self) -> int: return self._n_samples
 
 
 class SecurityAIAgent:
-    """
-    Phase-13: Hybrid Autonomous Security AI Agent.
-    IsolationForest ML + heuristic fallback + self-healing.
-    """
-
     def __init__(self) -> None:
-        self._model = _IsolationForestModel()
-        self._extractor = _FeatureExtractor()
-        self._healer = _SelfHealingEngine()
-        self._event_buffer: deque = deque(maxlen=_MAX_RECENT_EVENTS)
-        self._feature_buffer: deque = deque(maxlen=_MAX_RECENT_EVENTS)
-        self._retrain_task: Optional[asyncio.Task] = None
-        self._db_client: Any = None
-        self._analysis_count: int = 0
-        self._anomaly_count: int = 0
+        self._extractor  = _FeatureExtractor()
+        self._model      = _IFModel()
+        self._buffer: deque = deque(maxlen=_MAX_BUFFER)
+        self._running    = False
         self._last_retrain: Optional[datetime] = None
 
-    async def start(self) -> None:
-        try:
-            from backend.database.connection import get_db_client
-            self._db_client = await get_db_client()
-        except Exception as exc:
-            logger.warning("SecurityAI: DB unavailable at start: %s", exc)
-        await self.retrain_model()
-        self._retrain_task = asyncio.create_task(
-            self._retrain_loop(), name="security_ai_retrain"
-        )
-        logger.info("SecurityAI: agent started")
-
-    async def stop(self) -> None:
-        if self._retrain_task and not self._retrain_task.done():
-            self._retrain_task.cancel()
-            try:
-                await self._retrain_task
-            except asyncio.CancelledError:
-                pass
-        logger.info("SecurityAI: agent stopped")
-
-    async def _retrain_loop(self) -> None:
-        while True:
-            await asyncio.sleep(_RETRAIN_INTERVAL_SECONDS)
-            await self.retrain_model()
-
     async def analyze_event(self, event: SecurityEvent) -> AnomalyResult:
+        t0       = time.monotonic()
         features = self._extractor.extract(event)
-        self._event_buffer.append(event)
-        self._feature_buffer.append(features)
-        score, is_anomaly = self._model.predict(features)
-        if not self._model.is_trained():
-            score, is_anomaly = self._heuristic_fallback(event, features)
-        risk_level = self._score_to_risk(score, is_anomaly)
-        confidence = self._calc_confidence(score)
-        explanation = self._explain(event, features, score, is_anomaly)
-        result = AnomalyResult(
-            is_anomaly=is_anomaly,
-            score=round(score, 6),
-            risk_level=risk_level,
-            confidence=round(confidence, 4),
-            features=features,
-            explanation=explanation,
-        )
-        if is_anomaly and self._db_client:
-            action = await self._healer.apply(event, result, self._db_client)
-            result.self_heal_action = action
-        self._analysis_count += 1
-        if is_anomaly:
-            self._anomaly_count += 1
-        asyncio.create_task(self._persist_analysis(event, result))
+        self._buffer.append(features)
+        result   = await self.detect_anomaly(features)
+        result.inference_time_ms = (time.monotonic() - t0) * 1_000
+        if result.inference_time_ms > _INFER_TIMEOUT_MS:
+            log.warning("Inference %.1f ms > %.0f ms", result.inference_time_ms, _INFER_TIMEOUT_MS)
+        asyncio.create_task(self._persist(event, result))
+        if result.score < _BLOCK_THRESHOLD:
+            asyncio.create_task(self._self_heal(event, result))
         return result
 
-    async def detect_anomaly(self, features: List[float]) -> Tuple[float, bool]:
-        return self._model.predict(features)
+    async def detect_anomaly(self, features: List[float]) -> AnomalyResult:
+        if self._model.trained:
+            score       = await self._model.score(features)
+            explanation = self._explain(features, score)
+        else:
+            score, explanation = _heuristic_score(features)
+        is_anomaly = score < _SCORE_THRESHOLD
+        risk       = self._risk(score)
+        confidence = min(abs(score) / 0.5, 1.0) if is_anomaly else 0.0
+        return AnomalyResult(is_anomaly=is_anomaly, score=round(score,4),
+                             risk_level=risk, confidence=round(confidence,3),
+                             features=features, explanation=explanation)
 
-    async def retrain_model(self) -> bool:
-        X: List[List[float]] = list(self._feature_buffer)
-        if self._db_client:
+    async def retrain_model(self) -> None:
+        if len(self._buffer) < _MIN_SAMPLES:
+            log.info("Skipping retrain: %d/%d samples", len(self._buffer), _MIN_SAMPLES); return
+        X = np.array(list(self._buffer), dtype=np.float32)
+        X = await self._enrich(X)
+        await self._model.train(X)
+        self._last_retrain = datetime.now(timezone.utc)
+        asyncio.create_task(self._save_meta())
+
+    def get_stats(self) -> Dict[str, Any]:
+        return {"model_trained": self._model.trained,
+                "training_samples": self._model.n_samples,
+                "buffer_size": len(self._buffer),
+                "last_retrain": self._last_retrain.isoformat() if self._last_retrain else None,
+                "retrain_interval": _RETRAIN_INTERVAL_S,
+                "inference_threshold": _SCORE_THRESHOLD,
+                "block_threshold": _BLOCK_THRESHOLD}
+
+    async def start(self) -> None:
+        if self._running: return
+        self._running = True
+        log.info("SecurityAIAgent started (retrain every %ds)", _RETRAIN_INTERVAL_S)
+        await asyncio.sleep(30)
+        while self._running:
             try:
-                db_features = await asyncio.get_running_loop().run_in_executor(
-                    None, self._fetch_training_data
-                )
-                X = db_features + X
-            except Exception as exc:
-                logger.warning("SecurityAI: DB fetch for training failed: %s", exc)
-        if not X:
-            logger.info("SecurityAI: no training data yet")
-            return False
-        success = await self._model.train(X)
-        if success:
-            self._last_retrain = datetime.now(timezone.utc)
-        return success
+                await self.retrain_model()
+            except asyncio.CancelledError: break
+            except Exception as e: log.error("retrain: %s", e)
+            await asyncio.sleep(_RETRAIN_INTERVAL_S)
 
-    def is_ip_blocked(self, ip: str) -> bool:
-        return self._healer.is_blocked(ip)
+    def stop(self) -> None:
+        self._running = False
 
-    def stats(self) -> Dict[str, Any]:
-        return {
-            "analysis_count": self._analysis_count,
-            "anomaly_count": self._anomaly_count,
-            "model_trained": self._model.is_trained(),
-            "last_retrain": self._last_retrain.isoformat() if self._last_retrain else None,
-            "buffer_size": len(self._feature_buffer),
-            "blocked_ips": len(self._healer._blocked_ips),
-        }
+    @staticmethod
+    def _risk(score: float) -> RiskLevel:
+        if score < -0.40: return RiskLevel.CRITICAL
+        if score < -0.25: return RiskLevel.HIGH
+        if score < -0.15: return RiskLevel.MEDIUM
+        return RiskLevel.LOW
 
-    def _heuristic_fallback(self, event: SecurityEvent, features: List[float]) -> Tuple[float, bool]:
-        score = 0.0
-        req_rate = features[0] * 100
-        fail_rate = features[1] * 50
-        fail_ratio = features[2]
-        if req_rate > 50:
-            score -= 0.3
-        if fail_rate > 10:
-            score -= 0.25
-        if fail_ratio > 0.5:
-            score -= 0.2
-        if features[4] == 1.0 and fail_rate > 3:
-            score -= 0.3
-        return score, score < _ANOMALY_SCORE_THRESHOLD
+    @staticmethod
+    def _explain(features: List[float], score: float) -> List[str]:
+        expl: List[str] = []
+        checks = [(0, 0.7, "High request rate"), (1, 0.6, "High fail rate"),
+                  (2, 0.4, "High fail ratio"), (3, 0.7, "Endpoint diversity"), (7, 0.8, "High latency")]
+        for idx, thresh, label in checks:
+            if features[idx] > thresh: expl.append(label)
+        if score < -0.4: expl.insert(0, f"IF score={score:.3f}")
+        return expl or ["Normal"]
 
-    def _score_to_risk(self, score: float, is_anomaly: bool) -> RiskLevel:
-        if not is_anomaly:
-            return RiskLevel.LOW
-        if score > -0.25:
-            return RiskLevel.MEDIUM
-        if score > -0.40:
-            return RiskLevel.HIGH
-        return RiskLevel.CRITICAL
-
-    def _calc_confidence(self, score: float) -> float:
-        return max(0.0, min(1.0, (-score + 0.1) / 0.8))
-
-    def _explain(self, event: SecurityEvent, features: List[float], score: float, is_anomaly: bool) -> List[str]:
-        reasons: List[str] = []
-        if features[0] * 100 > 30:
-            reasons.append(f"High request rate: {features[0]*100:.0f} req/min")
-        if features[2] > 0.3:
-            reasons.append(f"High failure ratio: {features[2]*100:.0f}%")
-        if features[4] == 1.0 and features[1] * 50 > 3:
-            reasons.append("Multiple auth failures")
-        if features[11] == 1.0:
-            reasons.append("Night-time activity (00:00-06:00 UTC)")
-        if features[9] < 0.6:
-            reasons.append(f"HTTP {event.status_code} error responses")
-        if not reasons and is_anomaly:
-            reasons.append(f"Statistical anomaly (IF score={score:.4f})")
-        return reasons
-
-    def _fetch_training_data(self) -> List[List[float]]:
-        rows = (
-            self._db_client.table("security_audit_logs")
-            .select("ip_address,endpoint,method,status_code,response_time_ms,payload_size,created_at,event_type")
-            .order("created_at", desc=True)
-            .limit(5_000)
-            .execute()
-        )
-        X: List[List[float]] = []
-        for row in (rows.data or []):
-            try:
-                event = SecurityEvent(
-                    event_type=EventType(row.get("event_type", "api_request")),
-                    ip_address=row.get("ip_address", "0.0.0.0"),
-                    endpoint=row.get("endpoint", ""),
-                    method=row.get("method", "GET"),
-                    status_code=int(row.get("status_code", 200)),
-                    response_time_ms=float(row.get("response_time_ms", 0)),
-                    payload_size=int(row.get("payload_size", 0)),
-                )
-                X.append(self._extractor.extract(event))
-            except Exception:
-                continue
+    async def _enrich(self, X: np.ndarray) -> np.ndarray:
+        try:
+            from backend.database.connection import get_db_client
+            db = get_db_client()
+            since = (datetime.now(timezone.utc)-timedelta(hours=24)).isoformat()
+            r = await asyncio.wait_for(db.table("security_ai_analysis").select("features").gte("created_at",since).limit(5_000).execute(), timeout=_DB_TIMEOUT)
+            extras = [row["features"] for row in (r.data or []) if isinstance(row.get("features"),list) and len(row["features"])==_FEATURE_DIM]
+            if extras: X = np.vstack([X, np.array(extras, dtype=np.float32)])
+        except Exception as e: log.debug("enrich: %s", e)
         return X
 
-    async def _persist_analysis(self, event: SecurityEvent, result: AnomalyResult) -> None:
-        if not self._db_client:
-            return
+    async def _persist(self, ev: SecurityEvent, r: AnomalyResult) -> None:
+        if not r.is_anomaly and r.risk_level == RiskLevel.LOW: return
         try:
-            record = {
-                "event_type": event.event_type.value,
-                "ip_address": event.ip_address,
-                "user_id": event.user_id,
-                "endpoint": event.endpoint,
-                "is_anomaly": result.is_anomaly,
-                "anomaly_score": result.score,
-                "risk_level": result.risk_level.value,
-                "confidence": result.confidence,
-                "features": json.dumps(result.features),
-                "explanation": json.dumps(result.explanation),
-                "self_heal_action": result.self_heal_action,
-                "created_at": event.timestamp.isoformat(),
-            }
-            await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: self._db_client.table("security_ai_analysis").insert(record).execute(),
-            )
-        except Exception as exc:
-            logger.debug("SecurityAI: persist failed: %s", exc)
+            from backend.database.connection import get_db_client
+            db = get_db_client()
+            await asyncio.wait_for(db.table("security_ai_analysis").insert({
+                "id": str(uuid.uuid4()), "event_type": ev.event_type.value,
+                "risk_level": r.risk_level.value, "risk_score": r.score,
+                "is_anomaly": r.is_anomaly, "user_id": ev.user_id,
+                "ip_address": ev.ip_address, "endpoint": ev.endpoint,
+                "features": r.features, "explanation": r.explanation,
+                "metadata": ev.extra, "created_at": ev.timestamp.isoformat(),
+            }).execute(), timeout=_DB_TIMEOUT)
+        except Exception as e: log.debug("persist: %s", e)
+
+    async def _self_heal(self, ev: SecurityEvent, r: AnomalyResult) -> None:
+        try:
+            from backend.services.self_healing_service import self_healing_service
+            await self_healing_service.handle_anomaly(
+                {"ip_address": ev.ip_address, "user_id": ev.user_id,
+                 "event_type": ev.event_type.value, "endpoint": ev.endpoint}, r.score)
+        except ImportError: pass
+        except Exception as e: log.warning("self_heal: %s", e)
+
+    async def _save_meta(self) -> None:
+        try:
+            from backend.database.connection import get_db_client
+            db = get_db_client()
+            await asyncio.wait_for(db.table("security_model_metadata").insert({
+                "model_type": "IsolationForest", "training_samples": self._model.n_samples,
+                "contamination": 0.05, "feature_dim": _FEATURE_DIM,
+                "trained_at": datetime.now(timezone.utc).isoformat(),
+            }).execute(), timeout=_DB_TIMEOUT)
+        except Exception as e: log.debug("save meta: %s", e)
 
 
-_agent_instance: Optional[SecurityAIAgent] = None
-_agent_lock = asyncio.Lock()
-
-
-async def get_security_agent() -> SecurityAIAgent:
-    global _agent_instance
-    if _agent_instance is not None:
-        return _agent_instance
-    async with _agent_lock:
-        if _agent_instance is None:
-            _agent_instance = SecurityAIAgent()
-            await _agent_instance.start()
-    return _agent_instance
+security_ai_agent = SecurityAIAgent()
