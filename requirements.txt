@@ -1,3 +1,8 @@
+# ============================================================
+# Galaxy Vast AI Trading Platform — Requirements
+# Python 3.11+
+# ============================================================
+
 # Core API
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
@@ -9,6 +14,8 @@ python-multipart==0.0.9
 # Database
 asyncpg==0.29.0
 supabase==2.9.1
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
 
 # Auth & Security
 python-jose[cryptography]==3.3.0
@@ -23,6 +30,7 @@ numpy==1.26.4
 scikit-learn==1.5.2
 xgboost==2.1.1
 joblib==1.4.2
+shap==0.46.0
 
 # Data
 pandas==2.2.3
@@ -36,15 +44,17 @@ sentry-sdk[fastapi]==2.16.0
 
 # Backtest / Quant
 statsmodels==0.14.4
+scipy==1.14.1
 
 # Institutional modules
 streamlit==1.39.0
 plotly==5.24.1
+kaleido==0.2.1
 
-# RL (optional - install separately if needed)
-# stable-baselines3==2.3.2
-# gymnasium==0.29.1
-# torch==2.4.1
+# RL Agent (required — not optional)
+stable-baselines3==2.3.2
+gymnasium==0.29.1
+torch==2.4.1
 
 # Dev / Test
 pytest==8.3.3
