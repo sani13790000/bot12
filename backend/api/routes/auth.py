@@ -1,384 +1,404 @@
-"""Authentication routes — JWT via HttpOnly cookies with refresh token revocation.
+"""
+backend/api/routes/auth.py
+Authentication endpoints — secure implementation.
 
-Security model:
-- Access token:  HttpOnly + Secure + SameSite=Strict cookie (XSS-safe)
-- Refresh token: stored in DB for revocation; HttpOnly cookie
-- Account lockout: 5 failed attempts -> 15-minute lockout per IP+username
-- Passwords: bcrypt hashed via passlib
-- Production login: looks up user from Supabase users table
+Security:
+- bcrypt password hashing (12 rounds)
+- JWT in HttpOnly + Secure + SameSite=Strict cookie
+- Refresh token with jti stored in DB for revocation
+- Account lockout after 5 failed attempts (15 min)
+- Constant-time password comparison
+- No user enumeration (same response for bad user/pass)
+- Rate limiting handled by RateLimitMiddleware (/auth/login: 5/min)
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
-import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
-from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, EmailStr, field_validator
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
-logger = logging.getLogger(__name__)
-router = APIRouter()
+from backend.core.config import get_settings
+from backend.core.security import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    validate_refresh_token,
+    verify_password,
+)
+from backend.core.deps import get_current_user
+from backend.database.connection import get_db_client
 
-# ------------------------------------------------------------------ #
-# Config
-# ------------------------------------------------------------------ #
-ACCESS_TOKEN_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-REFRESH_TOKEN_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
-JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "")
-JWT_ALGO = "HS256"
+log = logging.getLogger(__name__)
+router = APIRouter(tags=["Authentication"])
 
-# ------------------------------------------------------------------ #
-# In-memory stores (replace with Redis/DB in high-scale deployments)
-# ------------------------------------------------------------------ #
-# key: f"{ip}:{username}"  value: {"attempts": int, "locked_until": float}
-_login_attempts: Dict[str, Dict[str, Any]] = {}
-# key: jti (str) — set of revoked refresh token IDs
-_revoked_tokens: set[str] = set()
-_revoked_lock = asyncio.Lock()
+# ---------------------------------------------------------------------------
+# Account lockout (in-memory, per IP)
+# ---------------------------------------------------------------------------
+_LOCKOUT_MAX_ATTEMPTS = 5
+_LOCKOUT_WINDOW_SEC = 15 * 60   # 15 minutes
+_MAX_TRACKED_IPS = 50_000
 
-MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_SECONDS = 15 * 60  # 15 minutes
-MAX_TRACKED_LOCKOUTS = 10_000  # prevent unbounded growth
-
-
-# ------------------------------------------------------------------ #
-# Background cleanup for _login_attempts (prevent memory growth)
-# ------------------------------------------------------------------ #
-async def _cleanup_login_attempts() -> None:
-    """Periodically remove expired lockout entries."""
-    while True:
-        await asyncio.sleep(300)  # every 5 minutes
-        now = time.time()
-        expired = [
-            k for k, v in list(_login_attempts.items())
-            if v.get("locked_until", 0) < now and v.get("attempts", 0) < MAX_LOGIN_ATTEMPTS
-        ]
-        for k in expired:
-            _login_attempts.pop(k, None)
-        # Hard cap
-        if len(_login_attempts) > MAX_TRACKED_LOCKOUTS:
-            oldest = sorted(_login_attempts.items(), key=lambda x: x[1].get("locked_until", 0))[:100]
-            for k, _ in oldest:
-                _login_attempts.pop(k, None)
+_attempts: Dict[str, list[float]] = defaultdict(list)   # ip → [timestamps]
+_lockout_until: Dict[str, float] = {}                   # ip → epoch unlock time
+_lock = asyncio.Lock()
 
 
-# Start background cleanup when module loads
-try:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        asyncio.ensure_future(_cleanup_login_attempts())
-except RuntimeError:
-    pass  # no event loop yet — task will be started by lifespan
+async def _record_failure(ip: str) -> None:
+    async with _lock:
+        now = time.monotonic()
+        _attempts[ip] = [t for t in _attempts[ip] if now - t < _LOCKOUT_WINDOW_SEC]
+        _attempts[ip].append(now)
+        if len(_attempts[ip]) >= _LOCKOUT_MAX_ATTEMPTS:
+            _lockout_until[ip] = now + _LOCKOUT_WINDOW_SEC
+            log.warning("Auth lockout triggered for IP %s", ip)
+        # Evict oldest if map too large
+        if len(_attempts) > _MAX_TRACKED_IPS:
+            oldest = min(_attempts, key=lambda k: _attempts[k][0] if _attempts[k] else 0)
+            _attempts.pop(oldest, None)
 
 
-# ------------------------------------------------------------------ #
-# Helpers
-# ------------------------------------------------------------------ #
-
-def _make_jwt(payload: Dict[str, Any], expires_delta: timedelta) -> str:
-    import jwt as pyjwt  # PyJWT
-    now = datetime.now(timezone.utc)
-    payload = {
-        **payload,
-        "iat": now,
-        "exp": now + expires_delta,
-        "jti": str(uuid.uuid4()),
-    }
-    return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+async def _is_locked(ip: str) -> bool:
+    async with _lock:
+        until = _lockout_until.get(ip)
+        if until and time.monotonic() < until:
+            return True
+        _lockout_until.pop(ip, None)
+        return False
 
 
-def _decode_jwt(token: str) -> Dict[str, Any]:
-    import jwt as pyjwt
-    try:
-        return pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-    except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except pyjwt.InvalidTokenError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+async def _clear_failures(ip: str) -> None:
+    async with _lock:
+        _attempts.pop(ip, None)
+        _lockout_until.pop(ip, None)
 
 
-def _cookie_kwargs(max_age: int) -> Dict[str, Any]:
-    """Secure cookie flags — Secure=True only outside dev so localhost works."""
-    is_prod = os.environ.get("ENVIRONMENT", "development") == "production"
-    return {
-        "httponly": True,
-        "samesite": "strict",
-        "secure": is_prod,  # True in prod (HTTPS), False in dev (HTTP localhost)
-        "max_age": max_age,
-        "path": "/",
-    }
+# ---------------------------------------------------------------------------
+# Cookie helper
+# ---------------------------------------------------------------------------
+
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Set both tokens as HttpOnly cookies."""
+    settings = get_settings()
+    is_prod = settings.ENVIRONMENT == "production"
+
+    cookie_kwargs = dict(
+        httponly=True,
+        secure=is_prod,           # HTTPS only in production
+        samesite="strict",        # CSRF protection
+        path="/",
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_kwargs,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86_400,
+        **cookie_kwargs,
+    )
 
 
-def _lockout_key(request: Request, username: str) -> str:
-    ip = request.client.host if request.client else "unknown"
-    return f"{ip}:{username.lower()}"
-
-
-def _check_lockout(key: str) -> None:
-    entry = _login_attempts.get(key)
-    if entry and entry.get("locked_until", 0) > time.time():
-        remaining = int(entry["locked_until"] - time.time())
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Account locked. Try again in {remaining}s.",
-        )
-
-
-def _record_failure(key: str) -> None:
-    entry = _login_attempts.setdefault(key, {"attempts": 0, "locked_until": 0.0})
-    entry["attempts"] += 1
-    if entry["attempts"] >= MAX_LOGIN_ATTEMPTS:
-        entry["locked_until"] = time.time() + LOCKOUT_SECONDS
-        logger.warning("Account locked for key=%s after %d failed attempts.", key, entry["attempts"])
-
-
-def _clear_attempts(key: str) -> None:
-    _login_attempts.pop(key, None)
-
-
-async def _hash_password(password: str) -> str:
-    from passlib.context import CryptContext
-    ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return ctx.hash(password)
-
-
-async def _verify_password(plain: str, hashed: str) -> bool:
-    from passlib.context import CryptContext
-    ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    return ctx.verify(plain, hashed)
-
-
-async def _lookup_user_from_db(username: str) -> Optional[Dict[str, Any]]:
-    """Look up user from Supabase users table.
-
-    Returns dict with {id, username, email, hashed_password, role}
-    or None if not found.
-    """
-    try:
-        from backend.database.connection import get_db_client
-        client = await get_db_client()
-        result = (
-            client.table("users")
-            .select("id, username, email, hashed_password, role")
-            .eq("username", username)
-            .limit(1)
-            .execute()
-        )
-        data = result.data
-        if data:
-            return data[0]
-        return None
-    except Exception as exc:  # noqa: BLE001
-        logger.error("DB user lookup failed: %s", exc)
-        return None
-
-
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------------
 # Schemas
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------------
 
 class RegisterRequest(BaseModel):
-    username: str
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(min_length=1, max_length=100)
 
     @field_validator("password")
     @classmethod
-    def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+    def _strong_password(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain an uppercase letter")
         if not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one digit")
+            raise ValueError("Password must contain a digit")
         return v
-
-    @field_validator("username")
-    @classmethod
-    def username_valid(cls, v: str) -> str:
-        if len(v) < 3:
-            raise ValueError("Username must be at least 3 characters")
-        if not v.isalnum():
-            raise ValueError("Username must be alphanumeric")
-        return v.lower()
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class TokenResponse(BaseModel):
-    message: str
-    username: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: dict
 
 
-# ------------------------------------------------------------------ #
-# Routes
-# ------------------------------------------------------------------ #
+class RefreshRequest(BaseModel):
+    # Body-based refresh (alternative to cookie)
+    refresh_token: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, response: Response) -> Dict[str, Any]:
-    """Register a new user and set auth cookies."""
-    # Check if username already exists
-    existing = await _lookup_user_from_db(body.username)
-    if existing:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Username already taken")
-
-    hashed = await _hash_password(body.password)
-    user_id = str(uuid.uuid4())
-
-    # Persist user to Supabase
+async def register(
+    body: RegisterRequest,
+    response: Response,
+    db=Depends(get_db_client),
+) -> dict:
+    """Register a new user."""
+    # Check duplicate email
     try:
-        from backend.database.connection import get_db_client
-        client = await get_db_client()
-        client.table("users").insert({
-            "id": user_id,
-            "username": body.username,
-            "email": body.email,
-            "hashed_password": hashed,
-            "role": "user",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Failed to persist user: %s", exc)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Registration failed")
+        existing = (
+            await db.table("users")
+            .select("id")
+            .eq("email", body.email)
+            .maybe_single()
+            .execute()
+        )
+        if existing.data:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("DB error during registration: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Registration failed") from exc
 
-    access_token = _make_jwt(
-        {"sub": user_id, "username": body.username, "role": "user"},
-        timedelta(minutes=ACCESS_TOKEN_MINUTES),
-    )
-    refresh_jti = str(uuid.uuid4())
-    refresh_token = _make_jwt(
-        {"sub": user_id, "jti": refresh_jti, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_DAYS),
-    )
+    # Hash password
+    hashed = hash_password(body.password)
 
-    response.set_cookie("access_token", access_token, **_cookie_kwargs(ACCESS_TOKEN_MINUTES * 60))
-    response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(REFRESH_TOKEN_DAYS * 86400))
+    # Insert user
+    try:
+        result = (
+            await db.table("users")
+            .insert({
+                "email": body.email,
+                "full_name": body.full_name,
+                "password_hash": hashed,
+                "role": "user",
+                "is_active": True,
+            })
+            .execute()
+        )
+        user = result.data[0]
+    except Exception as exc:
+        log.error("DB insert error: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Registration failed") from exc
 
-    logger.info("User registered: %s", body.username)
-    return {"message": "Registration successful", "username": body.username}
+    # Issue tokens
+    access = create_access_token(user["id"], {"role": user["role"]})
+    refresh, jti = create_refresh_token(user["id"])
+    await _store_refresh_jti(db, user["id"], jti)
+    _set_auth_cookies(response, access, refresh)
+
+    settings = get_settings()
+    return TokenResponse(
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user={"id": user["id"], "email": user["email"], "role": user["role"]},
+    ).model_dump()
 
 
 @router.post("/login")
-async def login(body: LoginRequest, request: Request, response: Response) -> Dict[str, Any]:
-    """Authenticate user; set HttpOnly cookies on success."""
-    key = _lockout_key(request, body.username)
-    _check_lockout(key)
+async def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db=Depends(get_db_client),
+) -> dict:
+    """Login — returns JWT in HttpOnly cookie."""
+    ip = request.client.host if request.client else "unknown"
 
-    is_dev = os.environ.get("ENVIRONMENT", "development") != "production"
+    # Lockout check
+    if await _is_locked(ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Try again in 15 minutes.",
+        )
 
-    if is_dev:
-        # Development: accept any non-empty credentials (no DB needed)
-        if not body.username or not body.password:
-            _record_failure(key)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        user_id = str(uuid.uuid4())
-        role = "admin" if body.username == "admin" else "user"
-    else:
-        # Production: verify against Supabase DB
-        user = await _lookup_user_from_db(body.username)
-        if not user:
-            _record_failure(key)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        if not await _verify_password(body.password, user["hashed_password"]):
-            _record_failure(key)
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-        user_id = user["id"]
-        role = user.get("role", "user")
+    # Fetch user — same error message for user-not-found vs wrong-password
+    # to prevent user enumeration
+    _GENERIC_ERROR = "Invalid email or password"
+    try:
+        result = (
+            await db.table("users")
+            .select("id, email, password_hash, role, is_active")
+            .eq("email", body.email)
+            .maybe_single()
+            .execute()
+        )
+        user = result.data
+    except Exception as exc:
+        log.error("DB error during login: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Login failed") from exc
 
-    _clear_attempts(key)
+    # Constant-time check even if user not found
+    dummy_hash = "$2b$12$notarealhashjustpadding000000000000000000000000000"
+    valid = verify_password(body.password, user["password_hash"] if user else dummy_hash)
 
-    access_token = _make_jwt(
-        {"sub": user_id, "username": body.username, "role": role},
-        timedelta(minutes=ACCESS_TOKEN_MINUTES),
-    )
-    refresh_jti = str(uuid.uuid4())
-    refresh_token = _make_jwt(
-        {"sub": user_id, "jti": refresh_jti, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_DAYS),
-    )
+    if not user or not valid or not user.get("is_active"):
+        await _record_failure(ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_GENERIC_ERROR,
+        )
 
-    response.set_cookie("access_token", access_token, **_cookie_kwargs(ACCESS_TOKEN_MINUTES * 60))
-    response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(REFRESH_TOKEN_DAYS * 86400))
+    await _clear_failures(ip)
 
-    logger.info("User logged in: %s (role=%s)", body.username, role)
-    return {"message": "Login successful", "username": body.username, "role": role}
+    access = create_access_token(user["id"], {"role": user["role"]})
+    refresh, jti = create_refresh_token(user["id"])
+    await _store_refresh_jti(db, user["id"], jti)
+    _set_auth_cookies(response, access, refresh)
+
+    settings = get_settings()
+    log.info("User %s logged in", user["id"])
+    return TokenResponse(
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user={"id": user["id"], "email": user["email"], "role": user["role"]},
+    ).model_dump()
 
 
 @router.post("/refresh")
-async def refresh_token_endpoint(
+async def refresh_token(
+    request: Request,
     response: Response,
-    refresh_token: Optional[str] = Cookie(None),
-) -> Dict[str, Any]:
-    """Issue a new access token using a valid (non-revoked) refresh token."""
-    if not refresh_token:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
+    db=Depends(get_db_client),
+) -> dict:
+    """Rotate refresh token — old jti is revoked, new pair issued."""
+    # Accept from cookie or body
+    token = request.cookies.get("refresh_token")
+    if not token:
+        body_bytes = await request.body()
+        try:
+            import json
+            body_data = json.loads(body_bytes)
+            token = body_data.get("refresh_token")
+        except Exception:
+            token = None
 
-    payload = _decode_jwt(refresh_token)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required",
+        )
 
-    if payload.get("type") != "refresh":
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+    try:
+        payload = validate_refresh_token(token)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
 
-    jti = payload.get("jti", "")
-    async with _revoked_lock:
-        if jti in _revoked_tokens:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token revoked — please log in again")
+    jti = payload["jti"]
+    user_id = payload["sub"]
 
-    # Issue new access token
-    new_access = _make_jwt(
-        {"sub": payload["sub"], "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_MINUTES),
-    )
-    response.set_cookie("access_token", new_access, **_cookie_kwargs(ACCESS_TOKEN_MINUTES * 60))
-    return {"message": "Token refreshed"}
+    # Verify jti exists in DB (not already revoked)
+    try:
+        row = (
+            await db.table("refresh_tokens")
+            .select("jti, user_id")
+            .eq("jti", jti)
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        if not row.data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("DB error during token refresh: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Token refresh failed") from exc
+
+    # Revoke old jti
+    try:
+        await db.table("refresh_tokens").delete().eq("jti", jti).execute()
+    except Exception:
+        pass  # Best effort
+
+    # Issue new tokens
+    new_access = create_access_token(user_id)
+    new_refresh, new_jti = create_refresh_token(user_id)
+    await _store_refresh_jti(db, user_id, new_jti)
+    _set_auth_cookies(response, new_access, new_refresh)
+
+    settings = get_settings()
+    return {"token_type": "bearer", "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}
 
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     response: Response,
-    refresh_token: Optional[str] = Cookie(None),
-) -> Dict[str, str]:
-    """Revoke refresh token and clear cookies."""
-    if refresh_token:
+    current_user: dict = Depends(get_current_user),
+    db=Depends(get_db_client),
+) -> dict:
+    """Revoke current access token jti + all refresh tokens for this user."""
+    # Revoke access token
+    token = request.cookies.get("access_token") or ""
+    if token:
         try:
-            payload = _decode_jwt(refresh_token)
-            jti = payload.get("jti", "")
-            if jti:
-                async with _revoked_lock:
-                    _revoked_tokens.add(jti)
-        except HTTPException:
-            pass  # Token already invalid — still clear cookies
+            from backend.core.security import validate_access_token
+            payload = validate_access_token(token)
+            await db.table("revoked_tokens").insert({
+                "jti": payload["jti"],
+                "user_id": current_user["id"],
+                "expires_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        except Exception:
+            pass  # Best effort
 
+    # Revoke all refresh tokens
+    try:
+        await db.table("refresh_tokens").delete().eq("user_id", current_user["id"]).execute()
+    except Exception:
+        pass
+
+    # Clear cookies
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
-    return {"message": "Logged out successfully"}
+
+    return {"detail": "Logged out successfully"}
 
 
 @router.get("/me")
-async def me(access_token: Optional[str] = Cookie(None)) -> Dict[str, Any]:
-    """Return current user info from the access token cookie."""
-    if not access_token:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    payload = _decode_jwt(access_token)
+async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
+    """Return current user profile."""
     return {
-        "sub": payload.get("sub"),
-        "username": payload.get("username"),
-        "role": payload.get("role"),
+        "id": current_user["id"],
+        "email": current_user["email"],
+        "role": current_user["role"],
     }
 
 
-@router.get("/status")
-async def auth_status(access_token: Optional[str] = Cookie(None)) -> Dict[str, Any]:
-    """Return authentication status — safe to call without credentials."""
-    if not access_token:
-        return {"authenticated": False}
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+async def _store_refresh_jti(db, user_id: str, jti: str) -> None:
+    """Persist refresh jti in DB so we can revoke it."""
     try:
-        payload = _decode_jwt(access_token)
-        return {"authenticated": True, "username": payload.get("username")}
-    except HTTPException:
-        return {"authenticated": False}
+        settings = get_settings()
+        expires_at = (
+            datetime.now(timezone.utc)
+            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        ).isoformat()
+        await db.table("refresh_tokens").insert({
+            "jti": jti,
+            "user_id": user_id,
+            "expires_at": expires_at,
+        }).execute()
+    except Exception as exc:
+        log.error("Failed to store refresh jti: %s", type(exc).__name__)
