@@ -7,7 +7,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Galaxy Vast Institutional",
-    page_icon="🌌",
+    page_icon="🎦",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -16,8 +16,10 @@ st.set_page_config(
     }
 )
 
-# Custom CSS
-st.markdown("""
+# Custom CSS — static string only (no user input), safe to use unsafe_allow_html
+# NOTE: unsafe_allow_html=True is acceptable here because the HTML is
+# hardcoded in this file, not derived from user input.
+_CUSTOM_CSS = """
 <style>
     .main { background-color: #0E1117; }
     .stMetric { background-color: #1E2329; border-radius: 8px; padding: 8px; }
@@ -26,10 +28,11 @@ st.markdown("""
     .galaxy-header { color: #FFD700; font-size: 2rem; font-weight: bold; }
     .status-live { color: #0ECB81; font-weight: bold; }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(_CUSTOM_CSS, unsafe_allow_html=True)  # safe: hardcoded HTML
 
-# Sidebar
-st.sidebar.markdown('<h2 style="color:#FFD700">🌌 Galaxy Vast</h2>', unsafe_allow_html=True)
+# Sidebar — static HTML, safe
+st.sidebar.markdown('<h2 style="color:#FFD700">🎦 Galaxy Vast</h2>', unsafe_allow_html=True)
 st.sidebar.markdown('<span style="color:#848E9C">Institutional Trading Platform v2.0</span>', unsafe_allow_html=True)
 st.sidebar.divider()
 
@@ -40,14 +43,14 @@ page = st.sidebar.radio(
         "📈 Backtest",
         "📉 Walk-Forward",
         "💼 Portfolio",
-        "🧠 AI Explainability",
-        "🎲 Monte Carlo",
+        "🦧 AI Explainability",
+        "🚲 Monte Carlo",
     ],
     label_visibility="collapsed"
 )
 
 st.sidebar.divider()
-st.sidebar.markdown('<span class="status-live">⚫ LIVE</span> Connected to API', unsafe_allow_html=True)
+st.sidebar.markdown('<span class="status-live">❤ LIVE</span> Connected to API', unsafe_allow_html=True)
 st.sidebar.caption("API: http://localhost:8000")
 
 # Add pages directory to sys.path so imports work in Streamlit context
@@ -61,15 +64,24 @@ _page_map = {
     "📈 Backtest": "backtest",
     "📉 Walk-Forward": "walk_forward",
     "💼 Portfolio": "portfolio",
-    "🧠 AI Explainability": "explainability",
-    "🎲 Monte Carlo": "monte_carlo",
+    "🦧 AI Explainability": "explainability",
+    "🚲 Monte Carlo": "monte_carlo",
 }
 
 _module_name = _page_map.get(page, "replay")
+_is_dev = os.getenv("ENVIRONMENT", "production").lower() in ("development", "dev", "local")
+
 try:
     _mod = importlib.import_module(_module_name)
     if hasattr(_mod, "render"):
         _mod.render()
 except Exception as _e:
     st.error(f"Failed to load page '{_module_name}': {_e}")
-    st.exception(_e)
+    if _is_dev:
+        # Only show full traceback in development — never in production
+        st.exception(_e)
+    else:
+        st.info(
+            "💡 If this error persists, please check the API is running "
+            "and contact support."
+        )
