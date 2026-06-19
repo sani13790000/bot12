@@ -1,127 +1,112 @@
--- Migration 013: Institutional modules tables
--- Run after 012
+-- Galaxy Vast AI Trading Platform
+-- Migration 013: Institutional Modules Tables
+-- Fixed: IF NOT EXISTS on all CREATE TABLE (idempotent)
 
-BEGIN;
-
--- Institutional backtest results
-CREATE TABLE IF NOT EXISTS institutional_backtest_results (
+-- Institutional backtests
+CREATE TABLE IF NOT EXISTS institutional_backtests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    symbol TEXT NOT NULL DEFAULT 'XAUUSD',
-    timeframe TEXT NOT NULL DEFAULT 'M15',
-    initial_balance NUMERIC(15,2) NOT NULL,
-    final_balance NUMERIC(15,2),
+    symbol VARCHAR(20) NOT NULL,
+    timeframe VARCHAR(10) NOT NULL,
+    start_date TIMESTAMPTZ,
+    end_date TIMESTAMPTZ,
     total_trades INTEGER DEFAULT 0,
-    win_rate NUMERIC(6,2) DEFAULT 0,
-    profit_factor NUMERIC(8,4) DEFAULT 0,
-    sharpe_ratio NUMERIC(8,4) DEFAULT 0,
-    sortino_ratio NUMERIC(8,4) DEFAULT 0,
-    calmar_ratio NUMERIC(8,4) DEFAULT 0,
-    max_drawdown_pct NUMERIC(6,2) DEFAULT 0,
-    recovery_factor NUMERIC(8,4) DEFAULT 0,
-    total_commission NUMERIC(12,2) DEFAULT 0,
-    total_spread_cost NUMERIC(12,2) DEFAULT 0,
-    total_slippage_cost NUMERIC(12,2) DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    win_rate DECIMAL(5,2) DEFAULT 0,
+    profit_factor DECIMAL(10,4) DEFAULT 0,
+    sharpe_ratio DECIMAL(10,4) DEFAULT 0,
+    sortino_ratio DECIMAL(10,4) DEFAULT 0,
+    calmar_ratio DECIMAL(10,4) DEFAULT 0,
+    max_drawdown DECIMAL(5,2) DEFAULT 0,
+    total_return DECIMAL(10,4) DEFAULT 0,
+    parameters JSONB DEFAULT '{}',
+    results JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
--- Institutional trades (backtest)
+-- Institutional trades
 CREATE TABLE IF NOT EXISTS institutional_trades (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    backtest_id UUID REFERENCES institutional_backtest_results(id) ON DELETE CASCADE,
-    trade_id INTEGER NOT NULL,
-    symbol TEXT NOT NULL,
-    direction TEXT NOT NULL CHECK (direction IN ('BUY', 'SELL')),
-    open_time NUMERIC(20,3),
-    close_time NUMERIC(20,3),
-    open_price NUMERIC(15,5),
-    close_price NUMERIC(15,5),
-    stop_loss NUMERIC(15,5),
-    take_profit NUMERIC(15,5),
-    lot_size NUMERIC(8,3),
-    gross_profit NUMERIC(12,2),
-    net_profit NUMERIC(12,2),
-    commission NUMERIC(8,2),
-    spread_cost NUMERIC(8,2),
-    slippage_cost NUMERIC(8,2),
-    close_reason TEXT,
-    explanation JSONB DEFAULT '{}',
+    backtest_id UUID REFERENCES institutional_backtests(id) ON DELETE CASCADE,
+    symbol VARCHAR(20) NOT NULL,
+    direction VARCHAR(10) NOT NULL CHECK (direction IN ('BUY', 'SELL')),
+    entry_price DECIMAL(20,8) NOT NULL,
+    exit_price DECIMAL(20,8),
+    entry_time TIMESTAMPTZ,
+    exit_time TIMESTAMPTZ,
+    pnl DECIMAL(20,8) DEFAULT 0,
+    pnl_pct DECIMAL(10,4) DEFAULT 0,
+    lot_size DECIMAL(10,4) DEFAULT 0.01,
+    commission DECIMAL(10,4) DEFAULT 0,
+    slippage DECIMAL(10,4) DEFAULT 0,
+    spread DECIMAL(10,4) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Monte Carlo results
 CREATE TABLE IF NOT EXISTS institutional_monte_carlo (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    n_simulations INTEGER NOT NULL,
-    n_trades INTEGER NOT NULL,
-    initial_balance NUMERIC(15,2),
-    median_final_balance NUMERIC(15,2),
-    mean_final_balance NUMERIC(15,2),
-    percentile_5 NUMERIC(15,2),
-    percentile_25 NUMERIC(15,2),
-    percentile_75 NUMERIC(15,2),
-    percentile_95 NUMERIC(15,2),
-    probability_of_ruin NUMERIC(6,2),
-    probability_of_profit NUMERIC(6,2),
-    expected_max_drawdown_pct NUMERIC(6,2),
-    ruin_threshold NUMERIC(15,2),
+    symbol VARCHAR(20),
+    simulations INTEGER DEFAULT 1000,
+    probability_of_ruin DECIMAL(5,4) DEFAULT 0,
+    expected_return DECIMAL(10,4) DEFAULT 0,
+    var_95 DECIMAL(10,4) DEFAULT 0,
+    cvar_95 DECIMAL(10,4) DEFAULT 0,
+    percentiles JSONB DEFAULT '{}',
+    parameters JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Walk-Forward results
+-- Walk-Forward Optimization results
 CREATE TABLE IF NOT EXISTS institutional_wfo_results (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    n_windows INTEGER NOT NULL,
-    optimization_metric TEXT NOT NULL DEFAULT 'sharpe_ratio',
-    avg_is_metric NUMERIC(8,4),
-    avg_val_metric NUMERIC(8,4),
-    avg_oos_metric NUMERIC(8,4),
-    avg_robustness_ratio NUMERIC(6,4),
-    is_robust BOOLEAN DEFAULT FALSE,
-    total_oos_trades INTEGER DEFAULT 0,
-    oos_win_rate NUMERIC(6,2),
-    oos_profit_factor NUMERIC(8,4),
-    best_params JSONB DEFAULT '{}',
+    symbol VARCHAR(20),
+    n_windows INTEGER DEFAULT 0,
+    is_sharpe DECIMAL(10,4) DEFAULT 0,
+    oos_sharpe DECIMAL(10,4) DEFAULT 0,
+    robustness_ratio DECIMAL(10,4) DEFAULT 0,
+    windows JSONB DEFAULT '[]',
+    parameters JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Market Replay sessions
+-- Replay sessions
 CREATE TABLE IF NOT EXISTS institutional_replay_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    symbol TEXT NOT NULL DEFAULT 'XAUUSD',
-    timeframe TEXT NOT NULL DEFAULT 'M15',
-    start_timestamp NUMERIC(20,3),
-    end_timestamp NUMERIC(20,3),
-    total_candles INTEGER DEFAULT 0,
+    symbol VARCHAR(20),
+    timeframe VARCHAR(10),
+    start_time TIMESTAMPTZ,
+    end_time TIMESTAMPTZ,
+    candles_count INTEGER DEFAULT 0,
     trades_count INTEGER DEFAULT 0,
-    final_equity NUMERIC(15,2),
+    final_equity DECIMAL(20,8) DEFAULT 0,
+    session_data JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_inst_backtest_symbol ON institutional_backtest_results(symbol);
-CREATE INDEX IF NOT EXISTS idx_inst_backtest_created ON institutional_backtest_results(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inst_backtests_symbol ON institutional_backtests(symbol);
+CREATE INDEX IF NOT EXISTS idx_inst_backtests_created ON institutional_backtests(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inst_trades_backtest ON institutional_trades(backtest_id);
 CREATE INDEX IF NOT EXISTS idx_inst_trades_symbol ON institutional_trades(symbol);
-CREATE INDEX IF NOT EXISTS idx_inst_mc_created ON institutional_monte_carlo(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_inst_wfo_created ON institutional_wfo_results(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inst_mc_symbol ON institutional_monte_carlo(symbol);
+CREATE INDEX IF NOT EXISTS idx_inst_wfo_symbol ON institutional_wfo_results(symbol);
 
 -- RLS
-ALTER TABLE institutional_backtest_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE institutional_backtests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE institutional_trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE institutional_monte_carlo ENABLE ROW LEVEL SECURITY;
 ALTER TABLE institutional_wfo_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE institutional_replay_sessions ENABLE ROW LEVEL SECURITY;
 
--- Service role full access
-CREATE POLICY inst_backtest_service ON institutional_backtest_results
-    USING (auth.role() = 'service_role');
-CREATE POLICY inst_trades_service ON institutional_trades
-    USING (auth.role() = 'service_role');
-CREATE POLICY inst_mc_service ON institutional_monte_carlo
-    USING (auth.role() = 'service_role');
-CREATE POLICY inst_wfo_service ON institutional_wfo_results
-    USING (auth.role() = 'service_role');
-CREATE POLICY inst_replay_service ON institutional_replay_sessions
-    USING (auth.role() = 'service_role');
-
-COMMIT;
+-- Policies (service role bypass)
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE tablename = 'institutional_backtests'
+        AND policyname = 'service_role_all_institutional_backtests'
+    ) THEN
+        CREATE POLICY service_role_all_institutional_backtests
+            ON institutional_backtests FOR ALL
+            USING (auth.role() = 'service_role');
+    END IF;
+END $$;

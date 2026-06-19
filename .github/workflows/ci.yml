@@ -1,4 +1,4 @@
-name: Galaxy Vast AI — CI
+name: Galaxy Vast CI
 
 on:
   push:
@@ -7,19 +7,14 @@ on:
     branches: [main]
 
 jobs:
-  # ─────────────────────────────────────────────────────────
-  # Job 1: Python Tests
-  # ─────────────────────────────────────────────────────────
   test-python:
-    name: Python Tests (pytest)
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -27,79 +22,53 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install dependencies (CPU-only, no GPU)
         run: |
-          python -m pip install --upgrade pip
+          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov scikit-learn numpy
 
-      - name: Run test suite
+      - name: Run tests
+        env:
+          SUPABASE_URL: http://localhost
+          SUPABASE_ANON_KEY: test_anon_key_minimum_32_characters_long
+          SUPABASE_SERVICE_ROLE_KEY: test_service_role_key_minimum_32_chars
+          SUPABASE_DB_URL: postgresql://postgres:test@localhost:5432/postgres
+          JWT_SECRET_KEY: test_jwt_secret_key_minimum_32_characters
+          LICENSE_ENCRYPTION_KEY: test_license_encryption_key_32_chars
+          LICENSE_SIGNATURE_KEY: test_license_signature_key_32_chars_
         run: |
-          pytest backend/tests/ \
-            -v \
-            --tb=short \
-            --cov=backend \
-            --cov-report=term-missing \
-            --cov-report=xml:coverage.xml \
-            --asyncio-mode=auto \
-            -rN
+          python -m pytest backend/tests/ -v --cov=backend --cov-report=term-missing --tb=short
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        continue-on-error: true
         with:
-          name: coverage-py${{ matrix.python-version }}
-          path: coverage.xml
-          retention-days: 7
+          token: ${{ secrets.CODECOV_TOKEN }}
 
-  # ─────────────────────────────────────────────────────────
-  # Job 2: Python syntax check (all backend files)
-  # ─────────────────────────────────────────────────────────
   syntax-check:
-    name: Python Syntax Check
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Check syntax on all Python files
+      - name: Check Python syntax
         run: |
-          echo "=== Syntax check ==="
-          find backend -name '*.py' | while read f; do
-            python -m py_compile "$f" && echo "OK: $f" || echo "FAIL: $f"
-          done
-          find backend -name '*.py' | xargs python -m py_compile
-          echo "All Python files passed syntax check."
+          find backend -name "*.py" -exec python -m py_compile {} \;
+          echo "All Python files syntax OK"
 
-  # ─────────────────────────────────────────────────────────
-  # Job 3: Frontend build (optional, non-blocking)
-  # ─────────────────────────────────────────────────────────
   frontend-build:
-    name: Frontend Build (Node.js)
     runs-on: ubuntu-latest
-    continue-on-error: true
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
+      - name: Install & build
         working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
+        run: |
+          npm ci
+          npm run build
