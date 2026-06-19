@@ -22,7 +22,7 @@ from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Middleware (hard import — no silent fail) ────────────────────────────────
+# ── Middleware (hard import — no silent fail) ──────────────────────────────
 from backend.middleware.security import SecurityMiddleware
 from backend.middleware.rate_limit import RateLimitMiddleware
 from backend.middleware.observability import ObservabilityMiddleware
@@ -50,6 +50,7 @@ from backend.api.routes import (
     trade_report,
     users,
     ai_prediction,
+    websocket_routes,          # ✔ WebSocket — was missing before
 )
 from backend.api.observability_routes import router as observability_router
 
@@ -62,7 +63,7 @@ except ImportError as exc:
     logger.warning("Observability module not available: %s", exc)
     HAS_OBSERVABILITY = False
 
-# ── DB Pool Monitor (optional) ────────────────────────────────────────────────
+# ── DB Pool Monitor (optional) ─────────────────────────────────────────────────
 try:
     from backend.database.connection_pool_monitor import pool_monitor
     HAS_POOL_MONITOR = True
@@ -78,9 +79,9 @@ except ImportError as exc:
     HAS_INSTITUTIONAL = False
 
 
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Lifespan
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown with proper resource management."""
@@ -124,9 +125,9 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete.")
 
 
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # App
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Galaxy Vast AI Trading Platform",
     description="Institutional-grade algorithmic trading system with AI agents, SMC analysis, and ML prediction.",
@@ -137,7 +138,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS — never wildcard in production ───────────────────────────────────────────
+# ── CORS — never wildcard in production ────────────────────────────────────────────
 allowed_origins: List[str] = getattr(
     settings, "ALLOWED_ORIGINS",
     ["http://localhost:3000", "http://localhost:8501"]
@@ -161,33 +162,34 @@ app.add_middleware(SecurityMiddleware)
 # ── Routers ───────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
-app.include_router(auth.router,                   prefix=PREFIX + "/auth",                   tags=["Authentication"])
-app.include_router(signals.router,                prefix=PREFIX + "/signals",                tags=["Signals"])
-app.include_router(trades.router,                 prefix=PREFIX + "/trades",                 tags=["Trades"])
-app.include_router(agents.router,                 prefix=PREFIX + "/agents",                 tags=["Agents"])
-app.include_router(analysis.router,               prefix=PREFIX + "/analysis",               tags=["Analysis"])
-app.include_router(analytics.router,              prefix=PREFIX + "/analytics",              tags=["Analytics"])
-app.include_router(backtest.router,               prefix=PREFIX + "/backtest",               tags=["Backtest"])
-app.include_router(backtest_engine.router,        prefix=PREFIX + "/backtest-engine",        tags=["Backtest Engine"])
-app.include_router(research.router,               prefix=PREFIX + "/research",               tags=["Research"])
-app.include_router(intelligence.router,           prefix=PREFIX + "/intelligence",           tags=["Intelligence"])
-app.include_router(decision.router,               prefix=PREFIX + "/decision",               tags=["Decision"])
-app.include_router(risk.router,                   prefix=PREFIX + "/risk",                   tags=["Risk"])
-app.include_router(self_learning.router,          prefix=PREFIX + "/self-learning",          tags=["Self Learning"])
-app.include_router(reports.router,                prefix=PREFIX + "/reports",                tags=["Reports"])
-app.include_router(institutional.router,          prefix=PREFIX + "/institutional",          tags=["Institutional"])
-app.include_router(institutional_backtest.router, prefix=PREFIX + "/institutional-backtest", tags=["Institutional Backtest"])
-app.include_router(dashboard.router,              prefix=PREFIX + "/dashboard",              tags=["Dashboard"])
-app.include_router(license.router,                prefix=PREFIX + "/license",                tags=["License"])
-app.include_router(trade_report.router,           prefix=PREFIX + "/trade-report",           tags=["Trade Report"])
-app.include_router(users.router,                  prefix=PREFIX + "/users",                  tags=["Users"])
-app.include_router(ai_prediction.router,          prefix=PREFIX + "/ai",                     tags=["AI Prediction"])
-app.include_router(observability_router,          prefix="/observability",                   tags=["Observability"])
+app.include_router(auth.router,                    prefix=PREFIX + "/auth",                   tags=["Authentication"])
+app.include_router(signals.router,                 prefix=PREFIX + "/signals",                tags=["Signals"])
+app.include_router(trades.router,                  prefix=PREFIX + "/trades",                 tags=["Trades"])
+app.include_router(agents.router,                  prefix=PREFIX + "/agents",                 tags=["Agents"])
+app.include_router(analysis.router,                prefix=PREFIX + "/analysis",               tags=["Analysis"])
+app.include_router(analytics.router,               prefix=PREFIX + "/analytics",              tags=["Analytics"])
+app.include_router(backtest.router,                prefix=PREFIX + "/backtest",               tags=["Backtest"])
+app.include_router(backtest_engine.router,         prefix=PREFIX + "/backtest-engine",        tags=["Backtest Engine"])
+app.include_router(research.router,                prefix=PREFIX + "/research",               tags=["Research"])
+app.include_router(intelligence.router,            prefix=PREFIX + "/intelligence",           tags=["Intelligence"])
+app.include_router(decision.router,                prefix=PREFIX + "/decision",               tags=["Decision"])
+app.include_router(risk.router,                    prefix=PREFIX + "/risk",                   tags=["Risk"])
+app.include_router(self_learning.router,           prefix=PREFIX + "/self-learning",          tags=["Self Learning"])
+app.include_router(reports.router,                 prefix=PREFIX + "/reports",                tags=["Reports"])
+app.include_router(institutional.router,           prefix=PREFIX + "/institutional",          tags=["Institutional"])
+app.include_router(institutional_backtest.router,  prefix=PREFIX + "/institutional-backtest", tags=["Institutional Backtest"])
+app.include_router(dashboard.router,               prefix=PREFIX + "/dashboard",              tags=["Dashboard"])
+app.include_router(license.router,                 prefix=PREFIX + "/license",                tags=["License"])
+app.include_router(trade_report.router,            prefix=PREFIX + "/trade-report",           tags=["Trade Report"])
+app.include_router(users.router,                   prefix=PREFIX + "/users",                  tags=["Users"])
+app.include_router(ai_prediction.router,           prefix=PREFIX + "/ai",                     tags=["AI Prediction"])
+app.include_router(websocket_routes.router,        prefix="",                                  tags=["WebSocket"])  # WS has no /api/v1 prefix
+app.include_router(observability_router,           prefix="/observability",                    tags=["Observability"])
 
 
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Exception Handlers — ordered: specific before generic
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Return correct HTTP status codes — do NOT return 500 for 4xx errors."""
@@ -276,11 +278,13 @@ async def root() -> dict[str, str]:
         "version": getattr(settings, "APP_VERSION", "2.0.0"),
         "docs": "/docs",
         "health": "/health",
+        "websocket_prices": "/ws/prices",
+        "websocket_signals": "/ws/signals",
         "routes": f"{route_count} active routes",
     }
 
 
-# ── Entry point ─────────────────────────────────────────────────────────────────
+# ── Entry point ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run(
         "backend.api.main:app",

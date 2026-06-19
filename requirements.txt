@@ -1,6 +1,6 @@
-# Galaxy Vast AI Trading Platform — Python Dependencies
+# Galaxy Vast AI Trading Platform— Python Dependencies
 # Fixed: torch CPU-only (saves ~3GB in Docker)
-# Fixed: aiosqlite removed (was installed but never used)
+# Fixed: numpy pinned to <2.0 (XGBoost 2.1.1 incompatible with numpy 2.x)
 
 # ── Web Framework ──
 fastapi==0.115.0
@@ -15,7 +15,7 @@ python-dotenv==1.0.1
 
 # ── Database ──
 supabase==2.9.1
-asyncclient==0.0.1
+asynclient==0.0.1
 httpx==0.27.2
 asyncpg==0.29.0
 sqlalchemy==2.0.35
@@ -29,7 +29,8 @@ passlib[bcrypt]==1.7.4
 PyJWT==2.9.0
 
 # ── ML / AI ──
-numpy==1.26.4
+# numpy pinned: XGBoost 2.1.1 is incompatible with numpy>=2.0
+numpy>=1.26.0,<2.0
 pandas==2.2.3
 scikit-learn==1.5.2
 xgboost==2.1.1
