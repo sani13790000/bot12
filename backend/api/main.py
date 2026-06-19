@@ -16,18 +16,18 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# ── Core ──────────────────────────────────────────────────────────────────────
+# ── Core ────────────────────────────────────────────────────────────────────
 from backend.core.config import settings
 from backend.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Middleware (hard import — no silent fail) ──────────────────────────────────
+# ── Middleware (hard import — no silent fail) ────────────────────────────────
 from backend.middleware.security import SecurityMiddleware
 from backend.middleware.rate_limit import RateLimitMiddleware
 from backend.middleware.observability import ObservabilityMiddleware
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Routes ──────────────────────────────────────────────────────────────────
 from backend.api.routes import (
     auth,
     signals,
@@ -43,10 +43,11 @@ from backend.api.routes import (
     self_learning,
     reports,
     institutional,
+    backtest_engine,
 )
-from backend.api.routes.observability_routes import router as observability_router
+from backend.api.observability_routes import router as observability_router
 
-# ── Observability ──────────────────────────────────────────────────────────────
+# ── Observability (optional — degraded mode if missing) ─────────────────────
 try:
     from backend.observability.metrics import metrics_registry
     from backend.observability.alert_manager import alert_manager
@@ -55,14 +56,14 @@ except ImportError as exc:
     logger.warning("Observability module not available: %s", exc)
     HAS_OBSERVABILITY = False
 
-# ── DB Pool Monitor ────────────────────────────────────────────────────────────
+# ── DB Pool Monitor (optional) ──────────────────────────────────────────────
 try:
     from backend.database.connection_pool_monitor import pool_monitor
     HAS_POOL_MONITOR = True
 except ImportError:
     HAS_POOL_MONITOR = False
 
-# ── Institutional ─────────────────────────────────────────────────────────────
+# ── Institutional (optional — degraded mode if missing) ─────────────────────
 try:
     from backend.institutional.data_store import data_store
     HAS_INSTITUTIONAL = True
@@ -71,9 +72,9 @@ except ImportError as exc:
     HAS_INSTITUTIONAL = False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 # Lifespan
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown with proper resource management."""
@@ -81,7 +82,6 @@ async def lifespan(app: FastAPI):
     logger.info("Environment : %s", settings.ENVIRONMENT)
     logger.info("Version     : %s", settings.APP_VERSION)
 
-    # ── Startup tasks ────────────────────────────────────────────────────────
     startup_tasks = []
 
     if HAS_POOL_MONITOR:
@@ -107,7 +107,7 @@ async def lifespan(app: FastAPI):
     logger.info("Startup complete. Ready to accept requests.")
     yield
 
-    # ── Shutdown ─────────────────────────────────────────────────────────────
+    # ── Shutdown ──
     logger.info("Shutting down ...")
     for task in startup_tasks:
         task.cancel()
@@ -118,9 +118,9 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 # App
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Galaxy Vast AI Trading Platform",
     description="Institutional-grade algorithmic trading system with AI agents, SMC analysis, and ML prediction.",
@@ -131,7 +131,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Middleware (order matters: outermost → innermost) ─────────────────────────
+# ── Middleware (order matters: outermost → innermost) ────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=getattr(settings, "ALLOWED_ORIGINS", ["*"]),
@@ -143,29 +143,30 @@ app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityMiddleware)
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# ── Routers ──────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
-app.include_router(auth.router,           prefix=PREFIX + "/auth",           tags=["Authentication"])
-app.include_router(signals.router,        prefix=PREFIX + "/signals",        tags=["Signals"])
-app.include_router(trades.router,         prefix=PREFIX + "/trades",         tags=["Trades"])
-app.include_router(agents.router,         prefix=PREFIX + "/agents",         tags=["Agents"])
-app.include_router(analysis.router,       prefix=PREFIX + "/analysis",       tags=["Analysis"])
-app.include_router(analytics.router,      prefix=PREFIX + "/analytics",      tags=["Analytics"])
-app.include_router(backtest.router,       prefix=PREFIX + "/backtest",       tags=["Backtest"])
-app.include_router(research.router,       prefix=PREFIX + "/research",       tags=["Research"])
-app.include_router(intelligence.router,   prefix=PREFIX + "/intelligence",   tags=["Intelligence"])
-app.include_router(decision.router,       prefix=PREFIX + "/decision",       tags=["Decision"])
-app.include_router(risk.router,           prefix=PREFIX + "/risk",           tags=["Risk"])
-app.include_router(self_learning.router,  prefix=PREFIX + "/self-learning",  tags=["Self Learning"])
-app.include_router(reports.router,        prefix=PREFIX + "/reports",        tags=["Reports"])
-app.include_router(institutional.router,  prefix=PREFIX + "/institutional",  tags=["Institutional"])
-app.include_router(observability_router,  prefix="/observability",           tags=["Observability"])
+app.include_router(auth.router,             prefix=PREFIX + "/auth",             tags=["Authentication"])
+app.include_router(signals.router,          prefix=PREFIX + "/signals",          tags=["Signals"])
+app.include_router(trades.router,           prefix=PREFIX + "/trades",           tags=["Trades"])
+app.include_router(agents.router,           prefix=PREFIX + "/agents",           tags=["Agents"])
+app.include_router(analysis.router,         prefix=PREFIX + "/analysis",         tags=["Analysis"])
+app.include_router(analytics.router,        prefix=PREFIX + "/analytics",        tags=["Analytics"])
+app.include_router(backtest.router,         prefix=PREFIX + "/backtest",         tags=["Backtest"])
+app.include_router(backtest_engine.router,  prefix=PREFIX + "/backtest-engine",  tags=["Backtest Engine"])
+app.include_router(research.router,         prefix=PREFIX + "/research",         tags=["Research"])
+app.include_router(intelligence.router,     prefix=PREFIX + "/intelligence",     tags=["Intelligence"])
+app.include_router(decision.router,         prefix=PREFIX + "/decision",         tags=["Decision"])
+app.include_router(risk.router,             prefix=PREFIX + "/risk",             tags=["Risk"])
+app.include_router(self_learning.router,    prefix=PREFIX + "/self-learning",    tags=["Self Learning"])
+app.include_router(reports.router,          prefix=PREFIX + "/reports",          tags=["Reports"])
+app.include_router(institutional.router,    prefix=PREFIX + "/institutional",    tags=["Institutional"])
+app.include_router(observability_router,    prefix="/observability",             tags=["Observability"])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 # Core Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
 async def health_check() -> dict[str, Any]:
     """Comprehensive health check for load balancers and monitoring."""
@@ -206,6 +207,11 @@ async def health_check() -> dict[str, Any]:
             "latency_ms": db_latency_ms,
             "pool": pool_status,
         },
+        "modules": {
+            "observability": HAS_OBSERVABILITY,
+            "institutional": HAS_INSTITUTIONAL,
+            "pool_monitor": HAS_POOL_MONITOR,
+        },
         "slow_queries_sample": slow_queries,
         "timestamp": time.time(),
     }
@@ -221,7 +227,7 @@ async def root() -> dict[str, str]:
     }
 
 
-# ── Global exception handler ──────────────────────────────────────────────────
+# ── Global exception handler ─────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
@@ -231,9 +237,9 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 # Entry point
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run(
         "backend.api.main:app",
