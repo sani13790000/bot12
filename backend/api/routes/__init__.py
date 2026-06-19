@@ -1,53 +1,10 @@
-"""Route modules — imported explicitly by main.py.
+"""Route modules — do NOT import anything here.
 
-All route modules are listed here so that:
-  from backend.api.routes import auth, signals, ...
-works without ambiguity.
+Calling code (main.py) does:
+    from backend.api.routes import auth, signals, ...
+
+Keeping this file empty avoids circular imports that occur when
+route modules import from backend.core which in turn might import
+from backend.api.
 """
-from backend.api.routes import (
-    agents,
-    ai_prediction,
-    analysis,
-    analytics,
-    auth,
-    backtest_engine,
-    dashboard,
-    decision,
-    institutional,
-    institutional_backtest,
-    intelligence,
-    license,
-    reports,
-    research,
-    risk,
-    self_learning,
-    signals,
-    trade_report,
-    trades,
-    users,
-    websocket_routes,
-)
-
-__all__ = [
-    "agents",
-    "ai_prediction",
-    "analysis",
-    "analytics",
-    "auth",
-    "backtest_engine",
-    "dashboard",
-    "decision",
-    "institutional",
-    "institutional_backtest",
-    "intelligence",
-    "license",
-    "reports",
-    "research",
-    "risk",
-    "self_learning",
-    "signals",
-    "trade_report",
-    "trades",
-    "users",
-    "websocket_routes",
-]
+# intentionally empty — routes are imported explicitly in main.py
