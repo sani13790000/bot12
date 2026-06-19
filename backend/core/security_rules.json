@@ -1,0 +1,90 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "GalaxyVast Security Rule Engine — Phase-5",
+    "last_updated": "2026-06-19T00:00:00Z",
+    "auto_reload_interval_seconds": 60,
+    "editable_by": ["SecurityAIAgent", "admin_api"]
+  },
+  "auth": {
+    "max_failed_logins": 5,
+    "lockout_duration_minutes": 15,
+    "lockout_multiplier": 2.0,
+    "max_lockout_minutes": 1440,
+    "max_sessions_per_user": 5,
+    "session_idle_timeout_minutes": 60,
+    "require_2fa_for_admin": true,
+    "password_min_length": 12,
+    "bcrypt_rounds": 12
+  },
+  "rate_limits": {
+    "global_max_requests_per_minute": 120,
+    "auth_login_per_minute": 5,
+    "auth_register_per_minute": 3,
+    "auth_refresh_per_minute": 10,
+    "analysis_per_minute": 30,
+    "backtest_per_minute": 10,
+    "websocket_per_minute": 20,
+    "health_per_minute": 300,
+    "dynamic_reduction_enabled": true,
+    "dynamic_reduction_factor_medium": 0.5,
+    "dynamic_reduction_factor_high": 0.25,
+    "dynamic_reduction_factor_critical": 0.0
+  },
+  "ip_blocking": {
+    "ip_block_threshold": 0.85,
+    "auto_block_enabled": true,
+    "auto_block_duration_minutes": 60,
+    "max_block_duration_minutes": 10080,
+    "unblock_on_clean_intel": true,
+    "whitelist": [],
+    "permanent_blacklist": []
+  },
+  "anomaly_detection": {
+    "isolation_forest_contamination": 0.05,
+    "isolation_forest_n_estimators": 200,
+    "anomaly_score_medium": -0.10,
+    "anomaly_score_high": -0.25,
+    "anomaly_score_critical": -0.40,
+    "retrain_interval_seconds": 3600,
+    "min_training_samples": 50,
+    "feature_window_seconds": 300
+  },
+  "trading_security": {
+    "trade_anomaly_threshold": 0.9,
+    "max_trade_frequency_per_minute": 10,
+    "max_volume_change_percent": 500,
+    "circuit_breaker_failure_threshold": 5,
+    "circuit_breaker_recovery_seconds": 60,
+    "circuit_breaker_half_open_successes": 3,
+    "flag_account_on_anomaly": true
+  },
+  "threat_intelligence": {
+    "enrich_all_events": true,
+    "block_tor_exits": false,
+    "block_datacenters": false,
+    "min_abuse_score_to_block": 90,
+    "min_threat_level_to_alert": "high"
+  },
+  "security_score": {
+    "refresh_interval_seconds": 300,
+    "alert_threshold_warning": 65,
+    "alert_threshold_critical": 40,
+    "score_history_hours": 24
+  },
+  "reporting": {
+    "scheduled_report_interval_hours": 24,
+    "report_retention_days": 90,
+    "include_raw_anomalies": false,
+    "telegram_report_enabled": true,
+    "email_report_enabled": false
+  },
+  "input_validation": {
+    "max_request_body_scan_bytes": 65536,
+    "sql_injection_patterns_enabled": true,
+    "xss_patterns_enabled": true,
+    "command_injection_patterns_enabled": true,
+    "path_traversal_patterns_enabled": true,
+    "ssrf_protection_enabled": true
+  }
+}
