@@ -1,26 +1,31 @@
-FROM python:3.13-slim
+# ================================================================
+# Dockerfile.bot - Galaxy Vast Telegram Bot
+# ================================================================
+FROM python:3.11-slim
 
-WORKDIR /app
+LABEL maintainer="Galaxy Vast Team"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y \
+    gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN groupadd -r galaxyvast && useradd -r -g galaxyvast galaxyvast
 
-# Copy application code
-COPY backend/ ./backend/
+WORKDIR /app
 
-# Environment defaults (overridden by docker-compose)
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Health check  - Telegram bot does not expose HTTP, ping process
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD pgrep -f "backend.telegram" || exit 1
+COPY backend/ /app/backend/
 
-CMD ["python", "-m", "backend.telegram.run"]
+RUN mkdir -p /app/logs && chown -R galaxyvast:galaxyvast /app
+
+USER galaxyvast
+
+CMD ["python", "-m", "backend.telegram.bot"]
