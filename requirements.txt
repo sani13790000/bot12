@@ -1,5 +1,5 @@
 # Galaxy Vast AI Trading Platform - Python dependencies
-# Pinned for reproducible builds
+# Pinned for reproducible production builds
 # Last validated: 2026-06-19
 
 # ------------------------------------------------------------
@@ -24,7 +24,7 @@ redis==5.1.1
 asyncpg==0.29.0
 
 # ------------------------------------------------------------
-# HTTP Client - single pin, no duplicate
+# HTTP Client (single pin — was listed twice)
 # ------------------------------------------------------------
 httpx>=0.27.0,<0.29.0
 
@@ -39,17 +39,17 @@ passlib[bcrypt]==1.7.4
 # ------------------------------------------------------------
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.4.1+cpu
-# Pin numpy: XGBoost 2.1.1 is incompatible with numpy 2.x
+# numpy: XGBoost 2.1.1 is incompatible with numpy 2.x
 numpy>=1.26.0,<2.0
 pandas>=2.2.0,<3.0
 scikit-learn==1.5.2
 xgboost==2.1.1
 shap==0.46.0
-# pandas-ta: 0.3.14b is the only available release (beta label, stable in practice)
+# pandas-ta: 0.3.14b is the only available release (stable in practice)
 pandas-ta==0.3.14b
 
 # ------------------------------------------------------------
-# RL (optional - excluded from CI install via grep filter)
+# RL (optional)
 # ------------------------------------------------------------
 stable-baselines3==2.3.2
 gymnasium==0.29.1
@@ -63,7 +63,7 @@ aiogram==3.13.1
 # Observability
 # ------------------------------------------------------------
 prometheus-client==0.21.0
-# sentry-sdk is optional: install manually if SENTRY_DSN is set
+# sentry-sdk is optional: install if SENTRY_DSN is set
 # sentry-sdk==2.16.0
 
 # ------------------------------------------------------------
@@ -75,9 +75,8 @@ tenacity==9.0.0
 schedule==1.2.2
 
 # ------------------------------------------------------------
-# Testing
+# Testing (separate from runtime — consider moving to dev-requirements.txt)
 # ------------------------------------------------------------
 pytest==8.3.3
 pytest-asyncio==0.24.0
 pytest-cov==6.0.0
-httpx>=0.27.0,<0.29.0

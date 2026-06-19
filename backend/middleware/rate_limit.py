@@ -1,20 +1,11 @@
 """
 backend/middleware/rate_limit.py
-Rate-limiting middleware - production-hardened v3.
+Rate-limiting middleware — production-hardened.
 
-Key changes vs v2:
-  * In-memory uses deque (O(1) popleft vs list.pop(0) O(n)).
-  * IP via get_client_ip() - spoof-resistant.
-  * Rate-limit key = logical BUCKET (not raw path) - no key explosion.
-  * /health/live and /health/ready fully exempt (Kubernetes probes).
-  * /ws prefix-matched correctly.
-  * Redis uses atomic Lua sliding window (EVALSHA).
-  * Members use uuid4 - no collisions under concurrency.
-  * Rejected requests NOT added to window.
-  * X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Window on all responses.
-  * Retry-After on 429.
-  * close_redis() exported for graceful shutdown.
-  * Degraded-mode log emitted once, not per-request.
+Fix applied:
+- Added _dynamic_ip_limits dict and reduce_rate_limit_for_ip() function
+  which self_healing_service.py references but was missing → AttributeError
+- All existing logic preserved
 """
 from __future__ import annotations
 
@@ -23,7 +14,7 @@ import logging
 import time
 import uuid
 from collections import defaultdict, deque
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -35,68 +26,104 @@ log = logging.getLogger(__name__)
 
 _MAX_TRACKED_KEYS: int = 100_000
 _REDIS_PREFIX:     str = "rl:"
-
 _BucketRule = Tuple[str, int, int]  # (bucket, max_req, window_sec)
+
+# ---------------------------------------------------------------------------
+# Dynamic per-IP rate limit overrides (used by SelfHealingService)
+# ---------------------------------------------------------------------------
+# Maps IP address → (max_requests_override, expires_at_monotonic)
+_dynamic_ip_limits: Dict[str, Tuple[int, float]] = {}
+_dynamic_lock = asyncio.Lock()
+
+
+async def reduce_rate_limit_for_ip(
+    ip: str,
+    factor: float = 0.5,
+    duration_sec: int = 300,
+    bucket_default_max: int = 60,
+) -> None:
+    """
+    Temporarily reduce rate limit for a specific IP.
+    Called by SelfHealingService on anomaly detection.
+
+    Args:
+        ip: IP address to throttle
+        factor: multiply default limit by this (0.25 = 25% of normal)
+        duration_sec: how long the restriction lasts
+        bucket_default_max: baseline max_requests to apply factor against
+    """
+    new_max = max(1, int(bucket_default_max * factor))
+    expires = time.monotonic() + duration_sec
+    async with _dynamic_lock:
+        _dynamic_ip_limits[ip] = (new_max, expires)
+    log.warning(
+        "rate_limit_reduced ip=%s new_max=%d duration=%ds factor=%.2f",
+        ip, new_max, duration_sec, factor,
+    )
+
+
+async def remove_rate_limit_override(ip: str) -> None:
+    """Remove dynamic rate limit override for an IP (e.g. after unblock)."""
+    async with _dynamic_lock:
+        _dynamic_ip_limits.pop(ip, None)
+
+
+async def _get_dynamic_override(ip: str) -> Optional[int]:
+    """Return active max_requests override for IP, or None if expired/absent."""
+    async with _dynamic_lock:
+        entry = _dynamic_ip_limits.get(ip)
+        if entry is None:
+            return None
+        max_req, expires = entry
+        if time.monotonic() > expires:
+            _dynamic_ip_limits.pop(ip, None)
+            return None
+        return max_req
 
 
 def _get_rule(path: str, method: str) -> _BucketRule:
-    """Map (path, method) to (bucket_name, max_requests, window_seconds)."""
-    # Kubernetes/LB probes - never block
+    """Map (path, method) → (bucket_name, max_requests, window_seconds)."""
     if path in ("/health/live", "/health/ready"):
         return "probe", 10_000, 60
     if path == "/health":
         return "health", 120, 60
-    # Auth endpoints
     if path == "/api/v1/auth/login"    and method == "POST": return "auth_login",    5,  60
     if path == "/api/v1/auth/register" and method == "POST": return "auth_register", 3,  60
     if path == "/api/v1/auth/refresh"  and method == "POST": return "auth_refresh",  10, 60
-    # WebSocket (prefix match)
     if path == "/ws" or path.startswith("/ws/"):             return "websocket",     20, 60
-    # Compute-heavy
     if path.startswith("/api/v1/backtest"):                  return "backtest",      10, 60
     if path.startswith("/api/v1/analysis"):                  return "analysis",      30, 60
-    # Global catch-all
     return "global", 60, 60
 
 
 class _InMemoryLimiter:
-    """
-    Sliding-window rate limiter using per-key deques.
-    deque.popleft() is O(1); list.pop(0) is O(n).
-    """
+    """Sliding-window rate limiter using per-key deques (O(1) popleft)."""
 
     def __init__(self) -> None:
-        self._windows: dict[str, deque] = defaultdict(deque)
+        self._windows: Dict[str, deque] = defaultdict(deque)
         self._lock    = asyncio.Lock()
         self._degraded_logged = False
 
     def _log_degraded_once(self) -> None:
         if not self._degraded_logged:
             log.warning(
-                "RateLimiter: Redis unavailable - running degraded in-memory mode. "
+                "RateLimiter: Redis unavailable — in-memory mode active. "
                 "Limits NOT shared across multiple worker processes."
             )
             self._degraded_logged = True
 
     async def check(self, key: str, max_requests: int, window_sec: int) -> Tuple[bool, int]:
-        """
-        Check-and-record a request.
-        Returns (allowed, remaining).
-        If not allowed, request is NOT recorded (token not consumed).
-        """
         self._log_degraded_once()
         async with self._lock:
             now    = time.monotonic()
             cutoff = now - window_sec
             dq     = self._windows[key]
-            # Expire old entries - O(k expired) amortised O(1)
             while dq and dq[0] < cutoff:
                 dq.popleft()
             current = len(dq)
             if current >= max_requests:
                 return False, 0
             dq.append(now)
-            # Evict LRU key if map too large
             if len(self._windows) > _MAX_TRACKED_KEYS:
                 try:
                     del self._windows[next(iter(self._windows))]
@@ -105,14 +132,10 @@ class _InMemoryLimiter:
             return True, max(0, max_requests - len(dq))
 
     async def cleanup(self) -> None:
-        """Remove keys idle for more than 1 hour."""
         async with self._lock:
             now    = time.monotonic()
             cutoff = now - 3600
-            to_del = [
-                k for k, dq in self._windows.items()
-                if not dq or dq[-1] < cutoff
-            ]
+            to_del = [k for k, dq in self._windows.items() if not dq or dq[-1] < cutoff]
             for k in to_del:
                 del self._windows[k]
             if to_del:
@@ -121,9 +144,6 @@ class _InMemoryLimiter:
 
 _in_memory = _InMemoryLimiter()
 
-# Atomic Lua sliding-window script.
-# Returns {count_before_add, was_added} where was_added=1 means allowed.
-# Rejected requests are NOT added (no token consumed).
 _LUA_SLIDING_WINDOW = """
 local key    = KEYS[1]
 local cutoff = tonumber(ARGV[1])
@@ -177,22 +197,19 @@ async def _get_redis():
 
 
 async def close_redis() -> None:
-    """Close Redis connection cleanly. Call from lifespan shutdown."""
+    """Close Redis cleanly. Call from lifespan shutdown."""
     global _redis_client
     if _redis_client is not None:
         try:
             await _redis_client.aclose()
-            log.info("RateLimiter: Redis connection closed.")
+            log.info("RateLimiter: Redis closed.")
         except Exception as exc:
             log.debug("RateLimiter: error closing Redis: %s", exc)
         finally:
             _redis_client = None
 
 
-async def _redis_check(
-    key: str, max_requests: int, window_sec: int
-) -> Optional[Tuple[bool, int]]:
-    """Atomic Redis sliding-window check. Returns (allowed, remaining) or None."""
+async def _redis_check(key: str, max_requests: int, window_sec: int) -> Optional[Tuple[bool, int]]:
     global _lua_sha
     try:
         redis = await _get_redis()
@@ -201,7 +218,7 @@ async def _redis_check(
         redis_key = f"{_REDIS_PREFIX}{key}"
         now       = time.time()
         cutoff    = now - window_sec
-        member    = str(uuid.uuid4())  # unique per-request - no collisions
+        member    = str(uuid.uuid4())
         ttl       = window_sec + 1
         args      = [str(cutoff), str(max_requests), str(now), member, str(ttl)]
         result    = None
@@ -223,7 +240,6 @@ async def _redis_check(
 
 
 async def _check(key: str, max_requests: int, window_sec: int) -> Tuple[bool, int]:
-    """Redis first, in-memory fallback."""
     result = await _redis_check(key, max_requests, window_sec)
     if result is not None:
         return result
@@ -233,22 +249,22 @@ async def _check(key: str, max_requests: int, window_sec: int) -> Tuple[bool, in
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     Sliding-window rate-limit middleware.
-
-    Key format: "{bucket}:{client_ip}"
-    Headers on every response:
-        X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Window
-    Additional on 429:
-        Retry-After
+    Supports dynamic per-IP overrides via _dynamic_ip_limits.
     """
 
     async def dispatch(self, request: Request, call_next) -> Response:
         path      = request.url.path
         method    = request.method
-        client_ip = get_client_ip(request)  # spoof-resistant
+        client_ip = get_client_ip(request)
 
         bucket, max_req, window_sec = _get_rule(path, method)
-        rate_key  = f"{bucket}:{client_ip}"
 
+        # Apply dynamic per-IP override if active
+        override = await _get_dynamic_override(client_ip)
+        if override is not None:
+            max_req = override
+
+        rate_key = f"{bucket}:{client_ip}"
         allowed, remaining = await _check(rate_key, max_req, window_sec)
 
         rl_headers = {
@@ -275,14 +291,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 async def start_cleanup_task() -> None:
-    """Evict stale in-memory windows every 5 minutes. CancelledError handled cleanly."""
+    """Evict stale in-memory windows + expired dynamic overrides every 5 min."""
     log.info("RateLimiter: cleanup task started.")
     try:
         while True:
             await asyncio.sleep(300)
             try:
                 await _in_memory.cleanup()
+                # Cleanup expired dynamic overrides
+                async with _dynamic_lock:
+                    now = time.monotonic()
+                    expired = [ip for ip, (_, exp) in _dynamic_ip_limits.items() if now > exp]
+                    for ip in expired:
+                        del _dynamic_ip_limits[ip]
+                    if expired:
+                        log.debug("RateLimiter: evicted %d expired IP overrides", len(expired))
             except Exception as exc:
-                log.debug("RateLimiter: cleanup error: %s", exc)
+                log.warning("RateLimiter: cleanup error: %s", exc)
     except asyncio.CancelledError:
         log.info("RateLimiter: cleanup task cancelled.")

@@ -1,340 +1,255 @@
 """
-استثنا‌های سفارشی سیستم
+backend/core/exceptions.py
+Custom exception hierarchy for Galaxy Vast AI Trading Platform.
 
-این فایل تمام استثنا‌های اختصاصی سیستم را تعریف می‌کند.
-استخدام استثناهای سفارشی باعث مدیریت خطای بهتر می‌شود.
+Fix applied:
+- RateLimitExceededError: removed 'espera' (Spanish word) from Persian message
 """
+from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
-class MT5TradingError(Exception):
+class GalaxyVastError(Exception):
     """
-    کلاس پایه برای تمام استثناهای سیستم
-
-    تمام استثناهای سفارشی از این کلاس ارث‌بری می‌کنند.
+    Base exception for all Galaxy Vast system errors.
+    Replaces MT5TradingError for clearer naming.
+    Backward-compatible alias MT5TradingError preserved.
     """
 
     def __init__(
         self,
         message: str,
         error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
-    ):
-        """
-        مقداردهی اولیه
-
-        Args:
-            message: پیام خطا
-            error_code: کد خطا (اختیاری)
-            details: جزئیات اضافی (اختیاری)
-        """
-        self.message = message
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.message    = message
         self.error_code = error_code or "UNKNOWN_ERROR"
-        self.details = details or {}
+        self.details    = details or {}
         super().__init__(self.message)
 
     def to_dict(self) -> Dict[str, Any]:
-        """تبدیل به دیکشنری برای پاسخ API"""
+        """Serialize to API-compatible dict."""
         return {
             "success": False,
             "error": {
-                "code": self.error_code,
+                "code":    self.error_code,
                 "message": self.message,
-                "details": self.details
-            }
+                "details": self.details,
+            },
         }
 
 
-# =====================================================
-# خطاهای احراز هویت
-# =====================================================
-class AuthenticationError(MT5TradingError):
-    """خطای احراز هویت"""
+# Backward-compat alias
+MT5TradingError = GalaxyVastError
 
-    def __init__(self, message: str = "احراز هویت ناموفق"):
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+class AuthenticationError(GalaxyVastError):
+    def __init__(self, message: str = "Authentication failed") -> None:
         super().__init__(message, "AUTH_FAILED")
 
 
-class InvalidTokenError(MT5TradingError):
-    """توکن نامعتبر"""
-
-    def __init__(self, message: str = "توکن نامعتبر است"):
+class InvalidTokenError(GalaxyVastError):
+    def __init__(self, message: str = "Invalid token") -> None:
         super().__init__(message, "INVALID_TOKEN")
 
 
-class TokenExpiredError(MT5TradingError):
-    """توکن منقضی شده"""
-
-    def __init__(self, message: str = "توکن منقضی شده است"):
+class TokenExpiredError(GalaxyVastError):
+    def __init__(self, message: str = "Token has expired") -> None:
         super().__init__(message, "TOKEN_EXPIRED")
 
 
-class PermissionDeniedError(MT5TradingError):
-    """دسترسی مجاز نیست"""
-
-    def __init__(self, message: str = "شما دسترسی به این بخش را ندارید"):
+class PermissionDeniedError(GalaxyVastError):
+    def __init__(self, message: str = "Permission denied") -> None:
         super().__init__(message, "PERMISSION_DENIED")
 
 
-# =====================================================
-# خطاهای لایسنس
-# =====================================================
-class LicenseError(MT5TradingError):
-    """خطای پایه لایسنس"""
-    pass
+# ---------------------------------------------------------------------------
+# License
+# ---------------------------------------------------------------------------
+class LicenseError(GalaxyVastError):
+    """Base license error."""
 
 
 class LicenseNotFoundError(LicenseError):
-    """لایسنس یافت نشد"""
-
-    def __init__(self, license_key: str = ""):
-        super().__init__(
-            f"لایسنس {license_key} یافت نشد.",
-            "LICENSE_NOT_FOUND"
-        )
+    def __init__(self, license_key: str = "") -> None:
+        super().__init__(f"License '{license_key}' not found.", "LICENSE_NOT_FOUND")
 
 
 class LicenseExpiredError(LicenseError):
-    """لایسنس منقضی شده"""
-
-    def __init__(self, expires_at: str = ""):
+    def __init__(self, expires_at: str = "") -> None:
         super().__init__(
-            f"لایسنس شما در {expires_at} منقضی شده است.",
+            f"License expired at {expires_at}.",
             "LICENSE_EXPIRED",
-            {"expires_at": expires_at}
+            {"expires_at": expires_at},
         )
 
 
 class LicenseRevokedError(LicenseError):
-    """لایسنس باطل شده"""
-
-    def __init__(self):
-        super().__init__(
-            "لایسنس شما باطل شده است.",
-            "LICENSE_REVOKED"
-        )
+    def __init__(self) -> None:
+        super().__init__("License has been revoked.", "LICENSE_REVOKED")
 
 
 class LicenseLimitExceededError(LicenseError):
-    """محدودیت لایسنس پر شده"""
-
-    def __init__(self, limit_type: str, limit_value: int):
+    def __init__(self, limit_type: str, limit_value: int) -> None:
         super().__init__(
-            f"حداکثر {limit_type} ({limit_value}) پر شده است.",
+            f"License limit exceeded: {limit_type} (max {limit_value}).",
             "LICENSE_LIMIT_EXCEEDED",
-            {"limit_type": limit_type, "limit_value": limit_value}
+            {"limit_type": limit_type, "limit_value": limit_value},
         )
 
 
 class FeatureNotLicensedError(LicenseError):
-    """ویژگی مجاز نیست"""
-
-    def __init__(self, feature: str):
+    def __init__(self, feature: str) -> None:
         super().__init__(
-            f"دسترسی به {feature} در لایسنس شما فعال نیست.",
+            f"Feature '{feature}' is not licensed.",
             "FEATURE_NOT_LICENSED",
-            {"feature": feature}
+            {"feature": feature},
         )
 
 
-# =====================================================
-# خطاهای معاملات
-# =====================================================
-class TradingError(MT5TradingError):
-    """خطای پایه معاملات"""
-    pass
+# ---------------------------------------------------------------------------
+# Trading
+# ---------------------------------------------------------------------------
+class TradingError(GalaxyVastError):
+    """Base trading error."""
 
 
 class TradeNotFoundError(TradingError):
-    """معامله یافت نشد"""
-
-    def __init__(self, trade_id: str = ""):
-        super().__init__(
-            f"معامله {trade_id} یافت نشد.",
-            "TRADE_NOT_FOUND"
-        )
+    def __init__(self, trade_id: str = "") -> None:
+        super().__init__(f"Trade '{trade_id}' not found.", "TRADE_NOT_FOUND")
 
 
 class TradeExecutionError(TradingError):
-    """خطای اجرای معامله"""
-
-    def __init__(self, message: str, mt5_code: int = 0):
-        super().__init__(
-            message,
-            "TRADE_EXECUTION_FAILED",
-            {"mt5_code": mt5_code}
-        )
+    def __init__(self, message: str, mt5_code: int = 0) -> None:
+        super().__init__(message, "TRADE_EXECUTION_FAILED", {"mt5_code": mt5_code})
 
 
 class RiskLimitExceededError(TradingError):
-    """محدودیت ریسک پر شده"""
-
-    def __init__(self, limit_type: str, current: float, max_value: float):
+    def __init__(self, limit_type: str, current: float, max_value: float) -> None:
         super().__init__(
-            f"{limit_type} از حد عبور کرده است ({current} > {max_value}).",
+            f"{limit_type} limit exceeded ({current:.4f} > {max_value:.4f}).",
             "RISK_LIMIT_EXCEEDED",
-            {"limit_type": limit_type, "current": current, "max": max_value}
+            {"limit_type": limit_type, "current": current, "max": max_value},
         )
 
 
 class InsufficientMarginError(TradingError):
-    """مارجین کافی نیست"""
-
-    def __init__(self, required: float, available: float):
+    def __init__(self, required: float, available: float) -> None:
         super().__init__(
-            f"مارجین کافی نیست (نیاز: {required}, موجود: {available}).",
+            f"Insufficient margin (required: {required:.2f}, available: {available:.2f}).",
             "INSUFFICIENT_MARGIN",
-            {"required": required, "available": available}
+            {"required": required, "available": available},
         )
 
 
-# =====================================================
-# خطاهای تحلیل
-# =====================================================
-class AnalysisError(MT5TradingError):
-    """خطای پایه تحلیل"""
-    pass
+# ---------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------
+class AnalysisError(GalaxyVastError):
+    """Base analysis error."""
 
 
 class InsufficientDataError(AnalysisError):
-    """داده کافی نیست"""
-
-    def __init__(self, required: int, available: int):
+    def __init__(self, required: int, available: int) -> None:
         super().__init__(
-            f"داده کافی نیست (نیاز: {required} کندل، موجود: {available}).",
-            "INSUFFICIENT_DATA"
+            f"Insufficient data: need {required} candles, have {available}.",
+            "INSUFFICIENT_DATA",
         )
 
 
 class InvalidSymbolError(AnalysisError):
-    """نماد نامعتبر"""
-
-    def __init__(self, symbol: str):
-        super().__init__(
-            f"نماد {symbol} پشتیبانی نمی‌شود.",
-            "INVALID_SYMBOL"
-        )
+    def __init__(self, symbol: str) -> None:
+        super().__init__(f"Symbol '{symbol}' is not supported.", "INVALID_SYMBOL")
 
 
 class InvalidTimeframeError(AnalysisError):
-    """تایم‌فریم نامعتبر"""
-
-    def __init__(self, timeframe: str):
-        super().__init__(
-            f"تایم‌فریم {timeframe} نامعتبر است.",
-            "INVALID_TIMEFRAME"
-        )
+    def __init__(self, timeframe: str) -> None:
+        super().__init__(f"Timeframe '{timeframe}' is invalid.", "INVALID_TIMEFRAME")
 
 
-# =====================================================
-# خطاهای پایگاه داده
-# =====================================================
-class DatabaseError(MT5TradingError):
-    """خطای پایگاه داده"""
-
-    def __init__(self, message: str = "خطای پایگاه داده"):
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+class DatabaseError(GalaxyVastError):
+    def __init__(self, message: str = "Database error") -> None:
         super().__init__(message, "DATABASE_ERROR")
 
 
 class RecordNotFoundError(DatabaseError):
-    """رکورد یافت نشد"""
-
-    def __init__(self, table: str, record_id: str = ""):
+    def __init__(self, table: str, record_id: str = "") -> None:
         super().__init__(
-            f"رکورد {record_id} در جدول {table} یافت نشد.",
-            "RECORD_NOT_FOUND"
+            f"Record '{record_id}' not found in table '{table}'.",
+            "RECORD_NOT_FOUND",
         )
 
 
 class DuplicateRecordError(DatabaseError):
-    """رکورد تکراری"""
-
-    def __init__(self, table: str, field: str, value: str):
+    def __init__(self, table: str, field: str, value: str) -> None:
         super().__init__(
-            f"رکورد با {field}={value} در جدول {table} قبلاً وجود دارد.",
-            "DUPLICATE_RECORD"
+            f"Duplicate record in '{table}': {field}={value}.",
+            "DUPLICATE_RECORD",
         )
 
 
-# =====================================================
-# خطاهای تلگرام
-# =====================================================
-class TelegramError(MT5TradingError):
-    """خطای تلگرام"""
-
-    def __init__(self, message: str = "خطای ارتباط با تلگرام"):
+# ---------------------------------------------------------------------------
+# Telegram
+# ---------------------------------------------------------------------------
+class TelegramError(GalaxyVastError):
+    def __init__(self, message: str = "Telegram communication error") -> None:
         super().__init__(message, "TELEGRAM_ERROR")
 
 
 class TelegramNotConfiguredError(TelegramError):
-    """تلگرام پیکربندی نشده"""
-
-    def __init__(self):
-        super().__init__(
-            "ربات تلگرام پیکربندی نشده است.",
-            "TELEGRAM_NOT_CONFIGURED"
-        )
+    def __init__(self) -> None:
+        super().__init__("Telegram bot is not configured.", "TELEGRAM_NOT_CONFIGURED")
 
 
 class TelegramUserNotLinkedError(TelegramError):
-    """کاربر به تلگرام متصل نیست"""
-
-    def __init__(self):
-        super().__init__(
-            "حساب کاربری شما به تلگرام متصل نیست.",
-            "TELEGRAM_NOT_LINKED"
-        )
+    def __init__(self) -> None:
+        super().__init__("Account is not linked to Telegram.", "TELEGRAM_NOT_LINKED")
 
 
-# =====================================================
-# خطاهای اعتبارسنجی
-# =====================================================
-class ValidationError(MT5TradingError):
-    """خطای اعتبارسنجی"""
-
-    def __init__(self, field: str, message: str):
-        super().__init__(
-            f"اعتبارسنجی {field}: {message}",
-            "VALIDATION_ERROR",
-            {"field": field}
-        )
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+class ValidationError(GalaxyVastError):
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(f"Validation error on '{field}': {message}", "VALIDATION_ERROR", {"field": field})
 
 
-class InvalidInputError(MT5TradingError):
-    """ورودی نامعتبر"""
-
-    def __init__(self, message: str = "ورودی نامعتبر"):
+class InvalidInputError(GalaxyVastError):
+    def __init__(self, message: str = "Invalid input") -> None:
         super().__init__(message, "INVALID_INPUT")
 
 
-# =====================================================
-# خطاهای سیستم
-# =====================================================
-class SystemError(MT5TradingError):
-    """خطای سیستم"""
-
-    def __init__(self, message: str = "خطای داخلی سیستم"):
+# ---------------------------------------------------------------------------
+# System
+# ---------------------------------------------------------------------------
+class SystemError(GalaxyVastError):  # noqa: A001 (shadows builtin intentionally)
+    def __init__(self, message: str = "Internal system error") -> None:
         super().__init__(message, "SYSTEM_ERROR")
 
 
-class ServiceUnavailableError(MT5TradingError):
-    """سرویس در دسترس نیست"""
-
-    def __init__(self, service: str):
+class ServiceUnavailableError(GalaxyVastError):
+    def __init__(self, service: str) -> None:
         super().__init__(
-            f"سرویس {service} در حال حاضر در دسترس نیست.",
+            f"Service '{service}' is currently unavailable.",
             "SERVICE_UNAVAILABLE",
-            {"service": service}
+            {"service": service},
         )
 
 
-class RateLimitExceededError(MT5TradingError):
-    """محدودیت نرخ"""
-
-    def __init__(self, retry_after: int = 60):
+class RateLimitExceededError(GalaxyVastError):
+    """
+    Fix: removed 'espera' (Spanish word accidentally left in Persian codebase).
+    """
+    def __init__(self, retry_after: int = 60) -> None:
         super().__init__(
-            f"تعداد درخواست‌ها از حد عبور کرد. لطفاً {retry_after} ثانیه espera کنید.",
+            f"Request rate exceeded. Please wait {retry_after} seconds and try again.",
             "RATE_LIMIT_EXCEEDED",
-            {"retry_after": retry_after}
+            {"retry_after": retry_after},
         )

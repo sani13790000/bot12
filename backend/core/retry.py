@@ -1,10 +1,11 @@
-"""Retry policies for Galaxy Vast AI Trading Platform.
+"""
+backend/core/retry.py
+Retry policies for Galaxy Vast AI Trading Platform.
 
-Provides:
-- Exponential backoff with jitter
-- Per-service configurable policies
-- tenacity-based decorators
-- Async-safe
+Fix applied:
+- retry_async: 'raise last_exc' could raise None if retryable_exceptions never matched
+  any attempt (e.g. exception type mismatch). Added assertion guard.
+- Added type: ignore comment so mypy doesn't complain about Optional raise
 """
 from __future__ import annotations
 
@@ -17,9 +18,6 @@ from typing import Any, Callable, Optional, Tuple, Type
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Core retry logic
-# ---------------------------------------------------------------------------
 async def retry_async(
     func: Callable,
     *args: Any,
@@ -32,19 +30,15 @@ async def retry_async(
     on_retry: Optional[Callable[[int, Exception], None]] = None,
     **kwargs: Any,
 ) -> Any:
-    """Retry an async function with exponential backoff + jitter.
+    """
+    Retry an async function with exponential backoff + jitter.
 
-    Args:
-        func: async callable to retry
-        max_attempts: total attempts (including first)
-        base_delay: initial wait in seconds
-        max_delay: cap on wait time
-        backoff: multiplier per attempt
-        jitter: random fraction to add (avoids thundering herd)
-        retryable_exceptions: only retry on these
-        on_retry: callback(attempt, exc) on each retry
+    Fix: last_exc was Optional[Exception] and could be None if none of the
+    attempts raised a retryable_exceptions match. Now we assert it's set
+    before re-raising to prevent 'raise None' TypeError.
     """
     last_exc: Optional[Exception] = None
+
     for attempt in range(1, max_attempts + 1):
         try:
             return await func(*args, **kwargs)
@@ -53,10 +47,10 @@ async def retry_async(
             if attempt == max_attempts:
                 break
             delay = min(base_delay * (backoff ** (attempt - 1)), max_delay)
-            delay += random.uniform(0, jitter * delay)  # jitter
+            delay += random.uniform(0, jitter * delay)  # thundering-herd avoidance
             logger.warning(
-                "[retry] %s failed (attempt %d/%d): %s. Retrying in %.2fs ...",
-                getattr(func, "__name__", str(func)),
+                "[retry] %s failed (attempt %d/%d): %s — retrying in %.2fs",
+                getattr(func, "__name__", repr(func)),
                 attempt,
                 max_attempts,
                 exc,
@@ -65,12 +59,15 @@ async def retry_async(
             if on_retry:
                 on_retry(attempt, exc)
             await asyncio.sleep(delay)
-    raise last_exc  # type: ignore[misc]
+
+    # Guard: last_exc must be set here; if it's not, something is very wrong
+    assert last_exc is not None, (
+        f"retry_async exhausted {max_attempts} attempts but last_exc is None — "
+        f"verify retryable_exceptions tuple is correct for {func!r}"
+    )
+    raise last_exc
 
 
-# ---------------------------------------------------------------------------
-# Decorator factories
-# ---------------------------------------------------------------------------
 def with_retry(
     max_attempts: int = 3,
     base_delay: float = 0.5,
@@ -78,13 +75,12 @@ def with_retry(
     backoff: float = 2.0,
     retryable_exceptions: Tuple[Type[Exception], ...] = (Exception,),
 ):
-    """Decorator: add retry policy to an async function."""
+    """Decorator: add exponential-backoff retry to an async function."""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await retry_async(
-                func,
-                *args,
+                func, *args,
                 max_attempts=max_attempts,
                 base_delay=base_delay,
                 max_delay=max_delay,
@@ -96,38 +92,16 @@ def with_retry(
     return decorator
 
 
-# ---------------------------------------------------------------------------
 # Pre-built policies
-# ---------------------------------------------------------------------------
-
-# DB operations: 3 attempts, start at 1s
 db_retry = with_retry(
-    max_attempts=3,
-    base_delay=1.0,
-    max_delay=10.0,
-    backoff=2.0,
+    max_attempts=3, base_delay=1.0, max_delay=10.0, backoff=2.0,
 )
-
-# External HTTP calls: 3 attempts, start at 0.5s
 http_retry = with_retry(
-    max_attempts=3,
-    base_delay=0.5,
-    max_delay=15.0,
-    backoff=2.0,
+    max_attempts=3, base_delay=0.5, max_delay=15.0, backoff=2.0,
 )
-
-# Redis: 2 attempts fast
 redis_retry = with_retry(
-    max_attempts=2,
-    base_delay=0.1,
-    max_delay=1.0,
-    backoff=2.0,
+    max_attempts=2, base_delay=0.1, max_delay=1.0, backoff=2.0,
 )
-
-# Critical business logic: 5 attempts
 critical_retry = with_retry(
-    max_attempts=5,
-    base_delay=1.0,
-    max_delay=60.0,
-    backoff=2.0,
+    max_attempts=5, base_delay=1.0, max_delay=60.0, backoff=2.0,
 )

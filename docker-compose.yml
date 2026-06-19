@@ -1,5 +1,15 @@
 # Galaxy Vast AI Trading Platform
-# All services with resource limits, healthchecks, and restart policies.
+# All services with resource limits, healthchecks, restart policies,
+# and explicit Docker network for isolation.
+# Fix: added galaxyvast_net network — services previously used default bridge
+# (no isolation, no DNS-based service discovery guarantee)
+
+networks:
+  galaxyvast_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
 
 services:
   redis:
@@ -12,7 +22,9 @@ services:
       --save 900 1
       --appendonly no
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    networks:
+      - galaxyvast_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -41,11 +53,13 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+    networks:
+      - galaxyvast_net
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -76,6 +90,8 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - galaxyvast_net
     depends_on:
       api:
         condition: service_healthy
@@ -103,6 +119,8 @@ services:
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - galaxyvast_net
     depends_on:
       api:
         condition: service_healthy
@@ -137,6 +155,8 @@ services:
     restart: on-failure:3
     ports:
       - "3000:80"
+    networks:
+      - galaxyvast_net
     depends_on:
       api:
         condition: service_healthy
