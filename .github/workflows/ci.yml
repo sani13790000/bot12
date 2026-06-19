@@ -44,10 +44,14 @@ jobs:
           JWT_SECRET_KEY: test-secret-key-minimum-32-characters-long
           TELEGRAM_BOT_TOKEN: 123456:test-token
           TELEGRAM_CHAT_ID: "123456789"
+          TELEGRAM_ADMIN_IDS: "123456789"
           LICENSE_KEY: test-license-key
           LICENSE_SALT: test-license-salt-for-ci
+          LICENSE_SECRET: test-license-secret-for-ci
           ENVIRONMENT: development
           REDIS_URL: redis://localhost:6379/0
+          API_BASE_URL: http://localhost:8000
+          MQL5_API_TOKEN: test-mql5-token
         run: |
           python -m pytest backend/tests/ -v --tb=short \
             --cov=backend \

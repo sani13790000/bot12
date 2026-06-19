@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Galaxy Vast AI — Pre-flight startup validator
+"""Galaxy Vast AI - Pre-flight startup validator
 Run this before docker compose up to catch all config errors early.
 Usage: python3 startup_check.py
 """
@@ -43,7 +43,7 @@ def warn(msg: str) -> None:
 
 
 def section(title: str) -> None:
-    print(f"\n{BOLD}{BLUE}── {title} ─────────────────────────────────────────────{RESET}")
+    print(f"\n{BOLD}{BLUE}── {title} " + "─" * (50 - len(title)) + f"{RESET}")
 
 
 print(f"{BOLD}\nGalaxy Vast AI Trading Platform — Pre-flight Check{RESET}")
@@ -70,12 +70,10 @@ else:
 section("Required Environment Variables")
 REQUIRED_VARS = [
     ("SUPABASE_URL", "https://xxx.supabase.co"),
-    ("SUPABASE_ANON_KEY", "eyJ..."),
     ("SUPABASE_SERVICE_ROLE_KEY", "eyJ..."),
-    ("SUPABASE_DB_URL", "postgresql://..."),
-    ("JWT_SECRET_KEY", "min 32 chars hex"),
-    ("LICENSE_ENCRYPTION_KEY", "min 32 chars hex"),
-    ("LICENSE_SIGNATURE_KEY", "min 32 chars hex"),
+    ("JWT_SECRET_KEY", "min 64 hex chars"),
+    ("LICENSE_SECRET", "min 32 chars hex"),
+    ("LICENSE_SALT", "min 32 chars hex"),
 ]
 
 if env_path.exists():
@@ -84,7 +82,7 @@ if env_path.exists():
 
 for var, hint in REQUIRED_VARS:
     val = os.getenv(var, "")
-    if not val or val.startswith("REPLACE") or val.startswith("your") or val.startswith("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."):
+    if not val or val.startswith("REPLACE") or val.startswith("your") or val.startswith("generate"):
         fail(f"{var} not set", f"Expected: {hint}")
     elif var == "JWT_SECRET_KEY" and len(val) < 32:
         fail(f"{var} too short ({len(val)} chars)",
@@ -94,7 +92,13 @@ for var, hint in REQUIRED_VARS:
 
 # 4. Optional env vars
 section("Optional Environment Variables")
-OPTIONAL_VARS = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ADMIN_IDS", "MT5_LOGIN", "MT5_SERVER", "SENTRY_DSN"]
+OPTIONAL_VARS = [
+    "TELEGRAM_BOT_TOKEN",
+    "TELEGRAM_ADMIN_IDS",
+    "MQL5_API_TOKEN",
+    "SENTRY_DSN",
+    "API_BASE_URL",
+]
 for var in OPTIONAL_VARS:
     val = os.getenv(var, "")
     if val:
@@ -106,10 +110,8 @@ for var in OPTIONAL_VARS:
 section("Python Packages")
 REQUIRED_PACKAGES = [
     "fastapi", "uvicorn", "pydantic", "pydantic_settings",
-    "supabase", "asyncpg", "sqlalchemy",
+    "supabase", "redis",
     "xgboost", "sklearn", "numpy", "pandas",
-    "streamlit", "plotly",
-    "redis", "httpx", "python_telegram_bot",
     "jose", "cryptography",
     "prometheus_client",
 ]
@@ -118,12 +120,11 @@ OPTIONAL_PACKAGES = [
     ("gymnasium", "RL Environment"),
     ("torch", "PyTorch for RL"),
     ("shap", "SHAP explainability"),
-    ("optuna", "Hyperparameter optimization"),
-    ("cvxpy", "Portfolio optimization"),
-    ("statsmodels", "Statistical tests"),
+    ("pandas_ta", "Technical indicators"),
+    ("sentry_sdk", "Error tracking"),
 ]
 for pkg in REQUIRED_PACKAGES:
-    mod = pkg.replace("-", "_").replace("python_", "")
+    mod = pkg.replace("-", "_")
     try:
         importlib.import_module(mod)
         ok(pkg)
@@ -146,22 +147,21 @@ section("Project Structure")
 CRITICAL_FILES = [
     "backend/api/main.py",
     "backend/core/config.py",
+    "backend/core/logger.py",
+    "backend/core/deps.py",
+    "backend/core/retry.py",
+    "backend/core/validators.py",
     "backend/agents/voting_engine.py",
     "backend/analysis/smc_engine.py",
-    "backend/institutional/__init__.py",
+    "backend/cache.py",
+    "backend/middleware/observability.py",
     "dashboard/app.py",
-    "dashboard/pages/replay.py",
-    "dashboard/pages/backtest.py",
-    "dashboard/pages/walk_forward.py",
-    "dashboard/pages/portfolio.py",
-    "dashboard/pages/explainability.py",
-    "dashboard/pages/monte_carlo.py",
     "Dockerfile",
     "Dockerfile.bot",
-    "dashboard/Dockerfile",
-    "frontend/Dockerfile",
     "docker-compose.yml",
     ".env.example",
+    "pyproject.toml",
+    "ARCHITECTURE.md",
 ]
 for f in CRITICAL_FILES:
     if Path(f).exists():
@@ -175,19 +175,19 @@ mig_dir = Path("supabase/migrations")
 if mig_dir.exists():
     migs = sorted(mig_dir.glob("*.sql"))
     if len(migs) >= 13:
-        ok(f"{len(migs)} migration files found (001–013)")
+        ok(f"{len(migs)} migration files found")
     else:
-        warn(f"Only {len(migs)} migration files found. Expected 13+")
+        warn(f"Only {len(migs)} migration files. Expected 13+")
 else:
     fail("supabase/migrations/ not found")
 
-# ── Summary ───────────────────────────────────────────────────────────────────
-print(f"\n{'='*60}")
+# ── Summary
+print(f"\n{'=' * 60}")
 print(f"{BOLD}Summary:{RESET}")
-print(f"  {GREEN}✅ Passed : {passed}{RESET}")
+print(f"  {GREEN}✅ Passed  : {passed}{RESET}")
 print(f"  {YELLOW}⚠️  Warnings: {warnings}{RESET}")
-print(f"  {RED}❌ Failed : {failed}{RESET}")
-print(f"{'='*60}")
+print(f"  {RED}❌ Failed  : {failed}{RESET}")
+print(f"{'=' * 60}")
 
 if failed == 0:
     print(f"\n{GREEN}{BOLD}🚀 All checks passed! You can now run:{RESET}")
@@ -195,7 +195,8 @@ if failed == 0:
     print("")
     print("  Services:")
     print("  • API:       http://localhost:8000")
-    print("  • API Docs:  http://localhost:8000/docs")
+    print("  • API Docs:  http://localhost:8000/docs  (dev only)")
+    print("  • Health:    http://localhost:8000/health")
     print("  • Dashboard: http://localhost:8501")
     print("  • Frontend:  http://localhost:3000")
 else:
