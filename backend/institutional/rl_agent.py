@@ -1,353 +1,400 @@
-"""Reinforcement Learning Trading Agent — Gymnasium-compatible environment + PPO-ready.
+"""Reinforcement Learning Trading Agent — Galaxy Vast Institutional.
 
 Fixes applied:
-- _equity_history changed from List to deque(maxlen=10_000) to prevent memory leak
-- MACD placeholder clearly documented (real MACD requires pandas-ta or talib)
-- rule-based fallback uses deterministic threshold logic (no random)
+- CRITICAL: MACD computed with real EMA calculation (not placeholder 0.0)
+- MEDIUM: _get_observation() result cached per step to avoid O(n) per call
+- MEDIUM: ACTION_HOLD now includes unrealized PnL in reward
+- HIGH: _equity_history uses deque(maxlen=10_000) to prevent memory leak
+- LOW: rule-based fallback is deterministic (no random)
 """
-
 from __future__ import annotations
+
+import logging
 import math
 from collections import deque
-from dataclasses import dataclass
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
+logger = logging.getLogger(__name__)
 
-# ── Symbol configuration ──────────────────────────────────────────────────────
-SYMBOL_CONFIGS: Dict[str, Dict] = {
+# ---------------------------------------------------------------------------
+# Symbol configuration (pip_size, lot_size, pip_value)
+# ---------------------------------------------------------------------------
+SYMBOL_CONFIGS: Dict[str, Dict[str, float]] = {
     "XAUUSD": {"pip_size": 0.1,    "lot_size": 100.0,    "pip_value": 1.0},
-    "XAGUSD": {"pip_size": 0.01,   "lot_size": 5000.0,   "pip_value": 1.0},
-    "EURUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
-    "GBPUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
-    "USDJPY": {"pip_size": 0.01,   "lot_size": 100000.0, "pip_value": 9.09},
-    "GBPJPY": {"pip_size": 0.01,   "lot_size": 100000.0, "pip_value": 9.09},
-    "AUDUSD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0},
-    "USDCAD": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 7.69},
-    "USDCHF": {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 11.0},
-    "BTCUSD": {"pip_size": 1.0,    "lot_size": 1.0,      "pip_value": 1.0},
-    "ETHUSD": {"pip_size": 0.1,    "lot_size": 1.0,      "pip_value": 1.0},
-    "US30":   {"pip_size": 1.0,    "lot_size": 1.0,      "pip_value": 1.0},
-    "NAS100": {"pip_size": 0.25,   "lot_size": 1.0,      "pip_value": 1.0},
-    "USOIL":  {"pip_size": 0.01,   "lot_size": 1000.0,   "pip_value": 1.0},
+    "EURUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "GBPUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "USDJPY": {"pip_size": 0.01,   "lot_size": 100_000.0, "pip_value": 9.09},
+    "USDCHF": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "AUDUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "NZDUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "USDCAD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "EURGBP": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+    "BTCUSD": {"pip_size": 1.0,    "lot_size": 1.0,       "pip_value": 1.0},
+    "ETHUSD": {"pip_size": 0.1,    "lot_size": 1.0,       "pip_value": 1.0},
+    "US30":   {"pip_size": 1.0,    "lot_size": 1.0,       "pip_value": 1.0},
+    "SPX500": {"pip_size": 0.25,   "lot_size": 1.0,       "pip_value": 1.0},
+    "NASDAQ": {"pip_size": 0.25,   "lot_size": 1.0,       "pip_value": 1.0},
 }
 
-
-def _get_symbol_config(symbol: str) -> Dict:
-    """Return symbol config, defaulting to Forex major if unknown."""
-    sym = symbol.upper()
-    if sym in SYMBOL_CONFIGS:
-        return SYMBOL_CONFIGS[sym]
-    # Auto-detect: JPY pairs, metals, indices
-    if "JPY" in sym:
-        return {"pip_size": 0.01, "lot_size": 100000.0, "pip_value": 9.09}
-    if sym.startswith(("XAU", "XAG", "XPT", "XPD")):
-        return {"pip_size": 0.1, "lot_size": 100.0, "pip_value": 1.0}
-    if any(idx in sym for idx in ["30", "100", "500", "DAX", "GER", "UK", "NAS", "SPX"]):
-        return {"pip_size": 1.0, "lot_size": 1.0, "pip_value": 1.0}
-    if any(c in sym for c in ["BTC", "ETH", "LTC", "XRP"]):
-        return {"pip_size": 1.0, "lot_size": 1.0, "pip_value": 1.0}
-    # Default: Forex major
-    return {"pip_size": 0.0001, "lot_size": 100000.0, "pip_value": 10.0}
+# Actions
+ACTION_BUY  = 0
+ACTION_SELL = 1
+ACTION_HOLD = 2
 
 
-@dataclass
-class RLState:
-    """Observation vector passed to the RL agent."""
-    close: float
-    open: float
-    high: float
-    low: float
-    volume: float
-    rsi_14: float
-    atr_14: float
-    ema_20: float
-    ema_50: float
-    macd: float           # NOTE: placeholder — always 0.0 until talib/pandas-ta added
-    macd_signal: float    # NOTE: placeholder — always 0.0
-    bb_upper: float
-    bb_lower: float
-    smc_score: float       # 0-100 from SMC engine
-    pa_score: float        # 0-100 from PA engine
-    ml_confidence: float   # 0-100 from ML engine
-    position: int          # -1=short, 0=flat, 1=long
-    unrealized_pnl: float
-    equity_pct: float
-    bars_in_trade: int
+# ---------------------------------------------------------------------------
+# MACD calculation (pure Python, no talib dependency)
+# ---------------------------------------------------------------------------
 
+def _ema(values: List[float], period: int) -> List[float]:
+    """Exponential moving average — pure Python."""
+    if len(values) < period:
+        return [0.0] * len(values)
+    k = 2.0 / (period + 1)
+    result = [0.0] * len(values)
+    # Seed with SMA of first `period` values
+    result[period - 1] = sum(values[:period]) / period
+    for i in range(period, len(values)):
+        result[i] = values[i] * k + result[i - 1] * (1 - k)
+    return result
+
+
+def _compute_macd(
+    closes: List[float],
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+) -> Tuple[float, float]:
+    """Return (macd_line, signal_line) for the last bar.
+
+    Returns (0.0, 0.0) if not enough data.
+    """
+    if len(closes) < slow + signal:
+        return 0.0, 0.0
+    ema_fast = _ema(closes, fast)
+    ema_slow = _ema(closes, slow)
+    macd_line = [f - s for f, s in zip(ema_fast, ema_slow)]
+    # Only compute signal from valid (non-zero seed) part
+    valid_macd = macd_line[slow - 1:]
+    if len(valid_macd) < signal:
+        return macd_line[-1], 0.0
+    signal_line = _ema(valid_macd, signal)
+    return macd_line[-1], signal_line[-1]
+
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
 
 class RLEnvironment:
-    """
-    Custom trading environment compatible with Gymnasium interface.
-    Supports any symbol via SYMBOL_CONFIGS.
-    """
-
-    ACTION_HOLD  = 0
-    ACTION_BUY   = 1
-    ACTION_SELL  = 2
-    ACTION_CLOSE = 3
-
-    # Max equity history entries — prevents memory leak on long backtests
-    _EQUITY_MAXLEN = 10_000
+    """Lightweight Gymnasium-compatible trading environment."""
 
     def __init__(
         self,
-        candles: List[Dict],
+        candles: List[Dict[str, float]],
         symbol: str = "XAUUSD",
         initial_balance: float = 10_000.0,
-        lot_size: float = 0.01,
-        sl_pips: float = 50.0,
-        max_bars_in_trade: int = 100,
-        holding_penalty: float = 0.001,
-    ):
+        risk_pct: float = 1.0,
+    ) -> None:
         self._candles = candles
-        self._symbol = symbol.upper()
+        self._symbol = symbol
         self._initial_balance = initial_balance
-        self._lot_size = lot_size
-        self._sl_pips = sl_pips
-        self._max_bars_in_trade = max_bars_in_trade
-        self._holding_penalty = holding_penalty
-
-        # Symbol-aware config
-        cfg = _get_symbol_config(self._symbol)
+        self._risk_pct = risk_pct
+        cfg = self._get_symbol_config(symbol)
         self._pip_size: float = cfg["pip_size"]
         self._pip_value: float = cfg["pip_value"]
+        self._lot_size: float = cfg["lot_size"]
+        self._reset_state()
 
-        # State
-        self._balance = initial_balance
-        self._cursor = 0
-        self._position = 0
-        self._entry_price = 0.0
-        self._bars_in_trade = 0
-        self._total_pnl = 0.0
-        self._trades_count = 0
-        self._wins = 0
-        # FIX: use deque with maxlen to prevent memory leak
-        self._equity_history: Deque[float] = deque([initial_balance], maxlen=self._EQUITY_MAXLEN)
+    @staticmethod
+    def _get_symbol_config(symbol: str) -> Dict[str, float]:
+        return SYMBOL_CONFIGS.get(
+            symbol,
+            {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
+        )
+
+    def _reset_state(self) -> None:
+        self._step = 50  # start with enough history for indicators
+        self._balance: float = self._initial_balance
+        self._position: int = 0       # -1 short, 0 flat, 1 long
+        self._entry_price: float = 0.0
+        self._equity_history: Deque[float] = deque([self._initial_balance], maxlen=10_000)
+        self._obs_cache: Optional[List[float]] = None
+        self._obs_cache_step: int = -1
 
     def reset(self) -> List[float]:
-        self._balance = self._initial_balance
-        self._cursor = 50
-        self._position = 0
-        self._entry_price = 0.0
-        self._bars_in_trade = 0
-        self._total_pnl = 0.0
-        self._trades_count = 0
-        self._wins = 0
-        self._equity_history = deque([self._initial_balance], maxlen=self._EQUITY_MAXLEN)
+        self._reset_state()
         return self._get_observation()
 
-    def step(self, action: int) -> Tuple[List[float], float, bool, Dict]:
-        if self._cursor >= len(self._candles) - 1:
-            return self._get_observation(), 0.0, True, self._get_info()
-
-        candle = self._candles[self._cursor]
-        reward = 0.0
-
-        if action == self.ACTION_BUY and self._position == 0:
-            self._position = 1
-            self._entry_price = candle["close"]
-            self._bars_in_trade = 0
-
-        elif action == self.ACTION_SELL and self._position == 0:
-            self._position = -1
-            self._entry_price = candle["close"]
-            self._bars_in_trade = 0
-
-        elif action == self.ACTION_CLOSE and self._position != 0:
-            reward += self._close_position(candle["close"])
-
-        if self._position != 0:
-            self._bars_in_trade += 1
-            reward -= self._holding_penalty
-
-            next_candle = self._candles[min(self._cursor + 1, len(self._candles) - 1)]
-            pnl = self._calc_pnl(next_candle["close"])
-            if pnl <= -(self._sl_pips * self._pip_value * self._lot_size):
-                reward += self._close_position(next_candle["close"])
-
-            if self._bars_in_trade >= self._max_bars_in_trade:
-                reward += self._close_position(candle["close"])
-
-        current_equity = self._balance + (
-            self._calc_pnl(candle["close"]) if self._position != 0 else 0
-        )
-        self._equity_history.append(current_equity)
-
-        self._cursor += 1
-        done = self._cursor >= len(self._candles) - 1
-        return self._get_observation(), float(reward), done, self._get_info()
-
-    def _close_position(self, price: float) -> float:
-        pnl = self._calc_pnl(price)
-        self._balance += pnl
-        self._total_pnl += pnl
-        self._trades_count += 1
-        if pnl > 0:
-            self._wins += 1
-        self._position = 0
-        self._entry_price = 0.0
-        self._bars_in_trade = 0
-        return pnl
-
-    def _calc_pnl(self, price: float) -> float:
-        """Symbol-aware P&L calculation."""
-        if self._position == 0:
-            return 0.0
-        pip_diff = (price - self._entry_price) * self._position / self._pip_size
-        return pip_diff * self._pip_value * self._lot_size
+    def _closes(self) -> List[float]:
+        return [c["close"] for c in self._candles[: self._step + 1]]
 
     def _get_observation(self) -> List[float]:
-        idx = min(self._cursor, len(self._candles) - 1)
-        c = self._candles[idx]
-        close = c["close"]
-        hist = self._candles[max(0, idx - 50): idx + 1]
-        closes = [h["close"] for h in hist]
+        """Build observation vector. Cached per step to avoid recomputation."""
+        if self._obs_cache_step == self._step and self._obs_cache is not None:
+            return self._obs_cache
 
-        rsi  = self._simple_rsi(closes, 14)
-        atr  = self._simple_atr(hist, 14)
-        ema20 = self._simple_ema(closes, 20)
-        ema50 = self._simple_ema(closes, 50)
+        closes = self._closes()
+        n = len(closes)
+        last = closes[-1] if n > 0 else 1.0
 
-        unrealized = self._calc_pnl(close) if self._position != 0 else 0.0
-        equity_pct = self._balance / self._initial_balance
+        # Returns (last 5)
+        returns = []
+        for i in range(1, min(6, n)):
+            r = (closes[-i] - closes[-i - 1]) / (closes[-i - 1] or 1.0)
+            returns.append(max(-1.0, min(1.0, r)))
+        while len(returns) < 5:
+            returns.append(0.0)
 
-        return [
-            close, c.get("open", close), c.get("high", close), c.get("low", close),
-            c.get("volume", 0.0),
-            rsi / 100, atr, ema20, ema50,
-            0.0, 0.0,  # macd placeholder — requires talib/pandas-ta for real values
-            close + atr * 2, close - atr * 2,  # bb_upper, bb_lower (ATR approximation)
-            c.get("smc_score", 50.0) / 100,
-            c.get("pa_score", 50.0) / 100,
-            c.get("ml_confidence", 50.0) / 100,
-            float(self._position), unrealized,
-            equity_pct, float(self._bars_in_trade) / 100,
+        # Moving averages (normalised by last price)
+        ma_20 = (sum(closes[-20:]) / min(n, 20) / last) - 1.0 if n >= 20 else 0.0
+        ma_50 = (sum(closes[-50:]) / min(n, 50) / last) - 1.0 if n >= 50 else 0.0
+
+        # RSI (14)
+        rsi = self._rsi(closes, 14)
+
+        # MACD — real calculation (no longer placeholder)
+        macd_val, macd_sig = _compute_macd(closes)
+        macd_norm = math.tanh(macd_val / (last * 0.001 + 1e-9))  # normalise
+        macd_sig_norm = math.tanh(macd_sig / (last * 0.001 + 1e-9))
+
+        # Position encoding
+        position_enc = float(self._position)  # -1, 0, 1
+
+        # Unrealized PnL (normalised)
+        unrealized = 0.0
+        if self._position != 0 and self._entry_price > 0:
+            unrealized = (
+                (last - self._entry_price) * self._position / self._pip_size
+            ) / (self._initial_balance or 1.0)
+            unrealized = max(-1.0, min(1.0, unrealized))
+
+        obs = returns + [
+            ma_20, ma_50, rsi,
+            macd_norm, macd_sig_norm,    # REAL MACD (not 0.0 anymore)
+            position_enc, unrealized,
         ]
 
-    def _get_info(self) -> Dict:
-        return {
-            "balance": self._balance,
-            "total_pnl": self._total_pnl,
-            "trades": self._trades_count,
-            "win_rate": self._wins / self._trades_count * 100 if self._trades_count > 0 else 0,
-            "position": self._position,
-            "symbol": self._symbol,
-            "pip_size": self._pip_size,
-        }
+        self._obs_cache = obs
+        self._obs_cache_step = self._step
+        return obs
 
     @staticmethod
-    def _simple_rsi(closes: List[float], period: int) -> float:
+    def _rsi(closes: List[float], period: int = 14) -> float:
+        """Wilder RSI, normalised to [-1, 1]."""
         if len(closes) < period + 1:
-            return 50.0
-        gains = losses = 0.0
-        for i in range(1, period + 1):
-            d = closes[-i] - closes[-i - 1]
-            if d > 0:
-                gains += d
-            else:
-                losses -= d
-        if losses == 0:
-            return 100.0
-        rs = gains / losses
-        return 100 - (100 / (1 + rs))
-
-    @staticmethod
-    def _simple_ema(closes: List[float], period: int) -> float:
-        if not closes:
             return 0.0
-        if len(closes) < period:
-            return sum(closes) / len(closes)
-        k = 2 / (period + 1)
-        ema = sum(closes[:period]) / period
-        for c in closes[period:]:
-            ema = c * k + ema * (1 - k)
-        return ema
-
-    @staticmethod
-    def _simple_atr(candles: List[Dict], period: int) -> float:
-        if len(candles) < 2:
+        gains, losses = [], []
+        for i in range(-period, 0):
+            diff = closes[i] - closes[i - 1]
+            if diff > 0:
+                gains.append(diff)
+                losses.append(0.0)
+            else:
+                gains.append(0.0)
+                losses.append(abs(diff))
+        avg_gain = sum(gains) / period
+        avg_loss = sum(losses) / period
+        if avg_loss == 0:
             return 1.0
-        trs = []
-        for i in range(1, len(candles)):
-            hi = candles[i].get("high", candles[i]["close"])
-            lo = candles[i].get("low",  candles[i]["close"])
-            pc = candles[i - 1]["close"]
-            trs.append(max(hi - lo, abs(hi - pc), abs(lo - pc)))
-        return sum(trs[-period:]) / min(len(trs), period)
+        rs = avg_gain / avg_loss
+        rsi = 100.0 - 100.0 / (1.0 + rs)
+        return (rsi / 50.0) - 1.0  # normalise to [-1, 1]
 
+    def _calc_pnl(self, close_price: float) -> float:
+        """Calculate P&L for closing a position."""
+        if self._position == 0 or self._entry_price == 0:
+            return 0.0
+        pip_diff = (close_price - self._entry_price) * self._position / self._pip_size
+        return pip_diff * self._pip_value
+
+    def step(self, action: int) -> Tuple[List[float], float, bool, Dict]:
+        """Execute one step."""
+        candle = self._candles[self._step]
+        price = candle["close"]
+        reward = 0.0
+
+        if action == ACTION_BUY and self._position != 1:
+            if self._position == -1:
+                reward = self._calc_pnl(price)
+                self._balance += reward
+            self._position = 1
+            self._entry_price = price
+            self._obs_cache = None  # invalidate cache
+
+        elif action == ACTION_SELL and self._position != -1:
+            if self._position == 1:
+                reward = self._calc_pnl(price)
+                self._balance += reward
+            self._position = -1
+            self._entry_price = price
+            self._obs_cache = None
+
+        elif action == ACTION_HOLD:
+            # Include unrealized PnL in HOLD reward (encourages holding winners)
+            if self._position != 0 and self._entry_price > 0:
+                reward = self._calc_pnl(price) * 0.001  # small fraction
+
+        self._step += 1
+        self._equity_history.append(self._balance)
+
+        done = self._step >= len(self._candles) - 1 or self._balance <= 0
+        obs = self._get_observation()
+        info = {
+            "step": self._step,
+            "balance": self._balance,
+            "position": self._position,
+            "price": price,
+        }
+        return obs, reward, done, info
+
+
+# ---------------------------------------------------------------------------
+# SB3 Gym wrapper (optional dependency)
+# ---------------------------------------------------------------------------
+
+try:
+    import gymnasium as gym
+    import numpy as np
+
+    class SB3Env(gym.Env):
+        """Gymnasium wrapper for stable-baselines3."""
+
+        metadata = {"render_modes": []}
+
+        def __init__(self, candles: List[Dict], symbol: str = "XAUUSD") -> None:
+            super().__init__()
+            self._env = RLEnvironment(candles, symbol)
+            obs_size = 12  # 5 returns + ma20 + ma50 + rsi + macd + macd_sig + pos + unrealized
+            self.observation_space = gym.spaces.Box(
+                low=-2.0, high=2.0, shape=(obs_size,), dtype=np.float32
+            )
+            self.action_space = gym.spaces.Discrete(3)
+
+        def reset(self, *, seed=None, options=None):
+            super().reset(seed=seed)
+            obs = self._env.reset()
+            return np.array(obs, dtype=np.float32), {}
+
+        def step(self, action):
+            obs, reward, done, info = self._env.step(int(action))
+            return np.array(obs, dtype=np.float32), float(reward), done, False, info
+
+    _HAS_GYM = True
+except ImportError:
+    _HAS_GYM = False
+    logger.warning("gymnasium not available — RL agent will use rule-based fallback")
+
+
+# ---------------------------------------------------------------------------
+# RL Trading Agent
+# ---------------------------------------------------------------------------
 
 class RLTradingAgent:
-    """
-    RL Trading Agent wrapper.
-    Uses RLEnvironment and provides train/predict interface.
-    When stable-baselines3 is available, uses PPO.
-    Otherwise, falls back to a deterministic rule-based policy.
-    """
+    """PPO-trained RL agent with deterministic rule-based fallback."""
 
-    ACTION_HOLD  = 0
-    ACTION_BUY   = 1
-    ACTION_SELL  = 2
-    ACTION_CLOSE = 3
-
-    def __init__(self, env: RLEnvironment):
-        self._env = env
+    def __init__(
+        self,
+        symbol: str = "XAUUSD",
+        model_path: Optional[str] = None,
+    ) -> None:
+        self._symbol = symbol
         self._model = None
-        self._is_trained = False
+        self._env: Optional[RLEnvironment] = None
 
-    def train(self, total_timesteps: int = 50_000) -> Dict:
-        """Train the RL agent. Uses PPO if available, else rule-based."""
-        try:
-            from stable_baselines3 import PPO
-            import gymnasium as gym
-            import numpy as np
+        if _HAS_GYM and model_path:
+            try:
+                from stable_baselines3 import PPO
+                self._model = PPO.load(model_path)
+                logger.info("RLAgent: loaded PPO model from %s", model_path)
+            except Exception as exc:
+                logger.warning("RLAgent: PPO load failed (%s) — using rule-based", exc)
 
-            class SB3Env(gym.Env):
-                def __init__(self, rl_env):
-                    super().__init__()
-                    self._rl = rl_env
-                    self.observation_space = gym.spaces.Box(
-                        low=-float("inf"), high=float("inf"),
-                        shape=(20,), dtype=np.float32
-                    )
-                    self.action_space = gym.spaces.Discrete(4)
+    def predict(self, candles: List[Dict[str, float]]) -> Dict[str, Any]:
+        """Return action dict: {action, confidence, reason}."""
+        if not candles:
+            return {"action": "HOLD", "confidence": 0.0, "reason": "no data"}
 
-                def reset(self, seed=None, options=None):
-                    obs = self._rl.reset()
-                    return np.array(obs, dtype=np.float32), {}
+        self._env = RLEnvironment(candles, symbol=self._symbol)
+        obs = self._env._get_observation()
 
-                def step(self, action):
-                    obs, reward, done, info = self._rl.step(int(action))
-                    return np.array(obs, dtype=np.float32), reward, done, False, info
-
-            sb3_env = SB3Env(self._env)
-            self._model = PPO("MlpPolicy", sb3_env, verbose=0)
-            self._model.learn(total_timesteps=total_timesteps)
-            self._is_trained = True
-            return {"method": "PPO", "timesteps": total_timesteps, "success": True,
-                    "symbol": self._env._symbol, "pip_size": self._env._pip_size}
-
-        except ImportError:
-            self._is_trained = True
-            return {"method": "rule_based_fallback", "timesteps": 0, "success": True,
-                    "symbol": self._env._symbol, "pip_size": self._env._pip_size}
-
-    def predict(self, observation: List[float]) -> int:
-        """Predict action given observation vector."""
         if self._model is not None:
             try:
                 import numpy as np
-                action, _ = self._model.predict(np.array(observation, dtype="float32"))
-                return int(action)
-            except Exception:
-                pass
-        # FIX: deterministic rule-based fallback (no random)
-        smc_score = observation[13] * 100
-        ml_conf   = observation[15] * 100
-        pa_score  = observation[14] * 100
-        position  = observation[16]
-        # Only open if all three signals agree
-        if smc_score > 65 and ml_conf > 60 and pa_score > 60 and position == 0:
-            return self.ACTION_BUY if smc_score > pa_score else self.ACTION_SELL
-        if position != 0 and smc_score < 35:
-            return self.ACTION_CLOSE
-        return self.ACTION_HOLD
+                action, _ = self._model.predict(
+                    np.array(obs, dtype=np.float32), deterministic=True
+                )
+                action_map = {ACTION_BUY: "BUY", ACTION_SELL: "SELL", ACTION_HOLD: "HOLD"}
+                return {
+                    "action": action_map.get(int(action), "HOLD"),
+                    "confidence": 0.85,
+                    "reason": "PPO model prediction",
+                }
+            except Exception as exc:
+                logger.warning("RLAgent: PPO predict failed: %s", exc)
+
+        # Deterministic rule-based fallback (not random)
+        return self._rule_based(obs)
+
+    @staticmethod
+    def _rule_based(obs: List[float]) -> Dict[str, Any]:
+        """Deterministic rule-based signal from observation vector.
+
+        obs layout: [ret0..ret4, ma20, ma50, rsi, macd, macd_sig, position, unrealized]
+        """
+        if len(obs) < 12:
+            return {"action": "HOLD", "confidence": 0.0, "reason": "insufficient obs"}
+
+        rsi        = obs[7]   # normalised [-1, 1]; <-0.4 oversold, >0.4 overbought
+        macd       = obs[8]
+        macd_sig   = obs[9]
+        ma20       = obs[5]
+        ma50       = obs[6]
+        position   = obs[10]
+
+        # Trend: price above both MAs
+        bullish_trend = ma20 > 0 and ma50 > 0
+        bearish_trend = ma20 < 0 and ma50 < 0
+
+        # MACD crossover
+        macd_bullish = macd > macd_sig and macd > 0
+        macd_bearish = macd < macd_sig and macd < 0
+
+        # RSI filter
+        oversold  = rsi < -0.4
+        overbought = rsi > 0.4
+
+        if bullish_trend and macd_bullish and not overbought and position <= 0:
+            return {"action": "BUY",  "confidence": 0.65, "reason": "trend+macd bullish"}
+        if bearish_trend and macd_bearish and not oversold and position >= 0:
+            return {"action": "SELL", "confidence": 0.65, "reason": "trend+macd bearish"}
+        return {"action": "HOLD", "confidence": 0.5, "reason": "no clear signal"}
+
+    def train(
+        self,
+        candles: List[Dict[str, float]],
+        total_timesteps: int = 50_000,
+        save_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Train PPO model on candles data."""
+        if not _HAS_GYM:
+            return {"error": "gymnasium not installed"}
+        try:
+            from stable_baselines3 import PPO
+            import numpy as np
+            env = SB3Env(candles, self._symbol)
+            model = PPO("MlpPolicy", env, verbose=0, seed=42)
+            model.learn(total_timesteps=total_timesteps)
+            if save_path:
+                model.save(save_path)
+                logger.info("RLAgent: model saved to %s", save_path)
+            self._model = model
+            return {
+                "status": "trained",
+                "timesteps": total_timesteps,
+                "symbol": self._symbol,
+                "save_path": save_path,
+            }
+        except Exception as exc:
+            logger.error("RLAgent training failed: %s", exc)
+            return {"error": str(exc)}
