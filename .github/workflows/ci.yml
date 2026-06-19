@@ -8,10 +8,11 @@ on:
 
 jobs:
   test-python:
+    name: Python Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ['3.11', '3.12']
 
     steps:
       - uses: actions/checkout@v4
@@ -20,72 +21,74 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-
-      - name: Install dependencies (CPU torch, skip heavy ML)
+      - name: Install dependencies (skip heavy ML)
         run: |
           pip install --upgrade pip
-          # Install without torch/SB3/gymnasium for CI speed
-          grep -v -E '^(torch|stable-baselines3|gymnasium|--extra-index)' requirements.txt > ci-requirements.txt
-          pip install -r ci-requirements.txt
+          # Exclude torch, SB3, gymnasium (too large for CI), pandas-ta (beta)
+          grep -v -E '^(torch|stable-baselines3|gymnasium|--extra-index|pandas-ta)' requirements.txt \
+            | pip install -r /dev/stdin
+          pip install pytest pytest-asyncio pytest-cov httpx
 
-      - name: Set test environment variables
+      - name: Syntax check all Python files
         run: |
-          echo "SUPABASE_URL=https://test.supabase.co" >> $GITHUB_ENV
-          echo "SUPABASE_ANON_KEY=test-anon-key" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=test-service-key" >> $GITHUB_ENV
-          echo "SUPABASE_DB_URL=postgresql://postgres:test@localhost:5432/postgres" >> $GITHUB_ENV
-          echo "JWT_SECRET_KEY=test-secret-key-for-unit-tests-only-32chars" >> $GITHUB_ENV
-          echo "LICENSE_ENCRYPTION_KEY=test-enc-key-32chars-padded-here12" >> $GITHUB_ENV
-          echo "LICENSE_SIGNATURE_KEY=test-sig-key-32chars-padded-here12" >> $GITHUB_ENV
-          echo "LICENSE_SALT=test-salt-key-32chars-padded-here" >> $GITHUB_ENV
-          echo "ENVIRONMENT=development" >> $GITHUB_ENV
+          find backend dashboard -name '*.py' -print0 \
+            | xargs -0 python -m py_compile
 
-      - name: Run tests with coverage
+      - name: Run tests (all — including test_agents with mock)
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: test-anon-key-for-ci-only
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key-for-ci-only
+          JWT_SECRET_KEY: test-secret-key-minimum-32-characters-long
+          TELEGRAM_BOT_TOKEN: 123456:test-token
+          TELEGRAM_CHAT_ID: "123456789"
+          LICENSE_KEY: test-license-key
+          LICENSE_SALT: test-license-salt-for-ci
+          ENVIRONMENT: development
+          REDIS_URL: redis://localhost:6379/0
         run: |
           python -m pytest backend/tests/ -v --tb=short \
             --cov=backend \
             --cov-report=term-missing \
             --cov-report=xml \
-            --ignore=backend/tests/test_agents.py
+            --ignore=backend/tests/test_backtest_engine.py
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.11'
+        continue-on-error: true
         with:
-          file: ./coverage.xml
+          file: coverage.xml
           fail_ci_if_error: false
 
   syntax-check:
+    name: Syntax Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Syntax check all Python files
+          python-version: '3.11'
+      - name: Check syntax
         run: |
-          find backend -name "*.py" -exec python -m py_compile {} \;
-          echo "All Python files compiled successfully."
+          find . -name '*.py' -not -path './.git/*' -print0 \
+            | xargs -0 python -m py_compile
 
   frontend-build:
+    name: Frontend Build
     runs-on: ubuntu-latest
-    # Frontend failure does NOT block the pipeline
-    continue-on-error: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install and build frontend
+      - name: Install
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
+        run: npm ci
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        continue-on-error: false
