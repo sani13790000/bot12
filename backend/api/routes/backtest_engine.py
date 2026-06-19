@@ -1,34 +1,22 @@
-"""Backtest Engine Routes — Galaxy Vast AI Trading Platform
-
-Fix applied:
-  - ThreadPoolExecutor replaced with asyncio.run_in_executor
-    to avoid blocking the FastAPI async event loop.
-  - Race condition in _latest dict fixed with asyncio.Lock
+"""Backtest Engine Routes — Galaxy Vast AI
+Fix: ProcessPoolExecutor + asyncio.run_in_executor (non-blocking)
+Fix: asyncio.Lock for thread-safe _latest dict
 """
 from __future__ import annotations
-
-import asyncio
-import functools
+import asyncio, functools
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, Dict, Optional
-
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from typing import Any, Dict
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
-
 from backend.core.logger import get_logger
 
 logger = get_logger("api.backtest_engine")
 router = APIRouter()
-
-# ProcessPoolExecutor for CPU-bound backtest work (not ThreadPoolExecutor)
 _executor = ProcessPoolExecutor(max_workers=4)
-
-# Thread-safe results store
 _latest: Dict[str, Any] = {}
 _lock = asyncio.Lock()
 
 
-# ── Models ──
 class BacktestEngineRequest(BaseModel):
     symbol: str = Field(default="XAUUSD")
     timeframe: str = Field(default="M15")
@@ -51,114 +39,65 @@ class WFORequest(BaseModel):
     initial_balance: float = Field(default=10000.0, ge=100)
 
 
-class OptimizeRequest(BaseModel):
-    symbol: str = Field(default="XAUUSD")
-    timeframe: str = Field(default="M15")
-    param_grid: Dict[str, Any] = Field(default_factory=dict)
-    initial_balance: float = Field(default=10000.0, ge=100)
-    metric: str = Field(default="sharpe")
-
-
-# ── CPU-bound worker functions (run in ProcessPool) ──
-def _run_backtest_sync(req_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Synchronous backtest — runs in separate process to avoid GIL."""
+def _run_bt(d: Dict) -> Dict:
     try:
         from backend.institutional.tick_backtest import TickBacktestEngine
-        engine = TickBacktestEngine(
-            symbol=req_dict["symbol"],
-            initial_balance=req_dict["initial_balance"],
-            spread_pips=req_dict["spread_pips"],
-            slippage_pips=req_dict["slippage_pips"],
-            commission_per_lot=req_dict["commission_per_lot"],
-        )
-        return engine.run()
-    except Exception as exc:
-        return {"error": str(exc)}
+        return TickBacktestEngine(
+            symbol=d["symbol"],
+            initial_balance=d["initial_balance"],
+            spread_pips=d["spread_pips"],
+            slippage_pips=d["slippage_pips"],
+            commission_per_lot=d["commission_per_lot"],
+        ).run()
+    except Exception as e:
+        return {"error": str(e)}
 
 
-def _run_wfo_sync(req_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Synchronous walk-forward — runs in separate process."""
+def _run_wfo(d: Dict) -> Dict:
     try:
         from backend.institutional.walk_forward_optimizer import WalkForwardOptimizer
-        optimizer = WalkForwardOptimizer(
-            symbol=req_dict["symbol"],
-            timeframe=req_dict["timeframe"],
-            n_splits=req_dict["is_periods"],
-            oos_ratio=req_dict["oos_ratio"],
-        )
-        return optimizer.run()
-    except Exception as exc:
-        return {"error": str(exc)}
+        return WalkForwardOptimizer(
+            symbol=d["symbol"], timeframe=d["timeframe"],
+            n_splits=d["is_periods"], oos_ratio=d["oos_ratio"],
+        ).run()
+    except Exception as e:
+        return {"error": str(e)}
 
 
-# ── Async wrappers using run_in_executor (non-blocking) ──
-async def _run_backtest_async(req_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Run CPU-bound backtest without blocking event loop."""
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(
-        _executor,
-        functools.partial(_run_backtest_sync, req_dict)
-    )
-    async with _lock:
-        _latest[req_dict["symbol"]] = result
-    return result
-
-
-async def _run_wfo_async(req_dict: Dict[str, Any]) -> Dict[str, Any]:
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        _executor,
-        functools.partial(_run_wfo_sync, req_dict)
-    )
-
-
-# ── Endpoints ──
-@router.post("/run", tags=["Backtest Engine"])
+@router.post("/run")
 async def run_backtest(req: BacktestEngineRequest):
-    """Run tick-level backtest (non-blocking)."""
+    """Run tick-level backtest — non-blocking via ProcessPoolExecutor."""
     try:
-        result = await _run_backtest_async(req.model_dump())
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(_executor, functools.partial(_run_bt, req.model_dump()))
+        async with _lock:
+            _latest[req.symbol.upper()] = result
         return {"status": "completed", "symbol": req.symbol, "result": result}
     except Exception as exc:
         logger.error("Backtest failed: %s", exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest failed: {exc}"
-        )
+        raise HTTPException(status_code=500, detail=f"Backtest failed: {exc}")
 
 
-@router.post("/wfo", tags=["Backtest Engine"])
+@router.post("/wfo")
 async def run_wfo(req: WFORequest):
-    """Run Walk-Forward Optimization (non-blocking)."""
+    """Run Walk-Forward Optimization — non-blocking."""
     try:
-        result = await _run_wfo_async(req.model_dump())
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(_executor, functools.partial(_run_wfo, req.model_dump()))
         return {"status": "completed", "symbol": req.symbol, "result": result}
     except Exception as exc:
-        logger.error("WFO failed: %s", exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"WFO failed: {exc}"
-        )
+        raise HTTPException(status_code=500, detail=f"WFO failed: {exc}")
 
 
-@router.get("/latest/{symbol}", tags=["Backtest Engine"])
-async def get_latest_result(symbol: str):
-    """Get latest backtest result for a symbol (thread-safe)."""
+@router.get("/latest/{symbol}")
+async def get_latest(symbol: str):
     async with _lock:
         result = _latest.get(symbol.upper())
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No backtest results found for {symbol}"
-        )
+        raise HTTPException(status_code=404, detail=f"No results for {symbol}")
     return result
 
 
-@router.get("/health", tags=["Backtest Engine"])
-async def backtest_engine_health():
-    return {
-        "status": "healthy",
-        "executor": "ProcessPoolExecutor",
-        "max_workers": 4,
-        "cached_symbols": list(_latest.keys()),
-    }
+@router.get("/health")
+async def health():
+    return {"status": "healthy", "executor": "ProcessPoolExecutor", "max_workers": 4}
