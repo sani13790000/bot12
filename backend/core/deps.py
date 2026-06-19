@@ -1,121 +1,91 @@
-"""
-backend/core/deps.py
-FastAPI dependency-injection helpers — authentication, authorization.
+"""FastAPI dependency injection for Galaxy Vast AI Trading Platform.
+
+Centralizes:
+- DB client injection
+- Current user extraction
+- Admin guard
+- Service singletons
 """
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from functools import lru_cache
+from typing import Annotated, Optional
 
-from fastapi import Cookie, Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Cookie, Depends, Header, HTTPException, status
 
-from backend.core.security import validate_access_token
-from backend.database.connection import get_db_client
+from backend.core.config import settings
+from backend.core.security import decode_access_token
 
-log = logging.getLogger(__name__)
-
-_bearer = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
-def _extract_token(request: Request) -> Optional[str]:
-    """
-    Extract JWT from (in priority order):
-    1. HttpOnly cookie  `access_token`
-    2. Authorization: Bearer <token> header
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+async def get_db():
+    """Yield the Supabase client."""
+    from backend.database.connection import get_db_client
+    return await get_db_client()
 
-    Never reads token from query string for REST endpoints
-    (WS endpoints use ?token= with one-time-use validation).
-    """
-    # 1. Cookie (preferred — not accessible to JS)
-    cookie_token: Optional[str] = request.cookies.get("access_token")
-    if cookie_token:
-        return cookie_token
 
-    # 2. Bearer header (for API clients / MQL5)
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header[7:]
+DbDep = Annotated[object, Depends(get_db)]
 
-    return None
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+def _extract_token(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    access_token: Optional[str] = Cookie(None),
+) -> str:
+    """Extract JWT from Authorization header or HttpOnly cookie."""
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.removeprefix("Bearer ").strip()
+    if access_token:
+        return access_token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 async def get_current_user(
-    request: Request,
-    db=Depends(get_db_client),
+    token: Annotated[str, Depends(_extract_token)],
+    db=Depends(get_db),
 ) -> dict:
-    """
-    FastAPI dependency: extract + validate JWT, check revocation in DB.
-    Returns user dict with at least {id, email, role}.
-    Raises HTTP 401 on any auth failure.
-    """
-    token = _extract_token(request)
-    if not token:
+    """Decode JWT, check revocation, return user payload."""
+    payload = decode_access_token(token)
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Invalid or expired token",
         )
 
-    try:
-        payload = validate_access_token(token)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
+    # Revocation check
+    jti = payload.get("jti", "")
+    if jti:
+        try:
+            result = await db.table("revoked_tokens").select("jti").eq("jti", jti).execute()
+            if result.data:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked",
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Revocation check failed (allowing): %s", exc)
 
-    user_id = payload["sub"]
-    jti = payload["jti"]
-
-    # Check revocation list
-    try:
-        row = (
-            await db.table("revoked_tokens")
-            .select("jti")
-            .eq("jti", jti)
-            .maybe_single()
-            .execute()
-        )
-        if row.data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has been revoked",
-            )
-    except HTTPException:
-        raise
-    except Exception:  # DB unavailable — fail open with warning
-        log.warning("Could not check token revocation for user %s", user_id)
-
-    # Fetch user from DB
-    try:
-        user_row = (
-            await db.table("users")
-            .select("id, email, role, is_active")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
-    except Exception as exc:
-        log.error("DB error fetching user %s: %s", user_id, exc)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        ) from exc
-
-    user = user_row.data
-    if not user or not user.get("is_active"):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Inactive or deleted user",
-        )
-
-    return user
+    return payload
 
 
-async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """Require role == 'admin'."""
+CurrentUser = Annotated[dict, Depends(get_current_user)]
+
+
+async def require_admin(current_user: CurrentUser) -> dict:
+    """Require admin role."""
     if current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -124,6 +94,37 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
-async def require_active(current_user: dict = Depends(get_current_user)) -> dict:
-    """Require is_active == True (already checked in get_current_user)."""
-    return current_user
+AdminUser = Annotated[dict, Depends(require_admin)]
+
+
+# ---------------------------------------------------------------------------
+# Service Singletons (lazy)
+# ---------------------------------------------------------------------------
+@lru_cache(maxsize=1)
+def get_agent_service():
+    from backend.agents.agent_service import AgentService
+    return AgentService()
+
+
+@lru_cache(maxsize=1)
+def get_voting_engine():
+    from backend.agents.voting_engine import VotingEngine
+    return VotingEngine()
+
+
+@lru_cache(maxsize=1)
+def get_analytics_service():
+    from backend.analytics.analytics_service import AnalyticsService
+    return AnalyticsService()
+
+
+@lru_cache(maxsize=1)
+def get_cache():
+    from backend.cache import Cache
+    return Cache()
+
+
+AgentServiceDep = Annotated[object, Depends(get_agent_service)]
+VotingEngineDep = Annotated[object, Depends(get_voting_engine)]
+AnalyticsServiceDep = Annotated[object, Depends(get_analytics_service)]
+CacheDep = Annotated[object, Depends(get_cache)]

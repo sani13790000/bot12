@@ -1,162 +1,94 @@
-"""
-سیستم لاگ مرکزی
+"""Structured logging for Galaxy Vast AI Trading Platform.
 
-این ماژول سیستم لاگ یکپارچه را ارائه می‌دهد.
-تمام لاگ‌ها با فرمت استاندارد و سطح‌بندی مناسب ثبت می‌شوند.
+Provides:
+- JSON structured logging in production
+- Human-readable logging in development
+- Correlation ID propagation via contextvars
+- Log sanitization (no secrets in logs)
 """
+from __future__ import annotations
 
 import logging
+import os
 import sys
-from datetime import datetime
-from typing import Optional
-from pathlib import Path
-from .config import settings
+from contextvars import ContextVar
+from typing import Any
+
+# ContextVar for request correlation ID
+_correlation_id: ContextVar[str] = ContextVar("correlation_id", default="-")
 
 
-class PersianFormatter(logging.Formatter):
-    """
-    فرمت‌کننده فارسی برای لاگ‌ها
+def get_correlation_id() -> str:
+    return _correlation_id.get()
 
-    این کلاس پیام‌های لاگ را به فرمت خوانا تبدیل می‌کند.
-    """
 
-    # نام فارسی سطوح لاگ
-    LEVEL_NAMES = {
-        "DEBUG": "دیباگ",
-        "INFO": "اطلاعات",
-        "WARNING": "هشدار",
-        "ERROR": "خطا",
-        "CRITICAL": "بحرانی"
-    }
+def set_correlation_id(cid: str) -> None:
+    _correlation_id.set(cid)
 
-    def format(self, record):
-        # تبدیل سطح به فارسی
-        level_fa = self.LEVEL_NAMES.get(record.levelname, record.levelname)
 
-        # فرمت زمان
-        record.asctime_fa = datetime.fromtimestamp(record.created).strftime(
-            "%Y-%m-%d %H:%M:%S"
+class _SanitizeFilter(logging.Filter):
+    """Strip secrets from log records."""
+
+    _REDACT = frozenset({
+        "password", "secret", "token", "key", "authorization",
+        "supabase_key", "jwt_secret", "license_salt", "license_secret",
+    })
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        msg = str(record.getMessage())
+        for word in self._REDACT:
+            if word in msg.lower():
+                record.msg = "[REDACTED — contains sensitive data]"
+                record.args = ()
+                break
+        return True
+
+
+class _CorrelationFilter(logging.Filter):
+    """Inject correlation_id into every log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+        record.correlation_id = get_correlation_id()  # type: ignore[attr-defined]
+        return True
+
+
+def _configure_logging() -> None:
+    environment = os.getenv("ENVIRONMENT", "production")
+    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    # Reset handlers
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.setLevel(level)
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.addFilter(_SanitizeFilter())
+    handler.addFilter(_CorrelationFilter())
+
+    if environment == "production":
+        # JSON structured for log aggregators (Loki, CloudWatch, etc.)
+        fmt = (
+            '{"time": "%(asctime)s", "level": "%(levelname)s", '
+            '"logger": "%(name)s", "correlation_id": "%(correlation_id)s", '
+            '"message": "%(message)s"}'
         )
+        handler.setFormatter(logging.Formatter(fmt, datefmt="%Y-%m-%dT%H:%M:%S"))
+    else:
+        # Human-readable in development
+        fmt = "%(asctime)s | %(levelname)-8s | %(name)s | [%(correlation_id)s] %(message)s"
+        handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
 
-        # فرمت اصلی
-        formatted = f"[{record.asctime_fa}] [{level_fa}] [{record.name}] {record.getMessage()}"
+    root.addHandler(handler)
 
-        # اضافه کردن اطلاعات例外 در صورت وجود
-        if record.exc_info:
-            formatted += f"\n{self.formatException(record.exc_info)}"
-
-        return formatted
-
-
-def setup_logger(
-    name: str,
-    level: Optional[str] = None,
-    log_file: Optional[str] = None
-) -> logging.Logger:
-    """
-    راه‌اندازی لاگر
-
-    Args:
-        name: نام لاگر
-        level: سطح لاگ (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        log_file: مسیر فایل لاگ (اختیاری)
-
-    Returns:
-        logging.Logger: شیء لاگر پیکربندی شده
-    """
-    # ایجاد لاگر
-    logger = logging.getLogger(name)
-
-    # تنظیم سطح
-    log_level = level or settings.LOG_LEVEL
-    logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
-
-    # جلوگیری از تکرار هندلرها
-    if logger.handlers:
-        return logger
-
-    # ایجاد فرمت‌کننده
-    formatter = PersianFormatter()
-
-    # هندلر کنسول
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # هندلر فایل (در صورت درخواست)
-    if log_file:
-        file_path = Path(log_file)
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        file_handler = logging.FileHandler(
-            log_file,
-            encoding="utf-8",
-            mode="a"
-        )
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-    return logger
+    # Silence noisy third-party loggers
+    for name in ("uvicorn.access", "httpx", "httpcore", "supabase", "postgrest"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
-class LogContext:
-    """
-    کانتکست لاگ برای ردیابی عملیات
-
-    این کلاس امکان افزودن متادیتا به لاگ‌ها را فراهم می‌کند.
-    """
-
-    def __init__(self, logger: logging.Logger, **context):
-        """
-        مقداردهی اولیه
-
-        Args:
-            logger: لاگر اصلی
-            **context: متادیتای اضافی
-        """
-        self.logger = logger
-        self.context = context
-
-    def _add_context(self, msg: str) -> str:
-        """افزودن کانتکست به پیام"""
-        if self.context:
-            ctx_str = " | ".join(f"{k}={v}" for k, v in self.context.items())
-            return f"[{ctx_str}] {msg}"
-        return msg
-
-    def debug(self, msg: str):
-        """ثبت پیام دیباگ"""
-        self.logger.debug(self._add_context(msg))
-
-    def info(self, msg: str):
-        """ثبت پیام اطلاعاتی"""
-        self.logger.info(self._add_context(msg))
-
-    def warning(self, msg: str):
-        """ثبت هشدار"""
-        self.logger.warning(self._add_context(msg))
-
-    def error(self, msg: str):
-        """ثبت خطا"""
-        self.logger.error(self._add_context(msg))
-
-    def critical(self, msg: str):
-        """ثبت خطای بحرانی"""
-        self.logger.critical(self._add_context(msg))
-
-
-# لاگر پیش‌فرض
-default_logger = setup_logger("mt5_trading")
+_configure_logging()
 
 
 def get_logger(name: str) -> logging.Logger:
-    """
-    دریافت لاگر با نام مشخص
-
-    Args:
-        name: نام ماژول یا کامپوننت
-
-    Returns:
-        logging.Logger: لاگر پیکربندی شده
-    """
-    return setup_logger(name)
+    """Return a logger with sanitize + correlation filters attached."""
+    return logging.getLogger(name)
