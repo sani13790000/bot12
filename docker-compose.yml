@@ -1,35 +1,29 @@
-# =====================================================================
-# Docker Compose - bot12
-# =====================================================================
-# برای اجرا: docker-compose up -d
-# برای لاگ: docker-compose logs -f
-# =====================================================================
-
 version: "3.9"
 
 services:
+  # ─── Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # ----- سرور API -----
+  # ─── FastAPI Backend ─────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: bot12_api
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file: .env
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - API_SECRET_KEY=${API_SECRET_KEY}
-      - LICENSE_SECRET_KEY=${LICENSE_SECRET_KEY}
       - REDIS_URL=redis://redis:6379/0
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      - ./logs:/app/logs
-      - ./backend:/app/backend
     depends_on:
       redis:
         condition: service_healthy
@@ -38,20 +32,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - bot12_network
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
 
-  # ----- ربات تلگرام -----
+  # ─── Telegram Bot ────────────────────────────────────────
   telegram_bot:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    container_name: bot12_telegram
     restart: unless-stopped
+    env_file: .env
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_ADMIN_CHAT_IDS=${TELEGRAM_ADMIN_CHAT_IDS}
       - API_BASE_URL=http://api:8000
       - REDIS_URL=redis://redis:6379/0
     depends_on:
@@ -59,44 +51,35 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
-    networks:
-      - bot12_network
 
-  # ----- Redis Cache -----
-  redis:
-    image: redis:7.4-alpine
-    container_name: bot12_redis
+  # ─── Streamlit Institutional Dashboard ───────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
     restart: unless-stopped
     ports:
-      - "6379:6379"
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+      - "8501:8501"
+    env_file: .env
+    environment:
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - redis_data:/data
-    networks:
-      - bot12_network
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # ----- فرانت‌اند Dashboard -----
+  # ─── Frontend React ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: bot12_frontend
     restart: unless-stopped
     ports:
       - "3000:80"
+    env_file: .env
     depends_on:
       - api
-    networks:
-      - bot12_network
-
-volumes:
-  redis_data:
-
-networks:
-  bot12_network:
-    driver: bridge
