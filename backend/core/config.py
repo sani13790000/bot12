@@ -1,109 +1,148 @@
-"""Application settings — loaded from environment variables.
+"""Application configuration — all settings from environment variables.
 
-All REQUIRED fields will cause sys.exit(1) with a clear error message if missing.
-This is intentional: we never start with a broken config.
+All REQUIRED fields use Field(...) with no default.
+Missing required fields cause sys.exit(1) at startup.
 """
 from __future__ import annotations
 
+import logging
+import sys
 from typing import List, Optional
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+try:
+    from pydantic import Field, field_validator
+    from pydantic_settings import BaseSettings
+except ImportError as exc:  # noqa: BLE001
+    print(f"FATAL: pydantic/pydantic-settings not installed: {exc}")
+    sys.exit(1)
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
-    # ── App ──
-    APP_VERSION: str  = Field(default="2.0.0", env="APP_VERSION")
-    ENVIRONMENT: str  = Field(default="development", env="ENVIRONMENT")
-    PORT: int         = Field(default=8000, env="PORT")
+    """Platform-wide settings loaded from environment / .env file."""
 
-    # ── Supabase (REQUIRED) ───────────────────────────────────────────────────
-    SUPABASE_URL:             str = Field(..., env="SUPABASE_URL")
-    SUPABASE_ANON_KEY:        str = Field(..., env="SUPABASE_ANON_KEY")
-    SUPABASE_SERVICE_ROLE_KEY: str = Field(..., env="SUPABASE_SERVICE_ROLE_KEY")
-    SUPABASE_DB_URL:          str = Field(..., env="SUPABASE_DB_URL")
+    # ------------------------------------------------------------------ #
+    # Supabase
+    # ------------------------------------------------------------------ #
+    SUPABASE_URL: str = Field(..., description="Supabase project URL")
+    SUPABASE_ANON_KEY: str = Field(..., description="Supabase anon/public key")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(..., description="Supabase service role key")
 
-    # ── Security (REQUIRED) ──────────────────────────────────────────────────
-    JWT_SECRET_KEY:   str = Field(..., env="JWT_SECRET_KEY")
-    JWT_ALGORITHM:    str = Field(default="HS256", env="JWT_ALGORITHM")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    # ------------------------------------------------------------------ #
+    # JWT
+    # ------------------------------------------------------------------ #
+    JWT_SECRET_KEY: str = Field(..., min_length=32, description="JWT signing secret (min 32 chars)")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, ge=5, le=1440)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, ge=1, le=90)
 
-    # ── License (REQUIRED) ─────────────────────────────────────────────────
-    LICENSE_ENCRYPTION_KEY: str = Field(..., env="LICENSE_ENCRYPTION_KEY")
-    LICENSE_SIGNATURE_KEY:  str = Field(..., env="LICENSE_SIGNATURE_KEY")
-    # LICENSE_SALT is now REQUIRED — no hardcoded default (security fix)
-    LICENSE_SALT: str = Field(..., env="LICENSE_SALT")
+    # ------------------------------------------------------------------ #
+    # Redis
+    # ------------------------------------------------------------------ #
+    REDIS_URL: str = Field("redis://redis:6379/0", description="Redis connection URL")
 
-    # ── MT5 (optional — bot works without live trading) ──────────────────────
-    MT5_LOGIN:    Optional[int] = Field(default=None, env="MT5_LOGIN")
-    MT5_PASSWORD: Optional[str] = Field(default=None, env="MT5_PASSWORD")
-    MT5_SERVER:   Optional[str] = Field(default=None, env="MT5_SERVER")
-
-    # ── Trading Defaults ────────────────────────────────────────────────────
-    DEFAULT_SYMBOL:            str   = Field(default="XAUUSD", env="DEFAULT_SYMBOL")
-    DEFAULT_TIMEFRAME:         str   = Field(default="M15", env="DEFAULT_TIMEFRAME")
-    DEFAULT_RISK_PERCENT:      float = Field(default=1.0, env="DEFAULT_RISK_PERCENT")
-    MAX_DAILY_LOSS_PERCENT:    float = Field(default=3.0, env="MAX_DAILY_LOSS_PERCENT")
-    MAX_OPEN_TRADES:           int   = Field(default=3, env="MAX_OPEN_TRADES")
-    MIN_CONFIDENCE_THRESHOLD:  float = Field(default=0.55, env="MIN_CONFIDENCE_THRESHOLD")
-    MIN_VOTE_SCORE:            float = Field(default=65.0, env="MIN_VOTE_SCORE")
-
-    # ── Telegram (optional) ────────────────────────────────────────────────
-    TELEGRAM_BOT_TOKEN: Optional[str] = Field(default=None, env="TELEGRAM_BOT_TOKEN")
-    TELEGRAM_ADMIN_IDS: str           = Field(default="", env="TELEGRAM_ADMIN_IDS")
-
-    # ── Redis ──────────────────────────────────────────────────────────────────
-    REDIS_URL: str = Field(default="redis://redis:6379/0", env="REDIS_URL")
-
-    # ── Sentry (optional) ───────────────────────────────────────────────────
-    SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
-
-    # ── CORS ──────────────────────────────────────────────────────────────────
+    # ------------------------------------------------------------------ #
+    # App
+    # ------------------------------------------------------------------ #
+    ENVIRONMENT: str = Field("development", description="development | staging | production")
+    LOG_LEVEL: str = Field("INFO", description="Python logging level")
     ALLOWED_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:8501"],
-        env="ALLOWED_ORIGINS",
+        description="CORS allowed origins",
     )
 
-    # ── Misc ──────────────────────────────────────────────────────────────────
-    LOG_LEVEL:                  str = Field(default="INFO", env="LOG_LEVEL")
-    ML_RETRAIN_INTERVAL_HOURS:  int = Field(default=24, env="ML_RETRAIN_INTERVAL_HOURS")
-    BACKTEST_MAX_WORKERS:       int = Field(default=4, env="BACKTEST_MAX_WORKERS")
-    DASHBOARD_PORT:             int = Field(default=8501, env="DASHBOARD_PORT")
+    # ------------------------------------------------------------------ #
+    # License
+    # ------------------------------------------------------------------ #
+    LICENSE_KEY: str = Field(..., description="Platform license key")
+    LICENSE_SALT: str = Field(..., description="License hashing salt (no default — must be set)")
 
-    @field_validator("JWT_SECRET_KEY")
-    @classmethod
-    def jwt_secret_must_be_strong(cls, v: str) -> str:
-        if len(v) < 32:
-            raise ValueError("JWT_SECRET_KEY must be at least 32 characters. Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'")
-        return v
+    # ------------------------------------------------------------------ #
+    # Telegram
+    # ------------------------------------------------------------------ #
+    TELEGRAM_BOT_TOKEN: str = Field(..., description="Telegram bot token")
+    TELEGRAM_CHAT_ID: str = Field(..., description="Telegram chat/channel ID")
 
+    # ------------------------------------------------------------------ #
+    # Backtest tuning
+    # ------------------------------------------------------------------ #
+    BACKTEST_MAX_WORKERS: int = Field(4, ge=1, le=16, description="ProcessPoolExecutor workers")
+
+    # ------------------------------------------------------------------ #
+    # Optional integrations — NOT required at startup
+    # ------------------------------------------------------------------ #
+    # Sentry: set SENTRY_DSN in .env to enable error tracking.
+    # If not set, Sentry is silently disabled — no startup error.
+    SENTRY_DSN: Optional[str] = Field(None, description="Sentry DSN (optional — omit to disable)")
+
+    # ------------------------------------------------------------------ #
+    # Validators
+    # ------------------------------------------------------------------ #
     @field_validator("ENVIRONMENT")
     @classmethod
-    def environment_must_be_valid(cls, v: str) -> str:
+    def validate_environment(cls, v: str) -> str:
         allowed = {"development", "staging", "production"}
         if v not in allowed:
-            raise ValueError(f"ENVIRONMENT must be one of {allowed}")
+            raise ValueError(f"ENVIRONMENT must be one of {allowed}, got '{v}'")
         return v
 
-    @property
-    def telegram_admin_ids_list(self) -> List[int]:
-        if not self.TELEGRAM_ADMIN_IDS:
-            return []
-        return [int(x.strip()) for x in self.TELEGRAM_ADMIN_IDS.split(",") if x.strip()]
+    @field_validator("ALLOWED_ORIGINS")
+    @classmethod
+    def no_wildcard_in_production(cls, v: List[str], info) -> List[str]:  # type: ignore[override]
+        # We can't easily access other fields here in pydantic v2 validators,
+        # so we guard at app startup in main.py instead.
+        if "*" in v:
+            logger.warning("ALLOWED_ORIGINS contains wildcard '*' — ensure this is intentional.")
+        return v
 
-    model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+        extra = "ignore"
 
 
-# ── Singleton ─────────────────────────────────────────────────────────────────
-try:
-    settings = Settings()
-except Exception as exc:
-    import sys
-    print(f"\n{'='*60}")
-    print("GALAXY VAST CONFIG ERROR — Cannot start without required env vars")
-    print(f"{'='*60}")
-    print(str(exc))
-    print(f"{'='*60}")
-    print("Copy .env.example to .env and fill in all REQUIRED fields.")
-    print(f"{'='*60}\n")
-    sys.exit(1)
+def _load_settings() -> Settings:
+    """Load and validate settings; exit with a clear message on failure."""
+    try:
+        s = Settings()  # type: ignore[call-arg]
+
+        # Extra runtime guard: wildcard CORS in production is a security risk
+        if s.ENVIRONMENT == "production" and "*" in s.ALLOWED_ORIGINS:
+            print(
+                "FATAL: ALLOWED_ORIGINS contains '*' in production environment.\n"
+                "Set ALLOWED_ORIGINS to your actual frontend origin(s) in .env."
+            )
+            sys.exit(1)
+
+        # Initialise Sentry if DSN is provided
+        if s.SENTRY_DSN:
+            try:
+                import sentry_sdk  # type: ignore[import]
+
+                sentry_sdk.init(
+                    dsn=s.SENTRY_DSN,
+                    environment=s.ENVIRONMENT,
+                    traces_sample_rate=0.1,
+                )
+                logger.info("Sentry initialised (environment=%s).", s.ENVIRONMENT)
+            except ImportError:
+                logger.warning(
+                    "SENTRY_DSN is set but sentry-sdk is not installed. "
+                    "Add sentry-sdk to requirements.txt to enable error tracking."
+                )
+
+        return s
+
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"\n{'='*60}\n"
+            f"FATAL: Configuration error\n"
+            f"{exc}\n"
+            f"Run: python3 startup_check.py to validate your .env file\n"
+            f"{'='*60}\n"
+        )
+        sys.exit(1)
+
+
+settings = _load_settings()

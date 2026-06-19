@@ -6,7 +6,7 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: galaxyvast_redis
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "6379:6379"
     volumes:
@@ -19,6 +19,14 @@ services:
       retries: 5
     networks:
       - galaxyvast_net
+    deploy:
+      resources:
+        limits:
+          memory: 600m
+          cpus: '0.5'
+        reservations:
+          memory: 128m
+          cpus: '0.1'
     logging:
       driver: json-file
       options:
@@ -30,7 +38,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: galaxyvast_api
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "8000:8000"
     env_file:
@@ -49,6 +57,14 @@ services:
       start_period: 40s
     networks:
       - galaxyvast_net
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+          cpus: '2.0'
+        reservations:
+          memory: 512m
+          cpus: '0.5'
     logging:
       driver: json-file
       options:
@@ -60,7 +76,7 @@ services:
       context: .
       dockerfile: Dockerfile.bot
     container_name: galaxyvast_bot
-    restart: unless-stopped
+    restart: on-failure:3
     env_file:
       - .env
     depends_on:
@@ -68,6 +84,14 @@ services:
         condition: service_healthy
     networks:
       - galaxyvast_net
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '0.5'
+        reservations:
+          memory: 128m
+          cpus: '0.1'
     logging:
       driver: json-file
       options:
@@ -79,7 +103,7 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: galaxyvast_dashboard
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "8501:8501"
     env_file:
@@ -89,6 +113,14 @@ services:
         condition: service_healthy
     networks:
       - galaxyvast_net
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+        reservations:
+          memory: 256m
+          cpus: '0.25'
     logging:
       driver: json-file
       options:
@@ -100,7 +132,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: galaxyvast_frontend
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "3000:80"
     depends_on:
@@ -108,16 +140,19 @@ services:
         condition: service_healthy
     networks:
       - galaxyvast_net
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+        reservations:
+          memory: 64m
+          cpus: '0.1'
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  redis_data:
-  model_data:
-  log_data:
 
 networks:
   galaxyvast_net:
@@ -125,3 +160,8 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+volumes:
+  redis_data:
+  model_data:
+  log_data:
