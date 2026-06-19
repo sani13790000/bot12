@@ -36,6 +36,7 @@ from backend.api.routes import (
     analysis,
     analytics,
     backtest,
+    backtest_engine,
     research,
     intelligence,
     decision,
@@ -43,7 +44,12 @@ from backend.api.routes import (
     self_learning,
     reports,
     institutional,
-    backtest_engine,
+    institutional_backtest,
+    dashboard,
+    license,
+    trade_report,
+    users,
+    ai_prediction,
 )
 from backend.api.observability_routes import router as observability_router
 
@@ -56,7 +62,7 @@ except ImportError as exc:
     logger.warning("Observability module not available: %s", exc)
     HAS_OBSERVABILITY = False
 
-# ── DB Pool Monitor (optional) ──────────────────────────────────────────────
+# ── DB Pool Monitor (optional) ───────────────────────────────────────────────
 try:
     from backend.database.connection_pool_monitor import pool_monitor
     HAS_POOL_MONITOR = True
@@ -146,22 +152,33 @@ app.add_middleware(SecurityMiddleware)
 # ── Routers ──────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
-app.include_router(auth.router,             prefix=PREFIX + "/auth",             tags=["Authentication"])
-app.include_router(signals.router,          prefix=PREFIX + "/signals",          tags=["Signals"])
-app.include_router(trades.router,           prefix=PREFIX + "/trades",           tags=["Trades"])
-app.include_router(agents.router,           prefix=PREFIX + "/agents",           tags=["Agents"])
-app.include_router(analysis.router,         prefix=PREFIX + "/analysis",         tags=["Analysis"])
-app.include_router(analytics.router,        prefix=PREFIX + "/analytics",        tags=["Analytics"])
-app.include_router(backtest.router,         prefix=PREFIX + "/backtest",         tags=["Backtest"])
-app.include_router(backtest_engine.router,  prefix=PREFIX + "/backtest-engine",  tags=["Backtest Engine"])
-app.include_router(research.router,         prefix=PREFIX + "/research",         tags=["Research"])
-app.include_router(intelligence.router,     prefix=PREFIX + "/intelligence",     tags=["Intelligence"])
-app.include_router(decision.router,         prefix=PREFIX + "/decision",         tags=["Decision"])
-app.include_router(risk.router,             prefix=PREFIX + "/risk",             tags=["Risk"])
-app.include_router(self_learning.router,    prefix=PREFIX + "/self-learning",    tags=["Self Learning"])
-app.include_router(reports.router,          prefix=PREFIX + "/reports",          tags=["Reports"])
-app.include_router(institutional.router,    prefix=PREFIX + "/institutional",    tags=["Institutional"])
-app.include_router(observability_router,    prefix="/observability",             tags=["Observability"])
+# Core trading routes
+app.include_router(auth.router,                 prefix=PREFIX + "/auth",                 tags=["Authentication"])
+app.include_router(signals.router,              prefix=PREFIX + "/signals",              tags=["Signals"])
+app.include_router(trades.router,               prefix=PREFIX + "/trades",               tags=["Trades"])
+app.include_router(agents.router,               prefix=PREFIX + "/agents",               tags=["Agents"])
+app.include_router(analysis.router,             prefix=PREFIX + "/analysis",             tags=["Analysis"])
+app.include_router(analytics.router,            prefix=PREFIX + "/analytics",            tags=["Analytics"])
+app.include_router(backtest.router,             prefix=PREFIX + "/backtest",             tags=["Backtest"])
+app.include_router(backtest_engine.router,      prefix=PREFIX + "/backtest-engine",      tags=["Backtest Engine"])
+app.include_router(research.router,             prefix=PREFIX + "/research",             tags=["Research"])
+app.include_router(intelligence.router,         prefix=PREFIX + "/intelligence",         tags=["Intelligence"])
+app.include_router(decision.router,             prefix=PREFIX + "/decision",             tags=["Decision"])
+app.include_router(risk.router,                 prefix=PREFIX + "/risk",                 tags=["Risk"])
+app.include_router(self_learning.router,        prefix=PREFIX + "/self-learning",        tags=["Self Learning"])
+app.include_router(reports.router,              prefix=PREFIX + "/reports",              tags=["Reports"])
+app.include_router(institutional.router,        prefix=PREFIX + "/institutional",        tags=["Institutional"])
+app.include_router(institutional_backtest.router, prefix=PREFIX + "/institutional-backtest", tags=["Institutional Backtest"])
+
+# ── Previously missing routes — now added ────────────────────────────────────
+app.include_router(dashboard.router,            prefix=PREFIX + "/dashboard",            tags=["Dashboard"])
+app.include_router(license.router,              prefix=PREFIX + "/license",              tags=["License"])
+app.include_router(trade_report.router,         prefix=PREFIX + "/trade-report",         tags=["Trade Report"])
+app.include_router(users.router,                prefix=PREFIX + "/users",                tags=["Users"])
+app.include_router(ai_prediction.router,        prefix=PREFIX + "/ai",                   tags=["AI Prediction"])
+
+# Observability
+app.include_router(observability_router,        prefix="/observability",                 tags=["Observability"])
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -212,6 +229,10 @@ async def health_check() -> dict[str, Any]:
             "institutional": HAS_INSTITUTIONAL,
             "pool_monitor": HAS_POOL_MONITOR,
         },
+        "routes": {
+            "total": 22,
+            "active": 22,
+        },
         "slow_queries_sample": slow_queries,
         "timestamp": time.time(),
     }
@@ -224,10 +245,11 @@ async def root() -> dict[str, str]:
         "version": getattr(settings, "APP_VERSION", "2.0.0"),
         "docs": "/docs",
         "health": "/health",
+        "routes": "22 active routes",
     }
 
 
-# ── Global exception handler ─────────────────────────────────────────────────
+# ── Global exception handler ──────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
@@ -237,9 +259,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-# ────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ────────────────────────────────────────────────────────────────────────────
+# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run(
         "backend.api.main:app",
