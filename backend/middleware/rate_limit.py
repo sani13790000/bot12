@@ -1,171 +1,173 @@
-"""Rate-limiting middleware — Redis-backed with in-memory fallback.
+"""
+backend/middleware/rate_limit.py
+Rate limiting middleware — Redis-backed with InMemory fallback.
 
-Fixes applied:
-- Added MAX_TRACKED_IPS cap to InMemoryRateLimiter._windows to prevent OOM
-  during DDoS / mass IP attacks
-- Cleanup task evicts expired entries every 5 minutes
-- Per-path rules: /auth/login -> 5 req/min (brute-force protection)
+Limits:
+  - /api/v1/auth/login    : 5  req/min  per IP
+  - /api/v1/auth/register : 3  req/min  per IP
+  - /api/v1/auth/refresh  : 10 req/min  per IP
+  - /ws/*                 : 20 conn/min per IP
+  - All other endpoints   : 60 req/min  per IP
+
+Security:
+  - Sliding window algorithm
+  - MAX_TRACKED_IPS eviction to prevent memory DoS
+  - asyncio.Lock for thread safety
+  - Redis prefix isolation
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from collections import deque
-from typing import Callable, Deque, Dict, Optional, Tuple
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-# Maximum distinct IPs tracked in memory (prevents unbounded growth under DDoS)
-MAX_TRACKED_IPS = 50_000
-# Per-path rate-limit overrides: (max_requests, window_seconds)
-_PATH_RULES: Dict[str, Tuple[int, int]] = {
-    "/api/v1/auth/login": (5, 60),
-    "/api/v1/auth/register": (10, 60),
-    "/api/v1/auth/refresh": (20, 60),
-}
-_DEFAULT_RULE: Tuple[int, int] = (60, 60)  # 60 req / 60s
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+_MAX_TRACKED_IPS = 50_000
+_REDIS_PREFIX = "rl:"
+
+# (path_prefix, method_or_None) → (max_requests, window_seconds)
+_RULES: List[Tuple[str, Optional[str], int, int]] = [
+    ("/api/v1/auth/login",    "POST",  5,  60),
+    ("/api/v1/auth/register", "POST",  3,  60),
+    ("/api/v1/auth/refresh",  "POST",  10, 60),
+    ("/ws/",                  None,    20, 60),
+    ("/api/v1/backtest",      "POST",  10, 60),
+    ("/api/v1/analysis",      "POST",  30, 60),
+    ("/",                     None,    60, 60),   # catch-all
+]
+
+
+def _get_rule(path: str, method: str) -> Tuple[int, int]:
+    """Return (max_requests, window_seconds) for the given path+method."""
+    for prefix, rule_method, max_req, window in _RULES:
+        if path.startswith(prefix):
+            if rule_method is None or rule_method == method:
+                return max_req, window
+    return 60, 60  # default
 
 
 # ---------------------------------------------------------------------------
-# In-memory limiter (sliding window)
+# In-memory limiter (fallback when Redis is unavailable)
 # ---------------------------------------------------------------------------
 
-class InMemoryRateLimiter:
-    """Per-IP sliding-window rate limiter with bounded memory usage."""
+class _InMemoryLimiter:
+    """Sliding window rate limiter using in-memory deques."""
 
     def __init__(self) -> None:
-        # key: f"{ip}:{path}"  value: deque of timestamps
-        self._windows: Dict[str, Deque[float]] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._windows: Dict[str, List[float]] = defaultdict(list)
+        self._lock = asyncio.Lock()
 
-    def start(self) -> None:
-        if self._cleanup_task is None or self._cleanup_task.done():
-            self._cleanup_task = asyncio.create_task(self._cleanup_loop(), name="rate_limit_cleanup")
-
-    async def _cleanup_loop(self) -> None:
-        while True:
-            await asyncio.sleep(300)  # every 5 minutes
+    async def is_allowed(self, key: str, max_requests: int, window_sec: int) -> bool:
+        async with self._lock:
             now = time.monotonic()
-            expired_keys = [
-                k for k, dq in self._windows.items()
-                if not dq or now - dq[-1] > 120  # no request in last 2 min
-            ]
-            for k in expired_keys:
-                del self._windows[k]
-            if expired_keys:
-                logger.debug("Rate-limit cleanup: evicted %d expired keys.", len(expired_keys))
+            window = self._windows[key]
 
-    def is_allowed(self, ip: str, path: str, max_req: int, window_sec: int) -> Tuple[bool, int, int]:
-        """Returns (allowed, remaining, retry_after_sec)."""
-        key = f"{ip}:{path}"
-        now = time.monotonic()
-        cutoff = now - window_sec
+            # Slide window
+            cutoff = now - window_sec
+            # Remove expired entries
+            while window and window[0] < cutoff:
+                window.pop(0)
 
-        dq = self._windows.get(key)
-        if dq is None:
-            # Enforce cap before creating a new entry
-            if len(self._windows) >= MAX_TRACKED_IPS:
-                # Evict oldest entry (FIFO)
+            if len(window) >= max_requests:
+                return False
+
+            window.append(now)
+
+            # Evict oldest IP if map is too large
+            if len(self._windows) > _MAX_TRACKED_IPS:
                 oldest_key = next(iter(self._windows))
                 del self._windows[oldest_key]
-                logger.warning("Rate-limit: MAX_TRACKED_IPS reached, evicted %s", oldest_key)
-            dq = deque()
-            self._windows[key] = dq
 
-        # Remove timestamps outside the window
-        while dq and dq[0] < cutoff:
-            dq.popleft()
+            return True
 
-        remaining = max(0, max_req - len(dq))
-        if len(dq) >= max_req:
-            retry_after = int(window_sec - (now - dq[0])) + 1 if dq else window_sec
-            return False, 0, retry_after
-
-        dq.append(now)
-        return True, remaining - 1, 0
+    async def cleanup(self) -> None:
+        """Remove empty/expired windows."""
+        async with self._lock:
+            now = time.monotonic()
+            to_delete = [
+                k for k, v in self._windows.items()
+                if not v or now - v[-1] > 3600  # idle for 1 hour
+            ]
+            for k in to_delete:
+                del self._windows[k]
 
 
-# ---------------------------------------------------------------------------
-# Redis limiter
-# ---------------------------------------------------------------------------
+_in_memory = _InMemoryLimiter()
+_redis_client = None
+_redis_lock = asyncio.Lock()
 
-class RedisRateLimiter:
-    """Redis-backed sliding-window rate limiter using sorted sets."""
 
-    def __init__(self, redis_url: str = "redis://redis:6379/0") -> None:
-        self._url = redis_url
-        self._client = None
-
-    async def _get_client(self):
-        if self._client is None:
-            import redis.asyncio as aioredis
-            self._client = aioredis.from_url(self._url, decode_responses=True)
-        return self._client
-
-    async def is_allowed(
-        self, ip: str, path: str, max_req: int, window_sec: int
-    ) -> Tuple[bool, int, int]:
+async def _get_redis():
+    """Lazy Redis connection with thread-safe singleton."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client
+    async with _redis_lock:
+        if _redis_client is not None:
+            return _redis_client
         try:
-            r = await self._get_client()
-            key = f"rl:{ip}:{path}"
-            now = time.time()
-            cutoff = now - window_sec
-            async with r.pipeline(transaction=True) as pipe:
-                pipe.zremrangebyscore(key, "-inf", cutoff)
-                pipe.zcard(key)
-                pipe.zadd(key, {str(now): now})
-                pipe.expire(key, window_sec + 1)
-                results = await pipe.execute()
-            count_before = results[1]
-            if count_before >= max_req:
-                oldest = await r.zrange(key, 0, 0, withscores=True)
-                retry_after = int(window_sec - (now - oldest[0][1])) + 1 if oldest else window_sec
-                return False, 0, retry_after
-            return True, max(0, max_req - count_before - 1), 0
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Redis rate limiter error: %s — allowing request.", exc)
-            return True, max_req, 0
+            import redis.asyncio as aioredis
+            from backend.core.config import get_settings
+            settings = get_settings()
+            client = aioredis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+                max_connections=settings.REDIS_MAX_CONNECTIONS,
+                socket_connect_timeout=2,
+                socket_timeout=1,
+            )
+            await client.ping()
+            _redis_client = client
+            log.info("Rate limiter: Redis connected")
+            return _redis_client
+        except Exception as exc:
+            log.warning("Rate limiter: Redis unavailable (%s), using in-memory", type(exc).__name__)
+            return None
 
 
-# ---------------------------------------------------------------------------
-# Singleton limiter instances
-# ---------------------------------------------------------------------------
-
-_memory_limiter: Optional[InMemoryRateLimiter] = None
-_redis_limiter: Optional[RedisRateLimiter] = None
-_limiter_lock = asyncio.Lock()
-
-
-async def _get_limiter() -> InMemoryRateLimiter | RedisRateLimiter:
-    """Return Redis limiter if available, else InMemory."""
-    global _memory_limiter, _redis_limiter
-
-    # Try Redis first
-    if _redis_limiter is None:
-        async with _limiter_lock:
-            if _redis_limiter is None:
-                import os
-                redis_url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-                _redis_limiter = RedisRateLimiter(redis_url)
-
-    # Ensure memory limiter is running
-    if _memory_limiter is None:
-        async with _limiter_lock:
-            if _memory_limiter is None:
-                _memory_limiter = InMemoryRateLimiter()
-                _memory_limiter.start()
-
-    # Test Redis availability
+async def _redis_is_allowed(key: str, max_requests: int, window_sec: int) -> Optional[bool]:
+    """Sliding window via Redis ZADD. Returns None if Redis unavailable."""
     try:
-        ok, _, _ = await _redis_limiter.is_allowed("probe", "/", 10000, 60)
-        return _redis_limiter
-    except Exception:  # noqa: BLE001
-        return _memory_limiter
+        redis = await _get_redis()
+        if redis is None:
+            return None
+
+        redis_key = f"{_REDIS_PREFIX}{key}"
+        now = time.time()
+        cutoff = now - window_sec
+
+        pipe = redis.pipeline()
+        pipe.zremrangebyscore(redis_key, 0, cutoff)
+        pipe.zcard(redis_key)
+        pipe.zadd(redis_key, {str(now): now})
+        pipe.expire(redis_key, window_sec + 1)
+        results = await pipe.execute()
+
+        count_before_add = results[1]
+        return count_before_add < max_requests
+    except Exception as exc:
+        log.debug("Redis rate limit error: %s", type(exc).__name__)
+        return None
+
+
+async def _is_allowed(key: str, max_requests: int, window_sec: int) -> bool:
+    """Check rate limit — Redis first, fallback to in-memory."""
+    result = await _redis_is_allowed(key, max_requests, window_sec)
+    if result is not None:
+        return result
+    return await _in_memory.is_allowed(key, max_requests, window_sec)
 
 
 # ---------------------------------------------------------------------------
@@ -173,41 +175,44 @@ async def _get_limiter() -> InMemoryRateLimiter | RedisRateLimiter:
 # ---------------------------------------------------------------------------
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Apply per-path rate limits; return 429 with Retry-After on breach."""
 
-    _SKIP_PATHS: frozenset[str] = frozenset(["/health", "/", "/docs", "/openapi.json", "/ws/health"])
+    async def dispatch(self, request: Request, call_next) -> Response:
+        # Determine client IP
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        ip = forwarded.split(",")[0].strip() if forwarded else (
+            request.client.host if request.client else "unknown"
+        )
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
+        method = request.method
 
-        if path in self._SKIP_PATHS or path.startswith("/ws/"):
-            return await call_next(request)
+        max_req, window = _get_rule(path, method)
+        rate_key = f"{ip}:{path}"
 
-        ip = request.client.host if request.client else "0.0.0.0"
-        max_req, window_sec = _PATH_RULES.get(path, _DEFAULT_RULE)
-
-        limiter = await _get_limiter()
-
-        if isinstance(limiter, RedisRateLimiter):
-            allowed, remaining, retry_after = await limiter.is_allowed(ip, path, max_req, window_sec)
-        else:
-            allowed, remaining, retry_after = limiter.is_allowed(ip, path, max_req, window_sec)
-
+        allowed = await _is_allowed(rate_key, max_req, window)
         if not allowed:
-            logger.warning("Rate limit exceeded: ip=%s path=%s", ip, path)
+            log.warning("Rate limit exceeded: ip=%s path=%s", ip, path)
             return JSONResponse(
-                status_code=429,
-                content={"detail": "Too many requests", "retry_after": retry_after},
-                headers={
-                    "Retry-After": str(retry_after),
-                    "X-RateLimit-Limit": str(max_req),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Window": str(window_sec),
+                {
+                    "detail": "Too many requests",
+                    "retry_after": window,
                 },
+                status_code=429,
+                headers={"Retry-After": str(window)},
             )
 
-        response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(max_req)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
-        response.headers["X-RateLimit-Window"] = str(window_sec)
-        return response
+        return await call_next(request)
+
+
+# ---------------------------------------------------------------------------
+# Background cleanup task
+# ---------------------------------------------------------------------------
+
+async def start_cleanup_task() -> None:
+    """Run every 5 minutes to evict stale in-memory windows."""
+    while True:
+        await asyncio.sleep(300)
+        try:
+            await _in_memory.cleanup()
+        except Exception as exc:
+            log.debug("Rate limit cleanup error: %s", exc)
