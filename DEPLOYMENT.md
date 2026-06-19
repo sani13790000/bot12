@@ -1,115 +1,72 @@
-# Galaxy Vast AI Trading Bot — Deployment Guide
+# Galaxy Vast AI Trading Platform — Deployment Guide
 
-## سیستم مورد نیاز
+## Pre-flight Checklist
 
-- Python 3.11+
-- PostgreSQL (Supabase)
-- Redis (optional — for rate limiting)
-- MetaTrader 5 (Windows only — for live trading)
-
----
-
-## مراحل نصب
-
-### ۱. اجرای migrationها
-
-```bash
-psql $SUPABASE_DB_URL -f supabase/migrations/20260612155742_001_initial_schema.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_002_partitioning.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_003_missing_tables.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_004_stabilization.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_005_phase3_dedup.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_006_ml_realism.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_007_phase6_backtest.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_008_phase7_execution.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_009_phase8_db_hardening.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_010_phase9_observability.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_011_phase10_security.sql
-psql $SUPABASE_DB_URL -f supabase/migrations/20260618_012_final_10_10.sql
-```
-
-### ۲. متغیرهای محیط
-
+### 1. Environment Variables (required)
 ```bash
 cp .env.example .env
-# سپس مقادیر واقعی را پر کنید
+# Fill in all values:
+# SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+# JWT_SECRET_KEY (min 32 chars)
+# TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# LICENSE_KEY, LICENSE_SALT
+# ENVIRONMENT=production
+# ALLOWED_ORIGINS=https://yourdomain.com
 ```
 
-متغیرهای اجباری:
+### 2. Database Migrations
+Run migrations in order in Supabase SQL editor:
 ```
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=eyJ...
-JWT_SECRET=at-least-32-chars-secret-here
+supabase/migrations/20260612155742_001_initial_schema.sql
+supabase/migrations/20260618_002_partitioning.sql
+... (003 through 013)
+supabase/migrations/014_users_table.sql
 ```
 
-### ۳. نصب dependencies
+### 3. MQL5 EA Setup
+1. Open `mql5/Config.mqh`
+2. Set `API_BASE_URL` to your server URL (e.g. `https://api.yourdomain.com`)
+3. Set `API_TOKEN` to a valid JWT token from `/api/v1/auth/login`
+4. Compile and attach EA to chart
 
+### 4. Docker Deploy
 ```bash
-pip install -r requirements.txt
+python3 startup_check.py
+docker compose up -d --build
+docker compose ps  # all services should be healthy
 ```
 
-### ۴. اجرا تستها
-
+### 5. Verify
 ```bash
-pytest backend/tests/ -v --asyncio-mode=auto
+curl https://api.yourdomain.com/health
+# Expected: {"status": "healthy", "database": {"connected": true}}
+
+curl https://api.yourdomain.com/docs
+# Expected: Swagger UI with 22+ endpoints
 ```
 
-### ۵. اجرا سرور
-
-```bash
-uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --workers 2
-```
-
-### ۶. اجرا با Docker
-
-```bash
-docker build -t galaxy-vast-bot .
-docker run -p 8000:8000 --env-file .env galaxy-vast-bot
-```
-
----
-
-## ۱۰ Endpoint مهم
-
-| Endpoint | توضیح |
-|---|---|
-| `GET /health` | وضعیت DB + circuit breakers + metrics |
-| `GET /observability/metrics` | Prometheus format |
-| `GET /observability/alerts` | وضعیت alertها |
-| `POST /signals/generate` | تولید سیگنال |
-| `GET /agents/status` | وضعیت هفت agent |
-| `POST /research/backtest` | اجرای backtest |
-| `GET /intelligence/status` | وضعیت ML engine |
-| `POST /intelligence/retrain` | رترین مدل |
-| `GET /analytics/summary` | خلاصه انالیتیکس |
-| `GET /risk/status` | وضعیت risk engine |
-
----
-
-## میگریسیونها انجام شده تاکنون (12 migration)
-
-| شماره | نام | محتوا |
+### 6. Resource Limits (per service)
+| Service | Memory Limit | CPU Limit |
 |---|---|---|
-| 001 | initial_schema | schema اولیه |
-| 002 | partitioning | partitioned tables |
-| 003 | missing_tables | جداول گمشده |
-| 004 | stabilization | فاز ۱ تثبیت |
-| 005 | phase3_dedup | columnهای جدید |
-| 006 | ml_realism | جداول ML |
-| 007 | phase6_backtest | جداول backtest |
-| 008 | phase7_execution | جداول execution |
-| 009 | phase8_db_hardening | ۱۰ composite index |
-| 010 | phase9_observability | audit log + alert |
-| 011 | phase10_security | security + license |
-| 012 | final_10_10 | patchهای نهایی |
+| redis | 600MB | 0.5 core |
+| api | 3GB | 2.0 core |
+| telegram_bot | 512MB | 0.5 core |
+| dashboard | 1GB | 1.0 core |
+| frontend | 256MB | 0.5 core |
 
----
+### 7. Rollback
+If migration needs rollback:
+```bash
+# Run down migration in Supabase SQL editor:
+supabase/migrations/down/014_users_table_down.sql
+```
 
-## چکلیست قبل از Deploy
-
-- [ ] همه migrationها اجرا شدند
-- [ ] `.env` پر شده (SUPABASE_URL, JWT_SECRET)
-- [ ] `GET /health` پاسخ میدهد (`status: healthy`)
-- [ ] تستها pass شدند
-- [ ] SENTRY_DSN تنظیم شد (optional)
-- [ ] TELEGRAM_BOT_TOKEN تنظیم شد (optional)
+## Security Checklist
+- [ ] `ENVIRONMENT=production` in .env
+- [ ] `ALLOWED_ORIGINS` set to exact domain (no wildcard)
+- [ ] `JWT_SECRET_KEY` at least 32 random chars
+- [ ] `LICENSE_SALT` set to random value
+- [ ] `API_TOKEN` set in MQL5 Config.mqh
+- [ ] HTTPS enabled on server
+- [ ] Redis not exposed to public internet
+- [ ] Supabase RLS enabled on all tables
