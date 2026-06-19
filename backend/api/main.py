@@ -9,14 +9,14 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, List
 
 import uvicorn
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# ── Core ────────────────────────────────────────────────────────────────────
+# ── Core ───────────────────────────────────────────────────────────────────
 from backend.core.config import settings
 from backend.core.logger import get_logger
 
@@ -27,7 +27,7 @@ from backend.middleware.security import SecurityMiddleware
 from backend.middleware.rate_limit import RateLimitMiddleware
 from backend.middleware.observability import ObservabilityMiddleware
 
-# ── Routes ──────────────────────────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────────────
 from backend.api.routes import (
     auth,
     signals,
@@ -62,7 +62,7 @@ except ImportError as exc:
     logger.warning("Observability module not available: %s", exc)
     HAS_OBSERVABILITY = False
 
-# ── DB Pool Monitor (optional) ───────────────────────────────────────────────
+# ── DB Pool Monitor (optional) ────────────────────────────────────────────────
 try:
     from backend.database.connection_pool_monitor import pool_monitor
     HAS_POOL_MONITOR = True
@@ -137,10 +137,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Middleware (order matters: outermost → innermost) ────────────────────────
+# ── CORS — never wildcard in production ───────────────────────────────────────────
+allowed_origins: List[str] = getattr(
+    settings, "ALLOWED_ORIGINS",
+    ["http://localhost:3000", "http://localhost:8501"]
+)
+# Safety: block wildcard in production
+if settings.ENVIRONMENT == "production" and "*" in allowed_origins:
+    logger.error("ALLOWED_ORIGINS contains '*' in production — refusing to start.")
+    sys.exit(1)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=getattr(settings, "ALLOWED_ORIGINS", ["*"]),
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -149,41 +158,59 @@ app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityMiddleware)
 
-# ── Routers ──────────────────────────────────────────────────────────────────
+# ── Routers ───────────────────────────────────────────────────────────────────
 PREFIX = "/api/v1"
 
-# Core trading routes
-app.include_router(auth.router,                 prefix=PREFIX + "/auth",                 tags=["Authentication"])
-app.include_router(signals.router,              prefix=PREFIX + "/signals",              tags=["Signals"])
-app.include_router(trades.router,               prefix=PREFIX + "/trades",               tags=["Trades"])
-app.include_router(agents.router,               prefix=PREFIX + "/agents",               tags=["Agents"])
-app.include_router(analysis.router,             prefix=PREFIX + "/analysis",             tags=["Analysis"])
-app.include_router(analytics.router,            prefix=PREFIX + "/analytics",            tags=["Analytics"])
-app.include_router(backtest.router,             prefix=PREFIX + "/backtest",             tags=["Backtest"])
-app.include_router(backtest_engine.router,      prefix=PREFIX + "/backtest-engine",      tags=["Backtest Engine"])
-app.include_router(research.router,             prefix=PREFIX + "/research",             tags=["Research"])
-app.include_router(intelligence.router,         prefix=PREFIX + "/intelligence",         tags=["Intelligence"])
-app.include_router(decision.router,             prefix=PREFIX + "/decision",             tags=["Decision"])
-app.include_router(risk.router,                 prefix=PREFIX + "/risk",                 tags=["Risk"])
-app.include_router(self_learning.router,        prefix=PREFIX + "/self-learning",        tags=["Self Learning"])
-app.include_router(reports.router,              prefix=PREFIX + "/reports",              tags=["Reports"])
-app.include_router(institutional.router,        prefix=PREFIX + "/institutional",        tags=["Institutional"])
+app.include_router(auth.router,                   prefix=PREFIX + "/auth",                   tags=["Authentication"])
+app.include_router(signals.router,                prefix=PREFIX + "/signals",                tags=["Signals"])
+app.include_router(trades.router,                 prefix=PREFIX + "/trades",                 tags=["Trades"])
+app.include_router(agents.router,                 prefix=PREFIX + "/agents",                 tags=["Agents"])
+app.include_router(analysis.router,               prefix=PREFIX + "/analysis",               tags=["Analysis"])
+app.include_router(analytics.router,              prefix=PREFIX + "/analytics",              tags=["Analytics"])
+app.include_router(backtest.router,               prefix=PREFIX + "/backtest",               tags=["Backtest"])
+app.include_router(backtest_engine.router,        prefix=PREFIX + "/backtest-engine",        tags=["Backtest Engine"])
+app.include_router(research.router,               prefix=PREFIX + "/research",               tags=["Research"])
+app.include_router(intelligence.router,           prefix=PREFIX + "/intelligence",           tags=["Intelligence"])
+app.include_router(decision.router,               prefix=PREFIX + "/decision",               tags=["Decision"])
+app.include_router(risk.router,                   prefix=PREFIX + "/risk",                   tags=["Risk"])
+app.include_router(self_learning.router,          prefix=PREFIX + "/self-learning",          tags=["Self Learning"])
+app.include_router(reports.router,                prefix=PREFIX + "/reports",                tags=["Reports"])
+app.include_router(institutional.router,          prefix=PREFIX + "/institutional",          tags=["Institutional"])
 app.include_router(institutional_backtest.router, prefix=PREFIX + "/institutional-backtest", tags=["Institutional Backtest"])
-
-# ── Previously missing routes — now added ────────────────────────────────────
-app.include_router(dashboard.router,            prefix=PREFIX + "/dashboard",            tags=["Dashboard"])
-app.include_router(license.router,              prefix=PREFIX + "/license",              tags=["License"])
-app.include_router(trade_report.router,         prefix=PREFIX + "/trade-report",         tags=["Trade Report"])
-app.include_router(users.router,                prefix=PREFIX + "/users",                tags=["Users"])
-app.include_router(ai_prediction.router,        prefix=PREFIX + "/ai",                   tags=["AI Prediction"])
-
-# Observability
-app.include_router(observability_router,        prefix="/observability",                 tags=["Observability"])
+app.include_router(dashboard.router,              prefix=PREFIX + "/dashboard",              tags=["Dashboard"])
+app.include_router(license.router,                prefix=PREFIX + "/license",                tags=["License"])
+app.include_router(trade_report.router,           prefix=PREFIX + "/trade-report",           tags=["Trade Report"])
+app.include_router(users.router,                  prefix=PREFIX + "/users",                  tags=["Users"])
+app.include_router(ai_prediction.router,          prefix=PREFIX + "/ai",                     tags=["AI Prediction"])
+app.include_router(observability_router,          prefix="/observability",                   tags=["Observability"])
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# Core Endpoints
+# Exception Handlers — ordered: specific before generic
 # ────────────────────────────────────────────────────────────────────────────
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Return correct HTTP status codes — do NOT return 500 for 4xx errors."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all for unexpected errors. Never leak stack traces or path to client."""
+    logger.error(
+        "Unhandled exception on %s %s: %s",
+        request.method, request.url.path, exc, exc_info=True
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},  # no path, no trace
+    )
+
+
+# ── Core Endpoints ───────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["Health"])
 async def health_check() -> dict[str, Any]:
     """Comprehensive health check for load balancers and monitoring."""
@@ -214,6 +241,9 @@ async def health_check() -> dict[str, Any]:
         except Exception:  # noqa: BLE001
             pass
 
+    # Dynamic route count from app.routes
+    route_count = len([r for r in app.routes if hasattr(r, "methods")])
+
     overall = "healthy" if db_ok else "degraded"
     return {
         "status": overall,
@@ -230,8 +260,8 @@ async def health_check() -> dict[str, Any]:
             "pool_monitor": HAS_POOL_MONITOR,
         },
         "routes": {
-            "total": 22,
-            "active": 22,
+            "total": route_count,
+            "active": route_count,
         },
         "slow_queries_sample": slow_queries,
         "timestamp": time.time(),
@@ -240,26 +270,17 @@ async def health_check() -> dict[str, Any]:
 
 @app.get("/", tags=["Root"])
 async def root() -> dict[str, str]:
+    route_count = len([r for r in app.routes if hasattr(r, "methods")])
     return {
         "name": "Galaxy Vast AI Trading Platform",
         "version": getattr(settings, "APP_VERSION", "2.0.0"),
         "docs": "/docs",
         "health": "/health",
-        "routes": "22 active routes",
+        "routes": f"{route_count} active routes",
     }
 
 
-# ── Global exception handler ──────────────────────────────────────────────────
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error", "path": str(request.url.path)},
-    )
-
-
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run(
         "backend.api.main:app",
