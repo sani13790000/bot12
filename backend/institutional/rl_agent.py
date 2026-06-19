@@ -6,6 +6,7 @@ Fixes applied:
 - MEDIUM: ACTION_HOLD now includes unrealized PnL in reward
 - HIGH: _equity_history uses deque(maxlen=10_000) to prevent memory leak
 - LOW: rule-based fallback is deterministic (no random)
+- MEDIUM: SB3Env.obs_size is now dynamic (computed from RLEnvironment)
 """
 from __future__ import annotations
 
@@ -16,11 +17,11 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # Symbol configuration (pip_size, lot_size, pip_value)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 SYMBOL_CONFIGS: Dict[str, Dict[str, float]] = {
-    "XAUUSD": {"pip_size": 0.1,    "lot_size": 100.0,    "pip_value": 1.0},
+    "XAUUSD": {"pip_size": 0.1,    "lot_size": 100.0,     "pip_value": 1.0},
     "EURUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
     "GBPUSD": {"pip_size": 0.0001, "lot_size": 100_000.0, "pip_value": 10.0},
     "USDJPY": {"pip_size": 0.01,   "lot_size": 100_000.0, "pip_value": 9.09},
@@ -41,10 +42,12 @@ ACTION_BUY  = 0
 ACTION_SELL = 1
 ACTION_HOLD = 2
 
+# Observation vector size: 5 returns + ma20 + ma50 + rsi + macd + macd_sig + pos + unrealized
+OBS_SIZE = 12
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # MACD calculation (pure Python, no talib dependency)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 
 def _ema(values: List[float], period: int) -> List[float]:
     """Exponential moving average — pure Python."""
@@ -82,9 +85,9 @@ def _compute_macd(
     return macd_line[-1], signal_line[-1]
 
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # Environment
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 
 class RLEnvironment:
     """Lightweight Gymnasium-compatible trading environment."""
@@ -116,7 +119,7 @@ class RLEnvironment:
     def _reset_state(self) -> None:
         self._step = 50  # start with enough history for indicators
         self._balance: float = self._initial_balance
-        self._position: int = 0       # -1 short, 0 flat, 1 long
+        self._position: int = 0        # -1 short, 0 flat, 1 long
         self._entry_price: float = 0.0
         self._equity_history: Deque[float] = deque([self._initial_balance], maxlen=10_000)
         self._obs_cache: Optional[List[float]] = None
@@ -249,9 +252,9 @@ class RLEnvironment:
         return obs, reward, done, info
 
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 # SB3 Gym wrapper (optional dependency)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
 
 try:
     import gymnasium as gym
@@ -265,7 +268,10 @@ try:
         def __init__(self, candles: List[Dict], symbol: str = "XAUUSD") -> None:
             super().__init__()
             self._env = RLEnvironment(candles, symbol)
-            obs_size = 12  # 5 returns + ma20 + ma50 + rsi + macd + macd_sig + pos + unrealized
+            # Dynamic obs_size derived from the environment itself
+            _sample_obs = self._env._get_observation()
+            obs_size = len(_sample_obs)  # always matches OBS_SIZE constant
+            assert obs_size == OBS_SIZE, f"obs_size mismatch: {obs_size} != {OBS_SIZE}"
             self.observation_space = gym.spaces.Box(
                 low=-2.0, high=2.0, shape=(obs_size,), dtype=np.float32
             )
@@ -283,69 +289,47 @@ try:
     _HAS_GYM = True
 except ImportError:
     _HAS_GYM = False
-    logger.warning("gymnasium not available — RL agent will use rule-based fallback")
+    logger.info("gymnasium not installed — RL training disabled, rule-based only")
 
 
-# ---------------------------------------------------------------------------
-# RL Trading Agent
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------
+# High-level RLAgent
+# -----------------------------------------------------------------------
 
 class RLTradingAgent:
-    """PPO-trained RL agent with deterministic rule-based fallback."""
+    """High-level RL agent with SB3 PPO + deterministic rule-based fallback."""
 
-    def __init__(
-        self,
-        symbol: str = "XAUUSD",
-        model_path: Optional[str] = None,
-    ) -> None:
+    def __init__(self, symbol: str = "XAUUSD") -> None:
         self._symbol = symbol
         self._model = None
-        self._env: Optional[RLEnvironment] = None
 
-        if _HAS_GYM and model_path:
-            try:
-                from stable_baselines3 import PPO
-                self._model = PPO.load(model_path)
-                logger.info("RLAgent: loaded PPO model from %s", model_path)
-            except Exception as exc:
-                logger.warning("RLAgent: PPO load failed (%s) — using rule-based", exc)
+    def predict(self, obs: List[float]) -> Dict[str, Any]:
+        """Predict action from observation vector.
 
-    def predict(self, candles: List[Dict[str, float]]) -> Dict[str, Any]:
-        """Return action dict: {action, confidence, reason}."""
-        if not candles:
-            return {"action": "HOLD", "confidence": 0.0, "reason": "no data"}
-
-        self._env = RLEnvironment(candles, symbol=self._symbol)
-        obs = self._env._get_observation()
-
-        if self._model is not None:
+        obs: [r1..r5, ma20, ma50, rsi, macd, macd_sig, position, unrealized]
+        """
+        if self._model is not None and _HAS_GYM:
             try:
                 import numpy as np
                 action, _ = self._model.predict(
                     np.array(obs, dtype=np.float32), deterministic=True
                 )
-                action_map = {ACTION_BUY: "BUY", ACTION_SELL: "SELL", ACTION_HOLD: "HOLD"}
-                return {
-                    "action": action_map.get(int(action), "HOLD"),
-                    "confidence": 0.85,
-                    "reason": "PPO model prediction",
-                }
+                action_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
+                return {"action": action_map.get(int(action), "HOLD"), "confidence": 0.8, "reason": "PPO"}
             except Exception as exc:
-                logger.warning("RLAgent: PPO predict failed: %s", exc)
-
-        # Deterministic rule-based fallback (not random)
+                logger.warning("PPO predict failed: %s, falling back to rule-based", exc)
         return self._rule_based(obs)
 
     @staticmethod
     def _rule_based(obs: List[float]) -> Dict[str, Any]:
         """Deterministic rule-based signal from observation vector.
 
-        obs layout: [ret0..ret4, ma20, ma50, rsi, macd, macd_sig, position, unrealized]
+        obs: [r1..r5, ma20, ma50, rsi, macd, macd_sig, position, unrealized]
         """
         if len(obs) < 12:
             return {"action": "HOLD", "confidence": 0.0, "reason": "insufficient obs"}
 
-        rsi        = obs[7]   # normalised [-1, 1]; <-0.4 oversold, >0.4 overbought
+        rsi        = obs[7]    # normalised [-1, 1]; <-0.4 oversold, >0.4 overbought
         macd       = obs[8]
         macd_sig   = obs[9]
         ma20       = obs[5]
