@@ -1,10 +1,11 @@
 """Authentication routes — JWT via HttpOnly cookies with refresh token revocation.
 
 Security model:
-- Access token: HttpOnly + Secure + SameSite=Strict cookie (XSS-safe)
+- Access token:  HttpOnly + Secure + SameSite=Strict cookie (XSS-safe)
 - Refresh token: stored in DB for revocation; HttpOnly cookie
 - Account lockout: 5 failed attempts -> 15-minute lockout per IP+username
 - Passwords: bcrypt hashed via passlib
+- Production login: looks up user from Supabase users table
 """
 from __future__ import annotations
 
@@ -23,17 +24,17 @@ from pydantic import BaseModel, EmailStr, field_validator
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 # Config
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 ACCESS_TOKEN_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "")
 JWT_ALGO = "HS256"
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 # In-memory stores (replace with Redis/DB in high-scale deployments)
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 # key: f"{ip}:{username}"  value: {"attempts": int, "locked_until": float}
 _login_attempts: Dict[str, Dict[str, Any]] = {}
 # key: jti (str) — set of revoked refresh token IDs
@@ -42,11 +43,42 @@ _revoked_lock = asyncio.Lock()
 
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+MAX_TRACKED_LOCKOUTS = 10_000  # prevent unbounded growth
 
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
+# Background cleanup for _login_attempts (prevent memory growth)
+# ------------------------------------------------------------------ #
+async def _cleanup_login_attempts() -> None:
+    """Periodically remove expired lockout entries."""
+    while True:
+        await asyncio.sleep(300)  # every 5 minutes
+        now = time.time()
+        expired = [
+            k for k, v in list(_login_attempts.items())
+            if v.get("locked_until", 0) < now and v.get("attempts", 0) < MAX_LOGIN_ATTEMPTS
+        ]
+        for k in expired:
+            _login_attempts.pop(k, None)
+        # Hard cap
+        if len(_login_attempts) > MAX_TRACKED_LOCKOUTS:
+            oldest = sorted(_login_attempts.items(), key=lambda x: x[1].get("locked_until", 0))[:100]
+            for k, _ in oldest:
+                _login_attempts.pop(k, None)
+
+
+# Start background cleanup when module loads
+try:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        asyncio.ensure_future(_cleanup_login_attempts())
+except RuntimeError:
+    pass  # no event loop yet — task will be started by lifespan
+
+
+# ------------------------------------------------------------------ #
 # Helpers
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 
 def _make_jwt(payload: Dict[str, Any], expires_delta: timedelta) -> str:
     import jwt as pyjwt  # PyJWT
@@ -121,9 +153,34 @@ async def _verify_password(plain: str, hashed: str) -> bool:
     return ctx.verify(plain, hashed)
 
 
-# ---------------------------------------------------------------------------
+async def _lookup_user_from_db(username: str) -> Optional[Dict[str, Any]]:
+    """Look up user from Supabase users table.
+
+    Returns dict with {id, username, email, hashed_password, role}
+    or None if not found.
+    """
+    try:
+        from backend.database.connection import get_db_client
+        client = await get_db_client()
+        result = (
+            client.table("users")
+            .select("id, username, email, hashed_password, role")
+            .eq("username", username)
+            .limit(1)
+            .execute()
+        )
+        data = result.data
+        if data:
+            return data[0]
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.error("DB user lookup failed: %s", exc)
+        return None
+
+
+# ------------------------------------------------------------------ #
 # Schemas
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 
 class RegisterRequest(BaseModel):
     username: str
@@ -135,7 +192,18 @@ class RegisterRequest(BaseModel):
     def password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
         return v
+
+    @field_validator("username")
+    @classmethod
+    def username_valid(cls, v: str) -> str:
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if not v.isalnum():
+            raise ValueError("Username must be alphanumeric")
+        return v.lower()
 
 
 class LoginRequest(BaseModel):
@@ -148,18 +216,37 @@ class TokenResponse(BaseModel):
     username: str
 
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 # Routes
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------ #
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, response: Response) -> Dict[str, Any]:
     """Register a new user and set auth cookies."""
+    # Check if username already exists
+    existing = await _lookup_user_from_db(body.username)
+    if existing:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Username already taken")
+
     hashed = await _hash_password(body.password)
     user_id = str(uuid.uuid4())
 
-    # TODO: persist user to Supabase users table
-    # For now: return tokens so frontend can proceed
+    # Persist user to Supabase
+    try:
+        from backend.database.connection import get_db_client
+        client = await get_db_client()
+        client.table("users").insert({
+            "id": user_id,
+            "username": body.username,
+            "email": body.email,
+            "hashed_password": hashed,
+            "role": "user",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to persist user: %s", exc)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Registration failed")
+
     access_token = _make_jwt(
         {"sub": user_id, "username": body.username, "role": "user"},
         timedelta(minutes=ACCESS_TOKEN_MINUTES),
@@ -183,16 +270,26 @@ async def login(body: LoginRequest, request: Request, response: Response) -> Dic
     key = _lockout_key(request, body.username)
     _check_lockout(key)
 
-    # TODO: look up user from Supabase and verify hashed password
-    # Stub: accept any non-empty credentials in dev mode
     is_dev = os.environ.get("ENVIRONMENT", "development") != "production"
-    if is_dev and body.username and body.password:
+
+    if is_dev:
+        # Development: accept any non-empty credentials (no DB needed)
+        if not body.username or not body.password:
+            _record_failure(key)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         user_id = str(uuid.uuid4())
         role = "admin" if body.username == "admin" else "user"
     else:
-        # Production: verify against DB
-        _record_failure(key)
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        # Production: verify against Supabase DB
+        user = await _lookup_user_from_db(body.username)
+        if not user:
+            _record_failure(key)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        if not await _verify_password(body.password, user["hashed_password"]):
+            _record_failure(key)
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        user_id = user["id"]
+        role = user.get("role", "user")
 
     _clear_attempts(key)
 
@@ -209,7 +306,7 @@ async def login(body: LoginRequest, request: Request, response: Response) -> Dic
     response.set_cookie("access_token", access_token, **_cookie_kwargs(ACCESS_TOKEN_MINUTES * 60))
     response.set_cookie("refresh_token", refresh_token, **_cookie_kwargs(REFRESH_TOKEN_DAYS * 86400))
 
-    logger.info("User logged in: %s", body.username)
+    logger.info("User logged in: %s (role=%s)", body.username, role)
     return {"message": "Login successful", "username": body.username, "role": role}
 
 
