@@ -1,51 +1,46 @@
-# Galaxy Vast AI Trading Platform — Production Docker Compose
-# Note: 'version' key removed (deprecated in Compose v2)
+# Galaxy Vast AI Trading Platform
+# All services with resource limits, healthchecks, and restart policies.
 
 services:
-
   redis:
     image: redis:7.4-alpine
-    container_name: galaxyvast_redis
     restart: on-failure:3
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --appendonly no
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --save 60 1000 --loglevel warning --maxmemory 512mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - galaxyvast_net
+      start_period: 10s
     deploy:
       resources:
         limits:
-          memory: 600m
+          memory: 768M
           cpus: '0.5'
-        reservations:
-          memory: 128m
-          cpus: '0.1'
     logging:
       driver: json-file
       options:
-        max-size: "10m"
+        max-size: "20m"
         max-file: "3"
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: galaxyvast_api
     restart: on-failure:3
     ports:
       - "8000:8000"
-    env_file:
-      - .env
-    volumes:
-      - model_data:/app/models
-      - log_data:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
     depends_on:
       redis:
         condition: service_healthy
@@ -55,16 +50,18 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks:
-      - galaxyvast_net
     deploy:
       resources:
         limits:
-          memory: 3g
+          memory: 2G
           cpus: '2.0'
         reservations:
-          memory: 512m
+          memory: 512M
           cpus: '0.5'
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     logging:
       driver: json-file
       options:
@@ -75,93 +72,87 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    container_name: galaxyvast_bot
     restart: on-failure:3
-    env_file:
-      - .env
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
     depends_on:
       api:
         condition: service_healthy
-    networks:
-      - galaxyvast_net
     deploy:
       resources:
         limits:
-          memory: 512m
-          cpus: '0.5'
+          memory: 512M
+          cpus: '1.0'
         reservations:
-          memory: 128m
-          cpus: '0.1'
+          memory: 128M
+          cpus: '0.25'
     logging:
       driver: json-file
       options:
-        max-size: "10m"
+        max-size: "20m"
         max-file: "3"
 
   dashboard:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: galaxyvast_dashboard
     restart: on-failure:3
     ports:
       - "8501:8501"
-    env_file:
-      - .env
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
     depends_on:
       api:
         condition: service_healthy
-    networks:
-      - galaxyvast_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 1G
           cpus: '1.0'
         reservations:
-          memory: 256m
+          memory: 256M
           cpus: '0.25'
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     logging:
       driver: json-file
       options:
-        max-size: "10m"
+        max-size: "30m"
         max-file: "3"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: galaxyvast_frontend
     restart: on-failure:3
     ports:
       - "3000:80"
     depends_on:
       api:
         condition: service_healthy
-    networks:
-      - galaxyvast_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 256M
           cpus: '0.5'
-        reservations:
-          memory: 64m
-          cpus: '0.1'
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
-networks:
-  galaxyvast_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-
-volumes:
-  redis_data:
-  model_data:
-  log_data:
