@@ -1,1 +1,312 @@
-"""\nbackend/services/threat_intelligence_service.py\nPhase-4 — Optional Cloud Threat Intelligence\n\nProviders supported (via THREAT_INTEL_PROVIDER env var):\n  • abuseipdb   — AbuseIPDB v2 API\n  • virustotal  — VirusTotal v3 API\n  • cloudflare  — Cloudflare Radar / Threat Feeds\n  • local       — local-only (default when disabled/unavailable)\n\nDesign rules:\n  • THREAT_INTEL_ENABLED=false → local-only, no network calls\n  • Any cloud failure → silent fallback, system keeps running\n  • Results cached per IP (TTL configurable, default 1 h)\n  • Never blocks event loop — httpx async, 5 s timeout hard cap\n  • Integrates with SecurityAIAgent.analyze_event()\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport ipaddress\nimport logging\nimport os\nimport time\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any, Dict, Optional\n\nimport httpx\n\nlog = logging.getLogger(__name__)\n\n# ── env vars ──────────────────────────────────────────────────────────────────\n_ENABLED: bool = os.getenv("THREAT_INTEL_ENABLED", "false").lower() in ("1", "true", "yes")\n_PROVIDER: str = os.getenv("THREAT_INTEL_PROVIDER", "abuseipdb").lower()\n_API_KEY: str = os.getenv("THREAT_INTEL_API_KEY", "")\n_CACHE_TTL: int = int(os.getenv("THREAT_INTEL_CACHE_TTL", "3600"))  # seconds\n_TIMEOUT: float = float(os.getenv("THREAT_INTEL_TIMEOUT", "5.0"))   # hard cap\n\n# ── RFC-1918 / loopback — never query cloud for private IPs ──────────────────\n_PRIVATE_NETS = [\n    ipaddress.ip_network("10.0.0.0/8"),\n    ipaddress.ip_network("172.16.0.0/12"),\n    ipaddress.ip_network("192.168.0.0/16"),\n    ipaddress.ip_network("127.0.0.0/8"),\n    ipaddress.ip_network("::1/128"),\n    ipaddress.ip_network("fc00::/7"),\n]\n\n\ndef _is_private(ip: str) -> bool:\n    try:\n        addr = ipaddress.ip_address(ip)\n        return any(addr in net for net in _PRIVATE_NETS)\n    except ValueError:\n        return True  # malformed → treat as private, skip cloud\n\n\n# ── result dataclass ──────────────────────────────────────────────────────────\nclass ThreatLevel(str, Enum):\n    CLEAN = "clean"\n    LOW = "low"\n    MEDIUM = "medium"\n    HIGH = "high"\n    CRITICAL = "critical"\n\n\n@dataclass\nclass ThreatReport:\n    ip: str\n    threat_level: ThreatLevel = ThreatLevel.CLEAN\n    confidence_score: float = 0.0\n    abuse_score: int = 0\n    is_tor: bool = False\n    is_vpn: bool = False\n    is_datacenter: bool = False\n    country_code: str = ""\n    reports_count: int = 0\n    last_reported_at: Optional[str] = None\n    provider: str = "local"\n    cached: bool = False\n    error: Optional[str] = None\n    raw: Dict[str, Any] = field(default_factory=dict)\n\n    @property\n    def risk_score(self) -> float:\n        base = self.confidence_score / 100.0\n        if self.is_tor:\n            base = min(1.0, base + 0.3)\n        if self.is_datacenter:\n            base = min(1.0, base + 0.1)\n        return round(base, 4)\n\n\n# ── in-memory cache ───────────────────────────────────────────────────────────\nclass _Cache:\n    def __init__(self, ttl: int) -> None:\n        self._store: Dict[str, tuple[float, ThreatReport]] = {}\n        self._ttl = ttl\n        self._lock = asyncio.Lock()\n        self._MAX = 50_000\n\n    async def get(self, ip: str) -> Optional[ThreatReport]:\n        async with self._lock:\n            entry = self._store.get(ip)\n            if entry and (time.monotonic() - entry[0]) < self._ttl:\n                r = entry[1]\n                r.cached = True\n                return r\n            if entry:\n                del self._store[ip]\n            return None\n\n    async def set(self, ip: str, report: ThreatReport) -> None:\n        async with self._lock:\n            if len(self._store) >= self._MAX:\n                evict_n = self._MAX // 10\n                for k in list(self._store.keys())[:evict_n]:\n                    del self._store[k]\n            self._store[ip] = (time.monotonic(), report)\n\n\n# ── provider implementations ──────────────────────────────────────────────────\nclass _AbuseIPDBProvider:\n    _URL = "https://api.abuseipdb.com/api/v2/check"\n\n    def __init__(self, api_key: str) -> None:\n        self._key = api_key\n\n    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:\n        r = ThreatReport(ip=ip, provider="abuseipdb")\n        try:\n            resp = await client.get(\n                self._URL,\n                headers={"Key": self._key, "Accept": "application/json"},\n                params={"ipAddress": ip, "maxAgeInDays": "90"},\n                timeout=_TIMEOUT,\n            )\n            resp.raise_for_status()\n            data = resp.json().get("data", {})\n            score: int = data.get("abuseConfidenceScore", 0)\n            r.abuse_score = score\n            r.confidence_score = float(score)\n            r.country_code = data.get("countryCode", "")\n            r.reports_count = data.get("totalReports", 0)\n            r.last_reported_at = data.get("lastReportedAt")\n            r.is_tor = bool(data.get("isTor", False))\n            r.raw = data\n            r.threat_level = _score_to_level(score)\n        except Exception as exc:\n            r.error = f"abuseipdb: {type(exc).__name__}"\n            log.debug("AbuseIPDB error for %s: %s", ip, exc)\n        return r\n\n\nclass _VirusTotalProvider:\n    _URL = "https://www.virustotal.com/api/v3/ip_addresses/{ip}"\n\n    def __init__(self, api_key: str) -> None:\n        self._key = api_key\n\n    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:\n        r = ThreatReport(ip=ip, provider="virustotal")\n        try:\n            resp = await client.get(\n                self._URL.format(ip=ip),\n                headers={"x-apikey": self._key},\n                timeout=_TIMEOUT,\n            )\n            resp.raise_for_status()\n            attrs = resp.json().get("data", {}).get("attributes", {})\n            stats: Dict[str, int] = attrs.get("last_analysis_stats", {})\n            malicious: int = stats.get("malicious", 0)\n            suspicious: int = stats.get("suspicious", 0)\n            total: int = sum(stats.values()) or 1\n            score = round(((malicious * 1.0 + suspicious * 0.5) / total) * 100, 1)\n            r.confidence_score = score\n            r.abuse_score = int(score)\n            r.country_code = attrs.get("country", "")\n            r.is_tor = "TOR" in str(attrs.get("tags", []))\n            r.is_vpn = "VPN" in str(attrs.get("tags", []))\n            r.raw = attrs\n            r.threat_level = _score_to_level(score)\n        except Exception as exc:\n            r.error = f"virustotal: {type(exc).__name__}"\n            log.debug("VirusTotal error for %s: %s", ip, exc)\n        return r\n\n\nclass _CloudflareProvider:\n    _URL = "https://api.cloudflare.com/client/v4/radar/entities/ip?ip={ip}"\n\n    def __init__(self, api_key: str) -> None:\n        self._key = api_key\n\n    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:\n        r = ThreatReport(ip=ip, provider="cloudflare")\n        try:\n            resp = await client.get(\n                self._URL.format(ip=ip),\n                headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},\n                timeout=_TIMEOUT,\n            )\n            resp.raise_for_status()\n            result = resp.json().get("result", {})\n            ip_info = result.get("ipAddress", {})\n            is_bot = bool(ip_info.get("botStatus") == "verified_bot")\n            asn_type = str(ip_info.get("asnType", "")).lower()\n            r.is_datacenter = "hosting" in asn_type or "datacenter" in asn_type\n            r.country_code = str(ip_info.get("geoIpCountry", ""))\n            score = 20.0 if is_bot else 0.0\n            if r.is_datacenter:\n                score += 10.0\n            r.confidence_score = score\n            r.threat_level = _score_to_level(score)\n            r.raw = ip_info\n        except Exception as exc:\n            r.error = f"cloudflare: {type(exc).__name__}"\n            log.debug("Cloudflare error for %s: %s", ip, exc)\n        return r\n\n\nclass _LocalProvider:\n    async def check(self, ip: str, _client: httpx.AsyncClient) -> ThreatReport:\n        return ThreatReport(ip=ip, provider="local", threat_level=ThreatLevel.CLEAN)\n\n\ndef _score_to_level(score: float) -> ThreatLevel:\n    if score >= 80: return ThreatLevel.CRITICAL\n    if score >= 60: return ThreatLevel.HIGH\n    if score >= 30: return ThreatLevel.MEDIUM\n    if score >= 10: return ThreatLevel.LOW\n    return ThreatLevel.CLEAN\n\n\n# ── main service ──────────────────────────────────────────────────────────────\nclass ThreatIntelligenceService:\n    def __init__(self) -> None:\n        self._enabled = _ENABLED\n        self._cache = _Cache(ttl=_CACHE_TTL)\n        self._client: Optional[httpx.AsyncClient] = None\n        self._provider: Any = self._build_provider()\n        self._lock = asyncio.Lock()\n        self._stats = {"hits": 0, "misses": 0, "errors": 0, "local_only": 0}\n        if self._enabled:\n            log.info("ThreatIntel: enabled provider=%s", _PROVIDER)\n        else:\n            log.info("ThreatIntel: disabled — local-only mode")\n\n    def _build_provider(self) -> Any:\n        if not _ENABLED or not _API_KEY:\n            return _LocalProvider()\n        mapping = {"abuseipdb": _AbuseIPDBProvider, "virustotal": _VirusTotalProvider, "cloudflare": _CloudflareProvider}\n        cls = mapping.get(_PROVIDER)\n        if cls is None:\n            log.warning("ThreatIntel: unknown provider %r — falling back to local", _PROVIDER)\n            return _LocalProvider()\n        return cls(_API_KEY)\n\n    async def _get_client(self) -> httpx.AsyncClient:\n        async with self._lock:\n            if self._client is None or self._client.is_closed:\n                self._client = httpx.AsyncClient(\n                    timeout=httpx.Timeout(_TIMEOUT),\n                    limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),\n                    follow_redirects=False,\n                )\n            return self._client\n\n    async def check_ip(self, ip: str) -> ThreatReport:\n        if _is_private(ip):\n            self._stats["local_only"] += 1\n            return ThreatReport(ip=ip, provider="local", threat_level=ThreatLevel.CLEAN)\n        cached = await self._cache.get(ip)\n        if cached:\n            self._stats["hits"] += 1\n            return cached\n        self._stats["misses"] += 1\n        report: ThreatReport\n        try:\n            client = await self._get_client()\n            report = await asyncio.wait_for(self._provider.check(ip, client), timeout=_TIMEOUT + 1.0)\n        except asyncio.TimeoutError:\n            self._stats["errors"] += 1\n            report = ThreatReport(ip=ip, provider="local", error="timeout")\n        except Exception as exc:\n            self._stats["errors"] += 1\n            report = ThreatReport(ip=ip, provider="local", error=str(exc)[:120])\n        await self._cache.set(ip, report)\n        return report\n\n    async def enrich_event(self, event: Dict[str, Any]) -> Dict[str, Any]:\n        ip = str(event.get("ip", ""))\n        if not ip:\n            return event\n        try:\n            report = await self.check_ip(ip)\n            event["threat_intel"] = {\n                "threat_level": report.threat_level.value,\n                "confidence_score": report.confidence_score,\n                "is_tor": report.is_tor,\n                "is_vpn": report.is_vpn,\n                "is_datacenter": report.is_datacenter,\n                "country_code": report.country_code,\n                "provider": report.provider,\n                "cached": report.cached,\n                "risk_score": report.risk_score,\n            }\n        except Exception as exc:\n            log.debug("ThreatIntel enrich error: %s", exc)\n            event["threat_intel"] = {"error": "unavailable"}\n        return event\n\n    def stats(self) -> Dict[str, Any]:\n        return {"enabled": self._enabled, "provider": _PROVIDER if self._enabled else "local", "cache_ttl_seconds": _CACHE_TTL, **self._stats}\n\n    async def close(self) -> None:\n        if self._client and not self._client.is_closed:\n            await self._client.aclose()\n\n\nthreat_intelligence_service = ThreatIntelligenceService()\n
+from __future__ import annotations
+
+import asyncio
+import ipaddress
+import logging
+import os
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, Optional
+
+import httpx
+
+log = logging.getLogger(__name__)
+
+ENABLED: bool = os.getenv("THREAT_INTEL_ENABLED", "false").lower() in ("1", "true", "yes")
+PROVIDER: str = os.getenv("THREAT_INTEL_PROVIDER", "abuseipdb").lower()
+API_KEY: str = os.getenv("THREAT_INTEL_API_KEY", "")
+CACHE_TTL: int = int(os.getenv("THREAT_INTEL_CACHE_TTL", "3600"))
+TIMEOUT: float = float(os.getenv("THREAT_INTEL_TIMEOUT", "5.0"))
+
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _is_private(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        return any(addr in net for net in _PRIVATE_NETS)
+    except ValueError:
+        return True
+
+
+class ThreatLevel(str, Enum):
+    CLEAN = "clean"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+@dataclass
+class ThreatReport:
+    ip: str
+    threat_level: ThreatLevel = ThreatLevel.CLEAN
+    confidence_score: float = 0.0
+    abuse_score: int = 0
+    is_tor: bool = False
+    is_vpn: bool = False
+    is_datacenter: bool = False
+    country_code: str = ""
+    reports_count: int = 0
+    last_reported_at: Optional[str] = None
+    provider: str = "local"
+    cached: bool = False
+    error: Optional[str] = None
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def risk_score(self) -> float:
+        base = self.confidence_score / 100.0
+        if self.is_tor:
+            base = min(1.0, base + 0.3)
+        if self.is_datacenter:
+            base = min(1.0, base + 0.1)
+        return round(base, 4)
+
+
+class _Cache:
+    def __init__(self, ttl: int) -> None:
+        self._store: Dict[str, tuple] = {}
+        self._ttl = ttl
+        self._lock = asyncio.Lock()
+        self._MAX = 50_000
+
+    async def get(self, ip: str) -> Optional[ThreatReport]:
+        async with self._lock:
+            entry = self._store.get(ip)
+            if entry and (time.monotonic() - entry[0]) < self._ttl:
+                r = entry[1]
+                r.cached = True
+                return r
+            if entry:
+                del self._store[ip]
+            return None
+
+    async def set(self, ip: str, report: ThreatReport) -> None:
+        async with self._lock:
+            if len(self._store) >= self._MAX:
+                evict_n = self._MAX // 10
+                for k in list(self._store.keys())[:evict_n]:
+                    del self._store[k]
+            self._store[ip] = (time.monotonic(), report)
+
+
+class _AbuseIPDBProvider:
+    _URL = "https://api.abuseipdb.com/api/v2/check"
+
+    def __init__(self, api_key: str) -> None:
+        self._key = api_key
+
+    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:
+        r = ThreatReport(ip=ip, provider="abuseipdb")
+        try:
+            resp = await client.get(
+                self._URL,
+                headers={"Key": self._key, "Accept": "application/json"},
+                params={"ipAddress": ip, "maxAgeInDays": "90"},
+                timeout=TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json().get("data", {})
+            score: int = data.get("abuseConfidenceScore", 0)
+            r.abuse_score = score
+            r.confidence_score = float(score)
+            r.country_code = data.get("countryCode", "")
+            r.reports_count = data.get("totalReports", 0)
+            r.last_reported_at = data.get("lastReportedAt")
+            r.is_tor = bool(data.get("isTor", False))
+            r.raw = data
+            r.threat_level = _score_to_level(score)
+        except Exception as exc:
+            r.error = f"abuseipdb: {type(exc).__name__}"
+            log.debug("AbuseIPDB error for %s: %s", ip, exc)
+        return r
+
+
+class _VirusTotalProvider:
+    _URL = "https://www.virustotal.com/api/v3/ip_addresses/{ip}"
+
+    def __init__(self, api_key: str) -> None:
+        self._key = api_key
+
+    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:
+        r = ThreatReport(ip=ip, provider="virustotal")
+        try:
+            resp = await client.get(
+                self._URL.format(ip=ip),
+                headers={"x-apikey": self._key},
+                timeout=TIMEOUT,
+            )
+            resp.raise_for_status()
+            attrs = resp.json().get("data", {}).get("attributes", {})
+            stats: Dict[str, int] = attrs.get("last_analysis_stats", {})
+            malicious: int = stats.get("malicious", 0)
+            suspicious: int = stats.get("suspicious", 0)
+            total: int = sum(stats.values()) or 1
+            score = round(((malicious * 1.0 + suspicious * 0.5) / total) * 100, 1)
+            r.confidence_score = score
+            r.abuse_score = int(score)
+            r.country_code = attrs.get("country", "")
+            r.is_tor = "TOR" in str(attrs.get("tags", []))
+            r.is_vpn = "VPN" in str(attrs.get("tags", []))
+            r.raw = attrs
+            r.threat_level = _score_to_level(score)
+        except Exception as exc:
+            r.error = f"virustotal: {type(exc).__name__}"
+            log.debug("VirusTotal error for %s: %s", ip, exc)
+        return r
+
+
+class _CloudflareProvider:
+    _URL = "https://api.cloudflare.com/client/v4/radar/entities/ip?ip={ip}"
+
+    def __init__(self, api_key: str) -> None:
+        self._key = api_key
+
+    async def check(self, ip: str, client: httpx.AsyncClient) -> ThreatReport:
+        r = ThreatReport(ip=ip, provider="cloudflare")
+        try:
+            resp = await client.get(
+                self._URL.format(ip=ip),
+                headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
+                timeout=TIMEOUT,
+            )
+            resp.raise_for_status()
+            ip_info = resp.json().get("result", {}).get("ipAddress", {})
+            is_bot = bool(ip_info.get("botStatus") == "verified_bot")
+            asn_type = str(ip_info.get("asnType", "")).lower()
+            r.is_datacenter = "hosting" in asn_type or "datacenter" in asn_type
+            r.country_code = str(ip_info.get("geoIpCountry", ""))
+            score = 20.0 if is_bot else 0.0
+            if r.is_datacenter:
+                score += 10.0
+            r.confidence_score = score
+            r.threat_level = _score_to_level(score)
+            r.raw = ip_info
+        except Exception as exc:
+            r.error = f"cloudflare: {type(exc).__name__}"
+            log.debug("Cloudflare error for %s: %s", ip, exc)
+        return r
+
+
+class _LocalProvider:
+    async def check(self, ip: str, _client: httpx.AsyncClient) -> ThreatReport:
+        return ThreatReport(ip=ip, provider="local", threat_level=ThreatLevel.CLEAN)
+
+
+def _score_to_level(score: float) -> ThreatLevel:
+    if score >= 80:
+        return ThreatLevel.CRITICAL
+    if score >= 60:
+        return ThreatLevel.HIGH
+    if score >= 30:
+        return ThreatLevel.MEDIUM
+    if score >= 10:
+        return ThreatLevel.LOW
+    return ThreatLevel.CLEAN
+
+
+class ThreatIntelligenceService:
+    def __init__(self) -> None:
+        self._enabled = ENABLED
+        self._cache = _Cache(ttl=CACHE_TTL)
+        self._client: Optional[httpx.AsyncClient] = None
+        self._provider: Any = self._build_provider()
+        self._lock = asyncio.Lock()
+        self._stats = {"hits": 0, "misses": 0, "errors": 0, "local_only": 0}
+        if self._enabled:
+            log.info("ThreatIntel: enabled provider=%s", PROVIDER)
+        else:
+            log.info("ThreatIntel: disabled local-only mode")
+
+    def _build_provider(self) -> Any:
+        if not ENABLED or not API_KEY:
+            return _LocalProvider()
+        mapping = {
+            "abuseipdb": _AbuseIPDBProvider,
+            "virustotal": _VirusTotalProvider,
+            "cloudflare": _CloudflareProvider,
+        }
+        cls = mapping.get(PROVIDER)
+        if cls is None:
+            log.warning("ThreatIntel: unknown provider %r falling back to local", PROVIDER)
+            return _LocalProvider()
+        return cls(API_KEY)
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        async with self._lock:
+            if self._client is None or self._client.is_closed:
+                self._client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(TIMEOUT),
+                    limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+                    follow_redirects=False,
+                )
+            return self._client
+
+    async def check_ip(self, ip: str) -> ThreatReport:
+        if _is_private(ip):
+            self._stats["local_only"] += 1
+            return ThreatReport(ip=ip, provider="local", threat_level=ThreatLevel.CLEAN)
+        cached = await self._cache.get(ip)
+        if cached:
+            self._stats["hits"] += 1
+            return cached
+        self._stats["misses"] += 1
+        try:
+            client = await self._get_client()
+            report = await asyncio.wait_for(
+                self._provider.check(ip, client), timeout=TIMEOUT + 1.0
+            )
+        except asyncio.TimeoutError:
+            self._stats["errors"] += 1
+            report = ThreatReport(ip=ip, provider="local", error="timeout")
+        except Exception as exc:
+            self._stats["errors"] += 1
+            report = ThreatReport(ip=ip, provider="local", error=str(exc)[:120])
+        await self._cache.set(ip, report)
+        return report
+
+    async def enrich_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        ip = str(event.get("ip", ""))
+        if not ip:
+            return event
+        try:
+            report = await self.check_ip(ip)
+            event["threat_intel"] = {
+                "threat_level": report.threat_level.value,
+                "confidence_score": report.confidence_score,
+                "is_tor": report.is_tor,
+                "is_vpn": report.is_vpn,
+                "is_datacenter": report.is_datacenter,
+                "country_code": report.country_code,
+                "provider": report.provider,
+                "cached": report.cached,
+                "risk_score": report.risk_score,
+            }
+        except Exception as exc:
+            log.debug("ThreatIntel enrich error: %s", exc)
+            event["threat_intel"] = {"error": "unavailable"}
+        return event
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "enabled": self._enabled,
+            "provider": PROVIDER if self._enabled else "local",
+            "cache_ttl_seconds": CACHE_TTL,
+            **self._stats,
+        }
+
+    async def close(self) -> None:
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+
+
+threat_intelligence_service = ThreatIntelligenceService()
