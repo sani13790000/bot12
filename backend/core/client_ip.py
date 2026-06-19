@@ -40,8 +40,11 @@ def _get_trusted_networks() -> tuple:
     try:
         from backend.core.config import get_settings
         s = get_settings()
-        if hasattr(s, "TRUSTED_PROXY_CIDRS") and s.TRUSTED_PROXY_CIDRS:
-            raw_cidrs = [c.strip() for c in s.TRUSTED_PROXY_CIDRS.split(",") if c.strip()]
+       if hasattr(s, "TRUSTED_PROXY_CIDRS") and s.TRUSTED_PROXY_CIDRS:
+    if isinstance(s.TRUSTED_PROXY_CIDRS, str):
+        raw_cidrs = [c.strip() for c in s.TRUSTED_PROXY_CIDRS.split(",") if c.strip()]
+    else:
+        raw_cidrs = list(s.TRUSTED_PROXY_CIDRS)
     except Exception:
         pass
     networks = []
