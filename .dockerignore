@@ -1,48 +1,36 @@
+# .dockerignore — keep Docker image lean
+
 # Git
 .git
 .gitignore
-.github
 
-# Python cache
+# Node
+node_modules
+npm-debug.log
+frontend/node_modules
+frontend/.next
+frontend/dist
+
+# Python
 __pycache__
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
 .Python
 *.egg-info
-dist/
-build/
-.eggs/
-
-# Virtual environments
-venv/
-.venv/
-env/
-.env.local
-.env.*.local
-
-# Node / Frontend (built separately)
-frontend/node_modules/
-frontend/.next/
-frontend/dist/
-frontend/build/
-
-# Test artefacts
-.pytest_cache/
+dist
+build
+.eggs
+.mypy_cache
+.pytest_cache
 .coverage
-htmlcov/
-.tox/
+htmlcov
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Models (mounted as volume)
+# Models (large files)
 models/
 *.pkl
 *.joblib
+*.h5
 *.pt
 *.pth
 
@@ -50,14 +38,26 @@ models/
 logs/
 *.log
 
-# Docs (not needed at runtime)
-docs/
-*.md
-MQL5_INSTALLATION.md
-GALAXY_VAST_COMPLETE_GUIDE.md
-DEPLOYMENT.md
-SETUP.md
+# Env files
+.env
+.env.local
+.env.*.local
 
-# Misc
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Docs
+docs/
+*.md
+!README.md
