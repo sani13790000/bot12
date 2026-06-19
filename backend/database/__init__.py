@@ -1,12 +1,4 @@
-"""
-ماژول دیتابیس
+"""Database package for Galaxy Vast AI Trading Platform."""
+from backend.database.connection import get_db_client
 
-شامل:
-- اتصال به Supabase
-- Repositoryها
-- مدل‌ها
-"""
-
-from .connection import db, SupabaseManager, get_db
-
-__all__ = ["db", "SupabaseManager", "get_db"]
+__all__ = ["get_db_client"]

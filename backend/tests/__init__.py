@@ -1,1 +1,1 @@
-# Galaxy Vast AI Trading Platform — Test Suite
+"""Galaxy Vast AI Trading Platform — test suite."""
