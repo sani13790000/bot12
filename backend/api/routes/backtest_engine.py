@@ -1,10 +1,12 @@
 """Backtest Engine API routes — async-safe with ProcessPoolExecutor.
 
 Fixes applied:
-- Replaced ThreadPoolExecutor (blocks event loop) with asyncio.run_in_executor
-  backed by a ProcessPoolExecutor (CPU-bound work runs in separate process)
-- Added asyncio.Lock to protect _latest dict from concurrent write corruption
-- Comprehensive endpoints: run, status, results, cancel, compare
+- CRITICAL: Replaced MOCK random workers with real engine calls
+  (MultiSymbolBacktestEngine, WalkForwardAnalyzer, MonteCarloSimulator)
+- HIGH: asyncio.get_event_loop() → asyncio.get_running_loop() (Python 3.10+)
+- HIGH: Added job timeout (300s) — jobs can no longer run forever
+- HIGH: Jobs dict cleanup to prevent unbounded memory growth
+- LOW: Removed _executor._max_workers private attr access
 """
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ import uuid
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -25,13 +27,16 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Executor — CPU-bound backtest work runs in a separate process
 # ---------------------------------------------------------------------------
-_executor = ProcessPoolExecutor(max_workers=max(1, (os.cpu_count() or 2) - 1))
+_CPU_WORKERS = max(1, (os.cpu_count() or 2) - 1)
+_executor = ProcessPoolExecutor(max_workers=_CPU_WORKERS)
 
 # ---------------------------------------------------------------------------
 # In-memory job store (replace with Redis for multi-worker deployments)
 # ---------------------------------------------------------------------------
 _jobs: Dict[str, Dict[str, Any]] = {}
 _jobs_lock = asyncio.Lock()
+JOB_TIMEOUT_SECONDS = 300  # 5 minutes max per job
+MAX_JOBS_STORED = 500       # prevent unbounded memory growth
 
 
 # ---------------------------------------------------------------------------
@@ -67,149 +72,127 @@ class MonteCarloRequest(BaseModel):
 
 # ---------------------------------------------------------------------------
 # CPU-bound worker functions (run in separate process)
+# These call the REAL engines — no more mock random data
 # ---------------------------------------------------------------------------
 
 def _run_backtest_worker(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Pure function — safe to run in ProcessPoolExecutor."""
-    import math
-    import random
-    import time as _time
-
-    random.seed(42)
-    n_trades = random.randint(80, 300)
-    wins = int(n_trades * random.uniform(0.48, 0.68))
-    losses = n_trades - wins
-
-    gross_profit = sum(random.uniform(20, 200) for _ in range(wins))
-    gross_loss = sum(random.uniform(10, 150) for _ in range(losses))
-    net_pnl = gross_profit - gross_loss
-
-    # Build equity curve
-    equity = [params["initial_balance"]]
-    for _ in range(n_trades):
-        delta = random.uniform(-150, 200)
-        equity.append(max(equity[-1] + delta, 0))
-
-    peak = params["initial_balance"]
-    max_dd = 0.0
-    for e in equity:
-        if e > peak:
-            peak = e
-        dd = (peak - e) / peak if peak > 0 else 0
-        max_dd = max(max_dd, dd)
-
-    returns = [equity[i+1] - equity[i] for i in range(len(equity)-1)]
-    mean_r = sum(returns) / len(returns) if returns else 0
-    std_r = math.sqrt(sum((r - mean_r)**2 for r in returns) / len(returns)) if returns else 1
-    sharpe = (mean_r / std_r) * math.sqrt(252) if std_r > 0 else 0
-
-    neg_r = [r for r in returns if r < 0]
-    std_neg = math.sqrt(sum(r**2 for r in neg_r) / len(neg_r)) if neg_r else 1
-    sortino = (mean_r / std_neg) * math.sqrt(252) if std_neg > 0 else 0
-
-    return {
-        "symbol": params["symbol"],
-        "timeframe": params["timeframe"],
-        "strategy": params["strategy"],
-        "total_trades": n_trades,
-        "wins": wins,
-        "losses": losses,
-        "win_rate": round(wins / n_trades * 100, 2),
-        "net_pnl": round(net_pnl, 2),
-        "gross_profit": round(gross_profit, 2),
-        "gross_loss": round(gross_loss, 2),
-        "profit_factor": round(gross_profit / gross_loss, 3) if gross_loss else 999,
-        "max_drawdown_pct": round(max_dd * 100, 2),
-        "sharpe_ratio": round(sharpe, 3),
-        "sortino_ratio": round(sortino, 3),
-        "initial_balance": params["initial_balance"],
-        "final_balance": round(params["initial_balance"] + net_pnl, 2),
-        "equity_curve": equity[::10],  # sample every 10th point
-        "computed_at": _time.time(),
-    }
+    """Run real backtest using MultiSymbolBacktestEngine."""
+    try:
+        from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
+        engine = MultiSymbolBacktestEngine(
+            symbol=params["symbol"],
+            timeframe=params["timeframe"],
+            initial_balance=params["initial_balance"],
+            risk_pct=params["risk_pct"],
+        )
+        result = engine.run(
+            start_date=params["start_date"],
+            end_date=params["end_date"],
+            strategy=params["strategy"],
+            parameters=params.get("parameters", {}),
+        )
+        result["computed_at"] = time.time()
+        return result
+    except ImportError as exc:
+        # Fallback: engine not available — return informative error
+        raise RuntimeError(
+            f"BacktestEngine import failed: {exc}. "
+            "Ensure backend.backtest_engine.multi_symbol_engine is installed."
+        ) from exc
 
 
 def _run_wfo_worker(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Walk-forward optimisation — CPU-bound, runs in process pool."""
-    import random
-    import time as _time
-    random.seed(42)
-
-    folds = []
-    for i in range(params["n_folds"]):
-        is_sharpe = round(random.uniform(0.8, 2.5), 3)
-        oos_sharpe = round(random.uniform(0.5, is_sharpe), 3)
-        folds.append({
-            "fold": i + 1,
-            "is_sharpe": is_sharpe,
-            "oos_sharpe": oos_sharpe,
-            "robust": oos_sharpe >= 0.7,
-        })
-
-    is_avg = sum(f["is_sharpe"] for f in folds) / len(folds)
-    oos_avg = sum(f["oos_sharpe"] for f in folds) / len(folds)
-    robustness = sum(1 for f in folds if f["robust"]) / len(folds)
-
-    return {
-        "symbol": params["symbol"],
-        "n_folds": params["n_folds"],
-        "is_sharpe_avg": round(is_avg, 3),
-        "oos_sharpe_avg": round(oos_avg, 3),
-        "robustness_score": round(robustness, 2),
-        "is_robust": robustness >= 0.6 and oos_avg >= 0.7,
-        "folds": folds,
-        "computed_at": _time.time(),
-    }
+    """Run real Walk-Forward Optimisation using WalkForwardAnalyzer."""
+    try:
+        from backend.backtest_engine.walk_forward_advanced import WalkForwardAnalyzer
+        analyzer = WalkForwardAnalyzer(
+            symbol=params["symbol"],
+            timeframe=params["timeframe"],
+            n_folds=params["n_folds"],
+            is_ratio=params["is_ratio"],
+            initial_balance=params["initial_balance"],
+            risk_pct=params["risk_pct"],
+        )
+        result = analyzer.run()
+        result["computed_at"] = time.time()
+        return result
+    except ImportError as exc:
+        raise RuntimeError(
+            f"WalkForwardAnalyzer import failed: {exc}."
+        ) from exc
 
 
 def _run_mc_worker(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Monte Carlo simulation — CPU-bound."""
-    import math
-    import random
-    import time as _time
-    random.seed(42)
+    """Run real Monte Carlo simulation using MonteCarloSimulator."""
+    try:
+        from backend.backtest_engine.monte_carlo_advanced import MonteCarloSimulator
+        simulator = MonteCarloSimulator(
+            base_trades=params.get("base_trades", []),
+            n_simulations=params["n_simulations"],
+            initial_balance=params["initial_balance"],
+            ruin_threshold=params["ruin_threshold"],
+        )
+        result = simulator.run()
+        result["computed_at"] = time.time()
+        return result
+    except ImportError as exc:
+        raise RuntimeError(
+            f"MonteCarloSimulator import failed: {exc}."
+        ) from exc
 
-    n = params["n_simulations"]
-    balance = params["initial_balance"]
-    ruin = params["ruin_threshold"]
-    trades = params.get("base_trades", [])
 
-    if not trades:
-        # Generate synthetic trade returns
-        trades = [{"pnl": random.uniform(-150, 200)} for _ in range(200)]
+# ---------------------------------------------------------------------------
+# Helper: run a worker with timeout and job cleanup
+# ---------------------------------------------------------------------------
 
-    pnls = [t.get("pnl", 0) for t in trades]
-    mean_pnl = sum(pnls) / len(pnls)
-    std_pnl = math.sqrt(sum((p - mean_pnl)**2 for p in pnls) / len(pnls))
+async def _dispatch_job(
+    job_id: str,
+    job_type: str,
+    worker_fn,
+    params: Dict[str, Any],
+) -> None:
+    """Dispatch a CPU-bound worker with timeout protection."""
+    async with _jobs_lock:
+        _jobs[job_id]["status"] = "running"
 
-    finals, ruin_count = [], 0
-    for _ in range(n):
-        eq = balance
-        ruined = False
-        for _ in range(len(pnls)):
-            eq += random.gauss(mean_pnl, std_pnl)
-            if eq <= balance * ruin:
-                ruined = True
-                break
-        if ruined:
-            ruin_count += 1
-        finals.append(eq)
+    try:
+        loop = asyncio.get_running_loop()  # Python 3.10+ safe
+        result = await asyncio.wait_for(
+            loop.run_in_executor(_executor, worker_fn, params),
+            timeout=JOB_TIMEOUT_SECONDS,
+        )
+        async with _jobs_lock:
+            _jobs[job_id].update(
+                {"status": "done", "result": result, "finished_at": time.time()}
+            )
+    except asyncio.TimeoutError:
+        logger.error("%s job %s timed out after %ss", job_type, job_id, JOB_TIMEOUT_SECONDS)
+        async with _jobs_lock:
+            _jobs[job_id].update(
+                {"status": "error", "error": f"Job timed out after {JOB_TIMEOUT_SECONDS}s"}
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("%s job %s failed: %s", job_type, job_id, exc)
+        async with _jobs_lock:
+            _jobs[job_id].update({"status": "error", "error": str(exc)})
 
-    finals.sort()
-    p10 = finals[int(n * 0.10)]
-    p50 = finals[int(n * 0.50)]
-    p90 = finals[int(n * 0.90)]
 
-    return {
-        "n_simulations": n,
-        "initial_balance": balance,
-        "final_p10": round(p10, 2),
-        "final_p50": round(p50, 2),
-        "final_p90": round(p90, 2),
-        "ruin_probability": round(ruin_count / n, 4),
-        "expected_value": round(sum(finals) / n, 2),
-        "computed_at": _time.time(),
-    }
+async def _create_job(job_type: str) -> str:
+    """Create a new job entry; evict oldest if limit exceeded."""
+    job_id = str(uuid.uuid4())
+    async with _jobs_lock:
+        # Evict oldest jobs if limit exceeded
+        if len(_jobs) >= MAX_JOBS_STORED:
+            oldest = sorted(_jobs.items(), key=lambda x: x[1].get("created_at", 0))[:50]
+            for k, _ in oldest:
+                _jobs.pop(k, None)
+        _jobs[job_id] = {
+            "status": "queued",
+            "type": job_type,
+            "created_at": time.time(),
+            "result": None,
+        }
+    return job_id
 
 
 # ---------------------------------------------------------------------------
@@ -219,25 +202,17 @@ def _run_mc_worker(params: Dict[str, Any]) -> Dict[str, Any]:
 @router.post("/run", status_code=status.HTTP_202_ACCEPTED)
 async def run_backtest(body: BacktestRequest) -> Dict[str, Any]:
     """Submit a backtest job. Returns job_id immediately; poll /status/{job_id}."""
-    job_id = str(uuid.uuid4())
-    async with _jobs_lock:
-        _jobs[job_id] = {"status": "queued", "created_at": time.time(), "result": None}
-
-    async def _run() -> None:
-        async with _jobs_lock:
-            _jobs[job_id]["status"] = "running"
-        try:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(_executor, _run_backtest_worker, body.model_dump())
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "done", "result": result, "finished_at": time.time()})
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Backtest job %s failed: %s", job_id, exc)
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "error", "error": str(exc)})
-
-    asyncio.create_task(_run(), name=f"backtest_{job_id}")
-    return {"job_id": job_id, "status": "queued", "poll_url": f"/api/v1/backtest-engine/status/{job_id}"}
+    job_id = await _create_job("backtest")
+    asyncio.create_task(
+        _dispatch_job(job_id, "backtest", _run_backtest_worker, body.model_dump()),
+        name=f"backtest_{job_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "poll_url": f"/api/v1/backtest-engine/status/{job_id}",
+        "timeout_seconds": JOB_TIMEOUT_SECONDS,
+    }
 
 
 @router.get("/status/{job_id}")
@@ -265,47 +240,32 @@ async def cancel_backtest(job_id: str) -> Dict[str, str]:
 @router.post("/walk-forward", status_code=status.HTTP_202_ACCEPTED)
 async def run_walk_forward(body: WalkForwardRequest) -> Dict[str, Any]:
     """Submit a walk-forward optimisation job."""
-    job_id = str(uuid.uuid4())
-    async with _jobs_lock:
-        _jobs[job_id] = {"status": "queued", "type": "wfo", "created_at": time.time()}
-
-    async def _run() -> None:
-        async with _jobs_lock:
-            _jobs[job_id]["status"] = "running"
-        try:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(_executor, _run_wfo_worker, body.model_dump())
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "done", "result": result})
-        except Exception as exc:  # noqa: BLE001
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "error", "error": str(exc)})
-
-    asyncio.create_task(_run(), name=f"wfo_{job_id}")
-    return {"job_id": job_id, "status": "queued", "poll_url": f"/api/v1/backtest-engine/status/{job_id}"}
+    job_id = await _create_job("wfo")
+    asyncio.create_task(
+        _dispatch_job(job_id, "wfo", _run_wfo_worker, body.model_dump()),
+        name=f"wfo_{job_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "poll_url": f"/api/v1/backtest-engine/status/{job_id}",
+        "timeout_seconds": JOB_TIMEOUT_SECONDS,
+    }
 
 
 @router.post("/monte-carlo", status_code=status.HTTP_202_ACCEPTED)
 async def run_monte_carlo(body: MonteCarloRequest) -> Dict[str, Any]:
     """Submit a Monte Carlo simulation job."""
-    job_id = str(uuid.uuid4())
-    async with _jobs_lock:
-        _jobs[job_id] = {"status": "queued", "type": "mc", "created_at": time.time()}
-
-    async def _run() -> None:
-        async with _jobs_lock:
-            _jobs[job_id]["status"] = "running"
-        try:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(_executor, _run_mc_worker, body.model_dump())
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "done", "result": result})
-        except Exception as exc:  # noqa: BLE001
-            async with _jobs_lock:
-                _jobs[job_id].update({"status": "error", "error": str(exc)})
-
-    asyncio.create_task(_run(), name=f"mc_{job_id}")
-    return {"job_id": job_id, "status": "queued"}
+    job_id = await _create_job("mc")
+    asyncio.create_task(
+        _dispatch_job(job_id, "mc", _run_mc_worker, body.model_dump()),
+        name=f"mc_{job_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "timeout_seconds": JOB_TIMEOUT_SECONDS,
+    }
 
 
 @router.get("/jobs")
@@ -329,6 +289,8 @@ async def backtest_engine_health() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "executor": "ProcessPoolExecutor",
-        "workers": _executor._max_workers,
+        "workers": _CPU_WORKERS,
+        "timeout_seconds": JOB_TIMEOUT_SECONDS,
+        "max_jobs_stored": MAX_JOBS_STORED,
         "jobs": {"total": total, "running": running, "done": done},
     }

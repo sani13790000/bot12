@@ -1,6 +1,5 @@
-from .metrics import metrics_registry
-from .structured_logger import get_logger
-from .alert_manager import alert_manager
-from .tracing import tracer
+"""Observability package for Galaxy Vast AI Trading Platform."""
+from backend.observability.metrics import metrics_registry
+from backend.observability.alert_manager import alert_manager
 
-__all__ = ["metrics_registry", "get_logger", "alert_manager", "tracer"]
+__all__ = ["metrics_registry", "alert_manager"]
