@@ -1,206 +1,183 @@
-"""
-backend/services/self_healing_service.py
-Phase-3 (FINAL) + Phase-13.
-
-handle_anomaly() < 2ms hot path — all side-effects via asyncio.create_task.
-Never blocks trading execution.
-"""
 from __future__ import annotations
-import asyncio, logging, os, time
-from dataclasses import dataclass, field
+import asyncio
+import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
-_SCORE_CRITICAL       = float(os.getenv("HEALING_SCORE_CRITICAL", "-0.40"))
-_SCORE_HIGH           = float(os.getenv("HEALING_SCORE_HIGH",     "-0.20"))
-_SCORE_MEDIUM         = float(os.getenv("HEALING_SCORE_MEDIUM",   "-0.10"))
-_BLOCK_TTL_CRITICAL_H = int(os.getenv("HEALING_BLOCK_TTL_CRITICAL_H", "24"))
-_BLOCK_TTL_HIGH_H     = int(os.getenv("HEALING_BLOCK_TTL_HIGH_H",      "4"))
-
-
-class Severity(str, Enum):
-    MEDIUM = "medium"; HIGH = "high"; CRITICAL = "critical"
+_SCORE_CRITICAL = -0.40
+_SCORE_HIGH = -0.20
+_SCORE_MEDIUM = -0.10
+_BLOCK_TTL_CRITICAL = 3600
+_BLOCK_TTL_HIGH = 1800
+_BLOCK_TTL_MEDIUM = 900
 
 
 @dataclass
-class HealingAction:
-    action_type: str; target: str; severity: Severity
-    anomaly_score: float; reason: str
+class _HealingAction:
+    action_type: str
+    target: str
+    severity: str
+    reason: str
     auto_expire_at: Optional[datetime] = None
 
 
-@dataclass
-class HealingResult:
-    severity: Severity; actions_taken: List[str]
-    elapsed_ms: float; anomaly_score: float
-    ip: Optional[str]; user_id: Optional[str]
+def _now_utc() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+def _expire_at(seconds: int) -> datetime:
+    return _now_utc() + timedelta(seconds=seconds)
+
+
+async def _run_sync(fn) -> Any:
+    """Run synchronous callable in executor.
+    FIX: asyncio.get_event_loop() deprecated in Python 3.10+.
+    Uses asyncio.get_running_loop() instead.
+    """
+    loop = asyncio.get_running_loop()  # FIX: was get_event_loop()
+    return await loop.run_in_executor(None, fn)
 
 
 class SelfHealingService:
     def __init__(self) -> None:
-        self._action_log: List[HealingAction] = []
+        self._dynamic_rate_limits: Dict[str, float] = {}
         self._lock = asyncio.Lock()
 
-    async def handle_anomaly(self, event: Dict[str, Any], anomaly_score: float) -> HealingResult:
-        t0      = time.perf_counter()
-        ip      = str(event.get("ip", ""))
-        user_id = event.get("user_id")
-        if anomaly_score < _SCORE_CRITICAL:
-            sev, taken = Severity.CRITICAL, await self._handle_critical(ip, user_id, anomaly_score, event)
-        elif anomaly_score < _SCORE_HIGH:
-            sev, taken = Severity.HIGH, await self._handle_high(ip, user_id, anomaly_score, event)
-        elif anomaly_score < _SCORE_MEDIUM:
-            sev, taken = Severity.MEDIUM, await self._handle_medium(ip, user_id, anomaly_score, event)
-        else:
-            sev, taken = Severity.MEDIUM, ["no_action"]
-        elapsed = (time.perf_counter() - t0) * 1000
-        log.info("SelfHealing | sev=%s score=%.3f ip=%s actions=%s %.1fms",
-                 sev.value, anomaly_score, ip or "-", ",".join(taken), elapsed)
-        return HealingResult(sev, taken, round(elapsed, 2), anomaly_score, ip or None, user_id)
-
-    async def _handle_critical(self, ip, user_id, score, event):
-        actions = []
-        expire  = datetime.now(timezone.utc) + timedelta(hours=_BLOCK_TTL_CRITICAL_H)
-        if ip:
-            asyncio.create_task(self._block_ip(ip, score, expire, "critical_anomaly"))
-            asyncio.create_task(self._reduce_rate_limit(ip, 0.10))
-            actions += ["block_ip_24h", "rate_limit_10pct"]
-        if user_id:
-            asyncio.create_task(self._revoke_all_sessions(user_id, "critical_anomaly"))
-            asyncio.create_task(self._flag_trading_account(user_id, score, "critical"))
-            actions += ["revoke_all_sessions", "flag_account_critical"]
-        asyncio.create_task(self._open_trading_circuit_breaker(score))
-        asyncio.create_task(self._send_alert(Severity.CRITICAL, ip, user_id, score))
-        asyncio.create_task(self._log_actions(
-            [HealingAction(a, ip or user_id or "?", Severity.CRITICAL, score, "critical_anomaly")
-             for a in actions]))
-        return actions + ["circuit_breaker_open"]
-
-    async def _handle_high(self, ip, user_id, score, event):
-        actions = []
-        if ip:
-            asyncio.create_task(self._reduce_rate_limit(ip, 0.25))
-            actions.append("rate_limit_25pct")
-        if user_id:
-            asyncio.create_task(self._revoke_active_sessions(user_id, "high_anomaly"))
-            asyncio.create_task(self._flag_trading_account(user_id, score, "high"))
-            actions += ["revoke_active_sessions", "flag_account_high"]
-        asyncio.create_task(self._send_alert(Severity.HIGH, ip, user_id, score))
-        asyncio.create_task(self._log_actions(
-            [HealingAction(a, ip or user_id or "?", Severity.HIGH, score, "high_anomaly")
-             for a in actions]))
-        return actions
-
-    async def _handle_medium(self, ip, user_id, score, event):
-        actions = []
-        if ip:
-            asyncio.create_task(self._reduce_rate_limit(ip, 0.50))
-            actions.append("rate_limit_50pct")
-        asyncio.create_task(self._log_actions(
-            [HealingAction(a, ip or "?", Severity.MEDIUM, score, "medium_anomaly") for a in actions]))
-        return actions
-
-    async def _block_ip(self, ip, score, expire, reason):
+    async def handle_anomaly(self, event: Dict[str, Any], anomaly_score: float) -> None:
+        ip = str(event.get("ip", ""))
+        user_id = str(event.get("user_id", ""))
+        actions: List[_HealingAction] = []
         try:
-            from backend.middleware.rate_limit import _dynamic_ip_limits
-            _dynamic_ip_limits[ip] = (0, 1)
-        except Exception as e: log.debug("rate_limit block: %s", e)
+            if anomaly_score <= _SCORE_CRITICAL:
+                actions += await self._handle_critical(ip, user_id, anomaly_score)
+            elif anomaly_score <= _SCORE_HIGH:
+                actions += await self._handle_high(ip, user_id, anomaly_score)
+            elif anomaly_score <= _SCORE_MEDIUM:
+                actions += await self._handle_medium(ip, anomaly_score)
+            else:
+                return
+            asyncio.create_task(self._log_actions(actions, anomaly_score), name="self_heal_log")
+        except Exception as exc:
+            log.error("SelfHealingService.handle_anomaly: %s", exc, exc_info=True)
+
+    async def _handle_critical(self, ip: str, user_id: str, score: float) -> List[_HealingAction]:
+        actions: List[_HealingAction] = []
+        ttl = _BLOCK_TTL_CRITICAL
+        if ip:
+            await self._block_ip(ip, score, ttl, "critical")
+            actions.append(_HealingAction("block_ip", ip, "critical", f"score={score:.3f}", _expire_at(ttl)))
+        if user_id and user_id != "None":
+            await self._revoke_sessions(user_id, "critical")
+            actions.append(_HealingAction("revoke_sessions", user_id, "critical", f"score={score:.3f}"))
+            await self._flag_trading_account(user_id, "critical", score)
+            actions.append(_HealingAction("flag_account", user_id, "critical", f"score={score:.3f}"))
+        await self._open_circuit_breaker("security_global", score)
+        actions.append(_HealingAction("circuit_break", "security_global", "critical", f"score={score:.3f}"))
+        return actions
+
+    async def _handle_high(self, ip: str, user_id: str, score: float) -> List[_HealingAction]:
+        actions: List[_HealingAction] = []
+        ttl = _BLOCK_TTL_HIGH
+        if ip:
+            await self._reduce_rate_limit(ip, 0.25)
+            actions.append(_HealingAction("reduce_rate_limit", ip, "high", f"factor=0.25 score={score:.3f}", _expire_at(ttl)))
+        if user_id and user_id != "None":
+            await self._revoke_sessions(user_id, "high")
+            actions.append(_HealingAction("revoke_sessions", user_id, "high", f"score={score:.3f}"))
+            await self._flag_trading_account(user_id, "high", score)
+            actions.append(_HealingAction("flag_account", user_id, "high", f"score={score:.3f}"))
+        return actions
+
+    async def _handle_medium(self, ip: str, score: float) -> List[_HealingAction]:
+        actions: List[_HealingAction] = []
+        if ip:
+            await self._reduce_rate_limit(ip, 0.50)
+            actions.append(_HealingAction("reduce_rate_limit", ip, "medium", f"factor=0.50 score={score:.3f}", _expire_at(_BLOCK_TTL_MEDIUM)))
+        return actions
+
+    async def _block_ip(self, ip: str, score: float, ttl_s: int, severity: str) -> None:
+        expire = _expire_at(ttl_s)
+        await self._reduce_rate_limit(ip, 0.0)
+        row = {"ip_address": ip, "reason": f"auto_block_{severity}", "risk_score": float(score), "expires_at": expire.isoformat(), "auto_blocked": True}
+
+        async def _db_write() -> None:
+            try:
+                from backend.database.connection import get_db_client
+                db = await asyncio.wait_for(get_db_client(), timeout=2.0)
+                await _run_sync(lambda: db.table("security_blocked_ips").upsert(row).execute())
+            except Exception as exc:
+                log.debug("_block_ip DB: %s", exc)
+
+        asyncio.create_task(_db_write(), name=f"block_ip_{ip}")
         try:
             from backend.agents.security_ai_agent import security_ai_agent
-            await security_ai_agent.add_blocked_ip(ip, reason=reason, expires_at=expire)
-        except Exception as e: log.debug("agent block: %s", e)
-        try:
-            from backend.database.connection import get_db_client
-            db = await asyncio.wait_for(get_db_client(), timeout=2.0)
-            await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(None, lambda:
-                db.table("security_blocked_ips").upsert({
-                    "ip_address": ip, "reason": reason, "risk_score": score,
-                    "expires_at": expire.isoformat(),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()), timeout=3.0)
-        except Exception as e: log.debug("DB block: %s", e)
+            await security_ai_agent.add_blocked_ip(ip)
+        except Exception as exc:
+            log.debug("add_blocked_ip: %s", exc)
+        log.warning("SelfHealing: blocked ip=%s severity=%s ttl=%ds", ip, severity, ttl_s)
 
-    async def _reduce_rate_limit(self, ip, factor):
-        try:
-            from backend.middleware.rate_limit import _dynamic_ip_limits
-            _dynamic_ip_limits[ip] = (max(1, int(120 * factor)), 60)
-        except Exception as e: log.debug("reduce_rl: %s", e)
+    async def _revoke_sessions(self, user_id: str, severity: str) -> None:
+        now = _now_utc().isoformat()
 
-    async def _revoke_all_sessions(self, user_id, reason):
-        try:
-            from backend.services.session_service import session_service
-            await session_service.revoke_all_user_sessions(user_id=user_id, reason=reason)
-        except Exception as e: log.debug("revoke_all: %s", e)
+        async def _do() -> None:
+            try:
+                from backend.database.connection import get_db_client
+                db = await asyncio.wait_for(get_db_client(), timeout=2.0)
+                await _run_sync(lambda: db.table("refresh_tokens").update({"revoked": True, "revoked_at": now}).eq("user_id", user_id).eq("revoked", False).execute())
+            except Exception as exc:
+                log.debug("_revoke_sessions: %s", exc)
 
-    async def _revoke_active_sessions(self, user_id, reason):
-        try:
-            from backend.services.session_service import session_service
-            await session_service.revoke_active_sessions(user_id=user_id, reason=reason)
-        except Exception as e: log.debug("revoke_active: %s", e)
+        asyncio.create_task(_do(), name=f"revoke_{user_id}")
+        log.warning("SelfHealing: revoked sessions user=%s severity=%s", user_id, severity)
 
-    async def _flag_trading_account(self, user_id, score, severity):
-        try:
-            from backend.database.connection import get_db_client
-            db = await asyncio.wait_for(get_db_client(), timeout=2.0)
-            await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(None, lambda:
-                db.table("users").update({
-                    "trading_flagged": True,
-                    "flag_reason": f"security_anomaly_{severity}",
-                    "flag_score": score,
-                    "flagged_at": datetime.now(timezone.utc).isoformat(),
-                }).eq("id", user_id).execute()), timeout=3.0)
-        except Exception as e: log.debug("flag_account: %s", e)
+    async def _flag_trading_account(self, user_id: str, severity: str, score: float) -> None:
+        update = {"trading_flagged": True, "flag_reason": f"security_anomaly_{severity}", "flag_score": float(score), "flagged_at": _now_utc().isoformat()}
 
-    async def _open_trading_circuit_breaker(self, score):
+        async def _do() -> None:
+            try:
+                from backend.database.connection import get_db_client
+                db = await asyncio.wait_for(get_db_client(), timeout=2.0)
+                await _run_sync(lambda: db.table("users").update(update).eq("id", user_id).execute())
+            except Exception as exc:
+                log.debug("_flag_account: %s", exc)
+
+        asyncio.create_task(_do(), name=f"flag_{user_id}")
+        log.warning("SelfHealing: flagged user=%s", user_id)
+
+    async def _open_circuit_breaker(self, name: str, score: float) -> None:
         try:
             from backend.circuit_breaker import circuit_breaker_manager
-            await circuit_breaker_manager.get("trading_anomaly").open(reason=f"Anomaly score={score:.3f}")
-            asyncio.create_task(self._auto_recover_cb("trading_anomaly", 300))
-        except Exception as e: log.debug("CB open: %s", e)
+            cb = circuit_breaker_manager.get_breaker(name)
+            await cb.open(reason=f"security_anomaly score={score:.3f}")
+        except Exception as exc:
+            log.debug("_open_circuit_breaker: %s", exc)
 
-    async def _auto_recover_cb(self, name, delay_s):
-        await asyncio.sleep(delay_s)
-        try:
-            from backend.circuit_breaker import circuit_breaker_manager
-            cb = circuit_breaker_manager.get(name)
-            if cb.state.value == "open": await cb.close()
-        except Exception as e: log.debug("auto_recover: %s", e)
-
-    async def _send_alert(self, severity, ip, user_id, score):
-        try:
-            from backend.telegram.alerts import alert_critical_anomaly
-            await alert_critical_anomaly(
-                event_type=f"self_healing_{severity.value}",
-                ip_address=ip, user_id=user_id, risk_score=abs(score),
-                description=f"SelfHealing | sev={severity.value} score={score:.3f}",
-            )
-        except Exception as e: log.debug("telegram: %s", e)
-
-    async def _log_actions(self, actions):
+    async def _reduce_rate_limit(self, ip: str, factor: float) -> None:
         async with self._lock:
-            self._action_log.extend(actions)
-            if len(self._action_log) > 1000:
-                self._action_log = self._action_log[-1000:]
-        now = datetime.now(timezone.utc).isoformat()
+            self._dynamic_rate_limits[ip] = factor
+        log.info("SelfHealing: rate factor ip=%s -> %.2f", ip, factor)
+
+    async def restore_rate_limit(self, ip: str) -> None:
+        async with self._lock:
+            self._dynamic_rate_limits.pop(ip, None)
+
+    def get_rate_limit_factor(self, ip: str) -> float:
+        return self._dynamic_rate_limits.get(ip, 1.0)
+
+    async def _log_actions(self, actions: List[_HealingAction], score: float) -> None:
+        if not actions:
+            return
         try:
             from backend.database.connection import get_db_client
-            db   = await asyncio.wait_for(get_db_client(), timeout=2.0)
-            rows = [{"action_type": a.action_type, "target": a.target,
-                     "severity": a.severity.value, "anomaly_score": a.anomaly_score,
-                     "reason": a.reason, "created_at": now} for a in actions]
-            if rows:
-                await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(None, lambda:
-                    db.table("self_healing_actions").insert(rows).execute()), timeout=3.0)
-        except Exception as e: log.debug("log_actions: %s", e)
-
-    def stats(self) -> Dict[str, Any]:
-        return {"total_actions": len(self._action_log),
-                "recent": [{"action": a.action_type, "severity": a.severity.value,
-                            "target": a.target[:32], "score": round(a.anomaly_score, 3)}
-                           for a in self._action_log[-20:]]}
+            db = await asyncio.wait_for(get_db_client(), timeout=3.0)
+            now = _now_utc().isoformat()
+            rows = [{"action_type": a.action_type, "target": a.target, "severity": a.severity, "anomaly_score": float(score), "reason": a.reason, "auto_expire_at": (a.auto_expire_at.isoformat() if a.auto_expire_at else None), "created_at": now} for a in actions]
+            await _run_sync(lambda: db.table("self_healing_actions").insert(rows).execute())
+        except Exception as exc:
+            log.debug("_log_actions: %s", exc)
 
 
 self_healing_service = SelfHealingService()
