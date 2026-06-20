@@ -1,10 +1,14 @@
-// ════════════════════════════════════════════════════════════════
-// Galaxy Vast AI Trading Platform — Typed API Client v3
-// ════════════════════════════════════════════════════════════════
+// Galaxy Vast AI Trading Platform -- Typed API Client v4
+//
+// FIX-9  login: {telegram_id,password} -> {email,password} (422 on every login)
+// FIX-10 risk: /risk/status -> /risk/limits (404)
+// FIX-11 ai: /api/v1/ai/* -> /api/v1/ai-prediction/* (404)
+// FIX-12 trades.close: /trades/{id}/close -> /trades/close/{id} (405)
+
 import type {
   ApiResponse, DashboardStats, Trade, Signal, PortfolioRisk,
   MLWeights, BacktestResult, SystemSettings, AnalyticsMetrics,
-  BreakdownItem, AIPrediction, ModelVersion, EquityPoint,
+  AIPrediction, ModelVersion, EquityPoint,
 } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -26,106 +30,95 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<ApiR
     const err = await response.json().catch(() => ({ detail: "Unknown error" }));
     return { success: false, data: null as T, error: err.detail ?? "Request failed" };
   }
-  const json = await response.json();
-  return { success: true, data: json };
+  return { success: true, data: await response.json() };
 }
 
-// ── Auth ──────────────────────────────────────────────────────
 export const authApi = {
-  login: (telegram_id: string, password: string) =>
+  login: (email: string, password: string) =>
     request<{ access_token: string }>("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ telegram_id, password }),
+      method: "POST", body: JSON.stringify({ email, password }),
     }),
+  register: (email: string, password: string, full_name: string) =>
+    request<{ access_token: string }>("/api/v1/auth/register", {
+      method: "POST", body: JSON.stringify({ email, password, full_name }),
+    }),
+  logout: () => request<void>("/api/v1/auth/logout", { method: "POST" }),
+  refresh: () => request<{ access_token: string }>("/api/v1/auth/refresh", { method: "POST" }),
+  me: () => request<{ user_id: string; role: string }>("/api/v1/auth/me"),
 };
 
-// ── Dashboard ─────────────────────────────────────────────────
 export const dashboardApi = {
   getStats: () => request<DashboardStats>("/api/v1/dashboard/stats"),
   getEquityCurve: (days = 30) =>
     request<{ points: EquityPoint[] }>(`/api/v1/dashboard/equity-curve?days=${days}`),
 };
 
-// ── Live Trades ───────────────────────────────────────────────
 export const tradesApi = {
-  listOpen:    ()           => request<Trade[]>("/api/v1/trades?status=OPEN"),
+  listOpen:    ()            => request<Trade[]>("/api/v1/trades/open"),
   listAll:     (limit = 100) => request<Trade[]>(`/api/v1/trades?limit=${limit}`),
-  listHistory: (limit = 200) => request<Trade[]>("/api/v1/trades?status=CLOSED"),
-  close:       (id: string) => request<void>(`/api/v1/trades/${id}/close`,  { method: "POST" }),
-  closeAll:    ()           => request<void>("/api/v1/trades/close-all",     { method: "POST" }),
+  listHistory: (limit = 200) => request<Trade[]>("/api/v1/trades?status=closed"),
+  close:       (id: string)  => request<void>(`/api/v1/trades/close/${id}`, { method: "POST" }),
+  closeAll:    ()            => request<void>("/api/v1/trades/close-all", { method: "POST" }),
 };
 
-// ── Signals ───────────────────────────────────────────────────
 export const signalsApi = {
   list:    (status?: string) => request<Signal[]>(`/api/v1/signals${status ? `?status=${status}` : ""}`),
   execute: (id: string)      => request<void>(`/api/v1/signals/${id}/execute`, { method: "POST" }),
   cancel:  (id: string)      => request<void>(`/api/v1/signals/${id}/cancel`,  { method: "POST" }),
 };
 
-// ── AI Predictions ────────────────────────────────────────────
 export const aiApi = {
-  predict:       (payload: Record<string, unknown>) =>
-    request<AIPrediction>("/api/v1/ai/predict", { method: "POST", body: JSON.stringify(payload) }),
-  batchPredict:  (payloads: Record<string, unknown>[]) =>
-    request<AIPrediction[]>("/api/v1/ai/batch-predict", { method: "POST", body: JSON.stringify(payloads) }),
-  getModels:     ()           => request<ModelVersion[]>("/api/v1/ai/models"),
-  getFeatures:   ()           => request<{ names: string[] }>("/api/v1/ai/feature-names"),
-  trainSymbol:   (symbol: string) =>
-    request<{ status: string }>(`/api/v1/ai/train/${symbol}`, { method: "POST" }),
+  predict:      (payload: Record<string, unknown>) =>
+    request<AIPrediction>("/api/v1/ai-prediction/predict", { method: "POST", body: JSON.stringify(payload) }),
+  batchPredict: (payloads: Record<string, unknown>[]) =>
+    request<AIPrediction[]>("/api/v1/ai-prediction/batch-predict", { method: "POST", body: JSON.stringify(payloads) }),
+  getModels:    ()               => request<ModelVersion[]>("/api/v1/ai-prediction/models"),
+  getFeatures:  ()               => request<{ names: string[] }>("/api/v1/ai-prediction/features"),
+  trainSymbol:  (symbol: string) =>
+    request<{ status: string }>(`/api/v1/ai-prediction/train/${symbol}`, { method: "POST" }),
 };
 
-// ── Risk ──────────────────────────────────────────────────────
 export const riskApi = {
-  getPortfolio: () => request<PortfolioRisk>("/api/v1/risk/status"),
-  getEquity:    () => request<{ drawdown_pct: number; halt_active: boolean }>("/api/v1/risk/equity/state"),
-  resumeHalt:   () => request<void>("/api/v1/risk/equity/resume", { method: "POST" }),
-  resetDaily:   () => request<void>("/api/v1/risk/reset/daily",   { method: "POST" }),
+  getLimits:    () => request<PortfolioRisk>("/api/v1/risk/limits"),
+  calculate:    (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/v1/risk/calculate", { method: "POST", body: JSON.stringify(body) }),
+  positionSize: (body: Record<string, unknown>) =>
+    request<Record<string, unknown>>("/api/v1/risk/position-size", { method: "POST", body: JSON.stringify(body) }),
 };
 
-// ── Analytics ─────────────────────────────────────────────────
+export const analysisApi = {
+  analyze: (symbol: string, timeframe = "H1") =>
+    request<Record<string, unknown>>(`/api/v1/analysis/analyze?symbol=${symbol}&timeframe=${timeframe}`),
+};
+
 export const analyticsApi = {
-  getMetrics:    ()          => request<AnalyticsMetrics>("/api/v1/analytics/metrics"),
-  getSummary:    ()          => request<Record<string, number>>("/api/v1/analytics/summary"),
-  getEquity:     ()          => request<{ points: EquityPoint[] }>("/api/v1/analytics/equity-curve"),
-  getDrawdown:   ()          => request<{ points: EquityPoint[] }>("/api/v1/analytics/drawdown"),
-  getBySymbol:   ()          => request<BreakdownItem[]>("/api/v1/analytics/breakdown/symbol"),
-  getBySession:  ()          => request<BreakdownItem[]>("/api/v1/analytics/breakdown/session"),
-  compare:       (period: string) => request<Record<string, unknown>>(`/api/v1/analytics/compare?period=${period}`),
-  getReport:     ()          => request<Record<string, unknown>>("/api/v1/analytics/report/json"),
+  getMetrics:           () => request<AnalyticsMetrics>("/api/v1/analytics/metrics"),
+  getSecurityMetrics:   () => request<Record<string, unknown>>("/api/v1/analytics/security/metrics"),
+  getSecurityDashboard: () => request<Record<string, unknown>>("/api/v1/analytics/security/dashboard"),
 };
 
-// ── Model Performance ─────────────────────────────────────────
-export const modelApi = {
-  getVersions:  (symbol: string)   => request<ModelVersion[]>(`/api/v1/self-learning/models/${symbol}`),
-  compare:      (symbol: string)   => request<Record<string, unknown>>(`/api/v1/self-learning/models/${symbol}/compare`),
-  retrain:      (symbol: string)   => request<{ status: string }>("/api/v1/self-learning/retrain", { method: "POST", body: JSON.stringify({ symbol }) }),
-  rollback:     (symbol: string)   => request<{ status: string }>("/api/v1/self-learning/rollback", { method: "POST", body: JSON.stringify({ symbol }) }),
-  getStatus:    ()                 => request<Record<string, unknown>>("/api/v1/self-learning/status"),
-  getWeights:   ()                 => request<MLWeights>("/api/v1/intelligence/weights"),
-  runLearning:  ()                 => request<{ status: string }>("/api/v1/intelligence/run-learning", { method: "POST" }),
+export const mlApi = {
+  getWeights:    () => request<MLWeights>("/api/v1/intelligence/weights"),
+  updateWeights: (weights: Partial<MLWeights>) =>
+    request<void>("/api/v1/intelligence/weights", { method: "POST", body: JSON.stringify(weights) }),
 };
 
-// ── Bot Control ───────────────────────────────────────────────
-export const botApi = {
-  start:  () => request<void>("/api/v1/bot/start",  { method: "POST" }),
-  stop:   () => request<void>("/api/v1/bot/stop",   { method: "POST" }),
-  pause:  () => request<void>("/api/v1/bot/pause",  { method: "POST" }),
-  resume: () => request<void>("/api/v1/bot/resume", { method: "POST" }),
+export const backtestApi = {
+  run:        (config: Record<string, unknown>) =>
+    request<BacktestResult>("/api/v1/backtest/run", { method: "POST", body: JSON.stringify(config) }),
+  getSymbols: () => request<{ symbols: string[] }>("/api/v1/backtest/symbols"),
 };
 
-// ── Settings ──────────────────────────────────────────────────
 export const settingsApi = {
-  get:    ()                              => request<SystemSettings>("/api/v1/settings"),
-  update: (data: Partial<SystemSettings>) =>
-    request<SystemSettings>("/api/v1/settings", { method: "PATCH", body: JSON.stringify(data) }),
+  get:    () => request<SystemSettings>("/api/v1/users/settings"),
+  update: (settings: Partial<SystemSettings>) =>
+    request<void>("/api/v1/users/settings", { method: "PUT", body: JSON.stringify(settings) }),
 };
 
-// ── Research ──────────────────────────────────────────────────
-export const researchApi = {
-  runBacktest: (payload: Record<string, unknown>) =>
-    request<BacktestResult>("/api/v1/research/backtest", { method: "POST", body: JSON.stringify(payload) }),
-  runMonteCarlo: (payload: Record<string, unknown>) =>
-    request<Record<string, unknown>>("/api/v1/research/monte-carlo", { method: "POST", body: JSON.stringify(payload) }),
-  walkForward: (payload: Record<string, unknown>) =>
-    request<Record<string, unknown>>("/api/v1/research/walk-forward", { method: "POST", body: JSON.stringify(payload) }),
+export const reportsApi = {
+  list:     () => request<Record<string, unknown>[]>("/api/v1/reports"),
+  generate: (days = 30) =>
+    request<Record<string, unknown>>("/api/v1/analytics/security/report", {
+      method: "POST", body: JSON.stringify({ days }),
+    }),
 };
