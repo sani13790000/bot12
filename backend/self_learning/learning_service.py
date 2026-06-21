@@ -1,21 +1,76 @@
-"""Learning Service — Phase 5: drift-aware scheduling, OOS validation, feature importance logging."""
+"""
+self_learning/learning_service.py -- Unified Learning Service
+Phase D Fix (ARCH-5):
+
+BEFORE: Two separate LearningService implementations:
+  - backend/self_learning/learning_service.py    (drift-aware scheduler)
+  - backend/intelligence/learning_service.py     (tight-coupled)
+
+AFTER: Single canonical implementation here.
+       intelligence/learning_service.py is now a thin re-export shim.
+
+Design:
+  - Dependency injection for all collaborators (DIP)
+  - No direct imports from intelligence/ package (avoids circular deps)
+  - asyncio.to_thread() for all blocking ML calls (TECH-4 fix)
+"""
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class LearningService:
-    """Orchestrates the self-learning loop with drift-aware scheduling."""
+@dataclass
+class LearningCycleResult:
+    """Result of one complete learning cycle."""
+    cycle_number: int = 0
+    trades_processed: int = 0
+    model_retrained: bool = False
+    weights_adjusted: bool = False
+    failures_analyzed: bool = False
+    training_accuracy: float = 0.0
+    training_f1: float = 0.0
+    drift_detected: bool = False
+    drift_score: float = 0.0
+    errors: List[str] = field(default_factory=list)
+    completed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
-    CHECK_INTERVAL_SECONDS = 3600  # check every hour
-    FORCE_RETRAIN_HOURS = 24
-    MIN_SAMPLES_FOR_LEARN = 50
-    DRIFT_RETRAIN_THRESHOLD = 0.5
+    @property
+    def success(self) -> bool:
+        return len(self.errors) == 0
+
+
+@dataclass
+class LearningStats:
+    """Aggregate statistics across all learning cycles."""
+    total_cycles: int = 0
+    successful_cycles: int = 0
+    total_trades_processed: int = 0
+    total_retrains: int = 0
+    last_retrain_at: Optional[datetime] = None
+    last_drift_detected_at: Optional[datetime] = None
+    current_accuracy: float = 0.0
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class LearningService:
+    """
+    Orchestrates the self-learning loop with drift-aware scheduling.
+    All collaborators injected via constructor (DIP).
+    Blocking ML calls offloaded with asyncio.to_thread() (TECH-4).
+    """
+
+    CHECK_INTERVAL_SECONDS: int = 3600
+    FORCE_RETRAIN_HOURS: int = 24
+    MIN_SAMPLES_FOR_LEARN: int = 50
+    MIN_SAMPLES_FOR_RETRAIN: int = 100
+    MIN_SAMPLES_FOR_WEIGHTS: int = 200
+    DRIFT_RETRAIN_THRESHOLD: float = 0.5
 
     def __init__(
         self,
@@ -23,208 +78,197 @@ class LearningService:
         ml_engine: Optional[Any] = None,
         model_manager: Optional[Any] = None,
         retraining_service: Optional[Any] = None,
-        db=None,
-    ):
+        weight_adjuster: Optional[Any] = None,
+        failure_analyzer: Optional[Any] = None,
+        db: Optional[Any] = None,
+        on_cycle_complete: Optional[Callable[[LearningCycleResult], None]] = None,
+    ) -> None:
         self._memory = trade_memory
         self._engine = ml_engine
         self._manager = model_manager
-        self._retrainer = retraining_service
+        self._retraining_svc = retraining_service
+        self._weight_adjuster = weight_adjuster
+        self._failure_analyzer = failure_analyzer
         self._db = db
+        self._on_cycle_complete = on_cycle_complete
+        self._stats = LearningStats()
         self._running = False
-        self._learn_count = 0
-        self._last_learn: Optional[datetime] = None
-        self._last_drift_score: float = 0.0
-
-    # ------------------------------------------------------------------ #
-    #  PUBLIC API
-    # ------------------------------------------------------------------ #
+        self._task: Optional[asyncio.Task] = None
+        self._last_forced_retrain: Optional[datetime] = None
 
     async def start(self) -> None:
-        """Start the background self-learning loop."""
         if self._running:
-            logger.warning("[LearningService] already running")
+            logger.warning("LearningService already running")
             return
         self._running = True
-        logger.info("[LearningService] started")
-        asyncio.create_task(self._learn_loop())
+        self._task = asyncio.create_task(self._loop(), name="learning_loop")
+        logger.info("LearningService started (interval=%ds)", self.CHECK_INTERVAL_SECONDS)
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
         self._running = False
-        logger.info("[LearningService] stopped")
-
-    async def learn_now(self, force: bool = False) -> Dict[str, Any]:
-        """Trigger a learning cycle immediately."""
-        return await self._run_learn_cycle(force=force)
-
-    def get_status(self) -> Dict[str, Any]:
-        drift_info = {}
-        if self._engine and hasattr(self._engine, "get_drift_info"):
+        if self._task and not self._task.done():
+            self._task.cancel()
             try:
-                drift_info = self._engine.get_drift_info()
-            except Exception:
+                await self._task
+            except asyncio.CancelledError:
                 pass
+        logger.info("LearningService stopped")
 
-        return {
-            "running": self._running,
-            "learn_count": self._learn_count,
-            "last_learn": self._last_learn.isoformat() if self._last_learn else None,
-            "last_drift_score": self._last_drift_score,
-            "engine_trained": getattr(self._engine, "is_trained", False) if self._engine else False,
-            "engine_version": getattr(self._engine, "model_version", "1.0") if self._engine else None,
-            "drift_info": drift_info,
-        }
+    async def record_trade(
+        self,
+        trade_context: Any,
+        outcome: Any,
+        *,
+        trigger_learn: bool = True,
+    ) -> None:
+        if self._memory is not None:
+            try:
+                await asyncio.to_thread(self._memory.add, trade_context, outcome)
+                self._stats.total_trades_processed += 1
+            except Exception as exc:
+                logger.warning("record_trade: memory.add failed -- %s", exc)
+        if trigger_learn and self._sample_count() >= self.MIN_SAMPLES_FOR_LEARN:
+            asyncio.create_task(
+                self._run_cycle(),
+                name=f"learning_cycle_{self._stats.total_cycles + 1}",
+            )
 
-    # ------------------------------------------------------------------ #
-    #  LOOP
-    # ------------------------------------------------------------------ #
+    async def force_retrain(self) -> LearningCycleResult:
+        logger.info("LearningService: force retrain requested")
+        return await self._run_cycle(force=True)
 
-    async def _learn_loop(self) -> None:
+    def get_stats(self) -> LearningStats:
+        return self._stats
+
+    async def _loop(self) -> None:
         while self._running:
             try:
-                await self._run_learn_cycle()
+                await asyncio.sleep(self.CHECK_INTERVAL_SECONDS)
+                if not self._running:
+                    break
+                count = self._sample_count()
+                if count < self.MIN_SAMPLES_FOR_LEARN:
+                    logger.debug("LearningService: %d/%d samples -- skip", count, self.MIN_SAMPLES_FOR_LEARN)
+                    continue
+                await self._run_cycle(force=self._is_force_retrain_due())
+            except asyncio.CancelledError:
+                break
             except Exception as exc:
-                logger.error("[LearningService] loop error: %s", exc)
-            await asyncio.sleep(self.CHECK_INTERVAL_SECONDS)
+                logger.error("LearningService loop error: %s", exc, exc_info=True)
+                await asyncio.sleep(min(self.CHECK_INTERVAL_SECONDS * 2, 7200))
 
-    async def _run_learn_cycle(self, force: bool = False) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
-            "cycle_at": datetime.utcnow().isoformat(),
-            "learned": False,
-            "reason": None,
-            "samples": 0,
-            "accuracy": 0.0,
-            "oos_accuracy": 0.0,
-            "drift_score": 0.0,
-            "model_version": None,
-        }
-
-        # 1. Get drift score
-        drift_score = 0.0
-        if self._engine and hasattr(self._engine, "get_drift_info"):
-            try:
-                info = self._engine.get_drift_info()
-                drift_score = float(info.get("drift_score", 0.0))
-                self._last_drift_score = drift_score
-            except Exception:
-                pass
-
-        # 2. Decide if we should learn
-        should_learn = force
-        reason = "forced" if force else None
-
-        if not should_learn and self._last_learn is None:
-            should_learn = True
-            reason = "initial"
-
-        if not should_learn and drift_score > self.DRIFT_RETRAIN_THRESHOLD:
-            should_learn = True
-            reason = f"drift({drift_score:.3f})"
-
-        if not should_learn and self._last_learn:
-            age = datetime.utcnow() - self._last_learn
-            if age > timedelta(hours=self.FORCE_RETRAIN_HOURS):
-                should_learn = True
-                reason = f"interval({age.total_seconds()/3600:.1f}h)"
-
-        if not should_learn:
-            result["reason"] = "no_learn_needed"
-            result["drift_score"] = drift_score
-            return result
-
-        # 3. Delegate to RetrainingService if available
-        if self._retrainer is not None:
-            try:
-                retrain_result = await self._retrainer.check_and_retrain()
-                if retrain_result.get("retrained"):
-                    tr = retrain_result.get("training_result") or {}
-                    self._last_learn = datetime.utcnow()
-                    self._learn_count += 1
-                    result.update({
-                        "learned": True,
-                        "reason": reason,
-                        "accuracy": tr.get("accuracy", 0.0),
-                        "oos_accuracy": tr.get("avg_oos_accuracy", 0.0),
-                        "drift_score": drift_score,
-                        "model_version": tr.get("model_version"),
-                    })
-                    await self._log_feature_importance(tr)
-                    return result
-            except Exception as exc:
-                logger.error("[LearningService] retrainer error: %s", exc)
-
-        # 4. Direct engine fallback
-        if self._engine is None:
-            result["reason"] = "no_engine"
-            return result
-
-        contexts = await self._get_contexts()
-        result["samples"] = len(contexts)
-
-        if len(contexts) < self.MIN_SAMPLES_FOR_LEARN:
-            result["reason"] = f"insufficient_data({len(contexts)})"
-            return result
-
+    async def _run_cycle(self, *, force: bool = False) -> LearningCycleResult:
+        result = LearningCycleResult(cycle_number=self._stats.total_cycles + 1)
+        contexts = self._get_contexts()
+        result.trades_processed = len(contexts)
         try:
-            if asyncio.iscoroutinefunction(getattr(self._engine, "train", None)):
-                training_result = await self._engine.train(contexts)
-            else:
-                loop = asyncio.get_event_loop()
-                training_result = await loop.run_in_executor(None, self._engine.train, contexts)
+            # Step 1: Failure analysis
+            if self._failure_analyzer is not None and len(contexts) >= self.MIN_SAMPLES_FOR_LEARN:
+                try:
+                    await asyncio.to_thread(self._failure_analyzer.analyze, contexts)
+                    result.failures_analyzed = True
+                except Exception as exc:
+                    result.errors.append(f"failure_analysis: {exc}")
 
-            if training_result and getattr(training_result, "success", False):
-                self._last_learn = datetime.utcnow()
-                self._learn_count += 1
-                result.update({
-                    "learned": True,
-                    "reason": reason,
-                    "accuracy": getattr(training_result, "accuracy", 0.0),
-                    "oos_accuracy": getattr(training_result, "avg_oos_accuracy", 0.0),
-                    "drift_score": drift_score,
-                    "model_version": getattr(training_result, "model_version", None),
-                })
-                await self._log_feature_importance({
-                    "feature_importance": getattr(training_result, "feature_importance", {}),
-                    "model_version": getattr(training_result, "model_version", "1.0"),
-                })
-            else:
-                error = getattr(training_result, "error", "unknown") if training_result else "none"
-                result["reason"] = f"train_failed({error})"
+            # Step 2: Drift check
+            drift_score = await self._check_drift()
+            result.drift_score = drift_score
+            result.drift_detected = drift_score >= self.DRIFT_RETRAIN_THRESHOLD
+
+            # Step 3: Model retrain
+            should_retrain = (
+                force
+                or result.drift_detected
+                or self._is_force_retrain_due()
+                or (len(contexts) >= self.MIN_SAMPLES_FOR_RETRAIN and self._engine_should_retrain())
+            )
+            if should_retrain and self._engine is not None:
+                try:
+                    # asyncio.to_thread avoids blocking event loop (TECH-4)
+                    train_result = await asyncio.to_thread(self._engine.train, contexts)
+                    result.model_retrained = True
+                    result.training_accuracy = getattr(train_result, "accuracy", 0.0)
+                    result.training_f1 = getattr(train_result, "f1_score", 0.0)
+                    now = datetime.now(timezone.utc)
+                    self._last_forced_retrain = now
+                    self._stats.total_retrains += 1
+                    self._stats.last_retrain_at = now
+                    self._stats.current_accuracy = result.training_accuracy
+                    if result.drift_detected:
+                        self._stats.last_drift_detected_at = now
+                    logger.info(
+                        "Model retrained: acc=%.3f f1=%.3f drift=%.3f",
+                        result.training_accuracy, result.training_f1, drift_score,
+                    )
+                except Exception as exc:
+                    result.errors.append(f"retrain: {exc}")
+                    logger.error("retrain error: %s", exc, exc_info=True)
+
+            # Step 4: Weight adjustment
+            if self._weight_adjuster is not None and len(contexts) >= self.MIN_SAMPLES_FOR_WEIGHTS:
+                try:
+                    await asyncio.to_thread(self._weight_adjuster.adjust, contexts)
+                    result.weights_adjusted = True
+                except Exception as exc:
+                    result.errors.append(f"weight_adjust: {exc}")
+
         except Exception as exc:
-            logger.error("[LearningService] train error: %s", exc)
-            result["reason"] = f"exception({exc})"
-
+            result.errors.append(f"cycle: {exc}")
+            logger.error("cycle %d error: %s", result.cycle_number, exc, exc_info=True)
+        finally:
+            self._stats.total_cycles += 1
+            if result.success:
+                self._stats.successful_cycles += 1
+            result.completed_at = datetime.now(timezone.utc)
+            if self._on_cycle_complete is not None:
+                try:
+                    self._on_cycle_complete(result)
+                except Exception:
+                    pass
         return result
 
-    async def _get_contexts(self) -> List[Any]:
+    # -- Helpers --
+
+    def _sample_count(self) -> int:
+        if self._memory is None:
+            return 0
+        try:
+            count = getattr(self._memory, "count", None)
+            return int(count()) if callable(count) else int(getattr(self._memory, "size", 0))
+        except Exception:
+            return 0
+
+    def _get_contexts(self) -> List[Any]:
         if self._memory is None:
             return []
         try:
-            if asyncio.iscoroutinefunction(getattr(self._memory, "get_all", None)):
-                return await self._memory.get_all() or []
-            return list(getattr(self._memory, "_memory", []) or [])
-        except Exception as exc:
-            logger.error("[LearningService] get_contexts error: %s", exc)
+            get_all = getattr(self._memory, "get_all", None)
+            return list(get_all()) if callable(get_all) else []
+        except Exception:
             return []
 
-    async def _log_feature_importance(self, tr: Dict[str, Any]) -> None:
-        if self._db is None:
-            return
-        fi = tr.get("feature_importance") or {}
-        version = tr.get("model_version", "1.0")
-        if not fi:
-            return
+    async def _check_drift(self) -> float:
+        if self._engine is None:
+            return 0.0
         try:
-            rows = [
-                {
-                    "symbol": "XAUUSD",
-                    "model_version": version,
-                    "feature_name": name,
-                    "importance": float(imp),
-                    "trained_at": datetime.utcnow().isoformat(),
-                }
-                for name, imp in fi.items()
-            ]
-            if rows and hasattr(self._db, "table"):
-                self._db.table("feature_importance_log").insert(rows).execute()
-        except Exception as exc:
-            logger.warning("[LearningService] log_feature_importance error: %s", exc)
+            fn = getattr(self._engine, "get_drift_info", None)
+            if callable(fn):
+                info = await asyncio.to_thread(fn)
+                return float(info.get("drift_score", 0.0) if isinstance(info, dict) else 0.0)
+        except Exception:
+            pass
+        return 0.0
+
+    def _engine_should_retrain(self) -> bool:
+        if self._engine is None:
+            return False
+        try:
+            fn = getattr(self._engine, "should_retrain", None)
+            return bool(fn()) if callable(fn) else False
+        except Exception:
+            return False
+
+    def _is_force_retrain_due(self) -> bool:
+        if self._last_forced_retrain is None:
+            return True
+        return (datetime.now(timezone.utc) - self._last_forced_retrain) >= timedelta(hours=self.FORCE_RETRAIN_HOURS)
