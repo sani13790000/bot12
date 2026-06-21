@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -41,12 +42,9 @@ class CircuitBreaker:
     """
     Async circuit breaker - DEADLOCK-FREE.
 
-    FIX (F-5 DEADLOCK): Previously call() held _lock then called _ok()/_fail()
-    which also tried to acquire _lock -> asyncio.Lock is NOT reentrant -> deadlock.
-
-    Fix: _transition_locked() is lock-free (called only while lock is held).
-         call() releases lock BEFORE fn() runs.
-         _on_success() and _on_failure() acquire lock independently.
+    F-5 DEADLOCK FIX: call() releases _lock BEFORE fn() runs.
+    _on_success() and _on_failure() acquire lock independently.
+    _transition_locked() is lock-free (called only while lock is held).
     """
 
     def __init__(self, name: str, config: Optional[BreakerConfig] = None) -> None:
@@ -72,7 +70,7 @@ class CircuitBreaker:
         logger.info("CircuitBreaker %s force-closed: %s", self.name, reason)
 
     async def call(self, fn: Callable, *a: Any, **kw: Any) -> Any:
-        # Lock only for state check -- released BEFORE fn() runs
+        # Lock ONLY for state check - released BEFORE fn() runs (deadlock prevention)
         async with self._lock:
             self.stats.total_calls += 1
             if self.stats.state == State.OPEN:
@@ -87,7 +85,7 @@ class CircuitBreaker:
                 if self.stats.half_open_calls >= self.config.half_open_max_calls:
                     raise CircuitBreakerOpenError(self.name, int(self.config.recovery_timeout))
                 self.stats.half_open_calls += 1
-        # Lock released -- fn() runs without holding lock
+        # Lock released - fn() runs freely
         try:
             result = await fn(*a, **kw)
             await self._on_success()
@@ -118,7 +116,7 @@ class CircuitBreaker:
                 await self._transition_locked(State.OPEN)
 
     async def _transition_locked(self, new: State) -> None:
-        """Lock-free transition -- MUST be called while self._lock is held."""
+        """Lock-free transition - MUST be called while self._lock is held."""
         old = self.stats.state
         if old == new:
             return
@@ -156,28 +154,41 @@ class CircuitBreakerOpenError(Exception):
 
 
 class CircuitBreakerManager:
-    """Thread-safe registry of all circuit breakers."""
+    """
+    Thread-safe registry of all circuit breakers.
+
+    G-3 FIX: threading.Lock (not asyncio.Lock) guards _breakers dict
+    for sync callers (get(), get_breaker()). asyncio.Lock cannot be
+    acquired from sync context and was providing zero protection there.
+    get_async() uses asyncio.Lock to remain non-blocking for async callers.
+    """
 
     def __init__(self) -> None:
         self._breakers: Dict[str, CircuitBreaker] = {}
-        self._lock = asyncio.Lock()
+        self._sync_lock  = threading.Lock()
+        self._async_lock = asyncio.Lock()
 
     def get(self, name: str, config: Optional[BreakerConfig] = None) -> CircuitBreaker:
-        if name not in self._breakers:
-            self._breakers[name] = CircuitBreaker(name, config)
-        elif config is not None:
-            logger.debug("get(%s): config ignored, breaker already exists.", name)
-        return self._breakers[name]
+        """G-3 FIX: threading.Lock prevents TOCTOU race in sync context."""
+        with self._sync_lock:
+            if name not in self._breakers:
+                self._breakers[name] = CircuitBreaker(name, config)
+            elif config is not None:
+                logger.debug("get(%s): config ignored, breaker already exists.", name)
+            return self._breakers[name]
 
     async def get_async(self, name: str, config: Optional[BreakerConfig] = None) -> CircuitBreaker:
-        async with self._lock:
+        """G-4 FIX: async callers use asyncio.Lock."""
+        async with self._async_lock:
             return self.get(name, config)
 
     def all_status(self) -> Dict[str, dict]:
-        return {name: cb.to_dict() for name, cb in self._breakers.items()}
+        with self._sync_lock:
+            return {name: cb.to_dict() for name, cb in self._breakers.items()}
 
     def open_count(self) -> int:
-        return sum(1 for cb in self._breakers.values() if cb.stats.state == State.OPEN)
+        with self._sync_lock:
+            return sum(1 for cb in self._breakers.values() if cb.stats.state == State.OPEN)
 
 
 circuit_breaker_manager = CircuitBreakerManager()
@@ -185,6 +196,7 @@ _BREAKERS: Dict[str, CircuitBreaker] = circuit_breaker_manager._breakers
 
 
 def get_breaker(name: str, config: Optional[BreakerConfig] = None) -> CircuitBreaker:
+    """G-4 FIX: delegates to manager.get() which is now thread-safe."""
     return circuit_breaker_manager.get(name, config)
 
 

@@ -30,13 +30,14 @@ class AuditAction(str, Enum):
 
 class AuditService:
     """
-    Buffered audit logger with async-safe flush.
+    Buffered audit logger with async-safe parallel flush.
 
     ARCH-3 FIX : asyncio.Lock guards _buffer (race-condition prevention).
     PERF-4 FIX : deque(maxlen=200) bounds memory even when DB is down.
     TECH-6 FIX : datetime.now(timezone.utc) replaces deprecated utcnow().
-    F-3    FIX : get_action_logs() pushes filter to DB instead of Python-side
-                 N+1 over-fetch (was: fetch limit+200, filter in Python).
+    F-3    FIX : get_action_logs() pushes filter to DB instead of N+1 Python fetch.
+    G-1    FIX : _flush_locked() uses asyncio.gather() - parallel not sequential.
+    G-2    FIX : entries re-queued on failure (no data loss on partial error).
     """
 
     _FLUSH_AT: int = 50
@@ -126,7 +127,7 @@ class AuditService:
             result = await db.select(
                 "activity_logs",
                 filters={"user_id": user_id},
-                limit=limit,
+                limit=limit + offset,
             )
             return result[offset: offset + limit]
         except Exception as exc:
@@ -152,16 +153,36 @@ class AuditService:
             await self._flush_locked()
 
     async def _flush_locked(self) -> None:
+        """
+        G-1 FIX: parallel inserts via asyncio.gather() instead of sequential loop.
+        G-2 FIX: entries re-queued on failure - no silent data loss.
+        Buffer cleared BEFORE gather to prevent double-flush race.
+        Failed entries put back into buffer (preserved via appendleft).
+        """
         if not self._buffer:
             return
         entries = list(self._buffer)
         self._buffer.clear()
-        try:
-            for entry in entries:
+
+        async def _insert_one(entry: Dict[str, Any]) -> Optional[Exception]:
+            try:
                 await db.insert("activity_logs", entry, use_admin=True)
-            logger.debug("Flushed %d audit entries.", len(entries))
-        except Exception as exc:
-            logger.error("Audit flush failed (%d entries lost): %s", len(entries), exc)
+                return None
+            except Exception as exc:
+                return exc
+
+        results = await asyncio.gather(*[_insert_one(e) for e in entries])
+
+        failed = [entries[i] for i, r in enumerate(results) if r is not None]
+        if failed:
+            for entry in reversed(failed):
+                self._buffer.appendleft(entry)
+            logger.error(
+                "Audit flush: %d/%d entries failed, %d re-queued.",
+                len(failed), len(entries), len(failed),
+            )
+        else:
+            logger.debug("Audit flush: %d entries written.", len(entries))
 
 
 audit_service = AuditService()
