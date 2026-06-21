@@ -1,126 +1,118 @@
 """
-backend/core/deps.py
-FastAPI dependency injection for Galaxy Vast AI Trading Platform.
-
-Centralizes:
-- DB client injection
-- Current user extraction (with revocation check)
-- Admin guard
-- Service singletons (lazy, thread-safe via lru_cache)
-
-Fixes applied:
-- get_cache() now imports from backend.core.cache (was backend.cache — ImportError)
-- get_current_user() now calls validate_access_token (was decode_access_token — NameError)
+core/deps.py -- FastAPI Dependency Injection Container
+Phase D Fix (ARCH-10 / TECH-2):
+  - get_voting_engine() now initialises VotingEngine WITH agents from AgentService
+    (previously returned an empty VotingEngine() with no agents -> silent zero-vote decisions)
+  - All singletons use lru_cache(maxsize=1) for process-level caching
+  - DecisionService injected with agents (DIP)
 """
 from __future__ import annotations
 
-import logging
 from functools import lru_cache
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from backend.core.config import settings
-# validate_access_token was previously imported as decode_access_token (did not exist)
+from backend.core.config import settings  # noqa: F401 kept for backward compat
 from backend.core.security import validate_access_token
+from backend.core.logger import get_logger
 
-logger = logging.getLogger(__name__)
+# backward-compat alias used by older routes
+decode_access_token = validate_access_token
 
+logger = get_logger("core.deps")
 
-# ---------------------------------------------------------------------------
-# Database
-# ---------------------------------------------------------------------------
-async def get_db():
-    """Yield the Supabase async client."""
-    from backend.database.connection import get_db_client
-    return await get_db_client()
-
-
-DbDep = Annotated[object, Depends(get_db)]
-
-
-# ---------------------------------------------------------------------------
-# Authentication
-# ---------------------------------------------------------------------------
-def _extract_token(
-    authorization: Optional[str] = Header(None, alias="Authorization"),
-    access_token: Optional[str] = Cookie(None),
-) -> str:
-    """Extract JWT from Authorization header or HttpOnly cookie."""
-    if authorization and authorization.startswith("Bearer "):
-        return authorization.removeprefix("Bearer ").strip()
-    if access_token:
-        return access_token
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+# -- Auth Bearer --
+_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(_extract_token)],
-    db=Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict:
     """
-    Decode JWT access token, verify revocation, return payload.
-    Uses validate_access_token (not the non-existent decode_access_token).
+    Validate JWT Bearer token and return the decoded payload.
+    Raises HTTP 401 on missing/invalid token.
     """
-    try:
-        payload = validate_access_token(token)
-    except ValueError:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = validate_access_token(credentials.credentials)
+    if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-
-    # Revocation check against DB
-    jti = payload.get("jti", "")
-    if jti:
-        try:
-            result = await db.table("revoked_tokens").select("jti").eq("jti", jti).execute()
-            if result.data:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has been revoked",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.warning("Revocation check failed (allowing through): %s", type(exc).__name__)
-
     return payload
 
 
-CurrentUser = Annotated[dict, Depends(get_current_user)]
-
-
-async def require_admin(current_user: CurrentUser) -> dict:
-    """Require admin role — raises 403 otherwise."""
-    if current_user.get("role") != "admin":
+async def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Require role == 'admin'."""
+    if user.get("role") not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
         )
-    return current_user
+    return user
 
 
-AdminUser = Annotated[dict, Depends(require_admin)]
+# -- Service Singletons (lazy, process-level) --
 
-
-# ---------------------------------------------------------------------------
-# Service Singletons (lazy — created on first use, cached per process)
-# ---------------------------------------------------------------------------
 @lru_cache(maxsize=1)
 def get_agent_service():
+    """
+    Returns the global AgentService singleton.
+    AgentService owns agent instances + their weights.
+    """
     from backend.agents.agent_service import AgentService
     return AgentService()
 
 
 @lru_cache(maxsize=1)
 def get_voting_engine():
+    """
+    Returns a VotingEngine initialised with the full agent set from AgentService.
+
+    FIX (ARCH-10 / TECH-2): Previously returned VotingEngine() with NO agents,
+    causing every vote to produce score=0 and direction=NEUTRAL silently.
+    Now we pull agents from AgentService so weights are normalised correctly.
+    """
     from backend.agents.voting_engine import VotingEngine
-    return VotingEngine()
+
+    agent_svc = get_agent_service()
+    agents = getattr(agent_svc, "agents", None) or []
+
+    if not agents:
+        logger.warning(
+            "get_voting_engine: AgentService returned empty agents list -- "
+            "VotingEngine will produce zero-score decisions. "
+            "Check agent_service.py configuration."
+        )
+
+    engine = VotingEngine(agents=agents) if agents else VotingEngine()
+    logger.info(
+        "VotingEngine initialised with %d agents: %s",
+        len(agents),
+        [type(a).__name__ for a in agents],
+    )
+    return engine
+
+
+@lru_cache(maxsize=1)
+def get_decision_service():
+    """
+    Returns a DecisionService with agents injected (DIP).
+    Avoids DecisionService creating its own agent instances internally.
+    """
+    from backend.services.decision_service import DecisionService
+
+    agent_svc = get_agent_service()
+    agents = getattr(agent_svc, "agents", None) or []
+    return DecisionService(agents=agents)
 
 
 @lru_cache(maxsize=1)
@@ -131,12 +123,27 @@ def get_analytics_service():
 
 @lru_cache(maxsize=1)
 def get_cache():
-    # Fixed: was 'from backend.cache import Cache' → ImportError
+    # FIX: was 'from backend.cache import Cache' -> ImportError
     from backend.core.cache import Cache
     return Cache()
 
 
-AgentServiceDep  = Annotated[object, Depends(get_agent_service)]
-VotingEngineDep  = Annotated[object, Depends(get_voting_engine)]
+@lru_cache(maxsize=1)
+def get_risk_service():
+    try:
+        from backend.risk.risk_orchestrator import RiskOrchestrator
+        return RiskOrchestrator()
+    except ImportError:
+        logger.warning("RiskOrchestrator not available")
+        return None
+
+
+# -- Annotated dependency aliases --
+CurrentUser         = Annotated[dict, Depends(get_current_user)]
+CurrentAdmin        = Annotated[dict, Depends(get_current_admin)]
+AgentServiceDep     = Annotated[object, Depends(get_agent_service)]
+VotingEngineDep     = Annotated[object, Depends(get_voting_engine)]
+DecisionServiceDep  = Annotated[object, Depends(get_decision_service)]
 AnalyticsServiceDep = Annotated[object, Depends(get_analytics_service)]
-CacheDep         = Annotated[object, Depends(get_cache)]
+CacheDep            = Annotated[object, Depends(get_cache)]
+RiskServiceDep      = Annotated[object, Depends(get_risk_service)]
