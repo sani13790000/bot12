@@ -1,90 +1,81 @@
-import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, RefreshCw, Clock } from "lucide-react";
+/** frontend/src/pages/LiveTradesPage.tsx -- FIX-E5: Missing page */
+import { useEffect, useState, useCallback } from "react";
 import { tradesApi } from "../utils/api";
-import { useWS } from "../contexts/WebSocketContext";
 import type { Trade } from "../types";
-
-function PnlBadge({ pnl }: { pnl?: number }) {
-  if (pnl === undefined) return null;
-  const pos = pnl >= 0;
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-bold ${pos ? "bg-[#10b981]/15 text-[#10b981]" : "bg-[#ef4444]/15 text-[#ef4444]"}`}>
-      {pos ? "+" : ""}{pnl.toFixed(2)}
-    </span>
-  );
-}
+import { RefreshCw, TrendingUp, TrendingDown, XCircle } from "lucide-react";
 
 export default function LiveTradesPage() {
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const [trades,  setTrades]  = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
-  const { on } = useWS();
+  const [closing, setClosing] = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
 
-  const load = async () => { setLoading(true); const r = await tradesApi.getActive(); if (r.success) setTrades(r.data ?? []); setLoading(false); };
+  const load = useCallback(() => {
+    setLoading(true); setError(null);
+    tradesApi.listOpen()
+      .then(r => { if (r.success) setTrades(r.data ?? []); else setError(r.error ?? "\u062e\u0637\u0627"); })
+      .finally(() => setLoading(false));
+  }, []);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => {
-    const off1 = on("TRADE_OPENED", () => load());
-    const off2 = on("TRADE_CLOSED", () => load());
-    const off3 = on("EQUITY_UPDATE", () => load());
-    return () => { off1(); off2(); off3(); };
-  }, [on]);
+  useEffect(() => { load(); const id = setInterval(load, 5_000); return () => clearInterval(id); }, [load]);
+
+  const handleClose = async (id: string) => {
+    if (!confirm("\u0622\u06cc\u0627 \u0645\u0637\u0645\u0626\u0646\u06cc\u062f\u061f")) return;
+    setClosing(id);
+    const r = await tradesApi.close(id);
+    if (r.success) load(); else alert(r.error ?? "\u062e\u0637\u0627 \u062f\u0631 \u0628\u0633\u062a\u0646 \u0645\u0639\u0627\u0645\u0644\u0647");
+    setClosing(null);
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[#f0f6ff] text-xl font-bold">معاملات زنده</h1>
-          <p className="text-[#475569] text-sm mt-0.5">{trades.length} پوزیشن باز</p>
-        </div>
-        <button onClick={load} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#1e2d40] text-[#475569] hover:text-[#f0f6ff] text-sm transition-all">
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> رفرش
+        <h1 className="text-2xl font-bold text-white">\u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0632\u0646\u062f\u0647</h1>
+        <button onClick={load} className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400">
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
-
-      {loading ? (
-        <div className="flex justify-center py-16"><div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" /></div>
-      ) : trades.length === 0 ? (
-        <div className="gv-card p-12 text-center">
-          <Clock size={40} className="text-[#1e2d40] mx-auto mb-3" />
-          <p className="text-[#475569]">هیچ معامله‌ای در حال اجرا نیست</p>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          {trades.map(t => (
-            <div key={t.id} className="gv-card p-4 border border-[#1e2d40] hover:border-[#00d4ff]/30 transition-all">
-              <div className="flex items-start justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.direction === "BUY" ? "bg-[#10b981]/10" : "bg-[#ef4444]/10"}`}>
-                    {t.direction === "BUY" ? <TrendingUp size={18} className="text-[#10b981]" /> : <TrendingDown size={18} className="text-[#ef4444]" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#f0f6ff] font-bold">{t.symbol}</span>
-                      <span className={`text-xs font-bold ${t.direction === "BUY" ? "text-[#10b981]" : "text-[#ef4444]"}`}>{t.direction}</span>
-                    </div>
-                    <div className="text-xs text-[#475569] mt-0.5">Lot: {t.lot_size} · Risk: {t.risk_percent.toFixed(2)}%</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PnlBadge pnl={t.pnl} />
-                  <span className="badge-active text-xs">{t.status}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-[#1e2d40]">
-                {[["Entry",      `$${t.entry_price}`],
-                  ["Stop Loss",  `$${t.stop_loss}`],
-                  ["TP1",        `$${t.take_profit_1}`],
-                  ["Confidence", `${t.confidence_score}%`]].map(([k, v]) => (
-                  <div key={k}>
-                    <div className="text-[#475569] text-xs">{k}</div>
-                    <div className="text-[#f0f6ff] text-sm font-semibold mt-0.5">{v}</div>
-                  </div>
+      {error && <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>}
+      {trades.length === 0 && !loading
+        ? <div className="text-center py-20 text-gray-500">\u0645\u0639\u0627\u0645\u0644\u0647 \u0628\u0627\u0632 \u0648\u062c\u0648\u062f \u0646\u062f\u0627\u0631\u062f</div>
+        : (
+          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase">
+                  {["\u0646\u0645\u0627\u062f","\u062c\u0647\u062a","\u062d\u062c\u0645","\u0648\u0631\u0648\u062f","SL","TP","P&L","\u0639\u0645\u0644\u06cc\u0627\u062a"].map(h => (
+                    <th key={h} className="px-4 py-3 text-right">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {trades.map(t => (
+                  <tr key={t.id} className="hover:bg-gray-800/50">
+                    <td className="px-4 py-2.5 text-white font-medium">{t.symbol}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`flex items-center gap-1 font-bold text-xs ${t.direction==="BUY"?"text-green-400":"text-red-400"}`}>
+                        {t.direction==="BUY"?<TrendingUp className="w-3 h-3"/>:<TrendingDown className="w-3 h-3"/>}{t.direction}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-300 font-mono">{t.volume}</td>
+                    <td className="px-4 py-2.5 text-gray-300 font-mono">{t.entry_price?.toFixed(5)}</td>
+                    <td className="px-4 py-2.5 text-red-400 font-mono">{t.stop_loss?.toFixed(5)??"\u2014"}</td>
+                    <td className="px-4 py-2.5 text-green-400 font-mono">{t.take_profit?.toFixed(5)??"\u2014"}</td>
+                    <td className={`px-4 py-2.5 font-mono font-semibold ${(t.profit_loss??0)>=0?"text-green-400":"text-red-400"}`}>
+                      {t.profit_loss!==undefined?`$${t.profit_loss.toFixed(2)}`:"\u2014"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button onClick={()=>handleClose(t.id)} disabled={closing===t.id}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/60 disabled:opacity-50 text-xs">
+                        <XCircle className="w-3.5 h-3.5"/>{closing===t.id?"...":"\u0628\u0633\u062a\u0646"}
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              </tbody>
+            </table>
+          </div>
+        )}
     </div>
   );
 }

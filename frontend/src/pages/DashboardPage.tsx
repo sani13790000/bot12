@@ -1,130 +1,90 @@
+/**
+ * frontend/src/pages/DashboardPage.tsx
+ * FIX-E4: Missing page
+ */
 import { useEffect, useState } from "react";
-import { Activity, DollarSign, TrendingUp, TrendingDown, ShieldAlert, Zap, BarChart2, Target } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { StatCard } from "../components/common/StatCard";
-import { dashboardApi, botApi } from "../utils/api";
-import { useWS } from "../contexts/WebSocketContext";
-import type { DashboardStats, EquityPoint } from "../types";
+import { dashboardApi, tradesApi, signalsApi } from "../utils/api";
+import type { DashboardStats, Trade, Signal } from "../types";
+import { TrendingUp, Activity, RefreshCw } from "lucide-react";
 
-export default function DashboardPage() {
-  const [stats, setStats]   = useState<DashboardStats | null>(null);
-  const [equity, setEquity] = useState<EquityPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { on } = useWS();
-
-  const load = async () => {
-    setLoading(true);
-    const [s, e] = await Promise.all([dashboardApi.getStats(), dashboardApi.getEquityCurve(30)]);
-    if (s.success) setStats(s.data);
-    if (e.success) setEquity(e.data.points ?? []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  useEffect(() => {
-    const off1 = on("EQUITY_UPDATE",  (d: Partial<DashboardStats>) => setStats(s => s ? { ...s, ...d } : s));
-    const off2 = on("TRADE_OPENED",   () => load());
-    const off3 = on("TRADE_CLOSED",   () => load());
-    const off4 = on("BOT_STATUS",     (d: Partial<DashboardStats>) => setStats(s => s ? { ...s, ...d } : s));
-    return () => { off1(); off2(); off3(); off4(); };
-  }, [on]);
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+function StatCard({ label, value, color }: { label: string; value: string | number | undefined; color: string }) {
+  const c: Record<string,string> = { green: "text-green-400", blue: "text-blue-400", purple: "text-purple-400", red: "text-red-400" };
+  return (
+    <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <p className="text-gray-400 text-sm mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${c[color] ?? "text-white"}`}>{value ?? "\u2014"}</p>
     </div>
   );
+}
 
-  const modeColor  = stats?.bot_status === "RUNNING" ? "green" : stats?.bot_status === "PAUSED" ? "gold" : "red";
-  const modeLabel  = stats?.bot_status === "RUNNING" ? "در حال اجرا" : stats?.bot_status === "PAUSED" ? "متوقف موقت" : "متوقف";
+export default function DashboardPage() {
+  const [stats,   setStats]   = useState<DashboardStats | null>(null);
+  const [trades,  setTrades]  = useState<Trade[]>([]);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true); setError(null);
+    Promise.all([dashboardApi.getStats(), tradesApi.listOpen(), signalsApi.list("PENDING")])
+      .then(([s, t, sg]) => {
+        if (s.success) setStats(s.data); else setError(s.error ?? "\u062e\u0637\u0627");
+        if (t.success)  setTrades(t.data ?? []);
+        if (sg.success) setSignals(sg.data ?? []);
+      }).finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  if (loading) return <div className="flex justify-center pt-20"><RefreshCw className="w-6 h-6 text-blue-400 animate-spin" /></div>;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[#f0f6ff] text-2xl font-bold">داشبورد</h1>
-          <p className="text-[#475569] text-sm mt-1">Galaxy Vast AI Trading Platform</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`badge-${modeColor === "green" ? "active" : modeColor === "gold" ? "wait" : "sell"} text-xs`}>
-            {modeLabel}
-          </span>
-          <span className="badge-wait text-xs">{stats?.trading_mode}</span>
-          {stats?.bot_status !== "RUNNING" ? (
-            <button onClick={() => botApi.start().then(load)}
-              className="px-4 py-2 bg-[#10b981] text-[#070b12] rounded-xl text-sm font-bold hover:bg-[#059669] transition-all">
-              شروع
-            </button>
-          ) : (
-            <button onClick={() => botApi.pause().then(load)}
-              className="px-4 py-2 bg-[#f59e0b] text-[#070b12] rounded-xl text-sm font-bold hover:bg-[#d97706] transition-all">
-              توقف موقت
-            </button>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold text-white">\u062f\u0627\u0634\u0628\u0648\u0631\u062f</h1>
+        <button onClick={load} className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white"><RefreshCw className="w-4 h-4" /></button>
       </div>
-
-      {/* Stats Grid */}
+      {error && <div className="p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">{error}</div>}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="موجودی" value={stats?.balance ?? 0} format="currency" color="accent" icon={<DollarSign size={18} />} glow trend={stats?.today_pnl} />
-        <StatCard title="Equity" value={stats?.equity ?? 0} format="currency" color="green" icon={<TrendingUp size={18} />} />
-        <StatCard title="P&L امروز" value={stats?.today_pnl ?? 0} format="currency"
-          color={(stats?.today_pnl ?? 0) >= 0 ? "green" : "red"}
-          icon={(stats?.today_pnl ?? 0) >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />} />
-        <StatCard title="Drawdown" value={stats?.drawdown_percent ?? 0} format="percent" color="red" icon={<ShieldAlert size={18} />} />
+        <StatCard label="\u0645\u0648\u062c\u0648\u062f\u06cc" value={stats ? `$${stats.balance.toLocaleString()}` : undefined} color="green" />
+        <StatCard label="Equity" value={stats ? `$${stats.equity.toLocaleString()}` : undefined} color="blue" />
+        <StatCard label="\u0633\u0648\u062f \u0627\u0645\u0631\u0648\u0632" value={stats ? `$${stats.today_profit.toFixed(2)}` : undefined} color={stats && stats.today_profit >= 0 ? "green" : "red"} />
+        <StatCard label="Win Rate" value={stats ? `${stats.win_rate.toFixed(1)}%` : undefined} color="purple" />
       </div>
-
-      {/* Secondary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Win Rate" value={`${((stats?.win_rate ?? 0) * 100).toFixed(1)}%`} color="green" icon={<Target size={18} />} />
-        <StatCard title="Profit Factor" value={stats?.profit_factor ?? 0} format="ratio" color="accent" icon={<BarChart2 size={18} />} />
-        <StatCard title="Sharpe Ratio" value={stats?.sharpe_ratio ?? 0} format="ratio" color="purple" icon={<Activity size={18} />} />
-        <StatCard title="Expectancy" value={stats?.expectancy ?? 0} format="currency" color="gold" icon={<Zap size={18} />} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <StatCard label="\u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0628\u0627\u0632" value={trades.length} color="blue" />
+        <StatCard label="\u0633\u06cc\u06af\u0646\u0627\u0644\u200c\u0647\u0627\u06cc \u0641\u0639\u0627\u0644" value={signals.length} color="purple" />
+        <StatCard label="\u0627\u0645\u062a\u06cc\u0627\u0632 \u0627\u0645\u0646\u06cc\u062a\u06cc" value={stats?.security_score} color={stats && stats.security_score >= 70 ? "green" : "red"} />
       </div>
-
-      {/* Equity Chart */}
-      <div className="gv-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[#f0f6ff] font-semibold">منحنی Equity — ۳۰ روز اخیر</h2>
-          <div className="flex items-center gap-4 text-xs text-[#475569]">
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#00d4ff] inline-block" /> Equity</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#10b981] inline-block" /> Balance</span>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h2 className="text-white font-semibold mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-blue-400" />\u0645\u0639\u0627\u0645\u0644\u0627\u062a \u0628\u0627\u0632</h2>
+          {trades.length === 0 ? <p className="text-gray-500 text-sm">\u0645\u0639\u0627\u0645\u0644\u0647 \u0628\u0627\u0632 \u0648\u062c\u0648\u062f \u0646\u062f\u0627\u0631\u062f</p>
+            : trades.slice(0,5).map(t => (
+              <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${t.direction === "BUY" ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>{t.direction}</span>
+                  <span className="text-white text-sm">{t.symbol}</span>
+                </div>
+                <span className={`text-sm font-mono ${(t.profit_loss ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {t.profit_loss !== undefined ? `$${t.profit_loss.toFixed(2)}` : "\u2014"}
+                </span>
+              </div>
+            ))}
         </div>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={equity} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-              <defs>
-                <linearGradient id="gvEquity" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#00d4ff" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#00d4ff" stopOpacity={0}    />
-                </linearGradient>
-                <linearGradient id="gvBalance" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#10b981" stopOpacity={0.2}  />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}    />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2d40" vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1e2d40", borderRadius: 8, color: "#f0f6ff" }}
-                formatter={(v: number) => [`$${v.toLocaleString()}`, ""]} />
-              <Area type="monotone" dataKey="equity"  stroke="#00d4ff" strokeWidth={2} fill="url(#gvEquity)"  dot={false} />
-              <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={2} fill="url(#gvBalance)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h2 className="text-white font-semibold mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-purple-400" />\u0633\u06cc\u06af\u0646\u0627\u0644\u200c\u0647\u0627\u06cc \u0641\u0639\u0627\u0644</h2>
+          {signals.length === 0 ? <p className="text-gray-500 text-sm">\u0633\u06cc\u06af\u0646\u0627\u0644 \u0641\u0639\u0627\u0644 \u0648\u062c\u0648\u062f \u0646\u062f\u0627\u0631\u062f</p>
+            : signals.slice(0,5).map(s => (
+              <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${s.direction === "BUY" ? "bg-green-900/40 text-green-400" : s.direction === "SELL" ? "bg-red-900/40 text-red-400" : "bg-gray-700 text-gray-400"}`}>{s.direction}</span>
+                  <span className="text-white text-sm">{s.symbol}</span>
+                </div>
+                <span className="text-gray-400 text-sm">{(s.confidence*100).toFixed(0)}%</span>
+              </div>
+            ))}
         </div>
-      </div>
-
-      {/* Bottom Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="کل معاملات" value={stats?.total_trades ?? 0} color="accent" />
-        <StatCard title="معاملات باز" value={stats?.active_trades_count ?? 0} color="green" />
-        <StatCard title="سیگنال‌های فعال" value={stats?.active_signals_count ?? 0} color="gold" />
-        <StatCard title="ریسک پرتفولیو" value={stats?.portfolio_risk_percent ?? 0} format="percent"
-          color={(stats?.portfolio_risk_percent ?? 0) > 4 ? "red" : "green"} />
       </div>
     </div>
   );
