@@ -1,9 +1,11 @@
 """
-backend/database/__init__.py -- Phase-F fix
+backend/database/__init__.py -- Phase-F + Phase-G fixes
 
 F-1  db.select() alias missing -> decision_service crash on get_latest_decision().
      Added db.select() as alias for select_many().
 F-2  use_admin param added to insert() for audit_service compatibility.
+G-6  select() param 'select' shadowed method name -> renamed to 'columns'.
+G-7  select_many() + select_one() same shadowing issue -> renamed to 'columns'.
 """
 from __future__ import annotations
 
@@ -37,11 +39,11 @@ class DatabaseWrapper:
         order_desc: bool = False,
         limit: int = 100,
         offset: int = 0,
-        select: str = "*",
+        columns: str = "*",
     ) -> List[Dict[str, Any]]:
         client = await self._client()
         def _q():
-            q = client.table(table).select(select)
+            q = client.table(table).select(columns)
             for k, v in (filters or {}).items():
                 q = q.eq(k, v)
             if order_by:
@@ -59,11 +61,11 @@ class DatabaseWrapper:
         self,
         table: str,
         filters: Optional[Dict[str, Any]] = None,
-        select: str = "*",
+        columns: str = "*",
     ) -> Optional[Dict[str, Any]]:
         client = await self._client()
         def _q():
-            q = client.table(table).select(select)
+            q = client.table(table).select(columns)
             for k, v in (filters or {}).items():
                 q = q.eq(k, v)
             return q.maybe_single().execute()
@@ -75,6 +77,7 @@ class DatabaseWrapper:
             return None
 
     # F-1 FIX: select() alias -- used by decision_service, audit_service etc.
+    # G-6 FIX: parameter renamed from 'select' to 'columns' (shadowing fix)
     async def select(
         self,
         table: str,
@@ -82,7 +85,7 @@ class DatabaseWrapper:
         limit: int = 100,
         order_by: Optional[str] = None,
         order_desc: bool = False,
-        select: str = "*",
+        columns: str = "*",
     ) -> List[Dict[str, Any]]:
         """Alias for select_many() for backward compatibility."""
         return await self.select_many(
@@ -91,7 +94,7 @@ class DatabaseWrapper:
             order_by=order_by,
             order_desc=order_desc,
             limit=limit,
-            select=select,
+            columns=columns,
         )
 
     # -- INSERT ------------------------------------------------------------
