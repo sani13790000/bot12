@@ -1,7 +1,8 @@
 """
-Decision Service - Phase D fixes:
+Decision Service - Phase D fixes applied:
   ARCH-4: bounded LRU OrderedDict cache (maxsize=256)
   TECH-6: datetime.now(timezone.utc) everywhere
+  CRITICAL: _build_decision_input() field names fixed to match decision_engine.py
 """
 from __future__ import annotations
 
@@ -24,7 +25,6 @@ logger = get_logger("decision_service")
 
 
 def _get_voting_engine_class():
-    """Lazy import to avoid circular dependency."""
     try:
         from ..agents.voting_engine import VotingEngine
         return VotingEngine
@@ -57,10 +57,9 @@ class DecisionService:
 
     def __init__(self, agents: Optional[list] = None):
         self.engine = DecisionEngine()
-        # ARCH-4 FIX: bounded LRU cache instead of unbounded dict
         self._cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self._cache_max = 256
-        self._cache_ttl = 60  # seconds
+        self._cache_ttl = 60
 
         VotingEngine = _get_voting_engine_class()
         if VotingEngine is not None:
@@ -107,12 +106,12 @@ class DecisionService:
         if vote_result is not None:
             try:
                 if hasattr(vote_result, "weighted_score"):
-                    output.confidence_score = int(
-                        output.confidence_score * 0.4 + vote_result.weighted_score * 0.6
+                    output.confidence_score = round(
+                        output.confidence_score * 0.4 + vote_result.weighted_score * 0.6, 4
                     )
                 if hasattr(vote_result, "final_confidence"):
-                    output.quality_score = int(
-                        output.quality_score * 0.4 + vote_result.final_confidence * 0.6
+                    output.quality_score = round(
+                        output.quality_score * 0.4 + vote_result.final_confidence * 0.6, 4
                     )
             except Exception as exc:
                 logger.debug("Vote merge failed: %s", exc)
@@ -173,7 +172,6 @@ class DecisionService:
     ) -> DecisionInput:
         smc_data = market_data.get("smc", {})
         pa_data  = market_data.get("price_action", {})
-        # TECH-6 FIX: timezone-aware
         now_utc  = datetime.now(timezone.utc)
         user_cfg = user_settings or {}
 
@@ -181,45 +179,49 @@ class DecisionService:
             symbol=symbol,
             timeframe=timeframe,
             smc_context=SMCContext(
-                direction=smc_data.get("direction"),
+                # FIX: trend= not direction=, trend_score= not score=
+                trend=smc_data.get("direction", "ranging"),
+                trend_score=float(smc_data.get("score", 0)),
                 structure_event=smc_data.get("structure_event"),
                 structure_direction=smc_data.get("structure_direction"),
                 structure_level=smc_data.get("structure_level"),
-                order_blocks=smc_data.get("order_blocks"),
-                fvgs=smc_data.get("fvgs"),
+                order_blocks=smc_data.get("order_blocks") or [],
+                fvgs=smc_data.get("fvgs") or [],
                 swing_high=smc_data.get("swing_high"),
                 swing_low=smc_data.get("swing_low"),
                 liquidity_direction=smc_data.get("liquidity_direction"),
-                score=float(smc_data.get("score", 0)),
             ),
             price_action_context=PriceActionContext(
-                direction=pa_data.get("direction"),
-                patterns=pa_data.get("patterns"),
-                score=float(pa_data.get("score", 0)),
+                # FIX: direction_score= not score=
+                direction=pa_data.get("direction", "neutral"),
+                direction_score=float(pa_data.get("score", 0)),
+                patterns=pa_data.get("patterns") or [],
             ),
             session_context=SessionContext(
+                # FIX: removed hour_utc (not a field); session_score added
                 current_session=market_data.get("session", "london"),
-                hour_utc=now_utc.hour,
+                session_score=float(market_data.get("session_score", 50.0)),
             ),
             license_context=LicenseContext(
+                # FIX: removed features, allowed_symbols (not fields)
                 is_valid=user_cfg.get("license_valid", True),
-                features=["smc", "pa", "ml"],
-                allowed_symbols=[symbol],
+                license_type=user_cfg.get("license_type", "standard"),
             ),
             risk_context=RiskContext(
-                account_balance=user_cfg.get("balance", 10_000),
-                equity=user_cfg.get("equity", 10_000),
-                daily_loss_percent=user_cfg.get("daily_loss_percent", 0.0),
-                drawdown_percent=user_cfg.get("drawdown_percent", 0.0),
-                open_positions_count=user_cfg.get("open_positions", 0),
-                max_positions=user_cfg.get("max_positions", 3),
+                # FIX: use actual field names from RiskContext dataclass
+                available_margin=float(user_cfg.get("equity", 10_000)),
+                risk_per_trade=float(user_cfg.get("risk_per_trade", 0.01)),
+                max_daily_loss=float(user_cfg.get("max_daily_loss", 0.03)),
+                open_positions=int(user_cfg.get("open_positions", 0)),
+                max_positions=int(user_cfg.get("max_positions", 3)),
+                daily_loss_pct=float(user_cfg.get("daily_loss_percent", 0.0)),
             ),
             symbol_policy=SymbolPolicy(
+                # FIX: is_allowed= not allowed=, min_score_override= not min_score=
                 symbol=symbol,
-                min_score=user_cfg.get("min_score", 65),
-                min_confidence=user_cfg.get("min_confidence", 50),
+                is_allowed=user_cfg.get("symbol_allowed", True),
+                min_score_override=user_cfg.get("min_score"),
             ),
-            user_settings=user_cfg,
         )
 
     def _output_to_dict(self, output: DecisionOutput) -> Dict[str, Any]:
@@ -234,7 +236,7 @@ class DecisionService:
             "created_at":       datetime.now(timezone.utc).isoformat(),
         }
         for attr, key in [
-            ("reason_codes",   "reason_codes"),
+            ("reason_codes",    "reason_codes"),
             ("reasons_persian", "reasons"),
             ("blocked_reasons", "blocked_reasons"),
         ]:
