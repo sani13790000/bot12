@@ -1,172 +1,118 @@
-"""
-backend/api/routes/risk.py
-
-FIX: /status and /equity/state endpoints added (frontend was getting 404)
-FIX: prefix double-removed (main.py already adds /api/v1)
-"""
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 
-from backend.core.deps import get_current_user
+from backend.core.deps import get_current_user, get_current_admin
+from backend.core.logger import get_logger
+from backend.services.trade_service import trade_service
 
-log = logging.getLogger(__name__)
-router = APIRouter(prefix="/risk", tags=["Risk"])
-
-_ALLOWED_SYMBOLS = frozenset({
-    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-    "AUDUSD", "USDCAD", "NZDUSD", "GBPJPY", "EURJPY",
-    "EURGBP", "XAGUSD", "BTCUSD", "ETHUSD",
-})
+logger = get_logger("api.risk")
+router = APIRouter()
 
 
-class RiskCalcRequest(BaseModel):
+class RiskAssessRequest(BaseModel):
     symbol: str
-    account_balance: float = Field(..., gt=0, le=10_000_000)
-    risk_percent: float    = Field(..., gt=0, le=10)
-    entry_price: float     = Field(..., gt=0)
-    stop_loss_price: float = Field(..., gt=0)
-    take_profit_price: Optional[float] = Field(None, gt=0)
-
-    @field_validator("symbol")
-    @classmethod
-    def _sym(cls, v: str) -> str:
-        v = v.upper().strip()
-        if v not in _ALLOWED_SYMBOLS:
-            raise ValueError(f"Symbol '{v}' not supported")
-        return v
-
-    @field_validator("stop_loss_price")
-    @classmethod
-    def _sl_ne_entry(cls, v: float, info) -> float:
-        entry = info.data.get("entry_price")
-        if entry and abs(v - entry) < 1e-10:
-            raise ValueError("Stop loss cannot equal entry price")
-        return v
-
-
-class PositionSizeRequest(BaseModel):
-    symbol: str
-    account_balance: float = Field(..., gt=0)
-    risk_percent: float    = Field(..., gt=0, le=10)
-    pip_value: float       = Field(..., gt=0)
-    stop_loss_pips: float  = Field(..., gt=0, le=500)
-
-    @field_validator("symbol")
-    @classmethod
-    def _sym(cls, v: str) -> str:
-        v = v.upper().strip()
-        if v not in _ALLOWED_SYMBOLS:
-            raise ValueError(f"Symbol '{v}' not supported")
-        return v
-
-
-@router.post("/calculate")
-async def calculate_risk(
-    body: RiskCalcRequest,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    risk_amount = body.account_balance * (body.risk_percent / 100)
-    price_diff  = abs(body.entry_price - body.stop_loss_price)
-    if price_diff == 0:
-        raise HTTPException(400, "Entry and stop loss prices cannot be equal")
-    result: dict = {
-        "symbol":          body.symbol,
-        "account_balance": body.account_balance,
-        "risk_percent":    body.risk_percent,
-        "risk_amount_usd": round(risk_amount, 2),
-        "price_diff":      round(price_diff, 5),
-        "entry_price":     body.entry_price,
-        "stop_loss_price": body.stop_loss_price,
-    }
-    if body.take_profit_price:
-        tp_diff = abs(body.take_profit_price - body.entry_price)
-        result["take_profit_price"]  = body.take_profit_price
-        result["reward_amount_usd"]  = round(risk_amount * (tp_diff / price_diff), 2)
-        result["risk_reward_ratio"]  = round(tp_diff / price_diff, 2)
-    return result
-
-
-@router.post("/position-size")
-async def calculate_position_size(
-    body: PositionSizeRequest,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    risk_amount = body.account_balance * (body.risk_percent / 100)
-    lots        = risk_amount / (body.stop_loss_pips * body.pip_value)
-    return {
-        "symbol":           body.symbol,
-        "recommended_lots": round(max(0.01, min(lots, 100)), 2),
-        "risk_amount_usd":  round(risk_amount, 2),
-        "stop_loss_pips":   body.stop_loss_pips,
-        "pip_value":        body.pip_value,
-    }
-
-
-@router.get("/limits")
-async def get_risk_limits(
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    return {
-        "max_risk_percent_per_trade": 10.0,
-        "max_lots":                   100.0,
-        "min_lots":                   0.01,
-        "max_open_positions":         20,
-        "daily_loss_limit_percent":   5.0,
-    }
+    direction: str = Field(..., pattern=r"^(BUY|SELL)$")
+    balance: float = Field(..., gt=0)
+    equity: float = Field(..., gt=0)
+    stop_loss_pips: float = Field(..., gt=0)
+    current_atr: float = Field(default=10.0, gt=0)
+    current_spread: float = Field(default=0.0, ge=0)
+    open_positions: int = Field(default=0, ge=0)
+    today_trades_count: int = Field(default=0, ge=0)
+    today_pnl_usd: float = Field(default=0.0)
 
 
 @router.get("/status")
-async def get_risk_status(
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    """
-    FIX: frontend was calling /risk/status and getting 404.
-    Returns current risk system status including circuit breakers.
-    """
-    user_id = current_user.get("sub", "")
+async def get_risk_status(user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """G-24 / E-5 FIX: was 404."""
+    return await trade_service.get_risk_status(user["sub"])
+
+
+@router.get("/limits")
+async def get_risk_limits(user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """G-23: real settings."""
     try:
-        from backend.circuit_breaker import circuit_breaker_manager
-        breakers = {
-            name: cb.state.value
-            for name, cb in circuit_breaker_manager._breakers.items()
+        from backend.core.config import settings
+        return {
+            "max_daily_loss_percent": getattr(settings, "MAX_DAILY_LOSS_PERCENT", 3.0),
+            "max_open_positions":     getattr(settings, "MAX_OPEN_POSITIONS", 5),
+            "max_exposure_percent":   getattr(settings, "MAX_EXPOSURE_PERCENT", 5.0),
+            "max_drawdown_percent":   getattr(settings, "MAX_DRAWDOWN_PERCENT", 10.0),
+            "risk_per_trade_percent": getattr(settings, "RISK_PER_TRADE_PERCENT", 1.0),
         }
     except Exception:
-        breakers = {}
-    return {
-        "status":           "active",
-        "circuit_breakers": breakers,
-        "limits":           await get_risk_limits(current_user),
-        "user_id":          user_id,
-    }
+        return {"max_daily_loss_percent": 3.0, "max_open_positions": 5,
+                "max_exposure_percent": 5.0, "max_drawdown_percent": 10.0,
+                "risk_per_trade_percent": 1.0}
 
 
 @router.get("/equity/state")
-async def get_equity_state(
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    """
-    FIX: frontend was calling /risk/equity/state and getting 404.
-    Returns equity and drawdown state from trade_service.
-    """
-    user_id = current_user.get("sub", "")
+async def get_equity_state(user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """E-5 FIX: was 404."""
+    return await trade_service.get_equity_state(user["sub"])
+
+
+@router.post("/assess")
+async def assess_risk(body: RiskAssessRequest, user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """G-25: full RiskOrchestrator assessment."""
     try:
-        from backend.services.trade_service import trade_service
-        stats = await trade_service.get_trade_stats(user_id, days=30)
-        return {
-            "user_id":        user_id,
-            "total_profit":   stats.get("total_profit", 0),
-            "win_rate":       stats.get("win_rate", 0),
-            "profit_factor":  stats.get("profit_factor", 0),
-            "open_positions": stats.get("open_trades", 0),
-            "closed_today":   stats.get("closed_trades", 0),
-            "drawdown_pct":   0.0,
-            "equity_state":   "normal",
-        }
+        from backend.risk.risk_orchestrator import RiskOrchestrator, RiskInput
+        inp = RiskInput(
+            symbol=body.symbol, direction=body.direction,
+            balance=body.balance, equity=body.equity,
+            stop_loss_pips=body.stop_loss_pips,
+            current_atr=body.current_atr, atr_history=[body.current_atr] * 14,
+            current_spread=body.current_spread, avg_spread=body.current_spread,
+            open_positions=[], today_trades_count=body.today_trades_count,
+            today_pnl_usd=body.today_pnl_usd, week_pnl_usd=0.0, month_pnl_usd=0.0,
+        )
+        decision = await RiskOrchestrator().assess(inp)
+        return decision.to_dict()
+    except ImportError:
+        return {"approved": True, "block_reason": "", "lot_size": 0.01,
+                "risk_percent": 1.0, "risk_usd": body.balance * 0.01,
+                "note": "RiskOrchestrator not available"}
     except Exception as exc:
-        log.warning("equity_state fallback: %s", exc)
-        return {"user_id": user_id, "equity_state": "unknown", "error": "Could not fetch equity data"}
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/circuit-breaker/{name}")
+async def get_circuit_breaker(name: str, user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """G-26: frontend circuit breaker state."""
+    try:
+        from backend.circuit_breaker import get_breaker
+        breaker = get_breaker(name)
+        s = breaker.stats
+        return {"name": name, "state": s.state.value, "failures": s.failures,
+                "successes": s.successes, "total_calls": s.total_calls,
+                "total_failures": s.total_failures, "last_failure_time": s.last_failure_time}
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Breaker {name!r} not found")
+
+
+@router.post("/circuit-breaker/{name}/open")
+async def open_circuit_breaker(
+    name: str, reason: str = Query(default="manual"),
+    admin: dict = Depends(get_current_admin),
+) -> Dict[str, Any]:
+    try:
+        from backend.circuit_breaker import get_breaker
+        await get_breaker(name).open(reason=reason)
+        return {"success": True, "name": name, "state": "open", "reason": reason}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/circuit-breaker/{name}/close")
+async def close_circuit_breaker(name: str, admin: dict = Depends(get_current_admin)) -> Dict[str, Any]:
+    try:
+        from backend.circuit_breaker import get_breaker
+        await get_breaker(name).close(reason="admin_manual_close")
+        return {"success": True, "name": name, "state": "closed"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
