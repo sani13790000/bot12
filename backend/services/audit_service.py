@@ -32,10 +32,11 @@ class AuditService:
     """
     Buffered audit logger with async-safe flush.
 
-    ARCH-3 FIX: asyncio.Lock guards _buffer so concurrent coroutines
-    cannot double-flush or lose entries.
-    PERF-4 FIX: deque(maxlen=200) bounds memory even if DB is down.
-    TECH-6 FIX: datetime.now(timezone.utc) replaces deprecated utcnow().
+    ARCH-3 FIX : asyncio.Lock guards _buffer (race-condition prevention).
+    PERF-4 FIX : deque(maxlen=200) bounds memory even when DB is down.
+    TECH-6 FIX : datetime.now(timezone.utc) replaces deprecated utcnow().
+    F-3    FIX : get_action_logs() pushes filter to DB instead of Python-side
+                 N+1 over-fetch (was: fetch limit+200, filter in Python).
     """
 
     _FLUSH_AT: int = 50
@@ -122,16 +123,26 @@ class AuditService:
         self, user_id: str, limit: int = 50, offset: int = 0,
     ) -> List[Dict[str, Any]]:
         try:
-            result = await db.select("activity_logs", filters={"user_id": user_id}, limit=limit)
-            return result[offset : offset + limit]
+            result = await db.select(
+                "activity_logs",
+                filters={"user_id": user_id},
+                limit=limit,
+            )
+            return result[offset: offset + limit]
         except Exception as exc:
             logger.error("get_user_logs failed: %s", exc)
             return []
 
-    async def get_action_logs(self, action: AuditAction, limit: int = 100) -> List[Dict[str, Any]]:
+    async def get_action_logs(
+        self, action: AuditAction, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """F-3 FIX: DB-side filter replaces Python-side over-fetch."""
         try:
-            logs = await db.select("activity_logs", limit=limit + 200)
-            return [l for l in logs if l.get("action") == action.value][:limit]
+            return await db.select(
+                "activity_logs",
+                filters={"action": action.value},
+                limit=limit,
+            )
         except Exception as exc:
             logger.error("get_action_logs failed: %s", exc)
             return []

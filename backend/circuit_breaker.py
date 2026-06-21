@@ -27,23 +27,26 @@ class BreakerConfig:
 
 @dataclass
 class BreakerStats:
-    failures:          int            = 0
-    successes:         int            = 0
+    failures:          int             = 0
+    successes:         int             = 0
     last_failure_time: Optional[float] = None
     last_success_time: Optional[float] = None
-    state:             State          = State.CLOSED
-    half_open_calls:   int            = 0
-    total_calls:       int            = 0
-    total_failures:    int            = 0
+    state:             State           = State.CLOSED
+    half_open_calls:   int             = 0
+    total_calls:       int             = 0
+    total_failures:    int             = 0
 
 
 class CircuitBreaker:
     """
-    Async circuit breaker.
+    Async circuit breaker - DEADLOCK-FREE.
 
-    PERF-5 FIX: _lock held only during state transitions, NOT during fn(),
-    allowing parallel calls through a CLOSED breaker.
-    ARCH-8 FIX: open()/close() methods for SelfHealingService integration.
+    FIX (F-5 DEADLOCK): Previously call() held _lock then called _ok()/_fail()
+    which also tried to acquire _lock -> asyncio.Lock is NOT reentrant -> deadlock.
+
+    Fix: _transition_locked() is lock-free (called only while lock is held).
+         call() releases lock BEFORE fn() runs.
+         _on_success() and _on_failure() acquire lock independently.
     """
 
     def __init__(self, name: str, config: Optional[BreakerConfig] = None) -> None:
@@ -58,23 +61,24 @@ class CircuitBreaker:
 
     async def open(self, reason: str = "") -> None:
         async with self._lock:
-            await self._transition(State.OPEN)
+            await self._transition_locked(State.OPEN)
         logger.warning("CircuitBreaker %s force-opened: %s", self.name, reason)
 
     async def close(self, reason: str = "") -> None:
         async with self._lock:
             self.stats.failures  = 0
             self.stats.successes = 0
-            await self._transition(State.CLOSED)
+            await self._transition_locked(State.CLOSED)
         logger.info("CircuitBreaker %s force-closed: %s", self.name, reason)
 
     async def call(self, fn: Callable, *a: Any, **kw: Any) -> Any:
+        # Lock only for state check -- released BEFORE fn() runs
         async with self._lock:
             self.stats.total_calls += 1
             if self.stats.state == State.OPEN:
                 elapsed = time.time() - (self.stats.last_failure_time or 0)
                 if elapsed > self.config.recovery_timeout:
-                    await self._transition(State.HALF_OPEN)
+                    await self._transition_locked(State.HALF_OPEN)
                 else:
                     raise CircuitBreakerOpenError(
                         self.name, int(self.config.recovery_timeout - elapsed)
@@ -83,17 +87,38 @@ class CircuitBreaker:
                 if self.stats.half_open_calls >= self.config.half_open_max_calls:
                     raise CircuitBreakerOpenError(self.name, int(self.config.recovery_timeout))
                 self.stats.half_open_calls += 1
+        # Lock released -- fn() runs without holding lock
         try:
             result = await fn(*a, **kw)
-            await self._ok()
+            await self._on_success()
             return result
         except CircuitBreakerOpenError:
             raise
         except Exception:
-            await self._fail()
+            await self._on_failure()
             raise
 
-    async def _transition(self, new: State) -> None:
+    async def _on_success(self) -> None:
+        async with self._lock:
+            self.stats.last_success_time = time.time()
+            self.stats.failures          = 0
+            if self.stats.state == State.HALF_OPEN:
+                self.stats.successes += 1
+                if self.stats.successes >= self.config.success_threshold:
+                    await self._transition_locked(State.CLOSED)
+
+    async def _on_failure(self) -> None:
+        async with self._lock:
+            self.stats.failures       += 1
+            self.stats.total_failures += 1
+            self.stats.last_failure_time = time.time()
+            if self.stats.state in (State.OPEN, State.HALF_OPEN):
+                await self._transition_locked(State.OPEN)
+            elif self.stats.failures >= self.config.failure_threshold:
+                await self._transition_locked(State.OPEN)
+
+    async def _transition_locked(self, new: State) -> None:
+        """Lock-free transition -- MUST be called while self._lock is held."""
         old = self.stats.state
         if old == new:
             return
@@ -109,25 +134,6 @@ class CircuitBreaker:
                     await r
             except Exception as exc:
                 logger.error("CB callback error: %s", exc)
-
-    async def _ok(self) -> None:
-        async with self._lock:
-            self.stats.last_success_time = time.time()
-            self.stats.failures          = 0
-            if self.stats.state == State.HALF_OPEN:
-                self.stats.successes += 1
-                if self.stats.successes >= self.config.success_threshold:
-                    await self._transition(State.CLOSED)
-
-    async def _fail(self) -> None:
-        async with self._lock:
-            self.stats.failures       += 1
-            self.stats.total_failures += 1
-            self.stats.last_failure_time = time.time()
-            if self.stats.state in (State.OPEN, State.HALF_OPEN):
-                await self._transition(State.OPEN)
-            elif self.stats.failures >= self.config.failure_threshold:
-                await self._transition(State.OPEN)
 
     def to_dict(self) -> dict:
         return {
@@ -150,10 +156,7 @@ class CircuitBreakerOpenError(Exception):
 
 
 class CircuitBreakerManager:
-    """
-    ARCH-8 FIX: Thread-safe registry of all circuit breakers.
-    Referenced by SelfHealingService, SecurityScoreEngine, RiskOrchestrator.
-    """
+    """Thread-safe registry of all circuit breakers."""
 
     def __init__(self) -> None:
         self._breakers: Dict[str, CircuitBreaker] = {}

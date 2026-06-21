@@ -1,1 +1,175 @@
-IiIiCmJhY2tlbmQvZGF0YWJhc2UvX19pbml0X18ucHkgLS0gUGhhc2UtQyBmaXgKCkMtOCAgZGIudXBkYXRlKCkgd2FzIHRydW5jYXRlZCBpbiBwcmV2aW91cyBjb21taXQgLS0gbWlzc2luZyBtZXRob2QgYm9keS4KICAgICBBZGRlZCBjb21wbGV0ZSBpbXBsZW1lbnRhdGlvbi4KQy05ICBBZGRlZCBkYi5kZWxldGUoKSBhbmQgZGIudXBzZXJ0KCkgdXNlZCBieSBzZXNzaW9uX3NlcnZpY2UuCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgYXN5bmNpbwppbXBvcnQgbG9nZ2luZwpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0LCBMaXN0LCBPcHRpb25hbAoKZnJvbSBiYWNrZW5kLmRhdGFiYXNlLmNvbm5lY3Rpb24gaW1wb3J0IGNsb3NlX2RiX2NsaWVudCwgZ2V0X2RiX2NsaWVudAoKX19hbGxfXyA9IFsiZ2V0X2RiX2NsaWVudCIsICJjbG9zZV9kYl9jbGllbnQiLCAiZGIiXQoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgoKY2xhc3MgRGF0YWJhc2VXcmFwcGVyOgogICAgIiIiVGhpbiBhc3luYyB3cmFwcGVyIGFyb3VuZCBTdXBhYmFzZSBjbGllbnQgd2l0aCBydW5faW5fZXhlY3V0b3IuIiIiCgogICAgYXN5bmMgZGVmIF9jbGllbnQoc2VsZik6CiAgICAgICAgcmV0dXJuIGF3YWl0IGdldF9kYl9jbGllbnQoKQoKICAgIGFzeW5jIGRlZiBfcnVuKHNlbGYsIGZuKToKICAgICAgICBsb29wID0gYXN5bmNpby5nZXRfcnVubmluZ19sb29wKCkKICAgICAgICByZXR1cm4gYXdhaXQgbG9vcC5ydW5faW5fZXhlY3V0b3IoTm9uZSwgZm4pCgogICAgIyAtLSBTRUxFQ1QgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCiAgICBhc3luYyBkZWYgc2VsZWN0X21hbnkoCiAgICAgICAgc2VsZiwKICAgICAgICB0YWJsZTogc3RyLAogICAgICAgIGZpbHRlcnM6IE9wdGlvbmFsW0RpY3Rbc3RyLCBBbnldXSA9IE5vbmUsCiAgICAgICAgb3JkZXJfYnk6IE9wdGlvbmFsW3N0cl0gPSBOb25lLAogICAgICAgIG9yZGVyX2Rlc2M6IGJvb2wgPSBGYWxzZSwKICAgICAgICBsaW1pdDogaW50ID0gMTAwLAogICAgICAgIG9mZnNldDogaW50ID0gMCwKICAgICAgICBzZWxlY3Q6IHN0ciA9ICIqIiwKICAgICkgLT4gTGlzdFtEaWN0W3N0ciwgQW55XV06CiAgICAgICAgY2xpZW50ID0gYXdhaXQgc2VsZi5fY2xpZW50KCkKICAgICAgICBkZWYgX3EoKToKICAgICAgICAgICAgcSA9IGNsaWVudC50YWJsZSh0YWJsZSkuc2VsZWN0KHNlbGVjdCkKICAgICAgICAgICAgZm9yIGssIHYgaW4gKGZpbHRlcnMgb3Ige30pLml0ZW1zKCk6CiAgICAgICAgICAgICAgICBxID0gcS5lcShrLCB2KQogICAgICAgICAgICBpZiBvcmRlcl9ieToKICAgICAgICAgICAgICAgIHEgPSBxLm9yZGVyKG9yZGVyX2J5LCBkZXNjPW9yZGVyX2Rlc2MpCiAgICAgICAgICAgIHEgPSBxLnJhbmdlKG9mZnNldCwgb2Zmc2V0ICsgbGltaXQgLSAxKQogICAgICAgICAgICByZXR1cm4gcS5leGVjdXRlKCkKICAgICAgICB0cnk6CiAgICAgICAgICAgIHJlc3VsdCA9IGF3YWl0IHNlbGYuX3J1bihfcSkKICAgICAgICAgICAgcmV0dXJuIHJlc3VsdC5kYXRhIG9yIFtdCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci5lcnJvcigic2VsZWN0X21hbnkoJXMpIGZhaWxlZDogJXMiLCB0YWJsZSwgZXhjKQogICAgICAgICAgICByZXR1cm4gW10KCiAgICBhc3luYyBkZWYgc2VsZWN0X29uZSgKICAgICAgICBzZWxmLAogICAgICAgIHRhYmxlOiBzdHIsCiAgICAgICAgZmlsdGVyczogT3B0aW9uYWxbRGljdFtzdHIsIEFueV1dID0gTm9uZSwKICAgICAgICBzZWxlY3Q6IHN0ciA9ICIqIiwKICAgICkgLT4gT3B0aW9uYWxbRGljdFtzdHIsIEFueV1dOgogICAgICAgIGNsaWVudCA9IGF3YWl0IHNlbGYuX2NsaWVudCgpCiAgICAgICAgZGVmIF9xKCk6CiAgICAgICAgICAgIHEgPSBjbGllbnQudGFibGUodGFibGUpLnNlbGVjdChzZWxlY3QpCiAgICAgICAgICAgIGZvciBrLCB2IGluIChmaWx0ZXJzIG9yIHt9KS5pdGVtcygpOgogICAgICAgICAgICAgICAgcSA9IHEuZXEoaywgdikKICAgICAgICAgICAgcmV0dXJuIHEubWF5YmVfc2luZ2xlKCkuZXhlY3V0ZSgpCiAgICAgICAgdHJ5OgogICAgICAgICAgICByZXN1bHQgPSBhd2FpdCBzZWxmLl9ydW4oX3EpCiAgICAgICAgICAgIHJldHVybiByZXN1bHQuZGF0YQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICBsb2dnZXIuZXJyb3IoInNlbGVjdF9vbmUoJXMpIGZhaWxlZDogJXMiLCB0YWJsZSwgZXhjKQogICAgICAgICAgICByZXR1cm4gTm9uZQoKICAgICMgLS0gSU5TRVJUIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgYXN5bmMgZGVmIGluc2VydCgKICAgICAgICBzZWxmLAogICAgICAgIHRhYmxlOiBzdHIsCiAgICAgICAgZGF0YTogRGljdFtzdHIsIEFueV0sCiAgICApIC0+IE9wdGlvbmFsW0RpY3Rbc3RyLCBBbnldXToKICAgICAgICBjbGllbnQgPSBhd2FpdCBzZWxmLl9jbGllbnQoKQogICAgICAgIGRlZiBfcSgpOgogICAgICAgICAgICByZXR1cm4gY2xpZW50LnRhYmxlKHRhYmxlKS5pbnNlcnQoZGF0YSkuZXhlY3V0ZSgpCiAgICAgICAgdHJ5OgogICAgICAgICAgICByZXN1bHQgPSBhd2FpdCBzZWxmLl9ydW4oX3EpCiAgICAgICAgICAgIHJldHVybiByZXN1bHQuZGF0YVswXSBpZiByZXN1bHQuZGF0YSBlbHNlIE5vbmUKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJpbnNlcnQoJXMpIGZhaWxlZDogJXMiLCB0YWJsZSwgZXhjKQogICAgICAgICAgICByZXR1cm4gTm9uZQoKICAgICMgLS0gVVBEQVRFIC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgYXN5bmMgZGVmIHVwZGF0ZSgKICAgICAgICBzZWxmLAogICAgICAgIHRhYmxlOiBzdHIsCiAgICAgICAgZmlsdGVyczogRGljdFtzdHIsIEFueV0sCiAgICAgICAgZGF0YTogRGljdFtzdHIsIEFueV0sCiAgICApIC0+IExpc3RbRGljdFtzdHIsIEFueV1dOgogICAgICAgICIiIkMtOCBGSVg6IGNvbXBsZXRlIGltcGxlbWVudGF0aW9uICh3YXMgdHJ1bmNhdGVkKS4iIiIKICAgICAgICBjbGllbnQgPSBhd2FpdCBzZWxmLl9jbGllbnQoKQogICAgICAgIGRlZiBfcSgpOgogICAgICAgICAgICBxID0gY2xpZW50LnRhYmxlKHRhYmxlKS51cGRhdGUoZGF0YSkKICAgICAgICAgICAgZm9yIGssIHYgaW4gZmlsdGVycy5pdGVtcygpOgogICAgICAgICAgICAgICAgcSA9IHEuZXEoaywgdikKICAgICAgICAgICAgcmV0dXJuIHEuZXhlY3V0ZSgpCiAgICAgICAgdHJ5OgogICAgICAgICAgICByZXN1bHQgPSBhd2FpdCBzZWxmLl9ydW4oX3EpCiAgICAgICAgICAgIHJldHVybiByZXN1bHQuZGF0YSBvciAgW10KICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJ1cGRhdGUoJXMpIGZhaWxlZDogJXMiLCB0YWJsZSwgZXhjKQogICAgICAgICAgICByZXR1cm4gW10KCiAgICAjIC0tIERFTEVURSAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICAgIGFzeW5jIGRlZiBkZWxldGUoCiAgICAgICAgc2VsZiwKICAgICAgICB0YWJsZTogc3RyLAogICAgICAgIGZpbHRlcnM6IERpY3Rbc3RyLCBBbnldLAogICAgKSAtPiBMaXN0W0RpY3Rbc3RyLCBBbnldXToKICAgICAgICAiIiJDLTk6IGFkZGVkIGZvciBzZXNzaW9uX3NlcnZpY2UucHVyZ2VfZXhwaXJlZCgpLiIiIgogICAgICAgIGNsaWVudCA9IGF3YWl0IHNlbGYuX2NsaWVudCgpCiAgICAgICAgZGVmIF9xKCk6CiAgICAgICAgICAgIHEgPSBjbGllbnQudGFibGUodGFibGUpLmRlbGV0ZSgpCiAgICAgICAgICAgIGZvciBrLCB2IGluIGZpbHRlcnMuaXRlbXMoKToKICAgICAgICAgICAgICAgIHEgPSBxLmVxKGssIHYpCiAgICAgICAgICAgIHJldHVybiBxLmV4ZWN1dGUoKQogICAgICAgIHRyeToKICAgICAgICAgICAgcmVzdWx0ID0gYXdhaXQgc2VsZi5fcnVuKF9xKQogICAgICAgICAgICByZXR1cm4gcmVzdWx0LmRhdGEgb3IgW10KICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJkZWxldGUoJXMpIGZhaWxlZDogJXMiLCB0YWJsZSwgZXhjKQogICAgICAgICAgICByZXR1cm4gW10KCiAgICAjIC0tIFVQU0VSVCAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KICAgIGFzeW5jIGRlZiB1cHNlcnQoCiAgICAgICAgc2VsZiwKICAgICAgICB0YWJsZTogc3RyLAogICAgICAgIGRhdGE6IERpY3Rbc3RyLCBBbnldLAogICAgICAgIG9uX2NvbmZsaWN0OiBzdHIgPSAiaWQiLAogICAgKSAtPiBPcHRpb25hbFtEaWN0W3N0ciwgQW55XV06CiAgICAgICAgIiIiQy05OiBhZGRlZCBmb3IgcmVmcmVzaF90b2tlbiB1cHNlcnQgaW4gYXV0aC5weS4iIiIKICAgICAgICBjbGllbnQgPSBhd2FpdCBzZWxmLl9jbGllbnQoKQogICAgICAgIGRlZiBfcSgpOgogICAgICAgICAgICByZXR1cm4gKAogICAgICAgICAgICAgICAgY2xpZW50LnRhYmxlKHRhYmxlKQogICAgICAgICAgICAgICAgLnVwc2VydChkYXRhLCBvbl9jb25mbGljdD1vbl9jb25mbGljdCkKICAgICAgICAgICAgICAgIC5leGVjdXRlKCkKICAgICAgICAgICAgKQogICAgICAgIHRyeToKICAgICAgICAgICAgcmVzdWx0ID0gYXdhaXQgc2VsZi5fcnVuKF9xKQogICAgICAgICAgICByZXR1cm4gcmVzdWx0LmRhdGFbMF0gaWYgcmVzdWx0LmRhdGEgZWxzZSBOb25lCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci5lcnJvcigidXBzZXJ0KCVzKSBmYWlsZWQ6ICVzIiwgdGFibGUsIGV4YykKICAgICAgICAgICAgcmV0dXJuIE5vbmUKCgpkYiA9IERhdGFiYXNlV3JhcHBlcigpCg==
+"""
+backend/database/__init__.py -- Phase-F fix
+
+F-1  db.select() alias missing -> decision_service crash on get_latest_decision().
+     Added db.select() as alias for select_many().
+F-2  use_admin param added to insert() for audit_service compatibility.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from typing import Any, Dict, List, Optional
+
+from backend.database.connection import close_db_client, get_db_client
+
+__all__ = ["get_db_client", "close_db_client", "db"]
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseWrapper:
+    """Thin async wrapper around Supabase client with run_in_executor."""
+
+    async def _client(self):
+        return await get_db_client()
+
+    async def _run(self, fn):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, fn)
+
+    # -- SELECT ------------------------------------------------------------
+    async def select_many(
+        self,
+        table: str,
+        filters: Optional[Dict[str, Any]] = None,
+        order_by: Optional[str] = None,
+        order_desc: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+        select: str = "*",
+    ) -> List[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            q = client.table(table).select(select)
+            for k, v in (filters or {}).items():
+                q = q.eq(k, v)
+            if order_by:
+                q = q.order(order_by, desc=order_desc)
+            q = q.range(offset, offset + limit - 1)
+            return q.execute()
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("select_many(%s) failed: %s", table, exc)
+            return []
+
+    async def select_one(
+        self,
+        table: str,
+        filters: Optional[Dict[str, Any]] = None,
+        select: str = "*",
+    ) -> Optional[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            q = client.table(table).select(select)
+            for k, v in (filters or {}).items():
+                q = q.eq(k, v)
+            return q.maybe_single().execute()
+        try:
+            result = await self._run(_q)
+            return result.data
+        except Exception as exc:
+            logger.error("select_one(%s) failed: %s", table, exc)
+            return None
+
+    # F-1 FIX: select() alias -- used by decision_service, audit_service etc.
+    async def select(
+        self,
+        table: str,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 100,
+        order_by: Optional[str] = None,
+        order_desc: bool = False,
+        select: str = "*",
+    ) -> List[Dict[str, Any]]:
+        """Alias for select_many() for backward compatibility."""
+        return await self.select_many(
+            table=table,
+            filters=filters,
+            order_by=order_by,
+            order_desc=order_desc,
+            limit=limit,
+            select=select,
+        )
+
+    # -- INSERT ------------------------------------------------------------
+    async def insert(
+        self,
+        table: str,
+        data: Dict[str, Any],
+        use_admin: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            return client.table(table).insert(data).execute()
+        try:
+            result = await self._run(_q)
+            return result.data[0] if result.data else None
+        except Exception as exc:
+            logger.error("insert(%s) failed: %s", table, exc)
+            return None
+
+    # -- UPDATE ------------------------------------------------------------
+    async def update(
+        self,
+        table: str,
+        filters: Dict[str, Any],
+        data: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            q = client.table(table).update(data)
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("update(%s) failed: %s", table, exc)
+            return []
+
+    # -- DELETE ------------------------------------------------------------
+    async def delete(
+        self,
+        table: str,
+        filters: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            q = client.table(table).delete()
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("delete(%s) failed: %s", table, exc)
+            return []
+
+    # -- UPSERT ------------------------------------------------------------
+    async def upsert(
+        self,
+        table: str,
+        data: Dict[str, Any],
+        on_conflict: str = "id",
+    ) -> Optional[Dict[str, Any]]:
+        client = await self._client()
+        def _q():
+            return (
+                client.table(table)
+                .upsert(data, on_conflict=on_conflict)
+                .execute()
+            )
+        try:
+            result = await self._run(_q)
+            return result.data[0] if result.data else None
+        except Exception as exc:
+            logger.error("upsert(%s) failed: %s", table, exc)
+            return None
+
+
+db = DatabaseWrapper()
