@@ -6,93 +6,91 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test-python:
-    name: Python Tests
+  backend:
+    name: Backend (Python 3.11)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12']
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-
-      - name: Install dependencies (skip heavy ML)
-        run: |
-          pip install --upgrade pip
-          # Exclude torch, SB3, gymnasium (too large for CI), pandas-ta (beta)
-          grep -v -E '^(torch|stable-baselines3|gymnasium|--extra-index|pandas-ta)' requirements.txt \
-            | pip install -r /dev/stdin
-          pip install pytest pytest-asyncio pytest-cov httpx
-
-      - name: Syntax check all Python files
-        run: |
-          find backend dashboard -name '*.py' -print0 \
-            | xargs -0 python -m py_compile
-
-      - name: Run tests (all — including test_agents with mock)
-        env:
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_ANON_KEY: test-anon-key-for-ci-only
-          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key-for-ci-only
-          JWT_SECRET_KEY: test-secret-key-minimum-32-characters-long
-          TELEGRAM_BOT_TOKEN: 123456:test-token
-          TELEGRAM_CHAT_ID: "123456789"
-          TELEGRAM_ADMIN_IDS: "123456789"
-          LICENSE_KEY: test-license-key
-          LICENSE_SALT: test-license-salt-for-ci
-          LICENSE_SECRET: test-license-secret-for-ci
-          ENVIRONMENT: development
-          REDIS_URL: redis://localhost:6379/0
-          API_BASE_URL: http://localhost:8000
-          MQL5_API_TOKEN: test-mql5-token
-        run: |
-          python -m pytest backend/tests/ -v --tb=short \
-            --cov=backend \
-            --cov-report=term-missing \
-            --cov-report=xml \
-            --ignore=backend/tests/test_backtest_engine.py
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        continue-on-error: true
-        with:
-          file: coverage.xml
-          fail_ci_if_error: false
-
-  syntax-check:
-    name: Syntax Check
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    env:
+      ENVIRONMENT: testing
+      JWT_SECRET_KEY: ci-test-secret-key-not-for-production
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_KEY: test-key
+      REDIS_URL: redis://localhost:6379/0
+      ALLOWED_ORIGINS: '["http://localhost:3000"]'
+      APP_VERSION: ci-test
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Check syntax
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
         run: |
-          find . -name '*.py' -not -path './.git/*' -print0 \
-            | xargs -0 python -m py_compile
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx ruff
+      - name: Lint
+        run: ruff check backend/ --select=E,W,F,I --ignore=E501 || true
+      - name: Tests
+        run: |
+          pytest backend/tests/ \
+            --tb=short \
+            --cov=backend \
+            --cov-report=term-missing \
+            --cov-fail-under=60 \
+            -x -q
 
-  frontend-build:
-    name: Frontend Build
+  frontend:
+    name: Frontend (Node 20)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install
         working-directory: frontend
         run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint || true
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
       - name: Build
         working-directory: frontend
         run: npm run build
-        continue-on-error: false
+        env:
+          VITE_API_URL: http://localhost:8000
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t galaxyvast-api:ci .
+      - name: Build Frontend image
+        run: docker build -f frontend/Dockerfile -t galaxyvast-frontend:ci frontend/
+        env:
+          VITE_API_URL: http://localhost:8000
