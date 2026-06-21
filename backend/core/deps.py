@@ -1,9 +1,9 @@
-"""
-core/deps.py -- FastAPI Dependency Injection Container
-Phase D Fix (ARCH-10 / TECH-2):
-  - get_agent_service() now uses module singleton from agent_service.py
-  - get_voting_engine() receives real 7-agent list from AgentService.agents
-  - DecisionService injected with agents (DIP)
+"""backend/core/deps.py — Security Audit Fix (Phase H)
+
+SEC-8  get_current_user: ValueError from validate_access_token properly caught
+SEC-9  get_db: dependency was missing — now defined and returns DatabaseWrapper
+SEC-10 get_db returns DatabaseWrapper (async-safe)
+SEC-11 require_permission: new endpoint-level RBAC dependency
 """
 from __future__ import annotations
 
@@ -33,13 +33,14 @@ async def get_current_user(
             detail="Missing authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    payload = validate_access_token(credentials.credentials)
-    if payload is None:
+    try:
+        payload = validate_access_token(credentials.credentials)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
     return payload
 
 
@@ -52,22 +53,37 @@ async def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+async def get_db():
+    from backend.database import db
+    return db
+
+
+def require_permission(permission: str):
+    async def _check(user: dict = Depends(get_current_user)) -> None:
+        from backend.services.rbac_service import rbac_service
+        user_id = user.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing user identifier",
+            )
+        has_perm = await rbac_service.check_permission(user_id, permission)
+        if not has_perm:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission required: {permission}",
+            )
+    return _check
+
+
 @lru_cache(maxsize=1)
 def get_agent_service():
-    """
-    FIX ARCH-10: uses module-level singleton from agent_service.py
-    instead of creating a new AgentService() per DI resolution.
-    """
     from backend.agents.agent_service import get_agent_service as _get
     return _get()
 
 
 @lru_cache(maxsize=1)
 def get_voting_engine():
-    """
-    FIX TECH-2: VotingEngine now receives real agents from AgentService.
-    Previously VotingEngine() was called with no agents -> silent zero-score.
-    """
     from backend.agents.voting_engine import VotingEngine
     agent_svc = get_agent_service()
     agents = getattr(agent_svc, "agents", None) or []
@@ -110,6 +126,7 @@ def get_risk_service():
 
 CurrentUser         = Annotated[dict, Depends(get_current_user)]
 CurrentAdmin        = Annotated[dict, Depends(get_current_admin)]
+DbDep               = Annotated[object, Depends(get_db)]
 AgentServiceDep     = Annotated[object, Depends(get_agent_service)]
 VotingEngineDep     = Annotated[object, Depends(get_voting_engine)]
 DecisionServiceDep  = Annotated[object, Depends(get_decision_service)]
