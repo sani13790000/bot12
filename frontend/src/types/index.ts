@@ -1,5 +1,14 @@
 // frontend/src/types/index.ts
-// Centralized TypeScript type definitions
+// FIX-FE4: WSMessageType added
+// FIX-FE7: Signal/Trade fields aligned with real page usage
+
+export type WSMessageType =
+  | "PRICE"
+  | "SIGNAL"
+  | "TRADE_UPDATE"
+  | "HEARTBEAT"
+  | "PONG"
+  | "*";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -12,6 +21,8 @@ export interface User {
   id: string;
   email: string;
   full_name?: string;
+  first_name?: string;
+  last_name?: string;
   role: "USER" | "TRADER" | "ADMIN";
   is_active: boolean;
   created_at: string;
@@ -29,17 +40,32 @@ export interface UserSettings {
 export interface Trade {
   id: string;
   symbol: string;
-  direction: "BUY" | "SELL";
+  direction: "BUY" | "SELL" | "buy" | "sell";
   volume: number;
+  lot_size?: number;
   entry_price: number;
   current_price?: number;
   stop_loss?: number;
   take_profit?: number;
+  take_profit_1?: number;
+  take_profit_2?: number;
   profit_loss?: number;
-  status: "OPEN" | "CLOSED" | "PENDING" | "CANCELLED";
-  opened_at: string;
+  profit_money?: number;
+  pnl?: number;
+  status: "OPEN" | "CLOSED" | "PENDING" | "CANCELLED" | "open" | "closed" | "pending" | "cancelled";
+  opened_at?: string;
+  open_time?: string;
   closed_at?: string;
-  user_id: string;
+  close_time?: string;
+  close_price?: number;
+  user_id?: string;
+  risk_percent?: number;
+  confidence_score?: number;
+  risk_level?: "LOW" | "MEDIUM" | "HIGH";
+  risk_reward_ratio?: number;
+  smc_score?: number;
+  pa_score?: number;
+  session?: string;
 }
 
 export interface Signal {
@@ -47,13 +73,23 @@ export interface Signal {
   symbol: string;
   direction: "BUY" | "SELL" | "NEUTRAL";
   confidence: number;
-  score: number;
+  confidence_score?: number;
+  score?: number;
   entry_price?: number;
   stop_loss?: number;
   take_profit?: number;
-  status: "PENDING" | "EXECUTED" | "CANCELLED" | "EXPIRED";
+  take_profit_1?: number;
+  take_profit_2?: number;
+  status: "PENDING" | "EXECUTED" | "CANCELLED" | "EXPIRED" | "ACTIVE" | "active" | "pending";
   reasoning?: string;
+  context_explanation?: string;
+  smc_details?: string;
+  pa_pattern?: string;
+  session?: string;
+  risk_level?: "LOW" | "MEDIUM" | "HIGH";
+  risk_reward_ratio?: number;
   created_at: string;
+  expires_at?: string;
 }
 
 export interface DashboardStats {
