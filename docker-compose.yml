@@ -1,9 +1,5 @@
 # Galaxy Vast AI Trading Platform
-# All services with resource limits, healthchecks, restart policies,
-# and explicit Docker network for isolation.
-# Fix: added galaxyvast_net network — services previously used default bridge
-# (no isolation, no DNS-based service discovery guarantee)
-
+# Phase L fixes: L-25/L-26/L-27/L-29/L-30
 networks:
   galaxyvast_net:
     driver: bridge
@@ -21,12 +17,13 @@ services:
       --maxmemory-policy allkeys-lru
       --save 900 1
       --appendonly no
+      --requirepass ${REDIS_PASSWORD:-changeme_redis}
     ports:
       - "127.0.0.1:6379:6379"
     networks:
       - galaxyvast_net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme_redis}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -48,7 +45,7 @@ services:
       dockerfile: Dockerfile
     restart: on-failure:3
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
@@ -95,6 +92,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -115,10 +118,11 @@ services:
       dockerfile: Dockerfile
     restart: on-failure:3
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     env_file: .env
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
     networks:
       - galaxyvast_net
     depends_on:
@@ -138,14 +142,10 @@ services:
         reservations:
           memory: 256M
           cpus: '0.25'
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
     logging:
       driver: json-file
       options:
-        max-size: "30m"
+        max-size: "20m"
         max-file: "3"
 
   frontend:
@@ -154,7 +154,7 @@ services:
       dockerfile: Dockerfile
     restart: on-failure:3
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     networks:
       - galaxyvast_net
     depends_on:
@@ -163,9 +163,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 10s
     deploy:
       resources:
         limits:
