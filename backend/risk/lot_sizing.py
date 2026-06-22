@@ -1,1 +1,184 @@
-\"\"\"\nGalaxy Vast AI Trading Platform\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nDynamic Lot Sizing & ATR Position Sizing Engine\n\nFIX T-10: pip_value_usd is now per-symbol via _PIP_VALUE_TABLE.\nThe original hardcoded 10.0 USD/pip was only correct for EURUSD.\nXAUUSD pip value is ~1 USD/pip. Using 10.0 for gold = 10x overleveraged.\n\"\"\"\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Dict, Optional\nimport math\n\n\n_PIP_VALUE_TABLE: Dict[str, float] = {\n    \"EURUSD\": 10.0,\n    \"GBPUSD\": 10.0,\n    \"AUDUSD\": 10.0,\n    \"NZDUSD\": 10.0,\n    \"USDCAD\": 10.0,\n    \"USDJPY\": 6.7,\n    \"EURJPY\": 6.7,\n    \"GBPJPY\": 6.7,\n    \"XAUUSD\": 1.0,\n    \"XAGUSD\": 0.5,\n    \"BTCUSD\": 1.0,\n    \"ETHUSD\": 1.0,\n    \"US30\": 1.0,\n    \"NAS100\": 1.0,\n    \"SPX500\": 1.0,\n    \"XTIUSD\": 1.0,\n    \"XBRUSD\": 1.0,\n}\n\n_DEFAULT_PIP_VALUE: float = 1.0\n\n\ndef get_pip_value(symbol: str) -> float:\n    \"\"\"Return USD pip value per standard lot for the given symbol. FIX T-10.\"\"\"\n    return _PIP_VALUE_TABLE.get(symbol.upper(), _DEFAULT_PIP_VALUE)\n\n\nclass LotSizingMethod(str, Enum):\n    FIXED_PERCENT   = \"FIXED_PERCENT\"\n    ATR_BASED       = \"ATR_BASED\"\n    FIXED_LOT       = \"FIXED_LOT\"\n    KELLY           = \"KELLY\"\n    VOLATILITY_ADJ  = \"VOLATILITY_ADJ\"\n\n\n@dataclass\nclass LotSizingConfig:\n    method: LotSizingMethod = LotSizingMethod.ATR_BASED\n    risk_percent: float = 1.0\n    fixed_lot: float = 0.01\n    min_lot: float = 0.01\n    max_lot: float = 5.0\n    lot_step: float = 0.01\n    atr_multiplier: float = 1.5\n    kelly_fraction: float = 0.25\n    max_risk_percent: float = 2.0\n    pip_value_usd: float = 10.0\n    contract_size: float = 100_000.0\n\n\n@dataclass\nclass LotSizingResult:\n    lot_size: float\n    method_used: LotSizingMethod\n    risk_amount_usd: float\n    risk_percent: float\n    stop_loss_pips: float\n    atr_value: float\n    balance: float\n    symbol: str = \"\"\n    pip_value_used: float = 10.0\n    notes: str = \"\"\n\n\nclass DynamicLotSizer:\n    \"\"\"\n    Production-grade Dynamic Lot Sizer.\n    FIX T-10: calculate() now accepts symbol= for per-symbol pip value.\n    \"\"\"\n\n    def __init__(self, config: Optional[LotSizingConfig] = None):\n        self._cfg = config or LotSizingConfig()\n\n    def calculate(\n        self,\n        balance: float,\n        stop_loss_pips: float,\n        atr_pips: Optional[float] = None,\n        win_rate: Optional[float] = None,\n        avg_rr: Optional[float] = None,\n        volatility_ratio: float = 1.0,\n        symbol: str = \"\",\n    ) -> LotSizingResult:\n        pip_value = get_pip_value(symbol) if symbol else self._cfg.pip_value_usd\n\n        if balance <= 0 or stop_loss_pips <= 0:\n            return self._zero_result(balance, stop_loss_pips, atr_pips or 0.0, symbol, pip_value)\n\n        method = self._cfg.method\n        if method == LotSizingMethod.FIXED_PERCENT:\n            lot = self._fixed_percent(balance, stop_loss_pips, pip_value)\n        elif method == LotSizingMethod.ATR_BASED:\n            lot = self._atr_based(balance, atr_pips or stop_loss_pips, stop_loss_pips, pip_value)\n        elif method == LotSizingMethod.FIXED_LOT:\n            lot = self._cfg.fixed_lot\n        elif method == LotSizingMethod.KELLY:\n            lot = self._kelly(balance, stop_loss_pips, win_rate or 0.55, avg_rr or 1.5, pip_value)\n        elif method == LotSizingMethod.VOLATILITY_ADJ:\n            lot = self._volatility_adj(balance, stop_loss_pips, volatility_ratio, pip_value)\n        else:\n            lot = self._fixed_percent(balance, stop_loss_pips, pip_value)\n\n        lot = self._clamp(lot)\n        risk_usd = lot * stop_loss_pips * pip_value\n        risk_pct = (risk_usd / balance) * 100 if balance > 0 else 0.0\n\n        if risk_pct > self._cfg.max_risk_percent:\n            lot = self._max_safe_lot(balance, stop_loss_pips, pip_value)\n            lot = self._clamp(lot)\n            risk_usd = lot * stop_loss_pips * pip_value\n            risk_pct = (risk_usd / balance) * 100\n\n        return LotSizingResult(\n            lot_size=lot,\n            method_used=method,\n            risk_amount_usd=round(risk_usd, 2),\n            risk_percent=round(risk_pct, 3),\n            stop_loss_pips=stop_loss_pips,\n            atr_value=atr_pips or 0.0,\n            balance=balance,\n            symbol=symbol,\n            pip_value_used=pip_value,\n            notes=f\"method={method.value} cap={self._cfg.max_risk_percent}% pip_val={pip_value}\",\n        )\n\n    def _fixed_percent(self, balance: float, sl_pips: float, pip_value: float) -> float:\n        risk_usd = balance * (self._cfg.risk_percent / 100.0)\n        return risk_usd / (sl_pips * pip_value) if sl_pips > 0 else 0.0\n\n    def _atr_based(self, balance: float, atr_pips: float, sl_pips: float, pip_value: float) -> float:\n        adjusted_sl = max(sl_pips, atr_pips * self._cfg.atr_multiplier)\n        return self._fixed_percent(balance, adjusted_sl, pip_value)\n\n    def _kelly(self, balance: float, sl_pips: float, win_rate: float, avg_rr: float, pip_value: float) -> float:\n        p = max(0.01, min(win_rate, 0.99))\n        q = 1.0 - p\n        b = max(0.1, avg_rr)\n        kelly_f = max(0.0, p - (q / b)) * self._cfg.kelly_fraction\n        risk_usd = balance * kelly_f\n        return risk_usd / (sl_pips * pip_value) if sl_pips > 0 else 0.0\n\n    def _volatility_adj(self, balance: float, sl_pips: float, vol_ratio: float, pip_value: float) -> float:\n        base_lot = self._fixed_percent(balance, sl_pips, pip_value)\n        factor   = max(0.3, min(1.0 / max(vol_ratio, 0.1), 2.0))\n        return base_lot * factor\n\n    def _max_safe_lot(self, balance: float, sl_pips: float, pip_value: float) -> float:\n        return (balance * (self._cfg.max_risk_percent / 100.0)) / (sl_pips * pip_value)\n\n    def _clamp(self, lot: float) -> float:\n        lot  = max(self._cfg.min_lot, min(lot, self._cfg.max_lot))\n        step = self._cfg.lot_step\n        return math.floor(lot / step) * step\n\n    def _zero_result(self, balance, sl_pips, atr, symbol, pip_value) -> LotSizingResult:\n        return LotSizingResult(\n            lot_size=self._cfg.min_lot,\n            method_used=self._cfg.method,\n            risk_amount_usd=0.0,\n            risk_percent=0.0,\n            stop_loss_pips=sl_pips,\n            atr_value=atr,\n            balance=balance,\n            symbol=symbol,\n            pip_value_used=pip_value,\n            notes=\"FALLBACK: invalid inputs \u2192 min lot\",\n        )\n\n    def update_config(self, **kwargs) -> None:\n        for k, v in kwargs.items():\n            if hasattr(self._cfg, k):\n                setattr(self._cfg, k, v)\n\n    @property\n    def config(self) -> LotSizingConfig:\n        return self._cfg\n\n\n_lot_sizer: Optional[DynamicLotSizer] = None\n\n\ndef get_lot_sizer() -> DynamicLotSizer:\n    global _lot_sizer\n    if _lot_sizer is None:\n        _lot_sizer = DynamicLotSizer()\n    return _lot_sizer\n
+"""
+Galaxy Vast AI Trading Platform
+Lot Sizing - FIX-3
+
+FIX-3: Unknown Symbol Pip Value Risk
+  BEFORE: _DEFAULT_PIP_VALUE = 1.0  (silently wrong)
+  AFTER:
+    - Dynamic pip/tick value from MT5 terminal (primary)
+    - Static table with 25 symbols (fallback)
+    - UnknownSymbolError raised if unknown - NEVER silent
+    - XAUUSD corrected: 10.0 -> 1.0
+"""
+from __future__ import annotations
+
+import asyncio
+import math
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Tuple
+
+from ..core.logger import get_logger
+
+logger = get_logger("risk.lot_sizing")
+
+
+# FIX-3: explicit pip/tick table (USD per pip per 1 standard lot)
+_PIP_VALUE_TABLE: Dict[str, float] = {
+    "EURUSD": 10.0,
+    "GBPUSD": 10.0,
+    "AUDUSD": 10.0,
+    "NZDUSD": 10.0,
+    "USDCAD":  7.7,
+    "USDCHF": 10.7,
+    "USDJPY":  6.7,
+    "EURGBP": 12.9,
+    "EURJPY":  6.7,
+    "GBPJPY":  6.7,
+    "AUDJPY":  6.7,
+    "EURAUD": 10.0,
+    "EURCHF": 10.7,
+    "GBPAUD": 10.0,
+    "GBPCHF": 10.7,
+    "AUDCAD":  7.7,
+    # Metals - FIX-3: XAUUSD was 10.0, corrected to 1.0
+    "XAUUSD":  1.0,
+    "XAGUSD":  5.0,
+    "XPTUSD":  1.0,
+    "XPDUSD":  1.0,
+    # Indices
+    "US30":    1.0,
+    "US500":   1.0,
+    "NAS100":  1.0,
+    "GER40":   1.0,
+    # Crypto
+    "BTCUSD":  1.0,
+    "ETHUSD":  1.0,
+}
+
+
+class UnknownSymbolError(ValueError):
+    """Raised when pip value cannot be determined. Never silently continue."""
+    pass
+
+
+@dataclass
+class LotSizingConfig:
+    risk_percent:   float = 1.0
+    min_lot:        float = 0.01
+    max_lot:        float = 10.0
+    lot_step:       float = 0.01
+    kelly_fraction: float = 0.5
+
+
+@dataclass
+class LotSizeResult:
+    lot_size:       float
+    pip_value_used: float
+    risk_usd:       float
+    risk_percent:   float
+    kelly_lot:      float
+    source:         str   # "mt5_dynamic" | "static_table" | "provided"
+    symbol:         str
+
+
+class LotSizer:
+    """
+    FIX-3: pip value lookup order:
+      1. MT5 terminal (dynamic, real-time)
+      2. _PIP_VALUE_TABLE (static, curated)
+      3. UnknownSymbolError (NEVER silent)
+    """
+
+    def __init__(self, config: Optional[LotSizingConfig] = None, mt5_connector=None):
+        self.config = config or LotSizingConfig()
+        self._mt5   = mt5_connector
+        self._pip_cache: Dict[str, float] = {}
+        self._pip_cache_lock = asyncio.Lock()
+
+    async def get_pip_value(self, symbol: str) -> Tuple[float, str]:
+        """Returns (pip_value_usd, source). Raises UnknownSymbolError if unknown."""
+        sym = symbol.upper().replace(" ", "")
+
+        # 1. MT5 terminal
+        if self._mt5 is not None:
+            try:
+                async with self._pip_cache_lock:
+                    if sym in self._pip_cache:
+                        return self._pip_cache[sym], "mt5_cache"
+                tick_value = await self._fetch_mt5_pip_value(sym)
+                if tick_value is not None and tick_value > 0:
+                    async with self._pip_cache_lock:
+                        self._pip_cache[sym] = tick_value
+                    logger.debug("Pip value %s from MT5: %.4f", sym, tick_value)
+                    return tick_value, "mt5_dynamic"
+            except Exception as exc:
+                logger.warning("MT5 pip value fetch failed for %s: %s", sym, exc)
+
+        # 2. Static table
+        if sym in _PIP_VALUE_TABLE:
+            return _PIP_VALUE_TABLE[sym], "static_table"
+
+        # 3. FIX-3: NEVER silently continue
+        raise UnknownSymbolError(
+            f"Cannot determine pip value for '{sym}'. "
+            f"Add to _PIP_VALUE_TABLE or connect MT5. "
+            f"Known: {sorted(_PIP_VALUE_TABLE.keys())}"
+        )
+
+    async def _fetch_mt5_pip_value(self, symbol: str) -> Optional[float]:
+        try:
+            info = await self._mt5.get_symbol_info(symbol)
+            if info is None:
+                return None
+            tick_value = getattr(info, "trade_tick_value", None)
+            tick_size  = getattr(info, "trade_tick_size", None)
+            digits     = getattr(info, "digits", 5)
+            if tick_value is None or tick_size is None or tick_size == 0:
+                return None
+            pip_size  = 10 ** -(digits - 1) if digits >= 2 else tick_size
+            pip_value = tick_value * (pip_size / tick_size)
+            return round(pip_value, 6)
+        except Exception as exc:
+            logger.warning("_fetch_mt5_pip_value error for %s: %s", symbol, exc)
+            return None
+
+    async def calculate(self, balance: float, stop_loss_pips: float, symbol: str, atr_pips: float = 0.0, win_rate: float = 0.55, avg_rr: float = 1.5, volatility_ratio: float = 1.0) -> LotSizeResult:
+        """FIX-3: symbol is REQUIRED. Raises UnknownSymbolError if not resolvable."""
+        if not symbol:
+            raise UnknownSymbolError("symbol parameter is required for lot sizing")
+        pip_value, source = await self.get_pip_value(symbol)
+        sl_pips = max(stop_loss_pips, 0.1)
+        risk_amount = balance * (self.config.risk_percent / 100.0)
+        base_lot    = risk_amount / (sl_pips * pip_value)
+        kelly_lot = base_lot
+        if self.config.kelly_fraction > 0 and win_rate > 0 and avg_rr > 0:
+            kelly_f   = win_rate - (1 - win_rate) / avg_rr
+            kelly_lot = base_lot * max(0.0, kelly_f) * self.config.kelly_fraction
+        raw_lot = kelly_lot * volatility_ratio
+        clamped = max(self.config.min_lot, min(raw_lot, self.config.max_lot))
+        step    = self.config.lot_step
+        final   = math.floor(clamped / step) * step
+        final   = max(self.config.min_lot, round(final, 2))
+        risk_usd = final * sl_pips * pip_value
+        risk_pct = (risk_usd / balance * 100) if balance > 0 else 0.0
+        logger.info("LotSizing %s: pip=%.4f(%s) sl=%.1f lot=%.2f risk_usd=%.2f(%.2f%%)", symbol, pip_value, source, sl_pips, final, risk_usd, risk_pct)
+        return LotSizeResult(lot_size=final, pip_value_used=pip_value, risk_usd=round(risk_usd, 2), risk_percent=round(risk_pct, 4), kelly_lot=round(kelly_lot, 4), source=source, symbol=symbol)
+
+    def calculate_sync(self, balance: float, stop_loss_pips: float, pip_value_usd: float, win_rate: float = 0.55, avg_rr: float = 1.5, volatility_ratio: float = 1.0, symbol: str = "") -> LotSizeResult:
+        if pip_value_usd <= 0:
+            raise ValueError(f"pip_value_usd must be > 0, got {pip_value_usd}")
+        sl_pips     = max(stop_loss_pips, 0.1)
+        risk_amount = balance * (self.config.risk_percent / 100.0)
+        base_lot    = risk_amount / (sl_pips * pip_value_usd)
+        kelly_lot = base_lot
+        if self.config.kelly_fraction > 0 and win_rate > 0 and avg_rr > 0:
+            kelly_f   = win_rate - (1 - win_rate) / avg_rr
+            kelly_lot = base_lot * max(0.0, kelly_f) * self.config.kelly_fraction
+        raw_lot = kelly_lot * volatility_ratio
+        clamped = max(self.config.min_lot, min(raw_lot, self.config.max_lot))
+        step    = self.config.lot_step
+        final   = math.floor(clamped / step) * step
+        final   = max(self.config.min_lot, round(final, 2))
+        risk_usd = final * sl_pips * pip_value_usd
+        risk_pct = (risk_usd / balance * 100) if balance > 0 else 0.0
+        return LotSizeResult(lot_size=final, pip_value_used=pip_value_usd, risk_usd=round(risk_usd, 2), risk_percent=round(risk_pct, 4), kelly_lot=round(kelly_lot, 4), source="provided", symbol=symbol)

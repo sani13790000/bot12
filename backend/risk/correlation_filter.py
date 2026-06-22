@@ -1,177 +1,233 @@
 """
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Correlation Filter — prevents over-exposure to correlated pairs
+Correlation Filter - FIX-4
+
+FIX-4: Static correlation table -> Rolling correlation engine
+  BEFORE: hardcoded dict {("EURUSD","GBPUSD"): 0.85, ...}
+  AFTER:
+    - RollingCorrelationEngine: Pearson on log-returns
+    - Configurable window (default 50 bars)
+    - TTL cache per pair (default 60s)
+    - Static table retained as cold-start fallback
+    - portfolio_correlation_matrix() for risk display
 """
 from __future__ import annotations
+
+import asyncio
+import math
+import time
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Tuple
+
+from ..core.logger import get_logger
+
+logger = get_logger("risk.correlation_filter")
 
 
-# ── Static Correlation Matrix (daily avg, major pairs) ──────────
-# Values between -1.0 (inverse) and +1.0 (same direction)
-CORRELATION_MATRIX: Dict[str, Dict[str, float]] = {
-    "EURUSD": {"GBPUSD": 0.85, "AUDUSD": 0.72, "NZDUSD": 0.70,
-               "USDCHF": -0.92, "USDJPY": -0.55, "USDCAD": -0.60,
-               "XAUUSD": 0.30, "EURUSD": 1.0},
-    "GBPUSD": {"EURUSD": 0.85, "AUDUSD": 0.65, "NZDUSD": 0.60,
-               "USDCHF": -0.80, "USDJPY": -0.45, "USDCAD": -0.55,
-               "XAUUSD": 0.25, "GBPUSD": 1.0},
-    "AUDUSD": {"EURUSD": 0.72, "GBPUSD": 0.65, "NZDUSD": 0.92,
-               "USDCHF": -0.68, "USDJPY": -0.40, "USDCAD": -0.50,
-               "XAUUSD": 0.45, "AUDUSD": 1.0},
-    "NZDUSD": {"EURUSD": 0.70, "GBPUSD": 0.60, "AUDUSD": 0.92,
-               "USDCHF": -0.65, "USDJPY": -0.38, "USDCAD": -0.48,
-               "XAUUSD": 0.40, "NZDUSD": 1.0},
-    "USDCHF": {"EURUSD": -0.92, "GBPUSD": -0.80, "AUDUSD": -0.68,
-               "NZDUSD": -0.65, "USDJPY": 0.50, "USDCAD": 0.55,
-               "XAUUSD": -0.28, "USDCHF": 1.0},
-    "USDJPY": {"EURUSD": -0.55, "GBPUSD": -0.45, "AUDUSD": -0.40,
-               "NZDUSD": -0.38, "USDCHF": 0.50, "USDCAD": 0.40,
-               "XAUUSD": -0.35, "USDJPY": 1.0},
-    "USDCAD": {"EURUSD": -0.60, "GBPUSD": -0.55, "AUDUSD": -0.50,
-               "NZDUSD": -0.48, "USDCHF": 0.55, "USDJPY": 0.40,
-               "XAUUSD": -0.20, "USDCAD": 1.0},
-    "XAUUSD": {"EURUSD": 0.30, "GBPUSD": 0.25, "AUDUSD": 0.45,
-               "NZDUSD": 0.40, "USDCHF": -0.28, "USDJPY": -0.35,
-               "USDCAD": -0.20, "XAUUSD": 1.0},
-    "XAGUSD": {"XAUUSD": 0.87, "EURUSD": 0.28, "AUDUSD": 0.42, "XAGUSD": 1.0},
-    "BTCUSD": {"XAUUSD": 0.15, "ETHUSD": 0.92, "BTCUSD": 1.0},
-    "ETHUSD": {"BTCUSD": 0.92, "ETHUSD": 1.0},
+# Static fallback table (cold-start / insufficient data)
+_STATIC_CORRELATION_TABLE: Dict[Tuple[str, str], float] = {
+    ("EURUSD", "GBPUSD"):  0.85,
+    ("EURUSD", "AUDUSD"):  0.72,
+    ("EURUSD", "NZDUSD"):  0.70,
+    ("EURUSD", "USDCHF"): -0.92,
+    ("EURUSD", "USDCAD"): -0.78,
+    ("GBPUSD", "AUDUSD"):  0.70,
+    ("GBPUSD", "NZDUSD"):  0.68,
+    ("GBPUSD", "USDCHF"): -0.88,
+    ("AUDUSD", "NZDUSD"):  0.91,
+    ("AUDUSD", "USDCAD"): -0.62,
+    ("USDJPY", "EURJPY"):  0.75,
+    ("USDJPY", "GBPJPY"):  0.72,
+    ("USDJPY", "AUDJPY"):  0.70,
+    ("XAUUSD", "XAGUSD"):  0.80,
+    ("XAUUSD", "EURUSD"):  0.45,
+    ("XAUUSD", "USDCHF"): -0.40,
+    ("US30",   "US500"):   0.95,
+    ("US30",   "NAS100"):  0.88,
+    ("US500",  "NAS100"):  0.92,
+    ("BTCUSD", "ETHUSD"):  0.88,
 }
 
 
+def _canonical(a: str, b: str) -> Tuple[str, str]:
+    a, b = a.upper(), b.upper()
+    return (a, b) if a < b else (b, a)
+
+
+# --- Rolling correlation engine ---
+
+@dataclass
+class _PriceWindow:
+    window:  int
+    returns: Deque[float] = field(default_factory=deque)
+    last_price: Optional[float] = None
+
+    def add_price(self, price: float) -> None:
+        if price <= 0: return
+        if self.last_price is not None and self.last_price > 0:
+            lr = math.log(price / self.last_price)
+            self.returns.append(lr)
+            if len(self.returns) > self.window:
+                self.returns.popleft()
+        self.last_price = price
+
+    @property
+    def ready(self) -> bool: return len(self.returns) >= 5
+    def as_list(self) -> List[float]: return list(self.returns)
+
+
+@dataclass
+class _CacheEntry:
+    correlation: float
+    timestamp:   float
+
+
+class RollingCorrelationEngine:
+    """Computes Pearson correlation from rolling windows of log-returns."""
+
+    def __init__(self, window: int = 50, cache_ttl: float = 60.0):
+        self._window    = window
+        self._cache_ttl = cache_ttl
+        self._windows:  Dict[str, _PriceWindow]          = {}
+        self._cache:    Dict[Tuple[str, str], _CacheEntry] = {}
+        self._lock = asyncio.Lock()
+
+    async def add_price(self, symbol: str, price: float) -> None:
+        sym = symbol.upper()
+        async with self._lock:
+            if sym not in self._windows:
+                self._windows[sym] = _PriceWindow(window=self._window)
+            self._windows[sym].add_price(price)
+            stale = [k for k in self._cache if sym in k]
+            for k in stale: del self._cache[k]
+
+    async def get_correlation(self, a: str, b: str) -> Optional[float]:
+        key = _canonical(a, b)
+        if key[0] == key[1]: return 1.0
+        async with self._lock:
+            entry = self._cache.get(key)
+            if entry and (time.monotonic() - entry.timestamp) < self._cache_ttl:
+                return entry.correlation
+            win_a = self._windows.get(key[0])
+            win_b = self._windows.get(key[1])
+            if win_a is None or win_b is None or not win_a.ready or not win_b.ready:
+                return None
+            corr = _pearson(win_a.as_list(), win_b.as_list())
+            self._cache[key] = _CacheEntry(correlation=corr, timestamp=time.monotonic())
+            return corr
+
+    def get_tracked_symbols(self) -> List[str]: return list(self._windows.keys())
+
+    async def cache_stats(self) -> Dict:
+        async with self._lock:
+            now = time.monotonic()
+            return {"tracked_symbols": len(self._windows), "cache_entries": len(self._cache), "cache_live": sum(1 for e in self._cache.values() if now - e.timestamp < self._cache_ttl), "window_size": self._window, "cache_ttl": self._cache_ttl}
+
+
+def _pearson(x: List[float], y: List[float]) -> float:
+    n = min(len(x), len(y))
+    if n < 3: return 0.0
+    x, y = x[-n:], y[-n:]
+    mx = sum(x) / n; my = sum(y) / n
+    num = sum((x[i] - mx) * (y[i] - my) for i in range(n))
+    dx  = math.sqrt(sum((v - mx) ** 2 for v in x))
+    dy  = math.sqrt(sum((v - my) ** 2 for v in y))
+    return round(num / (dx * dy), 4) if dx * dy > 0 else 0.0
+
+
+# --- FIX-4: updated CorrelationFilter ---
+
 @dataclass
 class CorrelationFilterConfig:
-    max_correlated_exposure: float = 0.80   # block if |corr| > this
-    correlation_penalty_threshold: float = 0.60  # apply penalty above this
-    max_same_direction_corr_pairs: int = 2  # max highly corr pairs same dir
-    risk_multiplier_high_corr: float = 0.5  # reduce lot by this if corr > threshold
+    max_correlated_exposure:       float = 0.80
+    correlation_penalty_threshold: float = 0.60
+    window:                        int   = 50
+    cache_ttl:                     float = 60.0
 
 
 @dataclass
-class OpenPosition:
-    symbol: str
-    direction: str  # "BUY" or "SELL"
+class CorrPosition:
+    symbol:       str
+    direction:    str
     risk_percent: float
 
 
 @dataclass
-class CorrelationCheckResult:
-    can_trade: bool
-    reason: str
-    correlation_score: float        # highest |correlation| found
-    correlated_pairs: List[str]
-    adjusted_risk_percent: float    # risk after penalty
-    risk_multiplier: float          # 1.0 = no change, <1.0 = reduced
+class CorrelationResult:
+    can_trade:         bool
+    risk_multiplier:   float
+    correlation_score: float
+    reason:            str
+    source:            str  # "rolling" | "static" | "none"
 
 
 class CorrelationFilter:
     """
-    Prevents over-exposure to correlated currency pairs.
-    Uses static correlation matrix + direction-aware logic.
+    FIX-4: Rolling engine replaces static table.
+    Lookup: rolling -> static table -> None (uncorrelated assumption)
     """
 
     def __init__(self, config: Optional[CorrelationFilterConfig] = None):
-        self._cfg = config or CorrelationFilterConfig()
+        self.config  = config or CorrelationFilterConfig()
+        self._engine = RollingCorrelationEngine(window=self.config.window, cache_ttl=self.config.cache_ttl)
 
-    def check(
-        self,
-        new_symbol: str,
-        new_direction: str,
-        open_positions: List[OpenPosition],
-        base_risk_percent: float,
-    ) -> CorrelationCheckResult:
-        """Check if new trade is safe given open positions."""
+    async def add_price(self, symbol: str, price: float) -> None:
+        await self._engine.add_price(symbol, price)
+
+    async def check(self, new_symbol: str, new_direction: str, open_positions: List[CorrPosition], base_risk_percent: float) -> CorrelationResult:
         if not open_positions:
-            return CorrelationCheckResult(
-                can_trade=True,
-                reason="NO_OPEN_POSITIONS",
-                correlation_score=0.0,
-                correlated_pairs=[],
-                adjusted_risk_percent=base_risk_percent,
-                risk_multiplier=1.0,
-            )
+            return CorrelationResult(can_trade=True, risk_multiplier=1.0, correlation_score=0.0, reason="", source="none")
 
-        max_corr     = 0.0
-        corr_pairs   = []
-        same_dir_count = 0
-
+        max_corr = 0.0; max_pair = ""; net_exposure = 0.0; source = "none"
         for pos in open_positions:
-            corr = self._get_correlation(new_symbol, pos.symbol)
-            if corr is None:
-                continue
-            abs_corr = abs(corr)
-            if abs_corr > max_corr:
-                max_corr = abs_corr
+            corr, src = await self._get_correlation(new_symbol, pos.symbol)
+            if corr is None: continue
+            direction_factor = 1.0 if new_direction == pos.direction else -1.0
+            effective_corr = corr * direction_factor
+            net_exposure  += effective_corr * pos.risk_percent
+            if abs(corr) > abs(max_corr):
+                max_corr = corr; max_pair = pos.symbol; source = src
 
-            # Direction-aware: EURUSD BUY + GBPUSD BUY = amplified risk
-            effective_corr = corr
-            if pos.direction != new_direction:
-                effective_corr = -corr  # inverse position = actually diversifying
+        abs_net = abs(net_exposure)
+        logger.debug("Correlation check %s %s: net=%.3f max_corr=%.3f(%s)", new_direction, new_symbol, net_exposure, max_corr, max_pair)
 
-            if abs(effective_corr) >= self._cfg.correlation_penalty_threshold:
-                corr_pairs.append(f"{pos.symbol}({corr:+.2f})")
-                if effective_corr > 0:
-                    same_dir_count += 1
+        if abs_net >= self.config.max_correlated_exposure:
+            return CorrelationResult(can_trade=False, risk_multiplier=0.0, correlation_score=abs_net, reason=f"Correlated exposure {abs_net:.2f} >= max {self.config.max_correlated_exposure} (pair: {max_pair} corr={max_corr:.2f})", source=source)
 
-        # ① BLOCK if max correlation exceeds threshold
-        if max_corr >= self._cfg.max_correlated_exposure:
-            return CorrelationCheckResult(
-                can_trade=False,
-                reason=f"HIGH_CORRELATION {max_corr:.2f} >= {self._cfg.max_correlated_exposure}",
-                correlation_score=max_corr,
-                correlated_pairs=corr_pairs,
-                adjusted_risk_percent=0.0,
-                risk_multiplier=0.0,
-            )
+        if abs_net >= self.config.correlation_penalty_threshold:
+            penalty    = 1.0 - (abs_net - self.config.correlation_penalty_threshold) / (self.config.max_correlated_exposure - self.config.correlation_penalty_threshold)
+            multiplier = round(max(0.3, penalty), 2)
+            return CorrelationResult(can_trade=True, risk_multiplier=multiplier, correlation_score=abs_net, reason=f"Correlation penalty: net={abs_net:.2f} multiplier={multiplier}", source=source)
 
-        # ② BLOCK if too many same-direction correlated pairs
-        if same_dir_count >= self._cfg.max_same_direction_corr_pairs:
-            return CorrelationCheckResult(
-                can_trade=False,
-                reason=f"TOO_MANY_CORRELATED_PAIRS {same_dir_count} same-direction",
-                correlation_score=max_corr,
-                correlated_pairs=corr_pairs,
-                adjusted_risk_percent=0.0,
-                risk_multiplier=0.0,
-            )
+        return CorrelationResult(can_trade=True, risk_multiplier=1.0, correlation_score=abs_net, reason="", source=source)
 
-        # ③ Apply penalty if correlated pairs exist
-        multiplier = 1.0
-        if corr_pairs:
-            multiplier = self._cfg.risk_multiplier_high_corr
-        adj_risk = base_risk_percent * multiplier
-
-        return CorrelationCheckResult(
-            can_trade=True,
-            reason="PASSED" if not corr_pairs else f"CORR_PENALTY x{multiplier}",
-            correlation_score=max_corr,
-            correlated_pairs=corr_pairs,
-            adjusted_risk_percent=round(adj_risk, 3),
-            risk_multiplier=multiplier,
-        )
+    async def _get_correlation(self, sym_a: str, sym_b: str) -> Tuple[Optional[float], str]:
+        try:
+            corr = await self._engine.get_correlation(sym_a, sym_b)
+            if corr is not None: return corr, "rolling"
+        except Exception as exc:
+            logger.warning("Rolling correlation error %s/%s: %s", sym_a, sym_b, exc)
+        key = _canonical(sym_a, sym_b)
+        if key in _STATIC_CORRELATION_TABLE: return _STATIC_CORRELATION_TABLE[key], "static"
+        return None, "none"
 
     def get_correlation(self, sym_a: str, sym_b: str) -> Optional[float]:
-        return self._get_correlation(sym_a, sym_b)
+        """Sync lookup via static table only (backward compat)."""
+        if sym_a.upper() == sym_b.upper(): return 1.0
+        return _STATIC_CORRELATION_TABLE.get(_canonical(sym_a, sym_b))
 
-    def _get_correlation(self, a: str, b: str) -> Optional[float]:
-        a, b = a.upper(), b.upper()
-        if a == b:
-            return 1.0
-        row = CORRELATION_MATRIX.get(a, {})
-        if b in row:
-            return row[b]
-        row_b = CORRELATION_MATRIX.get(b, {})
-        if a in row_b:
-            return row_b[a]
-        return None
+    async def portfolio_correlation_matrix(self, symbols: List[str]) -> Dict[Tuple[str, str], float]:
+        """Full N*N correlation matrix for portfolio risk display."""
+        matrix: Dict[Tuple[str, str], float] = {}
+        for i, a in enumerate(symbols):
+            for b in symbols[i:]:
+                if a == b:
+                    matrix[_canonical(a, b)] = 1.0
+                else:
+                    corr, _ = await self._get_correlation(a, b)
+                    matrix[_canonical(a, b)] = corr if corr is not None else 0.0
+        return matrix
 
-
-_corr_filter: Optional[CorrelationFilter] = None
-
-def get_correlation_filter() -> CorrelationFilter:
-    global _corr_filter
-    if _corr_filter is None:
-        _corr_filter = CorrelationFilter()
-    return _corr_filter
+    @property
+    def rolling_engine(self) -> RollingCorrelationEngine: return self._engine
