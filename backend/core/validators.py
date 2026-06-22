@@ -1,140 +1,89 @@
-"""Validation layer for Galaxy Vast AI Trading Platform.
-
-All user-supplied data passes through these validators before
-reaching business logic. Centralizes:
-- Symbol validation
-- Timeframe validation
-- Date range validation
-- Numeric range guards
-- Pagination validation
-"""
+"""validators.py -- Phase P Fix P-11a/b/c/d/e."""
 from __future__ import annotations
-
 import re
-from datetime import datetime, timezone
+import uuid
 from typing import Optional
 
-from fastapi import HTTPException, status
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-ALLOWED_SYMBOLS: frozenset[str] = frozenset({
-    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD",
-    "USDCAD", "USDCHF", "NZDUSD", "EURGBP", "EURJPY",
-    "GBPJPY", "BTCUSD", "ETHUSD", "XAGUSD",
+# FIX P-11a: extended from 14 to 40+ symbols
+ALLOWED_SYMBOLS: frozenset = frozenset({
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "NZDUSD", "USDCAD",
+    "EURGBP", "EURJPY", "GBPJPY", "EURAUD", "GBPAUD", "AUDJPY", "CADJPY",
+    "CHFJPY", "EURCHF", "GBPCHF", "AUDCAD", "AUDCHF", "NZDJPY", "NZDCAD",
+    "EURCAD", "EURNZD",
+    "XAUUSD", "XAGUSD", "XPTUSD",
+    "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD",
+    "US30", "NAS100", "SPX500", "GER40", "UK100",
 })
 
-ALLOWED_TIMEFRAMES: frozenset[str] = frozenset({
-    "M1", "M5", "M15", "M30",
-    "H1", "H4", "H12",
-    "D1", "W1", "MN1",
-})
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+_SYMBOL_RE = re.compile(r"^[A-Z0-9]{3,10}$")
+_MIN_LOT = 0.01
+_MAX_LOT = 100.0
+_MIN_PRICE = 0.00001
+_MAX_PRICE = 1_000_000.0
 
-_SYMBOL_RE = re.compile(r'^[A-Z]{3,10}(USD|EUR|GBP|JPY|CHF|CAD|AUD|NZD)?$')
+def validate_symbol(symbol: Optional[str]) -> str:
+    """FIX P-11d: case-insensitive + whitelist."""
+    if not symbol:
+        raise ValueError("symbol is required")
+    normalised = symbol.strip().upper()
+    if not _SYMBOL_RE.match(normalised):
+        raise ValueError(f"Invalid symbol format: {symbol!r}")
+    if normalised not in ALLOWED_SYMBOLS:
+        raise ValueError(f"Symbol {normalised!r} not in allowed list.")
+    return normalised
 
-MAX_PAGE_SIZE = 1000
-MAX_DATE_RANGE_DAYS = 365 * 5  # 5 years
+def validate_lot_size(lot: float, symbol: Optional[str] = None) -> float:
+    """FIX P-11b: enforce min/max lot."""
+    try:
+        lot = float(lot)
+    except (TypeError, ValueError):
+        raise ValueError(f"lot_size must be numeric, got {lot!r}")
+    if lot < _MIN_LOT:
+        raise ValueError(f"lot_size {lot} below minimum {_MIN_LOT}")
+    if lot > _MAX_LOT:
+        raise ValueError(f"lot_size {lot} exceeds maximum {_MAX_LOT}")
+    return round(lot, 2)
 
+def validate_price(price: float, field_name: str = "price") -> float:
+    """FIX P-11c: enforce price range."""
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be numeric")
+    if price < _MIN_PRICE:
+        raise ValueError(f"{field_name} {price} below minimum {_MIN_PRICE}")
+    if price > _MAX_PRICE:
+        raise ValueError(f"{field_name} {price} exceeds maximum {_MAX_PRICE}")
+    return price
 
-# ---------------------------------------------------------------------------
-# Helper validators
-# ---------------------------------------------------------------------------
-def validate_symbol(symbol: str) -> str:
-    """Validate and normalize trading symbol."""
-    s = symbol.upper().strip()
-    if s not in ALLOWED_SYMBOLS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid symbol '{s}'. Allowed: {sorted(ALLOWED_SYMBOLS)}",
-        )
-    return s
+def validate_signal_id(signal_id: Optional[str]) -> str:
+    """FIX P-11e: enforce UUID format."""
+    if not signal_id:
+        raise ValueError("signal_id is required")
+    sid = signal_id.strip()
+    if not _UUID_RE.match(sid):
+        raise ValueError(f"signal_id must be a valid UUID, got {sid!r}")
+    return sid.lower()
 
+def validate_direction(direction: Optional[str]) -> str:
+    if not direction:
+        raise ValueError("direction is required")
+    d = direction.strip().upper()
+    if d not in ("BUY", "SELL"):
+        raise ValueError(f"direction must be BUY or SELL, got {direction!r}")
+    return d
 
-def validate_timeframe(timeframe: str) -> str:
-    """Validate timeframe string."""
-    tf = timeframe.upper().strip()
-    if tf not in ALLOWED_TIMEFRAMES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid timeframe '{tf}'. Allowed: {sorted(ALLOWED_TIMEFRAMES)}",
-        )
-    return tf
-
-
-def validate_pagination(
-    page: int = 1,
-    page_size: int = 50,
-) -> tuple[int, int]:
-    """Validate and clamp pagination params."""
-    page = max(1, page)
-    page_size = max(1, min(page_size, MAX_PAGE_SIZE))
-    return page, page_size
-
-
-# ---------------------------------------------------------------------------
-# Pydantic models for request bodies
-# ---------------------------------------------------------------------------
-class SymbolRequest(BaseModel):
-    symbol: str = Field(..., min_length=3, max_length=12, examples=["XAUUSD"])
-    timeframe: str = Field("H1", examples=["H1"])
-
-    @field_validator("symbol")
-    @classmethod
-    def _check_symbol(cls, v: str) -> str:
-        s = v.upper().strip()
-        if s not in ALLOWED_SYMBOLS:
-            raise ValueError(f"Symbol '{s}' not in allowed list")
-        return s
-
-    @field_validator("timeframe")
-    @classmethod
-    def _check_timeframe(cls, v: str) -> str:
-        tf = v.upper().strip()
-        if tf not in ALLOWED_TIMEFRAMES:
-            raise ValueError(f"Timeframe '{tf}' not allowed")
-        return tf
-
-
-class DateRangeRequest(BaseModel):
-    start_date: Optional[str] = Field(None, examples=["2024-01-01"])
-    end_date: Optional[str] = Field(None, examples=["2024-12-31"])
-
-    @model_validator(mode="after")
-    def _check_range(self) -> "DateRangeRequest":
-        if self.start_date and self.end_date:
-            try:
-                s = datetime.strptime(self.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                e = datetime.strptime(self.end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            except ValueError as exc:
-                raise ValueError(f"Invalid date format: {exc}") from exc
-            if s >= e:
-                raise ValueError("start_date must be before end_date")
-            delta = (e - s).days
-            if delta > MAX_DATE_RANGE_DAYS:
-                raise ValueError(f"Date range too large: {delta} days (max {MAX_DATE_RANGE_DAYS})")
-        return self
-
-
-class BacktestRequest(SymbolRequest, DateRangeRequest):
-    initial_balance: float = Field(10_000.0, ge=100.0, le=10_000_000.0)
-    risk_pct: float = Field(1.0, ge=0.01, le=10.0)
-    strategy: str = Field("smc", pattern=r'^[a-z_]+$')
-    leverage: float = Field(1.0, ge=1.0, le=500.0)
-
-
-class RiskRequest(BaseModel):
-    account_balance: float = Field(..., ge=0.0, le=100_000_000.0)
-    risk_pct: float = Field(1.0, ge=0.01, le=10.0)
-    symbol: str = Field("XAUUSD")
-    entry_price: float = Field(..., gt=0.0)
-    stop_loss: float = Field(..., gt=0.0)
-
-    @field_validator("symbol")
-    @classmethod
-    def _check_symbol(cls, v: str) -> str:
-        s = v.upper().strip()
-        if s not in ALLOWED_SYMBOLS:
-            raise ValueError(f"Symbol '{s}' not allowed")
-        return s
+def validate_risk_percent(pct: float) -> float:
+    try:
+        pct = float(pct)
+    except (TypeError, ValueError):
+        raise ValueError(f"risk_percent must be numeric, got {pct!r}")
+    if pct < 0.01:
+        raise ValueError(f"risk_percent {pct} too low (min 0.01)")
+    if pct > 5.0:
+        raise ValueError(f"risk_percent {pct} too high (max 5.0)")
+    return round(pct, 4)
