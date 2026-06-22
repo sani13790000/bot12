@@ -1,166 +1,383 @@
-# 🌌 Galaxy Vast AI Trading Bot
+# 🌌 Galaxy Vast AI Trading Platform
 ## راهنمای کامل — صفر تا صد
 
----
-
-# بخش اول: این ربات چه کار می‌کند؟
-
-## به زبان ساده
-
-**Galaxy Vast** یک ربات هوشمند معاملاتی است که:
-- بازار طلا (XAUUSD) را ۲۴ ساعته رصد می‌کند
-- با استفاده از هوش مصنوعی تصمیم می‌گیرد خرید کنیم یا بفروشیم
-- معاملات را از طریق نرم‌افزار MetaTrader 5 انجام می‌دهد
-- از طریق تلگرام شما را آگاه می‌کند
-- سود و زیان را ثبت و آنالیز می‌کند
+> **نسخه:** 2.0.0 | **آخرین بروزرسانی:** ۲۲ خرداد ۱۴۰۵
 
 ---
 
-## جریان کاری ربات (چطور کار می‌کند؟)
+## 📋 فهرست مطالب
+
+1. [معرفی سیستم](#-معرفی-سیستم)
+2. [ربات چه کاری انجام می‌دهد](#-ربات-چه-کاری-انجام-میدهد)
+3. [معماری کلی](#-معماری-کلی)
+4. [اجزای سیستم](#-اجزای-سیستم)
+5. [جریان کامل معامله](#-جریان-کامل-معامله)
+6. [سیستم هوش مصنوعی](#-سیستم-هوش-مصنوعی)
+7. [سیستم مدیریت ریسک](#-سیستم-مدیریت-ریسک)
+8. [ربات تلگرام](#-ربات-تلگرام)
+9. [پنل وب](#-پنل-وب)
+10. [پیش‌نیازها](#-پیشنیازها)
+11. [راه‌اندازی گام به گام](#-راهاندازی-گام-به-گام)
+12. [فایل .env کامل](#-فایل-env-کامل)
+13. [دستورات تلگرام](#-دستورات-تلگرام)
+14. [سطوح دسترسی](#-سطوح-دسترسی)
+15. [مانیتورینگ و لاگ](#-مانیتورینگ-و-لاگ)
+16. [بکاپ و بازیابی](#-بکاپ-و-بازیابی)
+17. [رفع مشکلات رایج](#-رفع-مشکلات-رایج)
+18. [سوالات متداول](#-سوالات-متداول)
+
+---
+
+## 🎯 معرفی سیستم
+
+**Galaxy Vast** یک پلتفرم کامل معامله‌گری خودکار در سطح Hedge Fund است که با هوش مصنوعی، تحلیل Smart Money Concept و Price Action، معاملات را در MetaTrader 5 اجرا می‌کند.
+
+### مشخصات کلی
+
+| مشخصه | مقدار |
+|---|---|
+| زبان Backend | Python 3.11+ |
+| Framework | FastAPI |
+| Frontend | React 18 + TypeScript |
+| پلتفرم معاملاتی | MetaTrader 5 (MQL5 EA) |
+| دیتابیس | Supabase (PostgreSQL) |
+| Cache | Redis 7.4 |
+| ارتباطات | Telegram Bot + WebSocket |
+| مانیتورینگ | Prometheus + Grafana |
+
+---
+
+## 🤖 ربات چه کاری انجام می‌دهد
+
+### به طور خلاصه:
+
+ربات به صورت **۲۴/۷** بازار فارکس/طلا/کریپتو را تحلیل می‌کند، سیگنال تولید می‌کند، ریسک را می‌سنجد و معاملات را **به طور خودکار** در MetaTrader 5 اجرا می‌کند. همه چیز از طریق **تلگرام** قابل کنترل است.
+
+### قابلیت‌های کامل:
+
+#### 1. تحلیل بازار (Analysis Engine)
+- **SMC — Smart Money Concept:** تشخیص BOS، CHOCH، Order Block، FVG، Liquidity Sweep
+- **Price Action:** Pin Bar، Engulfing، Fakey، Inside Bar، Morning Star و ۱۵ الگو دیگر
+- **Multi-Timeframe:** تحلیل همزمان H4، H1، M15، M5
+- **Kill Zones:** تشخیص پنجره‌های معاملاتی بهینه (London Open، NY Open)
+
+#### 2. هوش مصنوعی (AI Engine)
+- **۱۳ Agent موازی:** هر agent یک جنبه بازار را بررسی می‌کند
+- **Voting Engine:** رای‌گیری از agents و confidence score نهایی
+- **XGBoost Model:** پیش‌بینی جهت قیمت با ویژگی‌های استخراجی
+- **Self-Learning:** بهبود مستمر بر اساس نتیجه معاملات
+
+#### 3. مدیریت ریسک (Risk Engine)
+- **۵ Gate مستقل:** هر معامله باید از ۵ فیلتر رد شود
+- **Position Sizing:** محاسبه دقیق lot size بر اساس equity
+- **Drawdown Protection:** توقف خودکار در صورت ضرر بیش از حد
+- **Circuit Breaker:** قطع اتوماتیک در شرایط بحرانی
+
+#### 4. اجرای معاملات (Execution Engine)
+- **MT5 Connector:** اجرای مستقیم Order در MetaTrader 5
+- **Order State Machine:** ردیابی کامل وضعیت هر معامله
+- **Failure Recovery:** تلاش مجدد خودکار در صورت خطا
+- **Semi-Auto Mode:** تایید دستی از طریق تلگرام قبل از اجرا
+
+#### 5. کنترل و گزارش (Telegram Bot)
+- کنترل کامل ربات از تلگرام
+- گزارش لحظه‌ای معاملات
+- هشدارهای اتوماتیک
+- مدیریت کاربران و دسترسی‌ها
+
+---
+
+## 🏗️ معماری کلی
 
 ```
-[بازار XAUUSD]
-       |
-       v
-[7 Agent هوشمند — موازی]
-  |-- SMC Agent      <- ساختار بازار (Order Block / FVG / Liquidity)
-  |-- PA Agent       <- Price Action (Pin Bar / Engulfing / Fakey)
-  |-- ML Agent       <- مدل یادگیری ماشین (XGBoost)
-  |-- Risk Agent     <- ارزیابی ریسک
-  |-- News Agent     <- اخبار اقتصادی
-  |-- Liquidity Agent<- مناطق نقدینگی
-  +-- Execution Agent<- شرایط اجرا
-       |
-       v
-[VotingEngine — رای‌گیری وزن‌دار]
-  (اگر امتیاز >= 65 و اطمینان >= 50%)
-       |
-       v
-[DecisionEngine — تصمیم نهایی]
-  |-- BUY  -> معامله خرید
-  |-- SELL -> معامله فروش
-  +-- NO_TRADE -> بدون معامله
-       |
-       v
-[RiskOrchestrator — محاسبه حجم لات]
-       |
-       v
-[MT5Connector — اجرا در MetaTrader 5]
-       |
-       v
-[Telegram — اطلاع‌رسانی به شما]
-       |
-       v
-[Supabase DB — ذخیره همه اطلاعات]
+کاربر (Telegram / Web Dashboard)
+           |
+      Nginx (TLS + Rate Limit)
+           |
+    FastAPI Backend (Python)
+    |         |         |
+  Auth/JWT  REST API  WebSocket
+    |         |         |
+  Analysis  AI Agents  Risk Engine  Execution
+           |
+    Supabase DB + Redis
+           |
+    MetaTrader 5 (MQL5 EA)
 ```
 
 ---
 
-## بخش‌های اصلی ربات
+## 🧩 اجزای سیستم
 
-### 1. موتور تحلیل SMC (Smart Money Concept)
-- تشخیص **Order Block** (بلوک‌های سفارش بانک‌ها)
-- تشخیص **FVG** (Fair Value Gap)
-- تشخیص **BOS/CHOCH** (شکست ساختار بازار)
-- تشخیص **Liquidity Sweep** (جارو کردن نقدینگی)
-- تشخیص **Breaker Block** و **Mitigation Block**
-- تحلیل **Premium/Discount Zones**
+### 1. backend/analysis — موتور تحلیل
 
-### 2. موتور Price Action
-- الگوهای شمعی: Pin Bar، Engulfing، Fakey، Inside Bar، Outside Bar
-- الگوهای ترکیبی: Morning Star، Evening Star، Three Soldiers
-- Breakout، Retest، Compression، Expansion
+| فایل | وظیفه |
+|---|---|
+| `smc_engine.py` | تشخیص BOS، CHOCH، FVG، Order Block |
+| `price_action_engine.py` | تشخیص Pin Bar، Engulfing و... |
+| `smc_scoring.py` | امتیازدهی به ستاپ‌های SMC |
+| `decision_engine.py` | تصمیم نهایی BUY/SELL/WAIT |
 
-### 3. هوش مصنوعی (ML Engine)
-- مدل **XGBoost** برای پیش‌بینی جهت بازار
-- **15 فیچر** از بازار: RSI، MACD، Bollinger، ATR، حجم و...
-- **Walk-Forward Validation** (اعتبارسنجی واقعی بدون lookahead bias)
-- **Concept Drift Detection** (تشخیص تغییر رفتار بازار)
-- آموزش خودکار هر 24 ساعت
+### 2. backend/agents — سیستم AI Agents
 
-### 4. موتور ریسک
-- محدودیت ریسک روزانه (پیش‌فرض 1% سرمایه)
-- محدودیت تعداد معاملات روزانه
-- محاسبه خودکار **Lot Size**
-- Gate یکپارچه‌سازی: اگر سرمایه کافی نباشد بدون معامله
+| Agent | وظیفه |
+|---|---|
+| `smc_agent.py` | تحلیل SMC |
+| `market_structure_agent.py` | ساختار کلی بازار |
+| `liquidity_agent.py` | نقدینگی و Sweep |
+| `risk_agent.py` | ارزیابی ریسک |
+| `ml_agent.py` | مدل یادگیری ماشین |
+| `news_agent.py` | تاثیر اخبار |
+| `execution_agent.py` | کیفیت اجرا |
+| `ai_prediction_agent.py` | پیش‌بینی AI |
+| `security_ai_agent.py` | امنیت معاملات |
+| `voting_engine.py` | رای‌گیری نهایی از همه agents |
 
-### 5. Circuit Breaker
-- اگر MT5 قطع شود معاملات متوقف می‌شود
-- اگر DB قطع شود معاملات متوقف می‌شود
-- بعد از 3 خطا Circuit Breaker باز می‌شود
+### 3. backend/risk — موتور ریسک
 
-### 6. Self-Learning Loop (یادگیری خودکار)
-```
-هر 24 ساعت:
-  <- خواندن معاملات گذشته از DB
-  <- آموزش مدل ML جدید
-  <- مقایسه با مدل قدیمی
-  <- اگر بهتر بود جایگزینی
-```
+| فایل | وظیفه |
+|---|---|
+| `risk_orchestrator.py` | هماهنگ‌کننده — همه gates را اجرا می‌کند |
+| `equity_protection.py` | Gate 1: محافظت از equity |
+| `daily_limits.py` | Gate 2: محدودیت روزانه |
+| `volatility_filter.py` | Gate 3: فیلتر نوسان |
+| `correlation_filter.py` | Gate 4: همبستگی بین نمادها |
+| `exposure_control.py` | Gate 5: کنترل exposure کلی |
+| `lot_sizing.py` | محاسبه حجم معامله per-symbol |
+| `portfolio_risk.py` | ریسک کل پورتفولیو |
 
-### 7. Backtest Engine
-- تست استراتژی روی داده‌های تاریخی
-- محاسبه Sharpe Ratio، Sortino، Calmar، Max Drawdown
-- **Monte Carlo Simulation** — 1000 سناریو
-- **Walk-Forward Analysis** — تست روی داده‌های out-of-sample
-- **Parameter Optimizer** — پیدا کردن بهترین تنظیمات
+### 4. backend/execution — موتور اجرا
 
-### 8. ربات تلگرام
-```
-/start_bot    -> شروع معاملات
-/stop_bot     -> توقف معاملات
-/pause_bot    -> مکث موقت
-/resume_bot   -> ادامه
-/close_all    -> بستن همه معاملات
-/close_buy    -> بستن معاملات خرید
-/close_sell   -> بستن معاملات فروش
-/report_daily -> گزارش امروز
-/report_weekly-> گزارش هفتگی
-/winrate      -> نرخ موفقیت
-/signals      -> سیگنال‌های فعال
-/settings     -> تنظیمات
-/users        -> مدیریت کاربران (admin)
-/add_user     -> اضافه کردن کاربر (admin)
-```
+| فایل | وظیفه |
+|---|---|
+| `execution_service.py` | هماهنگ‌کننده کل جریان اجرا |
+| `mt5_connector.py` | اتصال به MetaTrader 5 + ارسال order |
+| `order_state_machine.py` | مدیریت وضعیت (NEW→FILLED→CLOSED) |
+| `failure_recovery.py` | retry خودکار + dead-letter queue |
+| `position_reconciliation.py` | مقایسه MT5 با DB |
+| `semi_auto.py` | حالت نیمه‌خودکار |
 
-### 9. Security و امنیت
-- JWT Authentication با الگوریتم HS256
-- Rate Limiting: 100 درخواست در دقیقه
-- محافظت از SQL Injection و XSS و Path Traversal
-- Audit Log برای همه درخواست‌ها
-- License Management (پلن‌های Free/Basic/Pro/Enterprise)
+### 5. backend/ai_prediction — مدل یادگیری ماشین
 
-### 10. Observability (قابلیت مشاهده)
-- **30+ متریک** (HTTP، Trade، ML، DB، MT5)
-- **Structured Logging** با JSON
-- **10 قانون Alert** (Circuit Breaker، MT5 قطع، Daily Loss)
-- **Distributed Tracing** برای debug
-- `/health` endpoint برای نظارت
+| فایل | وظیفه |
+|---|---|
+| `feature_extractor.py` | استخراج 50+ ویژگی از کندل‌ها |
+| `dataset_builder.py` | ساخت dataset از تاریخچه معاملات |
+| `xgboost_trainer.py` | آموزش مدل XGBoost |
+| `model_manager.py` | مدیریت نسخه‌های مدل |
+| `prediction_service.py` | پیش‌بینی real-time |
 
----
+### 6. backend/services — سرویس‌های اصلی
 
-# بخش دوم: راه‌اندازی صفر تا صد
+| فایل | وظیفه |
+|---|---|
+| `trade_service.py` | CRUD معاملات |
+| `signal_service.py` | مدیریت سیگنال‌ها |
+| `decision_service.py` | کش و ذخیره تصمیمات |
+| `audit_service.py` | لاگ همه رویدادها |
+| `rbac_service.py` | مدیریت نقش و دسترسی |
+| `session_service.py` | مدیریت session کاربران |
+| `license_service.py` | اعتبارسنجی لایسنس |
+| `self_healing_service.py` | خوداصلاحی سیستم |
 
-## زمان تخمینی: 2-3 ساعت
+### 7. backend/telegram — ربات تلگرام
 
----
+| فایل | وظیفه |
+|---|---|
+| `bot.py` | راه‌اندازی ربات aiogram |
+| `handlers/` | پردازش پیام‌ها و دستورات |
+| `routers/` | مسیریابی دستورات |
+| `rbac.py` | کنترل دسترسی در تلگرام |
+| `alerts.py` | ارسال هشدارها |
+| `keyboards.py` | کیبوردهای Inline |
 
-## مرحله 0 — پیش‌نیازها
+### 8. mql5 — Expert Advisor در MetaTrader
 
-| چیز | چرا |
-|-----|-----|
-| VPS یا کامپیوتر با اینترنت | برای اجرای ربات |
-| حساب Supabase (رایگان) | پایگاه داده |
-| حساب در یک بروکر | برای اتصال به MT5 |
-| MetaTrader 5 | نرم‌افزار معاملاتی |
-| ربات تلگرام | برای کنترل ربات |
-| Python 3.11+ | زبان برنامه‌نویسی |
-| Docker | برای اجرای آسان (اختیاری) |
-| Git | برای دانلود کد |
+| فایل | وظیفه |
+|---|---|
+| `Experts/GalaxyVast.mq5` | EA اصلی — اجرا در MT5 |
+| `Include/` | توابع کمکی |
+| `Config.mqh` | تنظیمات EA |
 
 ---
 
-## مرحله 1 — نصب ابزارهای اولیه (Ubuntu/Linux)
+## 🔄 جریان کامل معامله
+
+```
+STEP 1: دریافت داده
+  MT5 EA → POST /api/v1/signals/ingest
+  (symbol, timeframe, OHLCV candles)
+
+STEP 2: تحلیل موازی (~50-200ms)
+  SMC Engine: BOS/CHOCH/OB/FVG
+  PA Engine: الگوهای کندلی
+  Feature Extractor: 50+ ویژگی
+
+STEP 3: رای‌گیری AI (13 Agent)
+  هر agent: BUY/SELL/WAIT + confidence
+  Voting Engine: تصمیم نهایی + score
+
+STEP 4: فیلتر ریسک (5 Gate)
+  Gate 1 — Equity Protection: drawdown < 8%?
+  Gate 2 — Daily Limits: loss_today < max?
+  Gate 3 — Volatility: spread < max_spread?
+  Gate 4 — Correlation: overlap < max?
+  Gate 5 — Exposure: total < max_exposure?
+  همه 5 gate باید سبز باشند
+
+STEP 5: محاسبه Lot Size
+  lot = (equity * risk%) / (sl_pips * pip_value)
+  pip_value per-symbol (XAUUSD=1.0, EURUSD=10.0)
+
+STEP 6: Dedup Check
+  همین signal در 30 ثانیه اخیر؟ → رد
+
+STEP 7: Semi-Auto Check
+  SEMI_AUTO_MODE=true → پیام تلگرام به ادمین
+  ادمین تایید یا رد می‌کند
+
+STEP 8: ارسال به MT5
+  MT5Connector.send_order()
+  retry x3 در صورت خطا
+
+STEP 9: Order State Machine
+  NEW → PENDING → FILLED → CLOSED
+
+STEP 10: اطلاع‌رسانی
+  پیام تلگرام + WebSocket dashboard + Audit Log
+```
+
+---
+
+## 🧠 سیستم هوش مصنوعی
+
+### XGBoost Pipeline:
+
+```
+داده خام (OHLCV)
+    |
+Feature Extraction (50+ ویژگی):
+  RSI, MACD, BB, ATR, EMA 20/50/200
+  SMC: OB strength, FVG size
+  Pattern: pin bar ratio, engulfing score
+  Session: London/NY/Asia
+    |
+XGBoost Classifier
+    |
+Probability: P(BUY), P(SELL), P(WAIT)
+    |
+Confidence Score (0.0 - 1.0)
+```
+
+### Self-Learning Loop:
+```
+معامله اجرا شد
+    |
+بسته شد (Win/Loss)
+    |
+نتیجه به dataset اضافه شد
+    |
+هر N معامله → re-train مدل
+    |
+مدل جدید جایگزین (اگر بهتر بود)
+```
+
+---
+
+## 🛡️ سیستم مدیریت ریسک
+
+### پارامترهای پیش‌فرض:
+
+| پارامتر | پیش‌فرض | توضیح |
+|---|---|---|
+| `risk_per_trade` | 1% | درصد equity در هر معامله |
+| `max_daily_loss` | 3% | حداکثر ضرر روزانه |
+| `max_drawdown` | 8% | حداکثر drawdown کل |
+| `max_open_trades` | 5 | حداکثر معاملات همزمان |
+| `max_correlation` | 0.7 | حداکثر همبستگی نمادها |
+| `max_spread_pips` | 3.0 | حداکثر spread مجاز |
+
+### Circuit Breaker:
+```
+CLOSED (طبیعی)
+  |
+3 خطای متوالی
+  |
+OPEN (قطع)
+  |
+60 ثانیه
+  |
+HALF-OPEN (آزمایش)
+  |
+موفق → CLOSED
+شکست → OPEN
+```
+
+---
+
+## 📱 ربات تلگرام
+
+### دستورات اصلی:
+
+| دستور | کار |
+|---|---|
+| `/start` | خوش‌آمدگویی |
+| `/status` | وضعیت کلی ربات |
+| `/start_bot` | روشن کردن ربات |
+| `/stop_bot` | خاموش کردن ربات |
+| `/pause_bot` | مکث موقت |
+| `/resume_bot` | ادامه بعد از مکث |
+| `/close_all` | بستن همه معاملات باز |
+| `/trades` | لیست معاملات باز |
+| `/report_daily` | گزارش امروز |
+| `/report_weekly` | گزارش هفتگی |
+| `/winrate` | نرخ موفقیت |
+| `/equity` | وضعیت حساب |
+| `/risk_status` | وضعیت ریسک |
+| `/settings` | تنظیمات (ADMIN) |
+| `/add_user` | اضافه کردن کاربر (ADMIN) |
+| `/remove_user` | حذف کاربر (ADMIN) |
+| `/set_role` | تغییر نقش (ADMIN) |
+| `/backup` | گرفتن بکاپ (SUPER) |
+
+---
+
+## 🔐 سطوح دسترسی
+
+```
+OWNER   (6) — مالک سیستم — دسترسی کامل
+SUPER   (5) — مدیر ارشد
+ADMIN   (4) — مدیر — مدیریت کاربران + تنظیمات
+TRADER  (3) — معامله‌گر — کنترل معاملات
+OPERATOR(2) — اپراتور — start/stop/pause
+USER    (1) — کاربر — فقط گزارش
+VIEWER  (0) — بیننده — فقط وضعیت
+```
+
+### افزودن کاربر جدید:
+```
+/add_user 987654321 TRADER
+```
+
+---
+
+## 📦 پیش‌نیازها
+
+| نیاز | مشخصه |
+|---|---|
+| VPS | Ubuntu 22.04, 4GB RAM, 2 vCPU, 50GB SSD |
+| Python | 3.11+ |
+| Docker | 24+ و Docker Compose 2.20+ |
+| Git | هر نسخه‌ای |
+| Supabase | اکانت رایگان (یا پولی) |
+| MetaTrader 5 | نرم‌افزار MT5 از بروکر |
+| Telegram Bot | از @BotFather |
+
+---
+
+## 🚀 راه‌اندازی گام به گام
+
+### مرحله 1 — نصب پیش‌نیازها (Ubuntu/Linux)
 
 ```bash
 # بروزرسانی سیستم
@@ -170,10 +387,6 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y software-properties-common
 sudo add-apt-repository ppa:deadsnakes/ppa
 sudo apt install -y python3.11 python3.11-venv python3.11-dev
-
-# بررسی نصب Python
-python3.11 --version
-# باید نشان دهد: Python 3.11.x
 
 # نصب Docker
 curl -fsSL https://get.docker.com | sudo sh
@@ -188,14 +401,14 @@ docker --version
 git --version
 ```
 
-**اگر از Windows استفاده می‌کنید:**
+**از Windows استفاده می‌کنید؟**
 1. از python.org نسخه 3.11 را نصب کنید
 2. از git-scm.com گیت را نصب کنید
 3. از docker.com Docker Desktop را نصب کنید
 
 ---
 
-## مرحله 2 — دانلود کد
+### مرحله 2 — دانلود کد
 
 ```bash
 # دانلود کد از GitHub
@@ -211,50 +424,50 @@ ls -la
 
 ---
 
-## مرحله 3 — ساخت حساب Supabase
+### مرحله 3 — ساخت حساب Supabase
 
-**Supabase یک پایگاه داده رایگان آنلاین است.**
+**Supabase یک دیتابیس رایگان ابری است (رایگان تا 500MB):**
 
 1. به supabase.com بروید
 2. روی "Start your project" کلیک کنید
 3. با GitHub یا Email ثبت‌نام کنید
 4. روی "New Project" کلیک کنید
 5. نام: `galaxy-vast`
-6. یک رمز عبور قوی برای DB بگذارید و ذخیره کنید!
-7. Region: Frankfurt یا نزدیک‌ترین به شما
+6. یک رمز قوی برای دیتابیس انتخاب کنید و ذخیره کنید!
+7. Region: Frankfurt (یا نزدیک‌ترین به شما)
 8. روی "Create new project" کلیک کنید (2 دقیقه صبر کنید)
 
 **گرفتن کلیدهای API:**
 1. از منوی چپ روی Settings کلیک کنید
 2. روی API کلیک کنید
-3. این سه مقدار را کپی کنید:
+3. اینها را از صفحه کپی کنید:
    - Project URL -> همان SUPABASE_URL است
    - anon public -> همان SUPABASE_ANON_KEY است
    - service_role secret -> همان SUPABASE_SERVICE_KEY است
 
-**ساخت جداول پایگاه داده:**
+**ساخت جداول دیتابیس:**
 1. از منوی چپ روی SQL Editor کلیک کنید
 2. روی New Query کلیک کنید
-3. فایل‌های زیر را به ترتیب شماره اجرا کنید:
+3. فایل‌های زیر را به ترتیب اجرا کنید:
 
 ```bash
-# محتوای این فایل‌ها را کپی کنید و در SQL Editor اجرا کنید:
+# محتوای این فایل‌ها را کپی کرده و در SQL Editor اجرا کنید:
 # backend/database/migrations/schema.sql
 # supabase/migrations/20260618_001_*.sql
 # supabase/migrations/20260618_002_*.sql
 # ... تا 20260618_012_*
 ```
 
-> مهم: همه فایل‌های migrations را به ترتیب شماره اجرا کنید!
+> مهم: همه فایل‌های migrations را به ترتیب اجرا کنید!
 
 ---
 
-## مرحله 4 — ساخت ربات تلگرام
+### مرحله 4 — ساخت ربات تلگرام
 
-1. در تلگرام @BotFather را جستجو کنید
+1. در تلگرام روی @BotFather جستجو کنید
 2. `/newbot` را ارسال کنید
-3. نام ربات: مثلاً `Galaxy Vast Trading`
-4. username: مثلاً `galaxyvast_yourname_bot`
+3. نام ربات: مثلا `Galaxy Vast Trading`
+4. username: مثلا `galaxyvast_yourname_bot`
 5. توکن را که BotFather می‌دهد ذخیره کنید
    - مثال: `1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ`
 
@@ -265,19 +478,19 @@ ls -la
 
 ---
 
-## مرحله 5 — تنظیم فایل .env
+### مرحله 5 — تنظیم فایل .env
 
 ```bash
-# کپی کردن فایل نمونه
+# کپی کردن فایل نمونه تنظیمات
 cp .env.example .env
 
-# باز کردن برای ویرایش
+# باز کردن فایل برای ویرایش
 nano .env
 ```
 
 ```env
 # تنظیمات Supabase (از مرحله 3 بگیرید)
-SUPABASE_URL=https://xxxxxxxxxxxxxxxx.supabase.co
+SUPABASE_URL=https://xxxxxxxxxxxxxxx.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIs...
 
@@ -304,20 +517,20 @@ DEFAULT_MIN_SCORE=0.65
 MAX_SPREAD_PIPS=3.0
 ```
 
-**ساخت کلیدهای امنیتی:**
+**ساختن کلیدهای امنیتی:**
 ```bash
-# برای هر کلید این دستور را اجرا کنید:
+# برای هر کلید یک عدد تصادفی امن بسازید:
 python3 -c "import secrets; print(secrets.token_hex(32))"
-# هر بار یک عدد تصادفی می‌دهد — آن را کپی کنید
+# هر بار اجرا کنید یک مقدار تصادفی می‌دهد — آن را کپی کنید
 ```
 
 ---
 
-## مرحله 6 — نصب MetaTrader 5 (برای معاملات واقعی)
+### مرحله 6 — نصب MetaTrader 5 (برای اجرای معاملات)
 
-> توجه: MT5 فقط روی Windows کار می‌کند.
+> توجه: MT5 فقط روی Windows اجرا می‌شود.
 
-1. از metatrader5.com نرم‌افزار را دانلود کنید
+1. از metatrader5.com نرم‌افزار را نصب کنید
 2. نصب کنید و با حساب بروکر وارد شوید
 3. روی Tools > Options > Expert Advisors بروید:
    - تیک Allow automated trading را بزنید
@@ -328,11 +541,11 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 **نصب EA:**
 - فایل‌های `mql5/Include/MTTrading/` را به MQL5/Include/MTTrading/ کپی کنید
 - فایل `mql5/Experts/MTTrading/MT5TradingEA_Complete.mq5` را به MQL5/Experts/MTTrading/ کپی کنید
-- در MetaEditor فایل را باز کنید و F7 بزنید (Compile)
+- در MetaEditor فایل را باز کرده و با F7 بسازید (Compile)
 
 ---
 
-## مرحله 7 — اجرا با Docker (پیشنهادی)
+### مرحله 7 — اجرا با Docker (پیشنهادی)
 
 ```bash
 # ساخت و اجرای Docker
@@ -340,7 +553,7 @@ docker compose up -d --build
 
 # بررسی وضعیت
 docker compose ps
-# باید: api و bot هر دو Up باشند
+# باید api و bot هر دو Up باشند
 
 # دیدن لاگ‌ها
 docker compose logs -f api
@@ -357,10 +570,10 @@ curl http://localhost:8000/health
 
 ---
 
-## مرحله 7-ب — اجرا بدون Docker
+### مرحله 7-b — اجرا بدون Docker
 
 ```bash
-# ساخت محیط مجازی Python
+# ساختن محیط مجازی Python
 python3.11 -m venv venv
 
 # فعال کردن
@@ -380,35 +593,35 @@ python -m backend.telegram.bot
 
 ---
 
-## مرحله 8 — تست اجرا
+### مرحله 8 — تست
 
 ```bash
 # تست 1: بررسی سلامت
 curl http://localhost:8000/health
 
-# تست 2: مستندات API (در مرورگر)
+# تست 2: مستندات API (در مرورگر باز کنید)
 http://localhost:8000/docs
 
 # تست 3: در تلگرام
 /start
-# باید خوش‌آمد بگوید
+# باید خوش‌آمدگویی بگوید
 ```
 
 ---
 
-## مرحله 9 — اولین اجرای ربات
+### مرحله 9 — اولین معامله نیمه‌خودکار
 
 ```
 در تلگرام:
-1. /start_bot را ارسال کنید
-2. ربات تایید می‌خواهد
-3. /confirm را ارسال کنید
-4. ربات شروع به تحلیل می‌کند
+1. /start_bot را ارسال کنید تا ربات روشن شود
+2. ربات تحلیل می‌کند — XAUUSDرا تحلیل می‌دهد
+3. /confirm را ارسال کنید تا اجرا شود
+4. ربات خبر می‌دهد که معامله باز شد
 ```
 
 **نمونه پیام سیگنال:**
 ```
-سیگنال جدید — XAUUSD
+سیگنال XAUUSD
 
 جهت: BUY
 امتیاز: 78.5/100
@@ -428,25 +641,25 @@ Risk/Reward: 1:2.1
 
 ---
 
-## مرحله 10 — سطح‌های دسترسی
+### مرحله 10 — سطوح دسترسی
 
 ```
-ADMIN    -> همه چیز
-SUPER    -> همه بجز تنظیمات سرور
-TRADER   -> معاملات + گزارش
-OPERATOR -> کنترل ربات + گزارش
-USER     -> فقط گزارش
-VIEWER   -> فقط دیدن
+ADMIN   -> همه
+SUPER   -> همه بجز مدیریت سرور
+TRADER  -> معاملات + گزارش
+OPERATOR-> کنترل ربات + گزارش
+USER    -> فقط گزارش
+VIEWER  -> فقط دیدن
 ```
 
-**اضافه کردن کاربر:**
+**افزودن کاربر:**
 ```
 /add_user 987654321 TRADER
 ```
 
 ---
 
-## مرحله 11 — نظارت
+### مرحله 11 — نظارت
 
 ```bash
 # متریک‌ها
@@ -461,26 +674,26 @@ docker compose logs --tail=100 api
 
 ---
 
-## مشکلات رایج
+## مدیریت مشکلات رایج
 
-### ربات شروع نمی‌شود
+### ربات پاسخ نمی‌دهد
 ```bash
 docker compose logs api | grep ERROR
-# احتمالاً مشکل .env است
+# احتمالاً: مقادیر .env اشتباه است
 # مطمئن شوید JWT_SECRET_KEY حداقل 32 کاراکتر است
 ```
 
 ### MT5 وصل نمی‌شود
 ```
 بررسی کنید:
-1. MT5 روی Windows اجرا است
+1. MT5 فقط روی Windows اجرا می‌شود
 2. Auto trading فعال است
 3. Allow WebRequest فعال است
-4. http://localhost:8000 در لیست URL است
+4. http://localhost:8000 در لیست است
 5. مقادیر MT5_LOGIN, MT5_PASSWORD, MT5_SERVER درست است
 ```
 
-### تلگرام پاسخ نمی‌دهد
+### تلگرام خطا می‌دهد
 ```bash
 docker compose logs bot | grep ERROR
 docker compose restart bot
@@ -496,7 +709,7 @@ curl $SUPABASE_URL/rest/v1/ -H "apikey: $SUPABASE_ANON_KEY"
 
 ---
 
-## ساختار پوشه‌ها
+## ساختار فایل‌های مهم
 
 ```
 galaxy-vast/
@@ -507,18 +720,18 @@ galaxy-vast/
 |   |-- backtest_engine/ <- Backtest + Monte Carlo + Walk-Forward
 |   |-- execution/       <- MT5 Connector + Order State Machine
 |   |-- database/        <- اتصال به Supabase
-|   |-- middleware/      <- Security + Rate Limit + Observability
+|   |-- middleware/       <- Security + Rate Limit + Observability
 |   |-- observability/   <- Metrics + Logging + Alerts + Tracing
 |   |-- risk/            <- Risk Engine
 |   |-- analytics/       <- آنالیز معاملات
 |   |-- telegram/        <- ربات تلگرام
 |   |-- core/            <- Enums + Auth + Logger
 |   +-- api/
-|       |-- main.py      <- نقطه شروع اصلی
+|       |-- main.py      <- نقطه شروع FastAPI
 |       +-- routes/      <- همه endpoint ها
-|-- mql5/                <- کد MetaTrader 5
+|-- mql5/               <- کد MetaTrader 5
 |-- supabase/
-|   +-- migrations/      <- ساختار پایگاه داده
+|   +-- migrations/      <- ساختار پایه داده فایل‌ها
 |-- .env.example         <- نمونه تنظیمات
 |-- requirements.txt     <- کتابخانه‌های Python
 |-- Dockerfile
@@ -529,18 +742,22 @@ galaxy-vast/
 
 ## سوالات متداول
 
-**آیا می‌توانم بدون MT5 استفاده کنم?**
-بله — ربات سیگنال می‌دهد و شما دستی معامله می‌کنید.
+**آیا می‌توان بدون MT5 تست کرد?**
+بله — SEMI_AUTO_MODE=true تنظیم کنید. سیستم تحلیل می‌کند ولی به جای اجرا، سیگنال به تلگرام می‌فرستد.
 
-**آیا ربات 100% سود می‌دهد?**
-خیر — هیچ ربات معاملاتی 100% موفق نیست. ریسک معاملات وجود دارد.
+**آیا می‌توان چند نماد را همزمان trade کرد?**
+بله. برای هر نماد یک EA در MT5 نصب کنید. Correlation filter از overlap جلوگیری می‌کند.
 
-**آیا Supabase رایگان است?**
-بله — برای استفاده شخصی پلن رایگان کافی است.
+**آیا Supabase رایگان به اندازه کافی است?**
+بله — پلان رایگان 500MB فضا و کافی برای شروع است.
 
-**آیا می‌توانم با چند نماد معامله کنم?**
-بله — Multi-Symbol Engine وجود دارد.
+**آیا می‌توان ریسک را تغییر داد?**
+بله. در .env مقادیر DEFAULT_RISK_PERCENT و MAX_SPREAD_PIPS را تغییر دهید.
+
+**چطور مدل AI را re-train کنیم?**
+بعد از 50+ معامله به طور خودکار re-train می‌شود. یا از `/admin` → AI → Retrain.
 
 ---
 
 *Galaxy Vast AI Trading Platform v2.0.0*
+*این سند در تاریخ ۲۲ خرداد ۱۴۰۵ تولید شد*
