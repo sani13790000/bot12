@@ -1,0 +1,67 @@
+groups:
+  - name: galaxyvast.trading
+    interval: 30s
+    rules:
+      - alert: APIDown
+        expr: up{job="galaxyvast-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Galaxy Vast API is DOWN"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate (>5%)"
+
+      - alert: SlowRequests
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency > 2s"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is DOWN"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name=~".*api.*"} / container_spec_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API container memory > 85%"
+
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker OPEN: {{ $labels.name }}"
+
+      - alert: EquityDrawdownCritical
+        expr: trading_equity_drawdown_percent > 0.10
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "EQUITY DRAWDOWN > 10% - HALT triggered"
+
+      - alert: DailyLossLimitNear
+        expr: trading_daily_loss_percent > 0.08
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Daily loss approaching limit"
