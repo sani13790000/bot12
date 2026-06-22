@@ -1,31 +1,29 @@
-# ================================================================
-# Dockerfile.bot - Galaxy Vast Telegram Bot
-# ================================================================
-FROM python:3.11-slim
+# Dockerfile.bot - DO-4: multi-stage build, non-root user, no gcc in final image
 
+FROM python:3.11-slim AS builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+FROM python:3.11-slim AS runtime
 LABEL maintainer="Galaxy Vast Team"
-
+LABEL org.opencontainers.image.description="Galaxy Vast Telegram Bot"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    PIP_NO_CACHE_DIR=1
-
-RUN apt-get update && apt-get install -y \
-    gcc \
-    curl \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/install/lib/python3.11/site-packages:/app \
+    PATH=/install/bin:$PATH
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd -r galaxyvast && useradd -r -g galaxyvast galaxyvast
-
+RUN groupadd -r galaxyvast && useradd -r -g galaxyvast -d /app galaxyvast
 WORKDIR /app
-
-COPY requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip && pip install -r requirements.txt
-
+COPY --from=builder /install /install
 COPY backend/ /app/backend/
-
 RUN mkdir -p /app/logs && chown -R galaxyvast:galaxyvast /app
-
 USER galaxyvast
-
+HEALTHCHECK --interval=60s --timeout=10s --start-period=20s --retries=3 \
+    CMD python3 -c "import sys; sys.exit(0)"
 CMD ["python", "-m", "backend.telegram.bot"]
