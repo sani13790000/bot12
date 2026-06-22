@@ -1,5 +1,5 @@
 groups:
-  - name: galaxyvast.trading
+  - name: galaxyvast.api
     interval: 30s
     rules:
       - alert: APIDown
@@ -8,24 +8,44 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Galaxy Vast API is DOWN"
+          summary: "GalaxyVast API is DOWN"
+          description: "API has been unreachable for > 1 minute."
 
       - alert: HighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        expr: |
+          rate(http_requests_total{job="galaxyvast-api",status=~"5.."}[5m])
+          / rate(http_requests_total{job="galaxyvast-api"}[5m]) > 0.05
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "High 5xx error rate (>5%)"
+          summary: "High 5xx error rate ({{ $value | humanizePercentage }})"
+          description: "More than 5% of requests are returning 5xx."
 
       - alert: SlowRequests
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
-        for: 5m
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket{job="galaxyvast-api"}[5m])
+          ) > 2.0
+        for: 3m
         labels:
           severity: warning
         annotations:
           summary: "P95 latency > 2s"
 
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{name=~".*api.*"}
+          / container_spec_memory_limit_bytes{name=~".*api.*"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API memory usage > 85%"
+
+  - name: galaxyvast.redis
+    interval: 30s
+    rules:
       - alert: RedisDown
         expr: up{job="redis"} == 0
         for: 30s
@@ -34,34 +54,100 @@ groups:
         annotations:
           summary: "Redis is DOWN"
 
-      - alert: HighMemoryUsage
-        expr: container_memory_usage_bytes{name=~".*api.*"} / container_spec_memory_limit_bytes > 0.85
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.80
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "API container memory > 85%"
+          summary: "Redis memory > 80%"
 
+      - alert: RedisRejectedConnections
+        expr: increase(redis_rejected_connections_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is rejecting connections"
+
+  - name: galaxyvast.trading
+    interval: 15s
+    rules:
       - alert: CircuitBreakerOpen
-        expr: circuit_breaker_state{state="open"} == 1
+        expr: galaxyvast_circuit_breaker_state == 2
         for: 0m
         labels:
           severity: critical
         annotations:
           summary: "Circuit breaker OPEN: {{ $labels.name }}"
 
-      - alert: EquityDrawdownCritical
-        expr: trading_equity_drawdown_percent > 0.10
+      - alert: DrawdownCritical
+        expr: galaxyvast_equity_drawdown_pct > 0.08
         for: 0m
         labels:
           severity: critical
         annotations:
-          summary: "EQUITY DRAWDOWN > 10% - HALT triggered"
+          summary: "Drawdown > 8% ({{ $value | humanizePercentage }})"
 
-      - alert: DailyLossLimitNear
-        expr: trading_daily_loss_percent > 0.08
+      - alert: DrawdownWarning
+        expr: galaxyvast_equity_drawdown_pct > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Drawdown > 5%"
+
+      - alert: NoTradesExecuted
+        expr: increase(galaxyvast_trades_executed_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No trades executed in the last 2 hours"
+
+      - alert: HighSlippage
+        expr: galaxyvast_order_slippage_pips > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High slippage detected ({{ $value }} pips)"
+
+  - name: galaxyvast.infra
+    interval: 60s
+    rules:
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space < 15%"
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space CRITICAL < 5%"
+
+      - alert: HighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU usage > 90%"
+
+      - alert: BackupMissing
+        expr: time() - galaxyvast_last_backup_timestamp > 90000
         for: 0m
         labels:
           severity: warning
         annotations:
-          summary: "Daily loss approaching limit"
+          summary: "No backup in the last 25 hours"
