@@ -1,14 +1,11 @@
 // frontend/src/types/index.ts
-// FIX-FE4: WSMessageType added
-// FIX-FE7: Signal/Trade fields aligned with real page usage
+// FIX-FE4: WSMessageType وجود نداشت → useWebSocket.ts crash
+// FIX-FE5: Signal interface ناقص → SignalsPage TypeScript errors
 
 export type WSMessageType =
-  | "PRICE"
-  | "SIGNAL"
-  | "TRADE_UPDATE"
-  | "HEARTBEAT"
-  | "PONG"
-  | "*";
+  | "PING" | "PONG"
+  | "PRICE_UPDATE" | "SIGNAL_NEW" | "TRADE_UPDATE"
+  | "ALERT" | "HEARTBEAT" | "*";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -40,32 +37,17 @@ export interface UserSettings {
 export interface Trade {
   id: string;
   symbol: string;
-  direction: "BUY" | "SELL" | "buy" | "sell";
+  direction: "BUY" | "SELL";
   volume: number;
-  lot_size?: number;
   entry_price: number;
   current_price?: number;
   stop_loss?: number;
   take_profit?: number;
-  take_profit_1?: number;
-  take_profit_2?: number;
   profit_loss?: number;
-  profit_money?: number;
-  pnl?: number;
-  status: "OPEN" | "CLOSED" | "PENDING" | "CANCELLED" | "open" | "closed" | "pending" | "cancelled";
-  opened_at?: string;
-  open_time?: string;
+  status: "OPEN" | "CLOSED" | "PENDING" | "CANCELLED";
+  opened_at: string;
   closed_at?: string;
-  close_time?: string;
-  close_price?: number;
-  user_id?: string;
-  risk_percent?: number;
-  confidence_score?: number;
-  risk_level?: "LOW" | "MEDIUM" | "HIGH";
-  risk_reward_ratio?: number;
-  smc_score?: number;
-  pa_score?: number;
-  session?: string;
+  user_id: string;
 }
 
 export interface Signal {
@@ -74,20 +56,20 @@ export interface Signal {
   direction: "BUY" | "SELL" | "NEUTRAL";
   confidence: number;
   confidence_score?: number;
-  score?: number;
+  score: number;
+  risk_level?: "LOW" | "MEDIUM" | "HIGH";
+  risk_reward_ratio?: number;
   entry_price?: number;
   stop_loss?: number;
   take_profit?: number;
   take_profit_1?: number;
   take_profit_2?: number;
-  status: "PENDING" | "EXECUTED" | "CANCELLED" | "EXPIRED" | "ACTIVE" | "active" | "pending";
+  status: "PENDING" | "ACTIVE" | "EXECUTED" | "CANCELLED" | "EXPIRED";
+  session?: string;
   reasoning?: string;
   context_explanation?: string;
   smc_details?: string;
   pa_pattern?: string;
-  session?: string;
-  risk_level?: "LOW" | "MEDIUM" | "HIGH";
-  risk_reward_ratio?: number;
   created_at: string;
   expires_at?: string;
 }
@@ -114,49 +96,24 @@ export interface PortfolioRisk {
   profit_factor: number;
 }
 
+export interface RiskStatus {
+  equity_protection: boolean;
+  daily_limit_reached: boolean;
+  circuit_breaker_open: boolean;
+  current_exposure: number;
+  max_allowed_exposure: number;
+  daily_loss: number;
+  daily_limit: number;
+  open_trades_count: number;
+  max_trades: number;
+}
+
 export interface MLWeights {
   smc_weight: number;
   pa_weight: number;
   ml_weight: number;
   rl_weight: number;
   news_weight: number;
-}
-
-export interface BacktestResult {
-  id: string;
-  symbol: string;
-  start_date: string;
-  end_date: string;
-  total_trades: number;
-  win_rate: number;
-  profit_factor: number;
-  max_drawdown: number;
-  net_profit: number;
-  sharpe_ratio: number;
-  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
-  created_at: string;
-}
-
-export interface SystemSettings {
-  trading_enabled: boolean;
-  max_daily_trades: number;
-  risk_per_trade: number;
-  max_drawdown_limit: number;
-  allowed_symbols: string[];
-}
-
-export interface AnalyticsMetrics {
-  period: string;
-  total_trades: number;
-  winning_trades: number;
-  losing_trades: number;
-  win_rate: number;
-  profit_factor: number;
-  total_profit: number;
-  max_drawdown: number;
-  avg_trade_duration: string;
-  best_trade: number;
-  worst_trade: number;
 }
 
 export interface AIPrediction {
@@ -178,11 +135,33 @@ export interface ModelVersion {
   is_active: boolean;
 }
 
-export interface EquityPoint {
-  timestamp: string;
-  equity: number;
-  balance: number;
-  drawdown: number;
+export interface BacktestResult {
+  id: string;
+  symbol: string;
+  start_date: string;
+  end_date: string;
+  total_trades: number;
+  win_rate: number;
+  profit_factor: number;
+  max_drawdown: number;
+  net_profit: number;
+  sharpe_ratio: number;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  created_at: string;
+}
+
+export interface AnalyticsMetrics {
+  period: string;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate: number;
+  profit_factor: number;
+  total_profit: number;
+  max_drawdown: number;
+  avg_trade_duration: string;
+  best_trade: number;
+  worst_trade: number;
 }
 
 export interface SecurityMetrics {
@@ -203,14 +182,17 @@ export interface SecurityEvent {
   created_at: string;
 }
 
-export interface RiskStatus {
-  equity_protection: boolean;
-  daily_limit_reached: boolean;
-  circuit_breaker_open: boolean;
-  current_exposure: number;
-  max_allowed_exposure: number;
-  daily_loss: number;
-  daily_limit: number;
-  open_trades_count: number;
-  max_trades: number;
+export interface EquityPoint {
+  timestamp: string;
+  equity: number;
+  balance: number;
+  drawdown: number;
+}
+
+export interface SystemSettings {
+  trading_enabled: boolean;
+  max_daily_trades: number;
+  risk_per_trade: number;
+  max_drawdown_limit: number;
+  allowed_symbols: string[];
 }
