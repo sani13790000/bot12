@@ -1,20 +1,20 @@
-// frontend/src/main.tsx
-// FIX-FE1: AuthProvider MISSING → useAuth() crash در Login + DashboardLayout
-// FIX-FE2: @/ path alias → vite.config.ts resolve.alias اضافه شد
-
+/**
+ * frontend/src/main.tsx
+ * FIX-7: BrowserRouter باید اینجا باشد
+ */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
 import App from "./App";
 import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("Root element #root not found in DOM");
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <App />
     </BrowserRouter>
   </React.StrictMode>
 );
