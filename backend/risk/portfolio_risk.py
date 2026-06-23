@@ -1,319 +1,323 @@
-"""
-===============================================================================
-Galaxy Vast AI Trading Platform
-مدیریت ریسک پرتفولیو — Portfolio Risk Manager
-
-این ماژول مسئول کنترل ریسک کل حساب در چند نماد همزمان است.
-بانک‌ها و صندوق‌های پوشش ریسک همیشه ریسک کل پرتفولیو را کنترل می‌کنند،
-نه فقط ریسک هر معامله به تنهایی.
-
-ویژگی‌ها:
-- تجمیع ریسک cross-symbol در لحظه
-- ماتریس همبستگی ارزها
-- محدودیت exposure per currency
-- بلوک خودکار معاملات جدید در صورت تجاوز از حد مجاز
-
-نویسنده: Galaxy Vast Team
-"""
-
 from __future__ import annotations
-
-import asyncio
+import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from decimal import Decimal
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
-from ..core.config import settings
-from ..core.logger import get_logger
+logger = logging.getLogger("risk.portfolio_risk")
 
-logger = get_logger("risk.portfolio")
+# ---------------------------------------------------------------------------
+# Pip-value table  (broker-aware: FIX #4)
+# ---------------------------------------------------------------------------
 
+_PIP_VALUE_TABLE: Dict[str, float] = {
+    # Forex majors
+    "EURUSD": 10.0, "GBPUSD": 10.0, "AUDUSD": 10.0, "NZDUSD": 10.0,
+    "USDCAD": 10.0, "USDCHF": 10.0,
+    "USDJPY": 9.09,  # ~$9.09 per pip at 110
+    "EURJPY": 9.09, "GBPJPY": 9.09, "AUDJPY": 9.09,
+    "NZDJPY": 9.09, "CADJPY": 9.09, "CHFJPY": 9.09,
+    # Forex minors
+    "EURGBP": 12.50, "EURAUD": 10.0, "EURCAD": 10.0,
+    "EURCHF": 10.0,  "EURNZD": 10.0, "GBPAUD": 10.0,
+    "GBPCAD": 10.0,  "GBPCHF": 10.0, "GBPNZD": 10.0,
+    "AUDCAD": 10.0,  "AUDCHF": 10.0, "AUDNZD": 10.0,
+    "USDMXN": 10.0,  "USDZAR": 10.0,
+    # Metals
+    "XAUUSD":  1.0,   # Gold: $1 per 0.01 pip (1 cent per point)
+    "XAGUSD": 50.0,   # Silver: $50 per pip (5000 oz * $0.01/oz * 10 ticks)
+    "XPTUSD":  1.0,
+    # Crypto
+    "BTCUSD": 1.0, "ETHUSD": 1.0, "LTCUSD": 1.0, "XRPUSD": 1.0,
+    # Equity indices
+    "US30":   1.0, "NAS100": 1.0, "US500": 1.0,
+    "GER40":  1.0, "UK100":  1.0, "JPN225": 1.0, "AUS200": 1.0,
+    # Energy
+    "USOIL":  1.0, "UKOIL":  1.0,
+}
 
-# ─────────────────────────────────────────────
-# ثوابت همبستگی ارزها
-# جفت‌هایی که همبستگی بالا دارند → ریسک مضاعف
-# ─────────────────────────────────────────────
-CURRENCY_CORRELATIONS: Dict[Tuple[str, str], float] = {
-    ("EURUSD", "GBPUSD"): 0.85,
-    ("EURUSD", "AUDUSD"): 0.72,
-    ("EURUSD", "NZDUSD"): 0.68,
-    ("GBPUSD", "AUDUSD"): 0.70,
-    ("USDCHF", "EURUSD"): -0.92,  # همبستگی معکوس
-    ("USDCHF", "GBPUSD"): -0.88,
-    ("XAUUSD", "EURUSD"): 0.45,
-    ("XAUUSD", "USDCHF"): -0.55,
-    ("USDJPY", "XAUUSD"): -0.40,
+_SYMBOL_ALIASES: Dict[str, str] = {
+    "GOLD": "XAUUSD", "SILVER": "XAGUSD", "PLATINUM": "XPTUSD",
+    "BTC":  "BTCUSD", "ETH":    "ETHUSD",  "LTC":      "LTCUSD",
+    "XRP":  "XRPUSD",
+    "DAX":  "GER40",  "DAX40":  "GER40",   "FTSE":     "UK100",
+    "DOW":  "US30",   "SP500":  "US500",   "SPX500":   "US500",
+    "NIKKEI": "JPN225", "ASX200": "AUS200",
+    "WTI":  "USOIL",  "BRENT":  "UKOIL",   "NASDAQ":   "NAS100",
 }
 
 
+def _resolve_canonical(symbol: str):
+    """Resolve symbol to (canonical, method) using exact/alias/suffix."""
+    s = symbol.upper().strip()
+    if s in _PIP_VALUE_TABLE:
+        return s, "exact"
+    alias = _SYMBOL_ALIASES.get(s)
+    if alias and alias in _PIP_VALUE_TABLE:
+        return alias, "alias"
+    for trim in range(1, 5):
+        if len(s) <= trim:
+            break
+        c = s[:-trim]
+        if c in _PIP_VALUE_TABLE:
+            return c, "suffix"
+        al = _SYMBOL_ALIASES.get(c)
+        if al and al in _PIP_VALUE_TABLE:
+            return al, "suffix"
+    return s, "unknown"
+
+
+def _get_pip_value(symbol: str) -> float:
+    """Return pip value for symbol (backward-compatible float)."""
+    canonical, _ = _resolve_canonical(symbol)
+    val = _PIP_VALUE_TABLE.get(canonical)
+    if val is not None:
+        return val
+    # Fallback heuristic
+    s = symbol.upper()
+    if "JPY" in s:
+        return 9.09
+    if any(x in s for x in ("XAU", "GOLD", "XAG", "SILVER", "XPT",
+                             "BTC", "ETH", "US30", "NAS", "GER",
+                             "UK1", "JPN", "AUS", "OIL")):
+        return 1.0
+    return 10.0
+
+
+class PipValueSource(str, Enum):
+    INJECTED             = "INJECTED"
+    LOT_SIZER            = "LOT_SIZER"
+    TABLE                = "TABLE"
+    ALIAS                = "ALIAS"
+    SUFFIX               = "SUFFIX"
+    FALLBACK_FOREX       = "FALLBACK_FOREX"
+    FALLBACK_CONSERVATIVE = "FALLBACK_CONSERVATIVE"
+
+
+def _get_pip_value_with_source(symbol: str, injected: Optional[float] = None):
+    """Return (pip_value, PipValueSource) for audit trail."""
+    if injected and injected > 0:
+        return injected, PipValueSource.INJECTED
+    canonical, method = _resolve_canonical(symbol)
+    val = _PIP_VALUE_TABLE.get(canonical)
+    if val is not None:
+        source = (PipValueSource.TABLE  if method == "exact"  else
+                  PipValueSource.ALIAS  if method == "alias"  else PipValueSource.SUFFIX)
+        return val, source
+    s = symbol.upper()
+    if "JPY" in s:
+        return 9.09, PipValueSource.FALLBACK_FOREX
+    return 1.0, PipValueSource.FALLBACK_CONSERVATIVE
+
+
+async def _get_pip_value_async(
+    symbol: str,
+    lot_sizer=None,
+    injected: Optional[float] = None,
+):
+    """Async pip value: injected > LotSizer > table."""
+    if injected and injected > 0:
+        return injected, PipValueSource.INJECTED
+    if lot_sizer is not None:
+        try:
+            ls_val, ls_src = await lot_sizer.get_pip_value(symbol)
+            if ls_val and ls_val > 0:
+                return ls_val, PipValueSource.LOT_SIZER
+        except Exception as exc:
+            logger.warning("LotSizer.get_pip_value(%s) failed: %s", symbol, exc)
+    val, src = _get_pip_value_with_source(symbol)
+    return val, src
+
+
+# ---------------------------------------------------------------------------
+# Correlation table
+# ---------------------------------------------------------------------------
+
+_STATIC_CORRELATIONS: Dict[Tuple[str, str], float] = {
+    ("EURUSD", "GBPUSD"): 0.85,
+    ("EURUSD", "AUDUSD"): 0.72,
+    ("EURUSD", "NZDUSD"): 0.68, ("GBPUSD", "AUDUSD"): 0.70,
+    ("USDCHF", "EURUSD"): -0.92, ("USDCHF", "GBPUSD"): -0.88,
+    ("XAUUSD", "EURUSD"): 0.45, ("XAUUSD", "USDCHF"): -0.55,
+    ("USDJPY", "XAUUSD"): -0.40, ("BTCUSD", "ETHUSD"): 0.90,
+}
+
+
+# FIX #7: canonical FailMode from single source of truth
+try:
+    from backend.risk.fail_mode import FailMode, coerce as _coerce_fail_mode
+except ImportError:  # pragma: no cover
+    class FailMode(str, Enum):  # type: ignore[no-redef]
+        FAIL_CLOSED = "FAIL_CLOSED"
+        FAIL_OPEN   = "FAIL_OPEN"
+
+    def _coerce_fail_mode(v) -> "FailMode":  # type: ignore[misc]
+        return v if isinstance(v, FailMode) else FailMode(str(v).upper())
+
+
 class RiskLevel(str, Enum):
-    """سطوح ریسک پرتفولیو"""
-    SAFE = "SAFE"           # زیر ۶۰٪ حد مجاز
-    WARNING = "WARNING"     # ۶۰٪ تا ۸۰٪ حد مجاز
-    CRITICAL = "CRITICAL"   # ۸۰٪ تا ۱۰۰٪ حد مجاز
-    BLOCKED = "BLOCKED"     # بالای ۱۰۰٪ — معامله جدید مسدود
+    SAFE     = "SAFE"
+    WARNING  = "WARNING"
+    CRITICAL = "CRITICAL"
+    BLOCKED  = "BLOCKED"
 
 
 class TradeDirection(str, Enum):
-    """جهت معامله"""
-    BUY = "BUY"
+    BUY  = "BUY"
     SELL = "SELL"
 
 
 @dataclass
 class OpenTradeRisk:
-    """اطلاعات ریسک یک معامله باز"""
-    symbol: str
-    direction: TradeDirection
-    lot_size: float
-    entry_price: float
-    stop_loss: float
-    account_balance: float
-    risk_percent: float = field(init=False)
-    risk_amount: float = field(init=False)
-    base_currency: str = field(init=False)
+    """Single open trade risk record."""
+    symbol:           str
+    direction:        TradeDirection
+    lot_size:         float
+    entry_price:      float
+    stop_loss:        float
+    account_balance:  float
+    risk_percent:     float = field(init=False)
+    risk_amount:      float = field(init=False)
+    pip_value_source: str   = field(init=False)
+    timestamp:        str   = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
-        """محاسبه خودکار درصد و مقدار ریسک"""
-        pip_distance = abs(self.entry_price - self.stop_loss)
-        # محاسبه ریسک دلاری بر اساس فاصله از SL و حجم لات
-        if "JPY" in self.symbol:
-            pip_value = self.lot_size * 1000 * pip_distance
-        elif "XAU" in self.symbol:
-            pip_value = self.lot_size * 100 * pip_distance
-        else:
-            pip_value = self.lot_size * 100000 * pip_distance * 0.0001
-
-        self.risk_amount = pip_value
-        self.risk_percent = (self.risk_amount / self.account_balance) * 100
-        self.base_currency = self.symbol[:3]
+        pip_val, source = _get_pip_value_with_source(self.symbol)
+        pip_distance     = abs(self.entry_price - self.stop_loss)
+        self.risk_amount  = pip_distance * self.lot_size * pip_val
+        self.risk_percent = (
+            (self.risk_amount / self.account_balance) * 100
+            if self.account_balance > 0 else 0.0
+        )
+        self.pip_value_source = source.value
 
 
 @dataclass
-class PortfolioRiskSnapshot:
-    """وضعیت لحظه‌ای ریسک کل پرتفولیو"""
-    timestamp: datetime
-    total_risk_percent: float
-    total_risk_amount: float
-    correlation_adjusted_risk: float
-    risk_level: RiskLevel
-    open_trades: List[OpenTradeRisk]
-    blocked_reason: Optional[str]
-    currency_exposure: Dict[str, float]
-    can_open_new_trade: bool
-    max_allowed_risk: float
-    remaining_risk_capacity: float
+class PortfolioRiskConfig:
+    max_portfolio_risk_pct:  float    = 6.0
+    max_single_symbol_pct:   float    = 2.0
+    max_currency_exposure_pct: float  = 4.0
+    correlation_penalty_mult: float   = 0.5
+    fail_mode: FailMode               = FailMode.FAIL_CLOSED
+
+
+@dataclass(frozen=True)
+class PortfolioCheckResult:
+    can_trade:       bool
+    risk_level:      RiskLevel
+    reason:          str
+    total_risk_pct:  float
+    new_risk_pct:    float
+    remaining_cap:   float
+    metadata:        Dict = field(default_factory=dict)
 
 
 class PortfolioRiskManager:
-    """
-    مدیر ریسک پرتفولیو — Galaxy Vast
+    """Broker-aware portfolio risk manager (FIX #4)."""
 
-    این کلاس ریسک کل حساب را در تمام معاملات باز
-    به صورت لحظه‌ای محاسبه و کنترل می‌کند.
-
-    مثال استفاده:
-        manager = PortfolioRiskManager()
-        snapshot = await manager.get_portfolio_snapshot(balance, open_trades)
-        if snapshot.can_open_new_trade:
-            # اجازه معامله جدید
-    """
-
-    def __init__(self) -> None:
-        self._lock = asyncio.Lock()
-        self._max_portfolio_risk: float = settings.MAX_PORTFOLIO_RISK_PERCENT
-        self._max_single_currency_exposure: float = settings.MAX_SINGLE_CURRENCY_EXPOSURE
-        self._correlation_multiplier: float = settings.CORRELATION_RISK_MULTIPLIER
-        logger.info(
-            "PortfolioRiskManager راه‌اندازی شد — "
-            f"حداکثر ریسک پرتفولیو: {self._max_portfolio_risk}٪"
-        )
-
-    async def get_portfolio_snapshot(
+    def __init__(
         self,
-        account_balance: float,
+        config: Optional[PortfolioRiskConfig] = None,
+        lot_sizer=None,
+        fail_mode=None,
+    ) -> None:
+        self._cfg       = config or PortfolioRiskConfig()
+        self._lot_sizer = lot_sizer
+        fm = fail_mode if fail_mode is not None else self._cfg.fail_mode
+        self._fail_mode = _coerce_fail_mode(fm)
+
+    def check(
+        self,
+        trade: OpenTradeRisk,
         open_trades: List[OpenTradeRisk],
-    ) -> PortfolioRiskSnapshot:
-        """
-        محاسبه وضعیت کامل ریسک پرتفولیو
-
-        ورودی:
-            account_balance: موجودی فعلی حساب
-            open_trades: لیست معاملات باز با اطلاعات SL
-
-        خروجی:
-            PortfolioRiskSnapshot با تمام جزئیات ریسک
-        """
-        async with self._lock:
-            if not open_trades:
-                return self._build_empty_snapshot(account_balance)
-
-            # مرحله ۱: محاسبه ریسک خام هر معامله
-            raw_total = sum(t.risk_percent for t in open_trades)
-
-            # مرحله ۲: محاسبه تنظیم همبستگی
-            correlation_bonus = self._calculate_correlation_penalty(open_trades)
-            adjusted_risk = raw_total + correlation_bonus
-
-            # مرحله ۳: محاسبه exposure per currency
-            currency_exposure = self._calculate_currency_exposure(open_trades)
-
-            # مرحله ۴: تعیین سطح ریسک
-            risk_level, blocked_reason = self._determine_risk_level(
-                adjusted_risk, currency_exposure
-            )
-
-            can_open = risk_level not in (RiskLevel.BLOCKED,)
-            remaining = max(0.0, self._max_portfolio_risk - adjusted_risk)
-
-            snapshot = PortfolioRiskSnapshot(
-                timestamp=datetime.utcnow(),
-                total_risk_percent=raw_total,
-                total_risk_amount=sum(t.risk_amount for t in open_trades),
-                correlation_adjusted_risk=adjusted_risk,
-                risk_level=risk_level,
-                open_trades=open_trades,
-                blocked_reason=blocked_reason,
-                currency_exposure=currency_exposure,
-                can_open_new_trade=can_open,
-                max_allowed_risk=self._max_portfolio_risk,
-                remaining_risk_capacity=remaining,
-            )
-
-            logger.info(
-                f"پرتفولیو snapshot — "
-                f"ریسک خام: {raw_total:.2f}٪ | "
-                f"تنظیم‌شده: {adjusted_risk:.2f}٪ | "
-                f"سطح: {risk_level.value} | "
-                f"باقی‌مانده: {remaining:.2f}٪"
-            )
-            return snapshot
-
-    async def can_add_trade(
-        self,
-        new_trade: OpenTradeRisk,
-        existing_trades: List[OpenTradeRisk],
-    ) -> Tuple[bool, str]:
-        """
-        بررسی امکان افزودن معامله جدید به پرتفولیو
-
-        خروجی:
-            (True, "") → مجاز
-            (False, "دلیل") → مسدود
-        """
-        all_trades = existing_trades + [new_trade]
-        snapshot = await self.get_portfolio_snapshot(
-            new_trade.account_balance, all_trades
-        )
-
-        if not snapshot.can_open_new_trade:
-            return False, snapshot.blocked_reason or "ریسک پرتفولیو از حد مجاز بیشتر است"
-
-        # بررسی exposure ارز جدید
-        new_currency = new_trade.base_currency
-        current_exposure = snapshot.currency_exposure.get(new_currency, 0.0)
-        if current_exposure > self._max_single_currency_exposure:
-            return False, (
-                f"exposure ارز {new_currency} "
-                f"({current_exposure:.1f}٪) از حد مجاز "
-                f"({self._max_single_currency_exposure}٪) بیشتر است"
-            )
-
-        return True, ""
-
-    def _calculate_correlation_penalty(
-        self, trades: List[OpenTradeRisk]
-    ) -> float:
-        """
-        محاسبه جریمه همبستگی
-
-        وقتی دو ارز همبستگی بالا دارند و هر دو در یک جهت باز هستند،
-        ریسک واقعی بیشتر از مجموع ریسک‌های جداگانه است.
-        """
-        penalty = 0.0
-        symbols = [t.symbol for t in trades]
-
-        for i in range(len(trades)):
-            for j in range(i + 1, len(trades)):
-                pair = (trades[i].symbol, trades[j].symbol)
-                reverse_pair = (trades[j].symbol, trades[i].symbol)
-
-                correlation = CURRENCY_CORRELATIONS.get(
-                    pair, CURRENCY_CORRELATIONS.get(reverse_pair, 0.0)
+    ) -> PortfolioCheckResult:
+        """Synchronous check (uses static table pip values)."""
+        try:
+            return self._check_inner(trade, open_trades)
+        except Exception as exc:
+            logger.exception("PortfolioRiskManager.check error: %s", exc)
+            if self._fail_mode is FailMode.FAIL_CLOSED:
+                return PortfolioCheckResult(
+                    can_trade=False, risk_level=RiskLevel.BLOCKED,
+                    reason=f"PORTFOLIO_CHECK_ERROR: {exc}",
+                    total_risk_pct=0.0, new_risk_pct=0.0, remaining_cap=0.0,
                 )
-
-                if abs(correlation) < 0.5:
-                    continue
-
-                # همبستگی مثبت + یک جهت → جریمه بیشتر
-                same_direction = trades[i].direction == trades[j].direction
-                if correlation > 0 and same_direction:
-                    combined_risk = (trades[i].risk_percent + trades[j].risk_percent)
-                    penalty += combined_risk * correlation * self._correlation_multiplier
-                # همبستگی منفی + یک جهت → پوشش ریسک → کاهش
-                elif correlation < 0 and same_direction:
-                    combined_risk = (trades[i].risk_percent + trades[j].risk_percent)
-                    penalty -= combined_risk * abs(correlation) * 0.3
-
-        return max(0.0, penalty)
-
-    def _calculate_currency_exposure(
-        self, trades: List[OpenTradeRisk]
-    ) -> Dict[str, float]:
-        """محاسبه exposure هر ارز پایه"""
-        exposure: Dict[str, float] = {}
-        for trade in trades:
-            base = trade.base_currency
-            exposure[base] = exposure.get(base, 0.0) + trade.risk_percent
-        return exposure
-
-    def _determine_risk_level(
-        self,
-        adjusted_risk: float,
-        currency_exposure: Dict[str, float],
-    ) -> Tuple[RiskLevel, Optional[str]]:
-        """تعیین سطح ریسک و دلیل مسدود شدن"""
-        # بررسی ریسک کل
-        ratio = adjusted_risk / self._max_portfolio_risk if self._max_portfolio_risk > 0 else 0
-
-        if ratio >= 1.0:
-            return RiskLevel.BLOCKED, (
-                f"ریسک پرتفولیو ({adjusted_risk:.2f}٪) از حد مجاز "
-                f"({self._max_portfolio_risk}٪) فراتر رفته است"
+            logger.critical("FAIL_OPEN: portfolio check exception swallowed: %s", exc)
+            return PortfolioCheckResult(
+                can_trade=True, risk_level=RiskLevel.WARNING,
+                reason="FAIL_OPEN:PORTFOLIO_CHECK_ERROR",
+                total_risk_pct=0.0, new_risk_pct=trade.risk_percent, remaining_cap=0.0,
             )
 
-        # بررسی exposure هر ارز
-        for currency, exposure in currency_exposure.items():
-            if exposure > self._max_single_currency_exposure:
-                return RiskLevel.BLOCKED, (
-                    f"exposure ارز {currency} ({exposure:.2f}٪) "
-                    f"از حد مجاز ({self._max_single_currency_exposure}٪) بیشتر است"
+    async def check_async(
+        self,
+        trade: OpenTradeRisk,
+        open_trades: List[OpenTradeRisk],
+    ) -> PortfolioCheckResult:
+        """Async check — uses LotSizer pip value if injected."""
+        try:
+            if self._lot_sizer is not None:
+                pip_val, source = await _get_pip_value_async(
+                    trade.symbol, lot_sizer=self._lot_sizer
                 )
+                table_val = _get_pip_value(trade.symbol)
+                if abs(pip_val - table_val) > 0.01:
+                    # Use live pip value without mutating the frozen-ish dataclass
+                    pip_distance = abs(trade.entry_price - trade.stop_loss)
+                    risk_amount  = pip_distance * trade.lot_size * pip_val
+                    risk_pct     = (risk_amount / trade.account_balance * 100
+                                    if trade.account_balance > 0 else 0.0)
+                    object.__setattr__(trade, "risk_amount",      risk_amount)
+                    object.__setattr__(trade, "risk_percent",     risk_pct)
+                    object.__setattr__(trade, "pip_value_source", source.value)
+            return self._check_inner(trade, open_trades)
+        except Exception as exc:
+            logger.exception("PortfolioRiskManager.check_async error: %s", exc)
+            if self._fail_mode is FailMode.FAIL_CLOSED:
+                return PortfolioCheckResult(
+                    can_trade=False, risk_level=RiskLevel.BLOCKED,
+                    reason=f"PORTFOLIO_ASYNC_ERROR: {exc}",
+                    total_risk_pct=0.0, new_risk_pct=0.0, remaining_cap=0.0,
+                )
+            return PortfolioCheckResult(
+                can_trade=True, risk_level=RiskLevel.WARNING,
+                reason="FAIL_OPEN:PORTFOLIO_ASYNC_ERROR",
+                total_risk_pct=0.0, new_risk_pct=trade.risk_percent, remaining_cap=0.0,
+            )
 
-        if ratio >= 0.8:
-            return RiskLevel.CRITICAL, None
-        if ratio >= 0.6:
-            return RiskLevel.WARNING, None
-        return RiskLevel.SAFE, None
+    def _check_inner(
+        self,
+        trade: OpenTradeRisk,
+        open_trades: List[OpenTradeRisk],
+    ) -> PortfolioCheckResult:
+        existing_risk = sum(t.risk_percent for t in open_trades)
+        new_risk      = trade.risk_percent
+        total_risk    = existing_risk + new_risk
+        remaining_cap = max(0.0, self._cfg.max_portfolio_risk_pct - existing_risk)
 
-    def _build_empty_snapshot(self, balance: float) -> PortfolioRiskSnapshot:
-        """ساخت snapshot خالی برای حساب بدون معامله باز"""
-        return PortfolioRiskSnapshot(
-            timestamp=datetime.utcnow(),
-            total_risk_percent=0.0,
-            total_risk_amount=0.0,
-            correlation_adjusted_risk=0.0,
-            risk_level=RiskLevel.SAFE,
-            open_trades=[],
-            blocked_reason=None,
-            currency_exposure={},
-            can_open_new_trade=True,
-            max_allowed_risk=self._max_portfolio_risk,
-            remaining_risk_capacity=self._max_portfolio_risk,
+        if new_risk > self._cfg.max_single_symbol_pct:
+            return PortfolioCheckResult(
+                can_trade=False, risk_level=RiskLevel.BLOCKED,
+                reason=f"SINGLE_TRADE_RISK {new_risk:.2f}% > {self._cfg.max_single_symbol_pct}%",
+                total_risk_pct=total_risk, new_risk_pct=new_risk,
+                remaining_cap=remaining_cap,
+            )
+        if total_risk > self._cfg.max_portfolio_risk_pct:
+            return PortfolioCheckResult(
+                can_trade=False, risk_level=RiskLevel.BLOCKED,
+                reason=f"PORTFOLIO_RISK {total_risk:.2f}% > {self._cfg.max_portfolio_risk_pct}%",
+                total_risk_pct=total_risk, new_risk_pct=new_risk,
+                remaining_cap=remaining_cap,
+            )
+        level = (
+            RiskLevel.CRITICAL if total_risk >= self._cfg.max_portfolio_risk_pct * 0.8
+            else RiskLevel.WARNING if total_risk >= self._cfg.max_portfolio_risk_pct * 0.6
+            else RiskLevel.SAFE
         )
-
-
-# نمونه singleton برای استفاده در سراسر برنامه
-portfolio_risk_manager = PortfolioRiskManager()
+        return PortfolioCheckResult(
+            can_trade=True, risk_level=level,
+            reason="PORTFOLIO_OK",
+            total_risk_pct=total_risk, new_risk_pct=new_risk,
+            remaining_cap=remaining_cap,
+        )
