@@ -14,3 +14,11 @@ def _price_to_pips(s,d):
    if c in PA and PA[c] in PS:ps=PS[PA[c]];break
  if not ps:ps=0.0001
  return round(d/ps,6)
+def _estimate_risk_pct(sym,dist,lot,bal,pv=None):
+ try:
+  from backend.risk.portfolio_risk import _get_pip_value
+  if not pv or pv<=0:pv=_get_pip_value(sym)
+  src='table'
+ except Exception:pv,src=10.0,'fallback'
+ if not(bal>0 and lot>0 and dist>0):return 0.0,'zero'
+ return round((_price_to_pips(sym,dist)*lot*pv/bal)*100.0,4),src
