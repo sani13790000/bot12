@@ -35,3 +35,28 @@ class RiskOrchestrator:
    if hasattr(res,'__await__'):res=await res
    return{'can_trade':getattr(res,'can_trade',True),'reason':getattr(res,'reason','')}
   return{'can_trade':True,'reason':''}
+ async def _run_volatility_gate(self,sym,ctx):
+  r=self._volatility
+  if hasattr(r,'check'):
+   res=r.check(symbol=sym,current_atr=ctx.get('current_atr',0.0))
+   if hasattr(res,'__await__'):res=await res
+   return{'can_trade':getattr(res,'can_trade',True),'reason':getattr(res,'reason',''),'lot_multiplier':getattr(res,'lot_multiplier',1.0)}
+  return{'can_trade':True,'reason':'','lot_multiplier':1.0}
+ async def _run_correlation_gate(self,sym,d,ctx):
+  r=self._correlation
+  if hasattr(r,'check'):
+   res=r.check(symbol=sym,direction=d)
+   if hasattr(res,'__await__'):res=await res
+   return{'can_trade':getattr(res,'can_trade',True),'reason':getattr(res,'reason','')}
+  return{'can_trade':True,'reason':''}
+ async def _run_exposure_gate(self,sym,d,rp,ops):
+  r=self._exposure
+  if hasattr(r,'check'):
+   res=r.check(new_symbol=sym,new_direction=d,new_risk_percent=rp,open_positions=ops)
+   if hasattr(res,'__await__'):res=await res
+   return{'can_trade':res.can_trade,'reason':res.reason}
+  return{'can_trade':True,'reason':''}
+ @staticmethod
+ def _fcr(r,p,f,m):return RiskCheckResult(RiskDecision.BLOCKED,False,r,0.0,0.0,0.0,gates_passed=p,gates_failed=[r]+f,metadata=m)
+ @staticmethod
+ def _blk(r,p,f,m,rp,ls,lm):return RiskCheckResult(RiskDecision.BLOCKED,False,r,rp,ls,lm,gates_passed=p,gates_failed=f,metadata=m)
