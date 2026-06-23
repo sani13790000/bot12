@@ -40,9 +40,9 @@ class NewsEvent:
     event_time: datetime
 
 
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # FIX #3 - Symbol-specific volatility thresholds
-# ---------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 
 @dataclass
 class SymbolThresholds:
@@ -138,16 +138,16 @@ class VolatilityLevel(str, Enum):
 
 @dataclass
 class VolatilityCheckResult:
-    can_trade:      bool
-    level:          VolatilityLevel
-    reason:         str
-    atr_ratio:      float
-    spread_ratio:   float
-    lot_multiplier: float
-    current_atr:    float
-    avg_atr:        float
-    current_spread: float
-    avg_spread:     float
+    can_trade:       bool
+    level:           VolatilityLevel
+    reason:          str
+    atr_ratio:       float
+    spread_ratio:    float
+    lot_multiplier:  float
+    current_atr:     float
+    avg_atr:         float
+    current_spread:  float
+    avg_spread:      float
 
 
 @dataclass
@@ -164,7 +164,7 @@ class VolatilityFilterConfig:
     # Spread filter
     max_spread_ratio: float = 3.0
     # News filter
-    enable_news_filter:         bool = True
+    enable_news_filter:        bool = True
     news_block_minutes_before:  int  = 30
     news_block_minutes_after:   int  = 15
     # FIX #3: Per-symbol thresholds (None = use _DEFAULT_SYMBOL_THRESHOLDS)
@@ -191,6 +191,10 @@ class VolatilityFilter:
             self._symbol_thresholds.update({
                 k.upper(): v for k, v in self._cfg.symbol_thresholds.items()
             })
+        # FIX #6 final: cache fail_mode at construction time (not re-read every check call)
+        self._fail_mode: FailMode = _coerce_fm(
+            getattr(self._cfg, "fail_mode", FailMode.FAIL_CLOSED)
+        )
 
     # ------------------------------------------------------------------
     # ATR management
@@ -335,8 +339,7 @@ class VolatilityFilter:
             return self._check_inner(current_atr, atr_history, current_spread, avg_spread, symbol)
         except Exception as exc:
             logger.error("VolatilityFilter.check exception (symbol=%s): %s", symbol, exc, exc_info=True)
-            _fm = _coerce_fm(getattr(self._cfg, "fail_mode", FailMode.FAIL_CLOSED))
-            if _fm is FailMode.FAIL_CLOSED:
+            if self._fail_mode is FailMode.FAIL_CLOSED:
                 return VolatilityCheckResult(
                     can_trade=False, level=VolatilityLevel.EXTREME,
                     reason=f"FAIL_CLOSED:VOLATILITY_GATE_ERROR:{type(exc).__name__}",
@@ -345,7 +348,8 @@ class VolatilityFilter:
                     current_spread=current_spread, avg_spread=avg_spread,
                 )
             logger.critical(
-                "FAIL_OPEN: VolatilityFilter exception swallowed, trade ALLOWED. symbol=%s", symbol
+                "FAIL_OPEN: VolatilityFilter exception swallowed, trade ALLOWED. symbol=%s fail_mode=%s",
+                symbol, self._fail_mode,
             )
             return VolatilityCheckResult(
                 can_trade=True, level=VolatilityLevel.NORMAL,
