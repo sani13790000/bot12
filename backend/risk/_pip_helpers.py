@@ -1,2 +1,5 @@
-from typing import Dict
-D: Dict[str, float] = {'a':1.0}
+def f():
+ return 1
+def g(x):
+ if x: return x
+ return 0
