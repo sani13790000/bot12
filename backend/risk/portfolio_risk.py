@@ -6,137 +6,116 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger("risk.portfolio")
 
+# FIX #7: import FailMode from single source of truth (fail_mode.py)
+try:
+    from backend.risk.fail_mode import FailMode as FailMode  # noqa: F401
+except ImportError:
+    pass  # local fallback defined below if import fails
+
 # ---------------------------------------------------------------------------
 # Pip value table
 # FIX #4: XAGUSD 5.0 -> 50.0  (Silver std contract = 5000 troy oz)
-#   Silver contract: 5000 oz, tick = $0.001/oz, 10 ticks per pip
-#   pip_value = 5000 * 0.001 * 10 = $50.00/pip
-# Prior value of 5.0 caused 10x risk underestimate on Silver positions.
-# ---------------------------------------------------------------------------
 _PIP_VALUE_TABLE: Dict[str, float] = {
-    # Forex majors
-    "EURUSD": 10.0, "GBPUSD": 10.0, "AUDUSD": 10.0, "NZDUSD": 10.0,
-    "USDCAD":  7.7, "USDCHF": 10.7, "USDJPY":  6.7,
+    # Forex majors (pip = 0.0001, std lot = 100000 units)
+    "EURUSD": 10.0, "GBPUSD": 10.0, "AUDUSD": 10.0,
+    "NZDUSD": 10.0, "USDCAD": 7.46, "USDCHF": 9.26, "USDJPY": 9.26,
     # Forex minors
-    "EURGBP": 12.9, "EURJPY":  6.7, "EURAUD": 10.0,
-    "EURCHF": 10.7, "EURNZD": 10.0, "EURCAD":  7.7,
-    "GBPJPY":  6.7, "GBPAUD": 10.0, "GBPCHF": 10.7,
-    "GBPNZD": 10.0, "GBPCAD":  7.7,
-    "AUDJPY":  6.7, "AUDCAD":  7.7, "AUDCHF": 10.7, "AUDNZD": 10.0,
-    "CADCHF": 10.7, "CADJPY":  6.7, "CHFJPY":  6.7,
-    "NZDCAD":  7.7, "NZDCHF": 10.7, "NZDJPY":  6.7,
-    # Metals  (contract sizes determine pip_value)
-    "XAUUSD":  1.0,   # Gold:   100oz * $0.01/oz * 1 pip  = $1.00/pip
-    "XAGUSD": 50.0,   # Silver: 5000oz * $0.001/oz * 10   = $50.00/pip  (FIX #4)
-    "XPTUSD":  1.0,
-    "XPDUSD":  1.0,
-    # Energy
-    "USOIL":   1.0, "UKOIL":   1.0, "NATGAS":  1.0,
-    # Equity indices
-    "US30":    1.0, "US500":   1.0, "NAS100":  1.0,
-    "GER40":   1.0, "UK100":   1.0,
-    "JPN225":  0.1,   # Nikkei: JPY-denominated, $0.10/pip at 1:100 rate
-    "AUS200":  1.0,
+    "EURGBP": 13.0, "EURJPY": 9.26, "GBPJPY": 9.26, "EURCHF": 9.26,
+    "EURAUD": 7.0,  "EURCAD": 7.46, "GBPCHF": 9.26, "GBPAUD": 7.0,
+    "GBPCAD": 7.46, "AUDCAD": 7.46, "AUDCHF": 9.26, "AUDJPY": 9.26,
+    "CHFJPY": 9.26, "CADJPY": 9.26, "CADCHF": 9.26,
+    "NZDJPY": 9.26, "NZDCAD": 7.46, "NZDCHF": 9.26,
+    # Metals
+    "XAUUSD": 1.0,   # Gold: $1 per 0.01 price move per oz (100 oz lot)
+    "XAGUSD": 50.0,  # Silver: $50/pip (5000 oz * $0.001/oz * 10 ticks)
+    "XPTUSD": 1.0,
     # Crypto
-    "BTCUSD":  1.0, "ETHUSD":  1.0, "LTCUSD":  1.0, "XRPUSD":  1.0,
+    "BTCUSD": 1.0, "ETHUSD": 1.0, "LTCUSD": 1.0, "XRPUSD": 1.0,
+    # Equity indices
+    "US30":   1.0, "NAS100": 1.0, "US500": 1.0, "GER40": 1.0,
+    "UK100":  1.0, "JPN225": 1.0, "AUS200": 1.0,
+    # Energy
+    "USOIL":  1.0, "UKOIL":  1.0,
 }
 
 _SYMBOL_ALIASES: Dict[str, str] = {
     "GOLD": "XAUUSD", "SILVER": "XAGUSD", "PLATINUM": "XPTUSD",
-    "PALLADIUM": "XPDUSD",
-    "BTC": "BTCUSD", "ETH": "ETHUSD", "LTC": "LTCUSD", "XRP": "XRPUSD",
-    "WTI": "USOIL", "BRENT": "UKOIL",
-    "DAX": "GER40", "DAX40": "GER40", "FTSE": "UK100",
-    "SP500": "US500", "SPX500": "US500", "SPX": "US500",
-    "DOW": "US30", "DJ30": "US30",
-    "NIKKEI": "JPN225", "ASX200": "AUS200",
+    "BTC":  "BTCUSD", "ETH":   "ETHUSD",  "LTC":     "LTCUSD",
+    "XRP":  "XRPUSD", "DAX":   "GER40",   "DAX40":   "GER40",
+    "FTSE": "UK100",  "CAC40": "FRA40",   "SP500":   "US500",
+    "SPX500": "US500", "DOW":  "US30",    "WTI":     "USOIL",
+    "BRENT": "UKOIL", "NIKKEI": "JPN225",
 }
-
-
-class PipValueSource(str, Enum):
-    INJECTED              = "injected"
-    LOT_SIZER             = "lot_sizer"
-    TABLE                 = "table"
-    ALIAS                 = "alias"
-    SUFFIX                = "suffix"
-    FALLBACK_FOREX        = "fallback_forex"
-    FALLBACK_CONSERVATIVE = "fallback_conservative"
 
 
 def _resolve_canonical(symbol: str):
     sym = symbol.upper().strip()
     if sym in _PIP_VALUE_TABLE:
         return sym, "exact"
-    if sym in _SYMBOL_ALIASES:
-        return _SYMBOL_ALIASES[sym], "alias"
+    alias = _SYMBOL_ALIASES.get(sym)
+    if alias:
+        return alias, "alias"
     for trim in range(1, 5):
         candidate = sym[:-trim]
         if candidate in _PIP_VALUE_TABLE:
             return candidate, "suffix"
-        if candidate in _SYMBOL_ALIASES:
-            return _SYMBOL_ALIASES[candidate], "suffix"
+        alias2 = _SYMBOL_ALIASES.get(candidate)
+        if alias2:
+            return alias2, "alias"
     return sym, "unknown"
 
 
 def _get_pip_value(symbol: str, injected: Optional[float] = None) -> float:
     if injected is not None and injected > 0:
         return injected
+    canonical, _ = _resolve_canonical(symbol)
+    return _PIP_VALUE_TABLE.get(canonical, 1.0)
+
+
+class PipValueSource(str, Enum):
+    INJECTED   = "injected"
+    LOT_SIZER  = "lot_sizer"
+    TABLE      = "table"
+    ALIAS      = "alias"
+    SUFFIX     = "suffix"
+    FALLBACK_FOREX       = "fallback_forex"
+    FALLBACK_CONSERVATIVE = "fallback_conservative"
+
+
+def _get_pip_value_with_source(symbol: str, injected: Optional[float] = None):
+    if injected is not None and injected > 0:
+        return injected, PipValueSource.INJECTED.value
     canonical, method = _resolve_canonical(symbol)
     val = _PIP_VALUE_TABLE.get(canonical)
     if val is not None:
-        return val
-    sym_upper = symbol.upper().strip()
-    if len(sym_upper) == 6 and sym_upper.endswith("USD"):
-        logger.warning("pip_value: unknown Forex *USD '%s' -> using 10.0", symbol)
-        return 10.0
-    logger.error("pip_value: unknown symbol '%s' -> using 1.0 (conservative)", symbol)
-    return 1.0
+        src = PipValueSource.ALIAS.value if method == "alias" else \
+              PipValueSource.SUFFIX.value if method == "suffix" else \
+              PipValueSource.TABLE.value
+        return val, src
+    return 1.0, PipValueSource.FALLBACK_CONSERVATIVE.value
 
 
-def _get_pip_value_with_source(symbol: str, injected: Optional[float] = None) -> Tuple[float, str]:
+async def _get_pip_value_async(symbol: str, lot_sizer=None, injected: Optional[float] = None) -> float:
     if injected is not None and injected > 0:
-        return injected, PipValueSource.INJECTED
-    canonical, method = _resolve_canonical(symbol)
-    val = _PIP_VALUE_TABLE.get(canonical)
-    if val is not None:
-        source = (PipValueSource.TABLE if method == "exact" else
-                  PipValueSource.ALIAS if method == "alias" else PipValueSource.SUFFIX)
-        return val, source
-    sym_upper = symbol.upper().strip()
-    if len(sym_upper) == 6 and sym_upper.endswith("USD"):
-        logger.warning("pip_value: unknown Forex *USD '%s' -> using 10.0", symbol)
-        return 10.0, PipValueSource.FALLBACK_FOREX
-    logger.error("pip_value: unknown symbol '%s' -> using 1.0", symbol)
-    return 1.0, PipValueSource.FALLBACK_CONSERVATIVE
-
-
-async def _get_pip_value_async(
-    symbol: str, injected: Optional[float] = None, lot_sizer=None
-) -> Tuple[float, str]:
-    if injected is not None and injected > 0:
-        return injected, PipValueSource.INJECTED
+        return injected
     if lot_sizer is not None:
         try:
-            ls_val, ls_src = await lot_sizer.get_pip_value(symbol)
-            if ls_val > 0:
-                return ls_val, PipValueSource.LOT_SIZER
-        except Exception as exc:
-            logger.warning("pip_value async: LotSizer('%s') failed: %s", symbol, exc)
-    return _get_pip_value_with_source(symbol, None)
+            val = await lot_sizer.get_pip_value(symbol)
+            if val and val > 0:
+                return float(val)
+        except Exception as e:
+            logger.warning("LotSizer.get_pip_value failed for %s: %s", symbol, e)
+    return _get_pip_value(symbol)
 
 
-_STATIC_CORRELATIONS: Dict[Tuple[str, str], float] = {
-    ("EURUSD", "GBPUSD"): 0.85, ("EURUSD", "AUDUSD"): 0.72,
-    ("EURUSD", "NZDUSD"): 0.68, ("GBPUSD", "AUDUSD"): 0.70,
-    ("USDCHF", "EURUSD"): -0.92, ("USDCHF", "GBPUSD"): -0.88,
-    ("XAUUSD", "EURUSD"): 0.45, ("XAUUSD", "USDCHF"): -0.55,
-    ("USDJPY", "XAUUSD"): -0.40, ("BTCUSD", "ETHUSD"): 0.90,
-}
-
-
-class FailMode(str, Enum):
-    FAIL_CLOSED = "FAIL_CLOSED"
-    FAIL_OPEN   = "FAIL_OPEN"
+# FIX #7: FailMode imported from backend.risk.fail_mode (single source of truth).
+# Inline fallback retained for environments where the package is not installed.
+try:
+    FailMode  # noqa: F821 - already imported above
+except NameError:
+    class FailMode(str, Enum):  # type: ignore[no-redef]
+        FAIL_CLOSED = "FAIL_CLOSED"
+        FAIL_OPEN   = "FAIL_OPEN"
 
 
 class RiskLevel(str, Enum):
@@ -176,182 +155,169 @@ class OpenTradeRisk:
             (self.risk_amount / self.account_balance * 100)
             if self.account_balance > 0 else 0.0
         )
-        self.base_currency = self.symbol[:3] if len(self.symbol) >= 3 else self.symbol
+        self.base_currency    = self.symbol[:3] if len(self.symbol) >= 3 else self.symbol
+
+
+_STATIC_CORRELATION_TABLE: Dict[Tuple[str, str], float] = {
+    ("EURUSD", "GBPUSD"): 0.85, ("EURUSD", "AUDUSD"): 0.72,
+    ("EURUSD", "NZDUSD"): 0.68, ("GBPUSD", "AUDUSD"): 0.70,
+    ("USDCHF", "EURUSD"): -0.92, ("USDCHF", "GBPUSD"): -0.88,
+    ("XAUUSD", "EURUSD"): 0.45, ("XAUUSD", "USDCHF"): -0.55,
+    ("USDJPY", "XAUUSD"): -0.40, ("BTCUSD", "ETHUSD"): 0.90,
+}
 
 
 @dataclass
-class PortfolioRiskSnapshot:
-    total_risk_percent: float
-    risk_level:         RiskLevel
-    correlated_risk:    float
-    open_trades:        int
-    can_add_new:        bool
-    block_reason:       str
-    correlation_source: str
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+class PortfolioRiskConfig:
+    max_portfolio_risk_percent:   float    = 5.0
+    max_single_trade_risk_percent: float   = 2.0
+    max_correlated_exposure:      float    = 3.0
+    correlation_threshold:        float    = 0.7
+    fail_mode:                    FailMode = FailMode.FAIL_CLOSED
 
 
-class _UpdatedTradeProxy:
-    __slots__ = (
-        "symbol", "direction", "lot_size", "entry_price", "stop_loss",
-        "account_balance", "pip_value_per_lot", "pip_value_used",
-        "pip_value_source", "risk_amount", "risk_percent", "base_currency",
-    )
-    def __init__(self, orig, pip_val, pip_src, risk_amount, risk_percent):
-        self.symbol            = orig.symbol
-        self.direction         = orig.direction
-        self.lot_size          = orig.lot_size
-        self.entry_price       = orig.entry_price
-        self.stop_loss         = orig.stop_loss
-        self.account_balance   = orig.account_balance
-        self.pip_value_per_lot = orig.pip_value_per_lot
-        self.pip_value_used    = pip_val
-        self.pip_value_source  = pip_src
-        self.risk_amount       = risk_amount
-        self.risk_percent      = risk_percent
-        self.base_currency     = orig.base_currency
+@dataclass
+class PortfolioRiskResult:
+    can_trade:         bool
+    level:             RiskLevel
+    reason:            str
+    portfolio_risk_pct: float
+    new_trade_risk_pct: float
+    correlated_risk_pct: float
 
 
 class PortfolioRiskManager:
-    MAX_TOTAL_RISK_PCT = 5.0
-    WARNING_RISK_PCT   = 3.0
-    CRITICAL_RISK_PCT  = 4.0
-
     def __init__(
         self,
-        fail_mode: FailMode = FailMode.FAIL_CLOSED,
-        corr_engine=None,
-        lot_sizer=None,
+        config:       Optional[PortfolioRiskConfig] = None,
+        fail_mode:    Optional[FailMode] = None,
+        lot_sizer:    Optional[object]  = None,
     ) -> None:
-        self._fail_mode   = fail_mode
-        self._corr_engine = corr_engine
-        self._lot_sizer   = lot_sizer
-
-    def add_price_tick(self, symbol: str, price: float) -> None:
-        if self._corr_engine is not None:
+        self._cfg = config or PortfolioRiskConfig()
+        if fail_mode is not None:
             try:
-                self._corr_engine.add_price(symbol, price)
-            except Exception as exc:
-                logger.warning("add_price_tick error %s: %s", symbol, exc)
-
-    def _get_correlation(self, sym_a: str, sym_b: str) -> Tuple[float, str]:
-        if self._corr_engine is not None:
-            try:
-                rolling = self._corr_engine.get_correlation(sym_a, sym_b)
-                if rolling is not None:
-                    return rolling, "rolling"
-            except Exception as exc:
-                logger.warning("Rolling corr error %s/%s: %s", sym_a, sym_b, exc)
-        key = (sym_a, sym_b)
-        rev = (sym_b, sym_a)
-        val = _STATIC_CORRELATIONS.get(key) or _STATIC_CORRELATIONS.get(rev)
-        if val is not None:
-            return val, "static"
-        return 0.0, "none"
+                from backend.risk.fail_mode import coerce as _c
+                self._fail_mode = _c(fail_mode)
+            except ImportError:
+                self._fail_mode = FailMode(str(fail_mode).upper())
+        else:
+            self._fail_mode = self._cfg.fail_mode
+        self._lot_sizer = lot_sizer
 
     def check(
-        self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]
-    ) -> PortfolioRiskSnapshot:
+        self,
+        new_trade:     OpenTradeRisk,
+        open_trades:   List[OpenTradeRisk],
+    ) -> PortfolioRiskResult:
         try:
             return self._check_inner(new_trade, open_trades)
         except Exception as exc:
-            logger.exception(
-                "portfolio_risk.check() error %s: %s - mode=%s",
-                new_trade.symbol, exc, self._fail_mode,
-            )
+            logger.exception("PortfolioRiskManager.check() raised %s: %s",
+                             type(exc).__name__, exc, exc_info=True)
             if self._fail_mode is FailMode.FAIL_CLOSED:
-                return PortfolioRiskSnapshot(
-                    total_risk_percent=0.0, risk_level=RiskLevel.BLOCKED,
-                    correlated_risk=0.0, open_trades=len(open_trades),
-                    can_add_new=False,
-                    block_reason=f"INTERNAL_ERROR:{type(exc).__name__}",
-                    correlation_source="error",
+                return PortfolioRiskResult(
+                    can_trade=False, level=RiskLevel.BLOCKED,
+                    reason=f"FAIL_CLOSED:PORTFOLIO_RISK_ERROR:{type(exc).__name__}",
+                    portfolio_risk_pct=0.0, new_trade_risk_pct=0.0, correlated_risk_pct=0.0,
                 )
-            logger.critical("portfolio_risk FAIL_OPEN for %s", new_trade.symbol)
-            return PortfolioRiskSnapshot(
-                total_risk_percent=0.0, risk_level=RiskLevel.SAFE,
-                correlated_risk=0.0, open_trades=len(open_trades),
-                can_add_new=True, block_reason="FAIL_OPEN_EXCEPTION_IGNORED",
-                correlation_source="error",
+            return PortfolioRiskResult(
+                can_trade=True, level=RiskLevel.WARNING,
+                reason=f"FAIL_OPEN:PORTFOLIO_RISK_ERROR:{type(exc).__name__}",
+                portfolio_risk_pct=0.0, new_trade_risk_pct=0.0, correlated_risk_pct=0.0,
             )
 
     async def check_async(
-        self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]
-    ) -> PortfolioRiskSnapshot:
-        try:
-            if self._lot_sizer is not None:
-                pip_val, source = await _get_pip_value_async(
-                    new_trade.symbol,
-                    injected=new_trade.pip_value_per_lot,
-                    lot_sizer=self._lot_sizer,
-                )
-                if pip_val != new_trade.pip_value_used:
-                    price_dist = abs(new_trade.entry_price - new_trade.stop_loss)
-                    updated_risk_amount  = price_dist * new_trade.lot_size * pip_val
-                    updated_risk_percent = (
-                        (updated_risk_amount / new_trade.account_balance * 100)
-                        if new_trade.account_balance > 0 else 0.0
-                    )
-                    updated = _UpdatedTradeProxy(
-                        new_trade, pip_val, source,
-                        updated_risk_amount, updated_risk_percent,
-                    )
-                    return self._check_inner(updated, open_trades)
-            return self._check_inner(new_trade, open_trades)
-        except Exception as exc:
-            logger.exception(
-                "portfolio_risk.check_async() error %s: %s - mode=%s",
-                new_trade.symbol, exc, self._fail_mode,
-            )
-            if self._fail_mode is FailMode.FAIL_CLOSED:
-                return PortfolioRiskSnapshot(
-                    total_risk_percent=0.0, risk_level=RiskLevel.BLOCKED,
-                    correlated_risk=0.0, open_trades=len(open_trades),
-                    can_add_new=False,
-                    block_reason=f"INTERNAL_ERROR_ASYNC:{type(exc).__name__}",
-                    correlation_source="error",
-                )
-            return PortfolioRiskSnapshot(
-                total_risk_percent=0.0, risk_level=RiskLevel.SAFE,
-                correlated_risk=0.0, open_trades=len(open_trades),
-                can_add_new=True, block_reason="FAIL_OPEN_EXCEPTION_IGNORED",
-                correlation_source="error",
+        self,
+        new_trade:   OpenTradeRisk,
+        open_trades: List[OpenTradeRisk],
+    ) -> PortfolioRiskResult:
+        if self._lot_sizer is not None:
+            try:
+                live_pip = await _get_pip_value_async(new_trade.symbol, self._lot_sizer)
+                if abs(live_pip - new_trade.pip_value_used) > 0.01:
+                    proxy = _UpdatedTradeProxy(new_trade, live_pip)
+                    return self._check_inner(proxy, open_trades)
+            except Exception as e:
+                logger.warning("check_async LotSizer fallback: %s", e)
+        return self._check_inner(new_trade, open_trades)
+
+    def _check_inner(
+        self,
+        new_trade:   object,
+        open_trades: List[OpenTradeRisk],
+    ) -> PortfolioRiskResult:
+        current_total = sum(t.risk_percent for t in open_trades)
+        new_risk      = getattr(new_trade, "risk_percent", 0.0)
+        projected     = current_total + new_risk
+
+        if new_risk > self._cfg.max_single_trade_risk_percent:
+            return PortfolioRiskResult(
+                can_trade=False, level=RiskLevel.BLOCKED,
+                reason=(
+                    f"SINGLE_TRADE_RISK_TOO_HIGH: {new_risk:.2f}% > "
+                    f"{self._cfg.max_single_trade_risk_percent:.2f}%"
+                ),
+                portfolio_risk_pct=projected, new_trade_risk_pct=new_risk,
+                correlated_risk_pct=0.0,
             )
 
-    def _check_inner(self, new_trade, open_trades) -> PortfolioRiskSnapshot:
-        total_existing  = sum(t.risk_percent for t in open_trades)
-        projected_total = total_existing + new_trade.risk_percent
-        corr_risk   = new_trade.risk_percent
-        corr_source = "none"
-        for existing in open_trades:
-            corr, src = self._get_correlation(new_trade.symbol, existing.symbol)
-            corr_risk += abs(corr) * existing.risk_percent
-            if src != "none":
-                corr_source = src
-        if projected_total >= self.MAX_TOTAL_RISK_PCT:
-            return PortfolioRiskSnapshot(
-                total_risk_percent=round(projected_total, 4),
-                risk_level=RiskLevel.BLOCKED,
-                correlated_risk=round(corr_risk, 4),
-                open_trades=len(open_trades),
-                can_add_new=False,
-                block_reason=(
-                    f"TOTAL_RISK_EXCEEDED:{projected_total:.2f}%"
-                    f">={self.MAX_TOTAL_RISK_PCT}%"
+        if projected > self._cfg.max_portfolio_risk_percent:
+            return PortfolioRiskResult(
+                can_trade=False, level=RiskLevel.BLOCKED,
+                reason=(
+                    f"PORTFOLIO_RISK_TOO_HIGH: {projected:.2f}% > "
+                    f"{self._cfg.max_portfolio_risk_percent:.2f}%"
                 ),
-                correlation_source=corr_source,
+                portfolio_risk_pct=projected, new_trade_risk_pct=new_risk,
+                correlated_risk_pct=0.0,
             )
-        level = (
-            RiskLevel.CRITICAL if projected_total >= self.CRITICAL_RISK_PCT
-            else RiskLevel.WARNING if projected_total >= self.WARNING_RISK_PCT
-            else RiskLevel.SAFE
+
+        new_sym = getattr(new_trade, "symbol", "").upper()
+        corr_risk = 0.0
+        for t in open_trades:
+            key  = (min(new_sym, t.symbol.upper()), max(new_sym, t.symbol.upper()))
+            corr = abs(_STATIC_CORRELATION_TABLE.get(key, 0.0))
+            if corr >= self._cfg.correlation_threshold:
+                corr_risk += t.risk_percent * corr
+
+        if corr_risk > self._cfg.max_correlated_exposure:
+            return PortfolioRiskResult(
+                can_trade=False, level=RiskLevel.CRITICAL,
+                reason=(
+                    f"CORRELATED_RISK_TOO_HIGH: {corr_risk:.2f}% > "
+                    f"{self._cfg.max_correlated_exposure:.2f}%"
+                ),
+                portfolio_risk_pct=projected, new_trade_risk_pct=new_risk,
+                correlated_risk_pct=corr_risk,
+            )
+
+        level = RiskLevel.WARNING if projected > self._cfg.max_portfolio_risk_percent * 0.8 \
+                else RiskLevel.SAFE
+        return PortfolioRiskResult(
+            can_trade=True, level=level,
+            reason="",
+            portfolio_risk_pct=projected, new_trade_risk_pct=new_risk,
+            correlated_risk_pct=corr_risk,
         )
-        return PortfolioRiskSnapshot(
-            total_risk_percent=round(projected_total, 4),
-            risk_level=level,
-            correlated_risk=round(corr_risk, 4),
-            open_trades=len(open_trades),
-            can_add_new=True,
-            block_reason="",
-            correlation_source=corr_source,
+
+
+class _UpdatedTradeProxy:
+    def __init__(self, trade: OpenTradeRisk, new_pip: float) -> None:
+        self._trade   = trade
+        self._new_pip = new_pip
+        price_dist    = abs(trade.entry_price - trade.stop_loss)
+        self.risk_amount  = price_dist * trade.lot_size * new_pip
+        self.risk_percent = (
+            (self.risk_amount / trade.account_balance * 100)
+            if trade.account_balance > 0 else 0.0
         )
+
+    def __getattr__(self, name: str):
+        return getattr(self._trade, name)
+
+
+def get_portfolio_risk_manager(
+    config: Optional[PortfolioRiskConfig] = None,
+    lot_sizer=None,
+) -> PortfolioRiskManager:
+    return PortfolioRiskManager(config=config, lot_sizer=lot_sizer)
