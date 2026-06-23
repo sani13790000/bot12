@@ -21,6 +21,68 @@ class RiskOrchestrator:
   self._volatility=volatility_filter;self._correlation=correlation_filter
   self._exposure=exposure_control;self._lot_sizer=lot_sizer
   self._fail_corr=fail_mode_correlation;self._fail_exp=fail_mode_exposure
+ async def check(self,symbol,direction,entry_price,stop_loss,account_balance,
+                user_id,signal_id,extra_context=None,override_risk_pct=None):
+  ctx=extra_context or{};passed=[];failed=[];meta={}
+  pd=abs(entry_price-stop_loss)
+  if pd<=0:return self._blk('INVALID_SL',passed,['ENTRY_VALIDATION'],meta,0.0,0.0,0.0)
+  slp=_price_to_pips(symbol,pd)
+  meta['sl_conversion']={'price_distance':pd,'stop_loss_pips':slp,'symbol':symbol}
+  if self._equity is not None:
+   try:
+    eq=await self._run_equity_gate(user_id,account_balance,ctx)
+    if not eq['can_trade']:return self._blk(eq['reason'],passed,['EQUITY']+failed,meta,0.0,0.0,0.0)
+    passed.append('EQUITY');meta['equity']=eq
+   except Exception as e:logger.exception('EQUITY:%s',e);return self._fcr('EQUITY_GATE_ERROR',passed,failed,meta)
+  if self._daily is not None:
+   try:
+    dl=await self._run_daily_gate(user_id,ctx)
+    if not dl['can_trade']:return self._blk(dl['reason'],passed,['DAILY_LIMITS']+failed,meta,0.0,0.0,0.0)
+    passed.append('DAILY_LIMITS')
+   except Exception as e:logger.exception('DAILY:%s',e);return self._fcr('DAILY_LIMITS_GATE_ERROR',passed,failed,meta)
+  lm=1.0
+  if self._volatility is not None:
+   try:
+    vr=await self._run_volatility_gate(symbol,ctx)
+    if not vr['can_trade']:return self._blk(vr['reason'],passed,['VOLATILITY']+failed,meta,0.0,0.0,0.0)
+    lm=vr.get('lot_multiplier',1.0);passed.append('VOLATILITY');meta['volatility']=vr
+   except Exception as e:logger.exception('VOL:%s',e);return self._fcr('VOLATILITY_GATE_ERROR',passed,failed,meta)
+  if self._correlation is not None:
+   try:
+    cr=await self._run_correlation_gate(symbol,direction,ctx)
+    if not cr['can_trade']:return self._blk(cr['reason'],passed,['CORRELATION']+failed,meta,0.0,0.0,0.0)
+    passed.append('CORRELATION');meta['correlation']=cr
+   except Exception as e:
+    logger.exception('CORR:%s',e)
+    if self._fail_corr=='FAIL_CLOSED':return self._fcr('CORRELATION_GATE_ERROR',passed,failed,meta)
+    passed.append('CORRELATION_FAIL_OPEN')
+  pl=0.01;arp=0.0;rs='unknown'
+  if self._lot_sizer is not None:
+   try:
+    lr=await self._lot_sizer.calculate(balance=account_balance,stop_loss_pips=slp,symbol=symbol,volatility_ratio=lm,override_risk_pct=override_risk_pct)
+    pl=lr.lot_size;arp=lr.risk_percent;rs='lot_sizer'
+    meta['lot_sizing']={'lot_size':pl,'risk_percent':arp,'pip_value':lr.pip_value_used,'stop_loss_pips':slp,'risk_source':rs}
+    if pl<=0.0:return self._blk('LOT_SIZING_ZERO',passed,['LOT_SIZING']+failed,meta,arp,0.0,lm)
+    passed.append('LOT_SIZING')
+   except Exception as e:logger.exception('LOT:%s',e);return self._fcr('LOT_SIZING_GATE_ERROR',passed,failed,meta)
+  else:
+   if override_risk_pct and override_risk_pct>0:arp=override_risk_pct;rs='override'
+   else:
+    arp,es=_estimate_risk_pct(symbol,pd,pl,account_balance)
+    if arp<=0:arp=ctx.get('config_risk_pct',1.0);rs='config_fallback'
+    else:rs=f'estimated({es})'
+   meta['lot_sizing']={'note':'no_lot_sizer','actual_risk_pct':arp,'risk_source':rs,'stop_loss_pips':slp}
+  if self._exposure is not None:
+   try:
+    ops=ctx.get('open_positions',[])
+    er=await self._run_exposure_gate(symbol,direction,arp,ops)
+    if not er['can_trade']:return self._blk(er['reason'],passed,['EXPOSURE']+failed,meta,arp,0.0,lm)
+    er['risk_source']=rs;passed.append('EXPOSURE');meta['exposure']=er
+   except Exception as e:
+    logger.exception('EXP:%s',e)
+    if self._fail_exp=='FAIL_CLOSED':return self._fcr('EXPOSURE_GATE_ERROR',passed,failed,meta)
+    passed.append('EXPOSURE_FAIL_OPEN')
+  return RiskCheckResult(RiskDecision.APPROVED,True,'',arp,pl,lm,gates_passed=passed,gates_failed=failed,metadata=meta)
  async def _run_equity_gate(self,u,b,ctx):
   r=self._equity
   if hasattr(r,'check'):
