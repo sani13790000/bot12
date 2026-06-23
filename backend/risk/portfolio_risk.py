@@ -6,9 +6,18 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger("risk.portfolio")
 
+# ---------------------------------------------------------------------------
+# Pip value table
+# FIX #4: XAGUSD 5.0 -> 50.0  (Silver std contract = 5000 troy oz)
+#   Silver contract: 5000 oz, tick = $0.001/oz, 10 ticks per pip
+#   pip_value = 5000 * 0.001 * 10 = $50.00/pip
+# Prior value of 5.0 caused 10x risk underestimate on Silver positions.
+# ---------------------------------------------------------------------------
 _PIP_VALUE_TABLE: Dict[str, float] = {
+    # Forex majors
     "EURUSD": 10.0, "GBPUSD": 10.0, "AUDUSD": 10.0, "NZDUSD": 10.0,
     "USDCAD":  7.7, "USDCHF": 10.7, "USDJPY":  6.7,
+    # Forex minors
     "EURGBP": 12.9, "EURJPY":  6.7, "EURAUD": 10.0,
     "EURCHF": 10.7, "EURNZD": 10.0, "EURCAD":  7.7,
     "GBPJPY":  6.7, "GBPAUD": 10.0, "GBPCHF": 10.7,
@@ -16,10 +25,19 @@ _PIP_VALUE_TABLE: Dict[str, float] = {
     "AUDJPY":  6.7, "AUDCAD":  7.7, "AUDCHF": 10.7, "AUDNZD": 10.0,
     "CADCHF": 10.7, "CADJPY":  6.7, "CHFJPY":  6.7,
     "NZDCAD":  7.7, "NZDCHF": 10.7, "NZDJPY":  6.7,
-    "XAUUSD":  1.0, "XAGUSD":  5.0, "XPTUSD":  1.0, "XPDUSD":  1.0,
+    # Metals  (contract sizes determine pip_value)
+    "XAUUSD":  1.0,   # Gold:   100oz * $0.01/oz * 1 pip  = $1.00/pip
+    "XAGUSD": 50.0,   # Silver: 5000oz * $0.001/oz * 10   = $50.00/pip  (FIX #4)
+    "XPTUSD":  1.0,
+    "XPDUSD":  1.0,
+    # Energy
     "USOIL":   1.0, "UKOIL":   1.0, "NATGAS":  1.0,
+    # Equity indices
     "US30":    1.0, "US500":   1.0, "NAS100":  1.0,
-    "GER40":   1.0, "UK100":   1.0, "JPN225":  0.1, "AUS200":  1.0,
+    "GER40":   1.0, "UK100":   1.0,
+    "JPN225":  0.1,   # Nikkei: JPY-denominated, $0.10/pip at 1:100 rate
+    "AUS200":  1.0,
+    # Crypto
     "BTCUSD":  1.0, "ETHUSD":  1.0, "LTCUSD":  1.0, "XRPUSD":  1.0,
 }
 
@@ -36,12 +54,12 @@ _SYMBOL_ALIASES: Dict[str, str] = {
 
 
 class PipValueSource(str, Enum):
-    INJECTED = "injected"
-    LOT_SIZER = "lot_sizer"
-    TABLE = "table"
-    ALIAS = "alias"
-    SUFFIX = "suffix"
-    FALLBACK_FOREX = "fallback_forex"
+    INJECTED              = "injected"
+    LOT_SIZER             = "lot_sizer"
+    TABLE                 = "table"
+    ALIAS                 = "alias"
+    SUFFIX                = "suffix"
+    FALLBACK_FOREX        = "fallback_forex"
     FALLBACK_CONSERVATIVE = "fallback_conservative"
 
 
@@ -118,18 +136,18 @@ _STATIC_CORRELATIONS: Dict[Tuple[str, str], float] = {
 
 class FailMode(str, Enum):
     FAIL_CLOSED = "FAIL_CLOSED"
-    FAIL_OPEN = "FAIL_OPEN"
+    FAIL_OPEN   = "FAIL_OPEN"
 
 
 class RiskLevel(str, Enum):
-    SAFE = "SAFE"
-    WARNING = "WARNING"
+    SAFE     = "SAFE"
+    WARNING  = "WARNING"
     CRITICAL = "CRITICAL"
-    BLOCKED = "BLOCKED"
+    BLOCKED  = "BLOCKED"
 
 
 class TradeDirection(str, Enum):
-    BUY = "BUY"
+    BUY  = "BUY"
     SELL = "SELL"
 
 
@@ -142,11 +160,11 @@ class OpenTradeRisk:
     stop_loss:         float
     account_balance:   float
     pip_value_per_lot: Optional[float] = None
-    risk_percent:     float = field(init=False)
-    risk_amount:      float = field(init=False)
-    pip_value_used:   float = field(init=False)
-    pip_value_source: str   = field(init=False)
-    base_currency:    str   = field(init=False)
+    risk_percent:      float = field(init=False)
+    risk_amount:       float = field(init=False)
+    pip_value_used:    float = field(init=False)
+    pip_value_source:  str   = field(init=False)
+    base_currency:     str   = field(init=False)
 
     def __post_init__(self) -> None:
         pip_val, source       = _get_pip_value_with_source(self.symbol, self.pip_value_per_lot)
@@ -180,18 +198,18 @@ class _UpdatedTradeProxy:
         "pip_value_source", "risk_amount", "risk_percent", "base_currency",
     )
     def __init__(self, orig, pip_val, pip_src, risk_amount, risk_percent):
-        self.symbol = orig.symbol
-        self.direction = orig.direction
-        self.lot_size = orig.lot_size
-        self.entry_price = orig.entry_price
-        self.stop_loss = orig.stop_loss
-        self.account_balance = orig.account_balance
+        self.symbol            = orig.symbol
+        self.direction         = orig.direction
+        self.lot_size          = orig.lot_size
+        self.entry_price       = orig.entry_price
+        self.stop_loss         = orig.stop_loss
+        self.account_balance   = orig.account_balance
         self.pip_value_per_lot = orig.pip_value_per_lot
-        self.pip_value_used = pip_val
-        self.pip_value_source = pip_src
-        self.risk_amount = risk_amount
-        self.risk_percent = risk_percent
-        self.base_currency = orig.base_currency
+        self.pip_value_used    = pip_val
+        self.pip_value_source  = pip_src
+        self.risk_amount       = risk_amount
+        self.risk_percent      = risk_percent
+        self.base_currency     = orig.base_currency
 
 
 class PortfolioRiskManager:
@@ -231,12 +249,16 @@ class PortfolioRiskManager:
             return val, "static"
         return 0.0, "none"
 
-    def check(self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]) -> PortfolioRiskSnapshot:
+    def check(
+        self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]
+    ) -> PortfolioRiskSnapshot:
         try:
             return self._check_inner(new_trade, open_trades)
         except Exception as exc:
-            logger.exception("portfolio_risk.check() error %s: %s - mode=%s",
-                             new_trade.symbol, exc, self._fail_mode)
+            logger.exception(
+                "portfolio_risk.check() error %s: %s - mode=%s",
+                new_trade.symbol, exc, self._fail_mode,
+            )
             if self._fail_mode is FailMode.FAIL_CLOSED:
                 return PortfolioRiskSnapshot(
                     total_risk_percent=0.0, risk_level=RiskLevel.BLOCKED,
@@ -253,7 +275,9 @@ class PortfolioRiskManager:
                 correlation_source="error",
             )
 
-    async def check_async(self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]) -> PortfolioRiskSnapshot:
+    async def check_async(
+        self, new_trade: OpenTradeRisk, open_trades: List[OpenTradeRisk]
+    ) -> PortfolioRiskSnapshot:
         try:
             if self._lot_sizer is not None:
                 pip_val, source = await _get_pip_value_async(
@@ -263,18 +287,22 @@ class PortfolioRiskManager:
                 )
                 if pip_val != new_trade.pip_value_used:
                     price_dist = abs(new_trade.entry_price - new_trade.stop_loss)
-                    updated_risk_amount = price_dist * new_trade.lot_size * pip_val
+                    updated_risk_amount  = price_dist * new_trade.lot_size * pip_val
                     updated_risk_percent = (
                         (updated_risk_amount / new_trade.account_balance * 100)
                         if new_trade.account_balance > 0 else 0.0
                     )
-                    updated = _UpdatedTradeProxy(new_trade, pip_val, source,
-                                                updated_risk_amount, updated_risk_percent)
+                    updated = _UpdatedTradeProxy(
+                        new_trade, pip_val, source,
+                        updated_risk_amount, updated_risk_percent,
+                    )
                     return self._check_inner(updated, open_trades)
             return self._check_inner(new_trade, open_trades)
         except Exception as exc:
-            logger.exception("portfolio_risk.check_async() error %s: %s - mode=%s",
-                             new_trade.symbol, exc, self._fail_mode)
+            logger.exception(
+                "portfolio_risk.check_async() error %s: %s - mode=%s",
+                new_trade.symbol, exc, self._fail_mode,
+            )
             if self._fail_mode is FailMode.FAIL_CLOSED:
                 return PortfolioRiskSnapshot(
                     total_risk_percent=0.0, risk_level=RiskLevel.BLOCKED,
@@ -303,17 +331,27 @@ class PortfolioRiskManager:
         if projected_total >= self.MAX_TOTAL_RISK_PCT:
             return PortfolioRiskSnapshot(
                 total_risk_percent=round(projected_total, 4),
-                risk_level=RiskLevel.BLOCKED, correlated_risk=round(corr_risk, 4),
-                open_trades=len(open_trades), can_add_new=False,
-                block_reason=f"TOTAL_RISK_EXCEEDED:{projected_total:.2f}%>={self.MAX_TOTAL_RISK_PCT}%",
+                risk_level=RiskLevel.BLOCKED,
+                correlated_risk=round(corr_risk, 4),
+                open_trades=len(open_trades),
+                can_add_new=False,
+                block_reason=(
+                    f"TOTAL_RISK_EXCEEDED:{projected_total:.2f}%"
+                    f">={self.MAX_TOTAL_RISK_PCT}%"
+                ),
                 correlation_source=corr_source,
             )
-        level = (RiskLevel.CRITICAL if projected_total >= self.CRITICAL_RISK_PCT
-                 else RiskLevel.WARNING if projected_total >= self.WARNING_RISK_PCT
-                 else RiskLevel.SAFE)
+        level = (
+            RiskLevel.CRITICAL if projected_total >= self.CRITICAL_RISK_PCT
+            else RiskLevel.WARNING if projected_total >= self.WARNING_RISK_PCT
+            else RiskLevel.SAFE
+        )
         return PortfolioRiskSnapshot(
             total_risk_percent=round(projected_total, 4),
-            risk_level=level, correlated_risk=round(corr_risk, 4),
-            open_trades=len(open_trades), can_add_new=True, block_reason="",
+            risk_level=level,
+            correlated_risk=round(corr_risk, 4),
+            open_trades=len(open_trades),
+            can_add_new=True,
+            block_reason="",
             correlation_source=corr_source,
         )
