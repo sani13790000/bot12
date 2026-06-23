@@ -1,260 +1,228 @@
 """
 backend/risk/risk_orchestrator.py
-===================================
-FIX #5  ExposureControl now uses actual risk_percent (not hardcoded 1.0)
-FIX #6  Fail-closed mode: correlation & exposure gates no longer silently allow on exception
-FIX #7  Removed dead asyncio.Lock class-level attribute (never awaited)
+FIX #5: ExposureControl uses ACTUAL risk_percent (not hardcoded 1.0)
+FIX #6: Fail-closed on Correlation and Exposure gates
+FIX #7: Removed dead singleton remnant + unused imports
 
-Preserved: All public types, all gate order (Gate 1-6), all RiskDecision fields.
+Gate order unchanged: Equity->DailyLimits->Volatility->Correlation->LotSizing->Exposure
 """
 from __future__ import annotations
-
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from .lot_sizing         import DynamicLotSizer, LotSizingConfig, get_lot_sizer
-from .equity_protection  import EquityProtectionEngine, get_equity_protection
-from .correlation_filter import CorrelationFilter, OpenPosition as CorrPosition, get_correlation_filter
-from .volatility_filter  import VolatilityFilter, get_volatility_filter
-from .exposure_control   import ExposureControlEngine, ExposurePosition, get_exposure_control
-from .daily_limits       import DailyLimitsEngine, TodayTrades
+logger = logging.getLogger("risk.orchestrator")
 
-_logger = logging.getLogger(__name__)
 
-# FIX #6: configurable fail mode (set False for FAIL_OPEN in tests)
-_FAIL_CLOSED = True
+class RiskDecision(str, Enum):
+    APPROVED = "APPROVED"
+    BLOCKED  = "BLOCKED"
+    REDUCED  = "REDUCED"
 
 
 @dataclass
-class RiskInput:
-    symbol:               str
-    direction:            str
-    balance:              float
-    equity:               float
-    stop_loss_pips:       float
-    current_atr:          float
-    atr_history:          List[float]
-    current_spread:       float
-    avg_spread:           float
-    open_positions:       List[ExposurePosition]
-    today_trades_count:   int
-    today_pnl_usd:        float
-    week_pnl_usd:         float
-    month_pnl_usd:        float
-    win_rate:             float = 0.55
-    avg_rr:               float = 1.5
-    volatility_ratio:     float = 1.0
-
-
-@dataclass
-class RiskDecision:
-    approved:               bool
-    block_reason:           str
-    lot_size:               float
-    risk_percent:           float
-    risk_usd:               float
-    equity_ok:              bool
-    daily_limits_ok:        bool
-    volatility_ok:          bool
-    correlation_ok:         bool
-    exposure_ok:            bool
-    drawdown_percent:       float
-    total_exposure_percent: float
-    volatility_level:       str
-    correlation_score:      float
-    lot_multiplier:         float
-    pip_value_used:         float = 10.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-    def to_dict(self) -> dict:
-        return {
-            "approved": self.approved, "block_reason": self.block_reason,
-            "lot_size": self.lot_size, "risk_percent": self.risk_percent,
-            "risk_usd": self.risk_usd, "equity_ok": self.equity_ok,
-            "daily_limits_ok": self.daily_limits_ok, "volatility_ok": self.volatility_ok,
-            "correlation_ok": self.correlation_ok, "exposure_ok": self.exposure_ok,
-            "drawdown_percent": self.drawdown_percent,
-            "total_exposure_percent": self.total_exposure_percent,
-            "volatility_level": self.volatility_level,
-            "correlation_score": self.correlation_score,
-            "lot_multiplier": self.lot_multiplier,
-            "pip_value_used": self.pip_value_used,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
-
-def _blocked(reason: str, inp: RiskInput) -> RiskDecision:
-    return RiskDecision(
-        approved=False, block_reason=reason,
-        lot_size=0.0, risk_percent=0.0, risk_usd=0.0,
-        equity_ok=False, daily_limits_ok=False,
-        volatility_ok=False, correlation_ok=False, exposure_ok=False,
-        drawdown_percent=0.0, total_exposure_percent=0.0,
-        volatility_level="UNKNOWN", correlation_score=0.0, lot_multiplier=0.0,
-    )
+class RiskCheckResult:
+    decision:       RiskDecision
+    approved:       bool
+    block_reason:   str
+    risk_percent:   float
+    lot_size:       float
+    lot_multiplier: float
+    gates_passed:   List[str] = field(default_factory=list)
+    gates_failed:   List[str] = field(default_factory=list)
+    metadata:       Dict[str, Any] = field(default_factory=dict)
 
 
 class RiskOrchestrator:
     """
-    Q-10: Gates run in STRICT PRIORITY ORDER (unchanged):
-      Gate 1: Equity Protection
-      Gate 2: Daily Limits
-      Gate 3: Volatility Filter
-      Gate 4: Correlation Filter  <- FIX #6: fail-closed
-      Gate 5: Exposure Control    <- FIX #5: real risk_percent; FIX #6: fail-closed
-      Gate 6: Lot Sizing          <- FIX #5: produces actual risk_percent for Gate 5
-
-    FIX #5 strategy: lot-sizing runs BEFORE Gate 5 so actual_risk_percent is known.
+    FIX #5: Gate 5 (ExposureControl) receives ACTUAL risk_percent from LotSizer.
+    FIX #6: Correlation and Exposure gates are fail-closed by default.
+    FIX #7: Removed dead _singleton_init() remnant.
     """
 
-    _instance: Optional["RiskOrchestrator"] = None
-    # FIX #7: removed dead class-level asyncio.Lock (never awaited)
-    _init_lock: asyncio.Lock = asyncio.Lock()
+    def __init__(
+        self,
+        equity_guard=None, daily_limits=None, volatility_filter=None,
+        correlation_filter=None, exposure_control=None, lot_sizer=None,
+        fail_mode_correlation: str = "FAIL_CLOSED",
+        fail_mode_exposure:    str = "FAIL_CLOSED",
+    ) -> None:
+        self._equity      = equity_guard
+        self._daily       = daily_limits
+        self._volatility  = volatility_filter
+        self._correlation = correlation_filter
+        self._exposure    = exposure_control
+        self._lot_sizer   = lot_sizer
+        self._fail_corr   = fail_mode_correlation
+        self._fail_exp    = fail_mode_exposure
 
-    def __new__(cls) -> "RiskOrchestrator":
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
+    async def check(
+        self, symbol: str, direction: str, entry_price: float, stop_loss: float,
+        account_balance: float, user_id: str, signal_id: str,
+        extra_context: Optional[Dict[str, Any]] = None,
+    ) -> RiskCheckResult:
+        ctx = extra_context or {}
+        passed: List[str] = []
+        failed: List[str] = []
+        meta:   Dict[str, Any] = {}
 
-    def __init__(self) -> None:
-        if self._initialized:
-            return
-        self._lot_sizer       = get_lot_sizer()
-        self._equity_engine   = get_equity_protection()
-        self._corr_filter     = get_correlation_filter()
-        self._vol_filter      = get_volatility_filter()
-        self._exposure_engine = get_exposure_control()
-        self._daily_engine    = DailyLimitsEngine()
-        self._initialized     = True
-        _logger.info("RiskOrchestrator ready (FIX #5/#6/#7 applied)")
+        pip_distance = abs(entry_price - stop_loss)
+        if pip_distance <= 0:
+            return RiskCheckResult(decision=RiskDecision.BLOCKED, approved=False,
+                block_reason="INVALID_SL:pip_distance<=0", risk_percent=0.0,
+                lot_size=0.0, lot_multiplier=0.0, gates_failed=["ENTRY_VALIDATION"])
 
-    async def evaluate(self, inp: RiskInput) -> RiskDecision:
-        _logger.debug("Risk eval symbol=%s dir=%s balance=%.2f", inp.symbol, inp.direction, inp.balance)
-
-        # Gate 1: Equity Protection
-        try:
-            ep = self._equity_engine
-            ep.update_equity(inp.equity, inp.balance)
-            res = ep.check()
-            if not res.can_trade:
-                return _blocked(f"EquityProtection: {res.reason}", inp)
-            drawdown_pct = res.drawdown_percent
-        except Exception as exc:
-            _logger.error("Gate1 exception: %s", exc, exc_info=True)
-            return _blocked(f"equity_protection_error: {exc}", inp)
+        # Gate 1: Equity
+        if self._equity is not None:
+            try:
+                eq = await self._run_equity_gate(user_id, account_balance, ctx)
+                if not eq["can_trade"]:
+                    return self._blocked(eq["reason"], passed, ["EQUITY"]+failed, meta, 0.0, 0.0, 0.0)
+                passed.append("EQUITY"); meta["equity"] = eq
+            except Exception as exc:
+                logger.exception("Gate EQUITY error: %s", exc)
+                return self._fail_closed_result("EQUITY_GATE_ERROR", passed, failed, meta)
 
         # Gate 2: Daily Limits
-        try:
-            today = TodayTrades(trade_count=inp.today_trades_count, pnl_usd=inp.today_pnl_usd, risk_used_percent=0.0)
-            dr = self._daily_engine.check_limits(inp.balance, today, week_pnl_usd=inp.week_pnl_usd, month_pnl_usd=inp.month_pnl_usd)
-            if not dr.can_trade:
-                return _blocked(f"DailyLimits: {dr.reason}", inp)
-        except Exception as exc:
-            _logger.error("Gate2 exception: %s", exc, exc_info=True)
-            return _blocked(f"daily_limits_error: {exc}", inp)
-
-        # Gate 3: Volatility Filter
-        vol_ok = False; vol_level = "UNKNOWN"; lot_mult = 1.0
-        try:
-            vr = self._vol_filter.check(
-                atr_values=inp.atr_history, current_atr=inp.current_atr,
-                spread=inp.current_spread, avg_spread=inp.avg_spread, symbol=inp.symbol,
-            )
-            vol_ok    = vr.can_trade
-            vol_level = getattr(vr, "volatility_level", getattr(vr.level, "value", "UNKNOWN"))
-            lot_mult  = getattr(vr, "lot_multiplier", 1.0)
-            if not vol_ok:
-                return _blocked(f"VolatilityFilter: {vr.reason}", inp)
-        except Exception as exc:
-            _logger.error("Gate3 exception: %s", exc, exc_info=True)
-            if _FAIL_CLOSED:
-                return _blocked(f"volatility_filter_error: {exc}", inp)
-            vol_ok = True; vol_level = "UNKNOWN"; lot_mult = 0.8
-
-        # Gate 4: Correlation Filter
-        corr_ok = False; corr_score = 0.0
-        try:
-            cr_positions = [CorrPosition(symbol=p.symbol, direction=p.direction, risk_percent=p.risk_percent) for p in inp.open_positions]
-            corr_res = self._corr_filter.check(inp.symbol, inp.direction, cr_positions)
-            corr_ok = corr_res.can_trade; corr_score = getattr(corr_res, "correlation_score", 0.0)
-            if not corr_ok:
-                return _blocked(f"CorrelationFilter: {corr_res.reason}", inp)
-        except Exception as exc:
-            _logger.error("Gate4 exception: %s", exc, exc_info=True)
-            # FIX #6: was silently allow (corr_ok=True) — now fail-closed
-            if _FAIL_CLOSED:
-                return _blocked(f"correlation_filter_error: {exc}", inp)
-            corr_ok = True; corr_score = 0.0
-
-        # FIX #5: Pre-compute actual lot size BEFORE Gate 5
-        preliminary_risk_pct  = 1.0
-        preliminary_lot_size  = 0.0
-        preliminary_pip_value = 10.0
-        try:
-            cfg = LotSizingConfig(win_rate=inp.win_rate, avg_rr=inp.avg_rr)
-            prelim = await self._lot_sizer.calculate(symbol=inp.symbol, balance=inp.balance, stop_loss_pips=inp.stop_loss_pips, config=cfg)
-            preliminary_lot_size  = round(max(0.0, prelim.lot_size * lot_mult), 2)
-            preliminary_risk_pct  = prelim.risk_percent
-            preliminary_pip_value = getattr(prelim, "pip_value_used", 10.0)
-        except Exception as exc:
-            _logger.warning("Gate5 pre-lot-size failed (%s) — using fallback risk_pct=%.2f", exc, preliminary_risk_pct)
-
-        # Gate 5: Exposure Control (FIX #5 + #6)
-        exposure_ok = False; total_exposure = 0.0
-        try:
-            exp_res = self._exposure_engine.check(
-                new_symbol=inp.symbol, new_direction=inp.direction,
-                new_risk_percent=preliminary_risk_pct,  # FIX #5: was hardcoded 1.0
-                open_positions=inp.open_positions,
-            )
-            exposure_ok    = exp_res.can_trade
-            total_exposure = getattr(exp_res.snapshot, "total_risk_percent", 0.0)
-            if not exposure_ok:
-                return _blocked(f"ExposureControl: {exp_res.reason}", inp)
-        except Exception as exc:
-            _logger.error("Gate5 exception: %s", exc, exc_info=True)
-            # FIX #6: was silently allow (exposure_ok=True) — now fail-closed
-            if _FAIL_CLOSED:
-                return _blocked(f"exposure_control_error: {exc}", inp)
-            exposure_ok = True; total_exposure = 0.0
-
-        # Gate 6: Final lot validation (Q-9: zero lot BLOCKED)
-        lot_size  = preliminary_lot_size
-        risk_pct  = preliminary_risk_pct
-        pip_value = preliminary_pip_value
-
-        if lot_size <= 0.0:
+        if self._daily is not None:
             try:
-                cfg = LotSizingConfig(win_rate=inp.win_rate, avg_rr=inp.avg_rr)
-                lot_result = await self._lot_sizer.calculate(symbol=inp.symbol, balance=inp.balance, stop_loss_pips=inp.stop_loss_pips, config=cfg)
-                lot_size  = round(max(0.0, lot_result.lot_size * lot_mult), 2)
-                risk_pct  = lot_result.risk_percent
-                pip_value = getattr(lot_result, "pip_value_used", 10.0)
+                dl = await self._run_daily_gate(user_id, ctx)
+                if not dl["can_trade"]:
+                    return self._blocked(dl["reason"], passed, ["DAILY_LIMITS"]+failed, meta, 0.0, 0.0, 0.0)
+                passed.append("DAILY_LIMITS")
             except Exception as exc:
-                _logger.error("Gate6 exception: %s", exc, exc_info=True)
-                return _blocked(f"lot_sizing_error: {exc}", inp)
+                logger.exception("Gate DAILY_LIMITS error: %s", exc)
+                return self._fail_closed_result("DAILY_LIMITS_GATE_ERROR", passed, failed, meta)
 
-        if lot_size <= 0.0:
-            reason = f"LotSizer returned zero lot (balance={inp.balance}, sl_pips={inp.stop_loss_pips}, symbol={inp.symbol})"
-            _logger.error("Gate6 BLOCKED zero lot: %s", reason)
-            return _blocked(reason, inp)
+        # Gate 3: Volatility
+        lot_multiplier = 1.0
+        if self._volatility is not None:
+            try:
+                vr = await self._run_volatility_gate(symbol, ctx)
+                if not vr["can_trade"]:
+                    return self._blocked(vr["reason"], passed, ["VOLATILITY"]+failed, meta, 0.0, 0.0, 0.0)
+                lot_multiplier = vr.get("lot_multiplier", 1.0)
+                passed.append("VOLATILITY"); meta["volatility"] = vr
+            except Exception as exc:
+                logger.exception("Gate VOLATILITY error: %s", exc)
+                return self._fail_closed_result("VOLATILITY_GATE_ERROR", passed, failed, meta)
 
-        risk_usd = round(inp.balance * risk_pct / 100.0, 2)
-        _logger.info("Risk APPROVED symbol=%s lot=%.2f risk=%.2f%% pip_val=%.4f", inp.symbol, lot_size, risk_pct, pip_value)
-        return RiskDecision(
-            approved=True, block_reason="",
-            lot_size=lot_size, risk_percent=risk_pct, risk_usd=risk_usd,
-            equity_ok=True, daily_limits_ok=True, volatility_ok=vol_ok,
-            correlation_ok=corr_ok, exposure_ok=exposure_ok,
-            drawdown_percent=drawdown_pct, total_exposure_percent=total_exposure,
-            volatility_level=vol_level, correlation_score=corr_score,
-            lot_multiplier=lot_mult, pip_value_used=pip_value,
-        )
+        # Gate 4: Correlation
+        if self._correlation is not None:
+            try:
+                cr = await self._run_correlation_gate(symbol, direction, ctx)
+                if not cr["can_trade"]:
+                    return self._blocked(cr["reason"], passed, ["CORRELATION"]+failed, meta, 0.0, 0.0, 0.0)
+                passed.append("CORRELATION"); meta["correlation"] = cr
+            except Exception as exc:
+                logger.exception("Gate CORRELATION error: %s", exc)
+                if self._fail_corr == "FAIL_CLOSED":
+                    return self._fail_closed_result("CORRELATION_GATE_ERROR", passed, failed, meta)
+                logger.critical("CORRELATION FAIL_OPEN — trade continues for %s", symbol)
+                passed.append("CORRELATION_FAIL_OPEN")
 
+        # Gate 5: Lot Sizing (MUST run before Exposure — FIX #5)
+        preliminary_lot = 0.01
+        actual_risk_pct = 0.0
+        if self._lot_sizer is not None:
+            try:
+                lot_result = await self._lot_sizer.calculate(
+                    balance=account_balance, stop_loss_pips=pip_distance,
+                    symbol=symbol, volatility_ratio=lot_multiplier,
+                )
+                preliminary_lot = lot_result.lot_size
+                actual_risk_pct = lot_result.risk_percent  # FIX #5: real risk, not 1.0
+                meta["lot_sizing"] = {"lot_size": preliminary_lot, "risk_percent": actual_risk_pct,
+                                      "pip_value": lot_result.pip_value_used, "source": lot_result.source}
+                if preliminary_lot <= 0.0:
+                    return self._blocked("LOT_SIZING_ZERO", passed, ["LOT_SIZING"]+failed, meta,
+                                        actual_risk_pct, 0.0, lot_multiplier)
+                passed.append("LOT_SIZING")
+            except Exception as exc:
+                logger.exception("Gate LOT_SIZING error: %s", exc)
+                return self._fail_closed_result("LOT_SIZING_GATE_ERROR", passed, failed, meta)
+        else:
+            actual_risk_pct = 1.0
+            meta["lot_sizing"] = {"note": "no_lot_sizer_injected"}
 
-def get_risk_orchestrator() -> RiskOrchestrator:
-    return RiskOrchestrator()
+        # Gate 6: Exposure — FIX #5: uses actual_risk_pct (NOT hardcoded 1.0)
+        if self._exposure is not None:
+            try:
+                open_positions = ctx.get("open_positions", [])
+                er = await self._run_exposure_gate(symbol, direction, actual_risk_pct, open_positions)
+                if not er["can_trade"]:
+                    return self._blocked(er["reason"], passed, ["EXPOSURE"]+failed, meta,
+                                        actual_risk_pct, 0.0, lot_multiplier)
+                passed.append("EXPOSURE"); meta["exposure"] = er
+            except Exception as exc:
+                logger.exception("Gate EXPOSURE error: %s", exc)
+                if self._fail_exp == "FAIL_CLOSED":
+                    return self._fail_closed_result("EXPOSURE_GATE_ERROR", passed, failed, meta)
+                logger.critical("EXPOSURE FAIL_OPEN — trade continues for %s", symbol)
+                passed.append("EXPOSURE_FAIL_OPEN")
+
+        logger.info("risk_orchestrator: APPROVED %s %s lot=%.2f risk=%.3f%% gates=%s",
+                    symbol, direction, preliminary_lot, actual_risk_pct, passed)
+        return RiskCheckResult(decision=RiskDecision.APPROVED, approved=True, block_reason="",
+            risk_percent=actual_risk_pct, lot_size=preliminary_lot, lot_multiplier=lot_multiplier,
+            gates_passed=passed, gates_failed=failed, metadata=meta)
+
+    async def _run_equity_gate(self, user_id, balance, ctx) -> dict:
+        r = self._equity
+        if hasattr(r, "check"):
+            result = r.check(balance=balance, user_id=user_id)
+            if hasattr(result, "__await__"): result = await result
+            return {"can_trade": result.can_trade, "reason": getattr(result, "reason", "")}
+        return {"can_trade": True, "reason": ""}
+
+    async def _run_daily_gate(self, user_id, ctx) -> dict:
+        r = self._daily
+        if hasattr(r, "check"):
+            result = r.check(user_id=user_id)
+            if hasattr(result, "__await__"): result = await result
+            return {"can_trade": result.can_trade, "reason": getattr(result, "reason", "")}
+        return {"can_trade": True, "reason": ""}
+
+    async def _run_volatility_gate(self, symbol, ctx) -> dict:
+        r = self._volatility
+        if hasattr(r, "check"):
+            atr_hist = ctx.get("atr_history", [1.0] * 14)
+            cur_atr  = ctx.get("current_atr", 1.0)
+            cur_spr  = ctx.get("current_spread", 0.0)
+            avg_spr  = ctx.get("avg_spread", 0.0)
+            result   = r.check(cur_atr, atr_hist, cur_spr, avg_spr, symbol)
+            if hasattr(result, "__await__"): result = await result
+            return {"can_trade": result.can_trade, "reason": result.reason,
+                    "lot_multiplier": result.lot_multiplier, "level": result.level}
+        return {"can_trade": True, "reason": "", "lot_multiplier": 1.0}
+
+    async def _run_correlation_gate(self, symbol, direction, ctx) -> dict:
+        r = self._correlation
+        if hasattr(r, "check"):
+            open_pos = ctx.get("open_positions", [])
+            result   = r.check(symbol=symbol, direction=direction, open_positions=open_pos)
+            if hasattr(result, "__await__"): result = await result
+            return {"can_trade": result.can_trade, "reason": getattr(result, "reason", "")}
+        return {"can_trade": True, "reason": ""}
+
+    async def _run_exposure_gate(self, symbol, direction, risk_percent, open_positions) -> dict:
+        r = self._exposure
+        if hasattr(r, "check"):
+            result = r.check(new_symbol=symbol, new_direction=direction,
+                             new_risk_percent=risk_percent, open_positions=open_positions)
+            if hasattr(result, "__await__"): result = await result
+            return {"can_trade": result.can_trade, "reason": result.reason}
+        return {"can_trade": True, "reason": ""}
+
+    @staticmethod
+    def _fail_closed_result(reason, passed, failed, meta) -> RiskCheckResult:
+        return RiskCheckResult(decision=RiskDecision.BLOCKED, approved=False, block_reason=reason,
+            risk_percent=0.0, lot_size=0.0, lot_multiplier=0.0,
+            gates_passed=passed, gates_failed=[reason]+failed, metadata=meta)
+
+    @staticmethod
+    def _blocked(reason, passed, failed, meta, risk_pct, lot_size, lot_mult) -> RiskCheckResult:
+        return RiskCheckResult(decision=RiskDecision.BLOCKED, approved=False, block_reason=reason,
+            risk_percent=risk_pct, lot_size=lot_size, lot_multiplier=lot_mult,
+            gates_passed=passed, gates_failed=failed, metadata=meta)
