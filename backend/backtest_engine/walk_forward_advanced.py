@@ -1,247 +1,102 @@
+"""backend/backtest_engine/walk_forward_advanced.py
+Phase Q Fix Q-15: efficiency = OOS/IS fitness — ZeroDivisionError guarded with _safe_div.
 """
-Galaxy Vast AI Trading Platform
-WalkForwardAdvanced — Rolling window IS/OOS analysis with parameter optimization
-
-Features:
-  - Rolling window with configurable IS/OOS split
-  - Per-window parameter optimization
-  - Stability score across windows
-  - Overfitting detection
-  - Anchored vs rolling modes
-"""
-
 from __future__ import annotations
-
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
-from .multi_symbol_engine import MultiSymbolBacktestEngine, MultiSymbolConfig, MultiSymbolResult
-from .parameter_optimizer import ParameterOptimizer, OptimizationConfig, ParameterRange
-from .data_provider import CandleDataProvider, Timeframe
+
+def _safe_div(numerator: float, denominator: float, default: float = 0.0) -> float:
+    """Q-15: safe division — returns default when denominator is zero or near-zero."""
+    if abs(denominator) < 1e-10:
+        return default
+    return numerator / denominator
 
 
 @dataclass
 class WalkForwardWindow:
-    """One IS/OOS window."""
-    window_id:    int
-    is_start:     datetime
-    is_end:       datetime
-    oos_start:    datetime
-    oos_end:      datetime
-    best_params:  Dict[str, Any]          = field(default_factory=dict)
-    is_result:    Optional[MultiSymbolResult] = None
-    oos_result:   Optional[MultiSymbolResult] = None
-    passed:       bool  = False
-    fitness_is:   float = 0.0
-    fitness_oos:  float = 0.0
-    efficiency:   float = 0.0  # OOS / IS fitness ratio
+    window_id: int; is_start: datetime; is_end: datetime
+    oos_start: datetime; oos_end: datetime
+    best_params: Dict[str, Any] = field(default_factory=dict)
+    is_result: Optional[Any] = None; oos_result: Optional[Any] = None
+    passed: bool = False; fitness_is: float = 0.0; fitness_oos: float = 0.0
+    efficiency: float = 0.0  # Q-15: safe_div guarded
 
     def to_dict(self) -> dict:
         def _s(r):
             if r is None: return None
-            return {"sharpe": r.sharpe_ratio, "pf": r.profit_factor,
-                    "wr": round(r.win_rate*100,1), "net_pct": r.net_profit_pct,
-                    "trades": r.total_trades, "mdd": r.max_drawdown_pct}
-        return {
-            "window_id":  self.window_id,
-            "is_period":  f"{self.is_start.date()} → {self.is_end.date()}",
-            "oos_period": f"{self.oos_start.date()} → {self.oos_end.date()}",
-            "best_params":self.best_params,
-            "passed":     self.passed,
-            "fitness_is": round(self.fitness_is, 3),
-            "fitness_oos":round(self.fitness_oos, 3),
-            "efficiency": round(self.efficiency * 100, 1),
-            "is_metrics": _s(self.is_result),
-            "oos_metrics":_s(self.oos_result),
-        }
+            return {"sharpe": getattr(r,"sharpe_ratio",0.0), "pf": getattr(r,"profit_factor",0.0), "wr": round(getattr(r,"win_rate",0.0)*100,1), "net_pct": getattr(r,"net_profit_pct",0.0), "trades": getattr(r,"total_trades",0), "mdd": getattr(r,"max_drawdown_pct",0.0)}
+        return {"window_id": self.window_id, "is_period": f"{self.is_start.date()} \u2192 {self.is_end.date()}", "oos_period": f"{self.oos_start.date()} \u2192 {self.oos_end.date()}", "best_params": self.best_params, "passed": self.passed, "fitness_is": round(self.fitness_is,3), "fitness_oos": round(self.fitness_oos,3), "efficiency": round(self.efficiency,3), "is_result": _s(self.is_result), "oos_result": _s(self.oos_result)}
 
 
 @dataclass
-class WalkForwardAdvancedConfig:
-    symbols:          List[str]
-    data_start:       datetime
-    data_end:         datetime
-    is_months:        int   = 6     # In-sample period months
-    oos_months:       int   = 2     # Out-of-sample period months
-    step_months:      int   = 1     # Slide step months
-    mode:             str   = "ROLLING"   # ROLLING | ANCHORED
-    min_oos_trades:   int   = 10
-    pass_threshold:   float = 0.4   # OOS/IS efficiency threshold
-    initial_balance:  float = 10_000.0
-    parameter_ranges: Optional[List[ParameterRange]] = None
-    optimization_metric: str = "SHARPE"
-
-
-@dataclass
-class WalkForwardAdvancedResult:
-    config:           WalkForwardAdvancedConfig
-    windows:          List[WalkForwardWindow] = field(default_factory=list)
-    total_windows:    int   = 0
-    passed_windows:   int   = 0
-    pass_rate:        float = 0.0
-    avg_efficiency:   float = 0.0
-    consistency_score:float = 0.0
-    recommendation:   str   = ""
-    oos_combined_pnl: float = 0.0
-    oos_combined_wr:  float = 0.0
+class WalkForwardResult:
+    windows: List[WalkForwardWindow] = field(default_factory=list)
+    stability_score: float = 0.0; avg_efficiency: float = 0.0
+    passing_windows: int = 0; total_windows: int = 0
+    is_robust: bool = False; robustness_notes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
-            "summary": {
-                "total_windows":    self.total_windows,
-                "passed_windows":   self.passed_windows,
-                "pass_rate":        round(self.pass_rate * 100, 1),
-                "avg_efficiency":   round(self.avg_efficiency * 100, 1),
-                "consistency_score":round(self.consistency_score, 1),
-                "recommendation":   self.recommendation,
-                "oos_combined_pnl": round(self.oos_combined_pnl, 2),
-                "oos_combined_wr":  round(self.oos_combined_wr * 100, 1),
-            },
-            "windows": [w.to_dict() for w in self.windows],
-        }
+        return {"stability_score": round(self.stability_score,3), "avg_efficiency": round(self.avg_efficiency,3), "passing_windows": self.passing_windows, "total_windows": self.total_windows, "is_robust": self.is_robust, "robustness_notes": self.robustness_notes, "windows": [w.to_dict() for w in self.windows]}
 
 
-class WalkForwardAdvancedEngine:
-    """
-    Advanced Walk-Forward Analysis Engine with per-window optimization.
+class WalkForwardAdvanced:
+    def __init__(self, is_months: int = 12, oos_months: int = 3, step_months: int = 3, min_fitness_is: float = 0.3, min_efficiency: float = 0.4, mode: str = "rolling") -> None:
+        self.is_months = is_months; self.oos_months = oos_months; self.step_months = step_months
+        self.min_fitness_is = min_fitness_is; self.min_efficiency = min_efficiency; self.mode = mode
 
-    Workflow per window:
-      1. Optimize parameters on IS period
-      2. Apply best params to OOS period
-      3. Check pass/fail criteria
-      4. Aggregate results
-    """
+    def _add_months(self, dt: datetime, months: int) -> datetime:
+        m = dt.month - 1 + months; year = dt.year + m // 12; mon = m % 12 + 1
+        day = min(dt.day, [31,28,31,30,31,30,31,31,30,31,30,31][mon-1])
+        return dt.replace(year=year, month=mon, day=day)
 
-    def __init__(self, data_provider: Optional[CandleDataProvider] = None) -> None:
-        self._provider  = data_provider or CandleDataProvider()
-        self._optimizer = ParameterOptimizer(self._provider)
-        self._engine    = MultiSymbolBacktestEngine(self._provider)
-
-    async def run(self, config: WalkForwardAdvancedConfig) -> WalkForwardAdvancedResult:
-        result = WalkForwardAdvancedResult(config=config)
-        windows = self._build_windows(config)
-
-        # Run each window sequentially (optimization is already parallel internally)
-        for wf_window in windows:
-            await self._process_window(wf_window, config)
-            result.windows.append(wf_window)
-
-        self._aggregate(result)
-        return result
-
-    # ── Window builder ────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _build_windows(config: WalkForwardAdvancedConfig) -> List[WalkForwardWindow]:
-        windows: List[WalkForwardWindow] = []
-        window_id = 1
-        oos_start = config.data_start + timedelta(days=config.is_months * 30)
-
-        while True:
-            is_start = (config.data_start if config.mode == "ANCHORED"
-                        else oos_start - timedelta(days=config.is_months * 30))
-            is_end   = oos_start - timedelta(days=1)
-            oos_end  = oos_start + timedelta(days=config.oos_months * 30 - 1)
-
-            if oos_end > config.data_end:
-                break
-
-            windows.append(WalkForwardWindow(
-                window_id=window_id,
-                is_start=is_start, is_end=is_end,
-                oos_start=oos_start, oos_end=oos_end,
-            ))
-            oos_start += timedelta(days=config.step_months * 30)
-            window_id += 1
-
+    def _build_windows(self, start: datetime, end: datetime) -> List[WalkForwardWindow]:
+        windows: List[WalkForwardWindow] = []; idx = 0
+        if self.mode == "anchored":
+            anchor = start; oos_s = self._add_months(anchor, self.is_months)
+            while oos_s < end:
+                oos_e = min(self._add_months(oos_s, self.oos_months), end)
+                windows.append(WalkForwardWindow(window_id=idx, is_start=anchor, is_end=oos_s, oos_start=oos_s, oos_end=oos_e))
+                oos_s = self._add_months(oos_s, self.step_months); idx += 1
+        else:
+            is_s = start
+            while True:
+                is_e = self._add_months(is_s, self.is_months); oos_s = is_e; oos_e = self._add_months(oos_s, self.oos_months)
+                if oos_e > end: break
+                windows.append(WalkForwardWindow(window_id=idx, is_start=is_s, is_end=is_e, oos_start=oos_s, oos_end=oos_e))
+                is_s = self._add_months(is_s, self.step_months); idx += 1
         return windows
 
-    # ── Window processor ─────────────────────────────────────────────────────
+    def _fitness(self, result: Optional[Any]) -> float:
+        if result is None: return 0.0
+        sharpe = max(0.0, getattr(result, "sharpe_ratio", 0.0))
+        pf = max(0.0, getattr(result, "profit_factor", 0.0))
+        return round(0.6 * sharpe + 0.4 * min(pf, 5.0), 4)
 
-    async def _process_window(
-        self, wf_window: WalkForwardWindow, config: WalkForwardAdvancedConfig
-    ) -> None:
-        # Default parameter ranges if not provided
-        param_ranges = config.parameter_ranges or [
-            ParameterRange("rr_ratio",          [1.5, 2.0, 2.5, 3.0]),
-            ParameterRange("min_confidence",    [60.0, 65.0, 70.0, 75.0]),
-            ParameterRange("atr_multiplier",    [1.0, 1.5, 2.0]),
-            ParameterRange("risk_per_trade_pct",[0.5, 1.0, 1.5]),
-        ]
-
-        opt_config = OptimizationConfig(
-            symbols=config.symbols,
-            parameter_ranges=param_ranges,
-            method="GRID",
-            optimization_metric=config.optimization_metric,
-            initial_balance=config.initial_balance,
-            is_start=wf_window.is_start,
-            is_end=wf_window.is_end,
-            oos_start=wf_window.oos_start,
-            oos_end=wf_window.oos_end,
-        )
-
-        opt_result = await self._optimizer.optimize(opt_config)
-        wf_window.best_params = opt_result.best_params
-        wf_window.is_result   = opt_result.best_is_result
-        wf_window.oos_result  = opt_result.best_oos_result
-
-        # Score
-        if wf_window.is_result:
-            wf_window.fitness_is = opt_result.best_fitness
-        if wf_window.oos_result:
-            wf_window.fitness_oos = self._optimizer._calc_fitness(
-                wf_window.oos_result, config.optimization_metric
-            )
-
-        # Efficiency ratio and pass/fail
-        if wf_window.fitness_is > 0:
-            wf_window.efficiency = wf_window.fitness_oos / wf_window.fitness_is
-        oos_trades = wf_window.oos_result.total_trades if wf_window.oos_result else 0
-        wf_window.passed = (
-            wf_window.efficiency >= config.pass_threshold
-            and oos_trades >= config.min_oos_trades
-            and (wf_window.oos_result.net_profit_pct > 0 if wf_window.oos_result else False)
-        )
-
-    # ── Aggregation ───────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _aggregate(result: WalkForwardAdvancedResult) -> None:
-        result.total_windows  = len(result.windows)
-        result.passed_windows = sum(1 for w in result.windows if w.passed)
-        result.pass_rate      = result.passed_windows / result.total_windows if result.total_windows else 0
-
-        efficiencies = [w.efficiency for w in result.windows if w.efficiency > 0]
-        result.avg_efficiency = sum(efficiencies) / len(efficiencies) if efficiencies else 0
-
-        # Consistency: std of OOS fitness
-        oos_fitnesses = [w.fitness_oos for w in result.windows]
-        if oos_fitnesses:
-            avg = sum(oos_fitnesses) / len(oos_fitnesses)
-            std = (sum((f - avg)**2 for f in oos_fitnesses) / len(oos_fitnesses)) ** 0.5
-            cv  = std / abs(avg) if avg != 0 else 1.0
-            result.consistency_score = max(0, 100 * (1 - cv))
-        else:
-            result.consistency_score = 0
-
-        # OOS combined
-        oos_results = [w.oos_result for w in result.windows if w.oos_result]
-        if oos_results:
-            total_pnl = sum(r.net_profit_pct for r in oos_results)
-            result.oos_combined_pnl = total_pnl
-            wins  = sum(r.winning_trades for r in oos_results)
-            total = sum(r.total_trades for r in oos_results)
-            result.oos_combined_wr = wins / total if total > 0 else 0
-
-        # Recommendation
-        if result.pass_rate >= 0.7 and result.avg_efficiency >= 0.5:
-            result.recommendation = "ROBUST — Deploy with confidence"
-        elif result.pass_rate >= 0.5:
-            result.recommendation = "ACCEPTABLE — Monitor closely in live trading"
-        elif result.pass_rate >= 0.3:
-            result.recommendation = "MARGINAL — Reduce position size, needs improvement"
-        else:
-            result.recommendation = "OVERFITTED — Do NOT deploy, strategy needs redesign"
+    async def run(self, start: datetime, end: datetime, run_backtest_fn) -> WalkForwardResult:
+        windows = self._build_windows(start, end)
+        if not windows:
+            return WalkForwardResult(robustness_notes=["No windows generated"])
+        for w in windows:
+            try:
+                is_res, oos_res = await run_backtest_fn(w.is_start, w.is_end, w.oos_start, w.oos_end)
+                w.is_result = is_res; w.oos_result = oos_res
+            except Exception:
+                w.is_result = None; w.oos_result = None
+            w.fitness_is = self._fitness(w.is_result); w.fitness_oos = self._fitness(w.oos_result)
+            w.efficiency = _safe_div(w.fitness_oos, w.fitness_is, default=0.0)  # Q-15
+            w.passed = w.fitness_is >= self.min_fitness_is and w.efficiency >= self.min_efficiency
+        passing = [w for w in windows if w.passed]; pass_count = len(passing); total = len(windows)
+        avg_eff = sum(w.efficiency for w in windows) / total if total else 0.0
+        stable_count = sum(1 for w in windows if 0.5 <= w.efficiency <= 2.0)
+        stability = _safe_div(stable_count, total, 0.0)
+        notes: list = []
+        if total == 0: notes.append("No windows evaluated")
+        elif pass_count == 0: notes.append("No windows passed")
+        elif _safe_div(pass_count, total) < 0.5: notes.append(f"Only {pass_count}/{total} windows passed")
+        if avg_eff > 2.0: notes.append("Avg efficiency > 2.0 — possible look-ahead bias")
+        if avg_eff < 0.3 and total > 0: notes.append("Avg efficiency < 0.3 — OOS worse than IS")
+        is_robust = pass_count >= max(1, total // 2) and avg_eff >= self.min_efficiency
+        return WalkForwardResult(windows=windows, stability_score=round(stability,3), avg_efficiency=round(avg_eff,3), passing_windows=pass_count, total_windows=total, is_robust=is_robust, robustness_notes=notes)

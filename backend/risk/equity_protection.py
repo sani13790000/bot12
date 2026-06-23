@@ -1,1 +1,142 @@
-"""\nGalaxy Vast AI Trading Platform\n\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\nEquity Protection Engine\n- Drawdown guard\n- Consecutive loss stop\n- Equity high-water mark\n- Auto-halt + cooldown\n\nFIX T-9: initialize() is now called automatically at first update_equity()\nif never explicitly initialized. Removes the silent 100% drawdown bug\nwhere high_water_mark=0 caused drawdown=100% on the very first check.\n\"\"\"\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\nfrom enum import Enum\nfrom typing import Optional\n\n\nclass ProtectionLevel(str, Enum):\n    SAFE        = \"SAFE\"\n    WARNING     = \"WARNING\"\n    RESTRICTED  = \"RESTRICTED\"\n    HALTED      = \"HALTED\"\n\n\n@dataclass\nclass EquityProtectionConfig:\n    max_drawdown_percent: float = 10.0\n    warning_drawdown_percent: float = 5.0\n    max_consecutive_losses: int = 5\n    consecutive_loss_halt_count: int = 3\n    equity_recovery_required: float = 2.0\n    cooldown_minutes: int = 60\n    daily_loss_halt_percent: float = 3.0\n    weekly_loss_halt_percent: float = 7.0\n    monthly_drawdown_halt_percent: float = 15.0\n\n\n@dataclass\nclass EquityState:\n    balance: float = 0.0\n    equity: float = 0.0\n    high_water_mark: float = 0.0\n    current_drawdown_percent: float = 0.0\n    consecutive_losses: int = 0\n    total_trades: int = 0\n    daily_loss_usd: float = 0.0\n    daily_loss_percent: float = 0.0\n    weekly_loss_usd: float = 0.0\n    monthly_loss_usd: float = 0.0\n    protection_level: ProtectionLevel = ProtectionLevel.SAFE\n    halt_reason: str = \"\"\n    halt_time: Optional[datetime] = None\n    last_reset_date: Optional[datetime] = None\n    _initialized: bool = False\n\n\n@dataclass\nclass ProtectionCheckResult:\n    can_trade: bool\n    level: ProtectionLevel\n    reason: str\n    drawdown_percent: float\n    consecutive_losses: int\n    daily_loss_percent: float\n    should_close_all: bool = False\n    cooldown_remaining_minutes: float = 0.0\n\n\nclass EquityProtectionEngine:\n    \"\"\"\n    Production-grade Equity Protection:\n    - Real-time drawdown monitoring\n    - Consecutive loss tracking\n    - Daily/Weekly/Monthly loss limits\n    - Auto-halt with cooldown\n    - High-water mark maintenance\n\n    FIX T-9: If initialize() is never called (startup omission), the engine\n    now auto-initialises from the first equity value received instead of\n    silently treating high_water_mark=0 as a 100% drawdown.\n    \"\"\"\n\n    def __init__(self, config: Optional[EquityProtectionConfig] = None):\n        self._cfg   = config or EquityProtectionConfig()\n        self._state = EquityState()\n\n    def initialize(self, balance: float) -> None:\n        \"\"\"\n        Call once at startup with current account balance.\n        FIX T-9: Idempotent — safe to call multiple times.\n        \"\"\"\n        if self._state._initialized and self._state.high_water_mark > 0:\n            return\n        self._state.balance         = balance\n        self._state.equity          = balance\n        self._state.high_water_mark = balance\n        self._state.last_reset_date = datetime.now(timezone.utc)\n        self._state._initialized    = True\n\n    def update_equity(self, current_equity: float, current_balance: float) -> ProtectionCheckResult:\n        \"\"\"\n        Update equity state and return protection status.\n        FIX T-9: Auto-initialises if initialize() was never called.\n        \"\"\"\n        if not self._state._initialized or self._state.high_water_mark <= 0:\n            self.initialize(current_balance if current_balance > 0 else current_equity)\n\n        self._state.equity  = current_equity\n        self._state.balance = current_balance\n\n        if current_equity > self._state.high_water_mark:\n            self._state.high_water_mark = current_equity\n\n        hwm = self._state.high_water_mark\n        if hwm > 0:\n            self._state.current_drawdown_percent = ((hwm - current_equity) / hwm) * 100\n        else:\n            self._state.current_drawdown_percent = 0.0\n\n        return self._evaluate()\n\n    def record_trade_result(self, pnl_usd: float, balance: float) -> ProtectionCheckResult:\n        self._state.total_trades += 1\n        if pnl_usd < 0:\n            self._state.consecutive_losses += 1\n            abs_loss = abs(pnl_usd)\n            self._state.daily_loss_usd   += abs_loss\n            self._state.weekly_loss_usd  += abs_loss\n            self._state.monthly_loss_usd += abs_loss\n        else:\n            self._state.consecutive_losses = 0\n        if balance > 0:\n            self._state.daily_loss_percent = (self._state.daily_loss_usd / balance) * 100\n        return self._evaluate()\n\n    def check_can_trade(self) -> ProtectionCheckResult:\n        return self._evaluate()\n\n    def reset_daily(self) -> None:\n        self._state.daily_loss_usd     = 0.0\n        self._state.daily_loss_percent = 0.0\n        self._state.last_reset_date    = datetime.now(timezone.utc)\n\n    def reset_weekly(self) -> None:\n        self._state.weekly_loss_usd = 0.0\n\n    def reset_monthly(self) -> None:\n        self._state.monthly_loss_usd = 0.0\n\n    def manual_resume(self) -> None:\n        self._state.protection_level = ProtectionLevel.SAFE\n        self._state.halt_reason      = \"\"\n        self._state.halt_time        = None\n\n    @property\n    def state(self) -> EquityState:\n        return self._state\n\n    @property\n    def is_initialized(self) -> bool:\n        return self._state._initialized\n\n    def _evaluate(self) -> ProtectionCheckResult:\n        cfg   = self._cfg\n        state = self._state\n        now   = datetime.now(timezone.utc)\n\n        if state.halt_time:\n            elapsed   = (now - state.halt_time).total_seconds() / 60\n            remaining = max(0.0, cfg.cooldown_minutes - elapsed)\n            if remaining > 0:\n                return ProtectionCheckResult(\n                    can_trade=False,\n                    level=ProtectionLevel.HALTED,\n                    reason=f\"HALTED: {state.halt_reason} | cooldown {remaining:.0f}m remaining\",\n                    drawdown_percent=state.current_drawdown_percent,\n                    consecutive_losses=state.consecutive_losses,\n                    daily_loss_percent=state.daily_loss_percent,\n                    cooldown_remaining_minutes=remaining,\n                )\n            else:\n                if self._check_recovery():\n                    state.halt_time        = None\n                    state.halt_reason      = \"\"\n                    state.protection_level = ProtectionLevel.SAFE\n\n        if state.current_drawdown_percent >= cfg.max_drawdown_percent:\n            return self._halt(\n                f\"MAX DRAWDOWN {state.current_drawdown_percent:.1f}% >= {cfg.max_drawdown_percent}%\",\n                close_all=True,\n            )\n\n        if state.consecutive_losses >= cfg.consecutive_loss_halt_count:\n            return self._halt(\n                f\"CONSECUTIVE LOSSES {state.consecutive_losses} >= {cfg.consecutive_loss_halt_count}\",\n            )\n\n        if state.daily_loss_percent >= cfg.daily_loss_halt_percent:\n            return self._halt(\n                f\"DAILY LOSS {state.daily_loss_percent:.1f}% >= {cfg.daily_loss_halt_percent}%\",\n            )\n\n        weekly_pct = (state.weekly_loss_usd / max(state.balance, 1)) * 100\n        if weekly_pct >= cfg.weekly_loss_halt_percent:\n            return self._halt(\n                f\"WEEKLY LOSS {weekly_pct:.1f}% >= {cfg.weekly_loss_halt_percent}%\",\n            )\n\n        monthly_pct = (state.monthly_loss_usd / max(state.balance, 1)) * 100\n        if monthly_pct >= cfg.monthly_drawdown_halt_percent:\n            return self._halt(\n                f\"MONTHLY DRAWDOWN {monthly_pct:.1f}% >= {cfg.monthly_drawdown_halt_percent}%\",\n            )\n\n        if state.current_drawdown_percent >= cfg.warning_drawdown_percent:\n            state.protection_level = ProtectionLevel.WARNING\n            return ProtectionCheckResult(\n                can_trade=True,\n                level=ProtectionLevel.WARNING,\n                reason=f\"WARNING: drawdown {state.current_drawdown_percent:.1f}%\",\n                drawdown_percent=state.current_drawdown_percent,\n                consecutive_losses=state.consecutive_losses,\n                daily_loss_percent=state.daily_loss_percent,\n            )\n\n        state.protection_level = ProtectionLevel.SAFE\n        return ProtectionCheckResult(\n            can_trade=True,\n            level=ProtectionLevel.SAFE,\n            reason=\"SAFE\",\n            drawdown_percent=state.current_drawdown_percent,\n            consecutive_losses=state.consecutive_losses,\n            daily_loss_percent=state.daily_loss_percent,\n        )\n\n    def _halt(self, reason: str, close_all: bool = False) -> ProtectionCheckResult:\n        self._state.protection_level = ProtectionLevel.HALTED\n        self._state.halt_reason      = reason\n        self._state.halt_time        = datetime.now(timezone.utc)\n        return ProtectionCheckResult(\n            can_trade=False,\n            level=ProtectionLevel.HALTED,\n            reason=f\"HALTED: {reason}\",\n            drawdown_percent=self._state.current_drawdown_percent,\n            consecutive_losses=self._state.consecutive_losses,\n            daily_loss_percent=self._state.daily_loss_percent,\n            should_close_all=close_all,\n        )\n\n    def _check_recovery(self) -> bool:\n        hwm = self._state.high_water_mark\n        if hwm <= 0:\n            return True\n        recovery_pct = (\n            (self._state.equity - (hwm * (1 - self._cfg.max_drawdown_percent / 100)))\n            / hwm\n        ) * 100\n        return recovery_pct >= self._cfg.equity_recovery_required\n\n\n_equity_engine: Optional[EquityProtectionEngine] = None\n\n\ndef get_equity_protection() -> EquityProtectionEngine:\n    global _equity_engine\n    if _equity_engine is None:\n        _equity_engine = EquityProtectionEngine()\n    return _equity_engine\n
+"""backend/risk/equity_protection.py
+Phase Q Fix Q-12: cooldown_remaining_minutes always >= 0.0
+"""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Optional
+
+
+class ProtectionLevel(str, Enum):
+    SAFE = "SAFE"; WARNING = "WARNING"; RESTRICTED = "RESTRICTED"; HALTED = "HALTED"
+
+
+@dataclass
+class EquityProtectionConfig:
+    max_drawdown_percent: float = 10.0
+    warning_drawdown_percent: float = 5.0
+    max_consecutive_losses: int = 5
+    consecutive_loss_halt_count: int = 3
+    equity_recovery_required: float = 2.0
+    cooldown_minutes: int = 60
+    daily_loss_halt_percent: float = 3.0
+    weekly_loss_halt_percent: float = 7.0
+    monthly_drawdown_halt_percent: float = 15.0
+
+
+@dataclass
+class EquityState:
+    balance: float = 0.0; equity: float = 0.0; high_water_mark: float = 0.0
+    current_drawdown_percent: float = 0.0; consecutive_losses: int = 0
+    total_trades: int = 0; daily_loss_usd: float = 0.0; daily_loss_percent: float = 0.0
+    weekly_loss_usd: float = 0.0; monthly_loss_usd: float = 0.0
+    protection_level: ProtectionLevel = ProtectionLevel.SAFE
+    halt_reason: str = ""; halt_time: Optional[datetime] = None
+    last_reset_date: Optional[datetime] = None; _initialized: bool = False
+
+
+@dataclass
+class ProtectionCheckResult:
+    can_trade: bool; level: ProtectionLevel; reason: str
+    drawdown_percent: float; consecutive_losses: int; daily_loss_percent: float
+    should_close_all: bool = False
+    cooldown_remaining_minutes: float = 0.0  # Q-12: always >= 0
+
+
+class EquityProtectionEngine:
+    def __init__(self, config: Optional[EquityProtectionConfig] = None) -> None:
+        self._cfg = config or EquityProtectionConfig()
+        self._state = EquityState()
+
+    def initialize(self, initial_balance: float) -> None:
+        if initial_balance <= 0:
+            raise ValueError(f"initial_balance must be > 0, got {initial_balance}")
+        self._state.balance = initial_balance
+        self._state.equity = initial_balance
+        self._state.high_water_mark = initial_balance
+        self._state._initialized = True
+
+    def update_equity(self, equity: float, balance: float) -> None:
+        if not self._state._initialized:
+            self.initialize(max(balance, equity))
+        self._state.equity = equity; self._state.balance = balance
+        if equity > self._state.high_water_mark:
+            self._state.high_water_mark = equity
+        if self._state.high_water_mark > 0:
+            dd = (self._state.high_water_mark - equity) / self._state.high_water_mark * 100.0
+            self._state.current_drawdown_percent = max(0.0, dd)
+        else:
+            self._state.current_drawdown_percent = 0.0
+
+    def record_trade_result(self, pnl_usd: float) -> None:
+        if pnl_usd < 0:
+            self._state.consecutive_losses += 1
+            self._state.daily_loss_usd += abs(pnl_usd)
+            self._state.weekly_loss_usd += abs(pnl_usd)
+            self._state.monthly_loss_usd += abs(pnl_usd)
+        else:
+            self._state.consecutive_losses = 0
+        self._state.total_trades += 1
+        if self._state.balance > 0:
+            self._state.daily_loss_percent = self._state.daily_loss_usd / self._state.balance * 100.0
+
+    def _cooldown_remaining(self) -> float:
+        """Q-12: always returns >= 0.0"""
+        if self._state.halt_time is None:
+            return 0.0
+        elapsed = (datetime.now(timezone.utc) - self._state.halt_time).total_seconds() / 60.0
+        return max(0.0, self._cfg.cooldown_minutes - elapsed)  # Q-12 FIX
+
+    def check(self) -> ProtectionCheckResult:
+        state = self._state; cfg = self._cfg
+        if not state._initialized:
+            return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason="Not initialized", drawdown_percent=0.0, consecutive_losses=0, daily_loss_percent=0.0, cooldown_remaining_minutes=0.0)
+        cooldown_left = self._cooldown_remaining()
+        if state.protection_level == ProtectionLevel.HALTED and cooldown_left <= 0.0:
+            state.protection_level = ProtectionLevel.SAFE; state.halt_reason = ""; state.halt_time = None
+        if state.current_drawdown_percent >= cfg.max_drawdown_percent:
+            self._set_halt(f"Max drawdown {state.current_drawdown_percent:.1f}%"); return self._halted_result(self._cooldown_remaining())
+        if state.daily_loss_percent >= cfg.daily_loss_halt_percent:
+            self._set_halt(f"Daily loss {state.daily_loss_percent:.1f}%"); return self._halted_result(self._cooldown_remaining())
+        if state.consecutive_losses >= cfg.consecutive_loss_halt_count:
+            self._set_halt(f"Consecutive losses {state.consecutive_losses}"); return self._halted_result(self._cooldown_remaining())
+        if state.balance > 0:
+            weekly_pct = state.weekly_loss_usd / state.balance * 100.0
+            if weekly_pct >= cfg.weekly_loss_halt_percent:
+                self._set_halt(f"Weekly loss {weekly_pct:.1f}%"); return self._halted_result(self._cooldown_remaining())
+        if state.protection_level == ProtectionLevel.HALTED:
+            return self._halted_result(cooldown_left)
+        if state.current_drawdown_percent >= cfg.warning_drawdown_percent:
+            state.protection_level = ProtectionLevel.WARNING
+            return ProtectionCheckResult(can_trade=True, level=ProtectionLevel.WARNING, reason=f"Drawdown warning {state.current_drawdown_percent:.1f}%", drawdown_percent=state.current_drawdown_percent, consecutive_losses=state.consecutive_losses, daily_loss_percent=state.daily_loss_percent, cooldown_remaining_minutes=0.0)
+        state.protection_level = ProtectionLevel.SAFE
+        return ProtectionCheckResult(can_trade=True, level=ProtectionLevel.SAFE, reason="", drawdown_percent=state.current_drawdown_percent, consecutive_losses=state.consecutive_losses, daily_loss_percent=state.daily_loss_percent, cooldown_remaining_minutes=0.0)
+
+    def _set_halt(self, reason: str) -> None:
+        if self._state.protection_level != ProtectionLevel.HALTED:
+            self._state.protection_level = ProtectionLevel.HALTED
+            self._state.halt_reason = reason
+            self._state.halt_time = datetime.now(timezone.utc)
+
+    def _halted_result(self, cooldown_left: float) -> ProtectionCheckResult:
+        return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason=self._state.halt_reason, drawdown_percent=self._state.current_drawdown_percent, consecutive_losses=self._state.consecutive_losses, daily_loss_percent=self._state.daily_loss_percent, should_close_all=True, cooldown_remaining_minutes=cooldown_left)
+
+    def reset_daily(self) -> None:
+        self._state.daily_loss_usd = 0.0; self._state.daily_loss_percent = 0.0; self._state.consecutive_losses = 0
+
+    def reset_weekly(self) -> None:
+        self._state.weekly_loss_usd = 0.0
+
+    def get_state(self) -> dict:
+        s = self._state
+        return {"balance": s.balance, "equity": s.equity, "high_water_mark": s.high_water_mark, "drawdown_percent": round(s.current_drawdown_percent, 2), "consecutive_losses": s.consecutive_losses, "daily_loss_percent": round(s.daily_loss_percent, 2), "protection_level": s.protection_level.value, "halt_reason": s.halt_reason, "cooldown_remaining": round(self._cooldown_remaining(), 1)}
+
+
+_engine: Optional[EquityProtectionEngine] = None
+
+def get_equity_protection() -> EquityProtectionEngine:
+    global _engine
+    if _engine is None:
+        _engine = EquityProtectionEngine()
+    return _engine
