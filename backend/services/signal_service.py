@@ -1,100 +1,75 @@
-"""signal_service.py -- Phase P Fixes P-7a/b/c/d/e."""
+"""backend/services/signal_service.py v2 - Phase T"""
 from __future__ import annotations
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from ..core.logger import get_logger
-from ..core.enums import SignalStatus
-from ..database import db
-from .audit_service import audit_service, AuditAction
+import asyncio, logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
-logger = get_logger("signal_service")
+logger = logging.getLogger("services.signal_service")
+_now_utc = lambda: datetime.now(timezone.utc)
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 class SignalService:
-    async def get_signals(
-        self, user_id: str, status: Optional[str] = None,
-        symbol: Optional[str] = None, direction: Optional[str] = None,
-        min_score: Optional[int] = None, include_expired: bool = False,
-        limit: int = 50, offset: int = 0,
-    ) -> Dict[str, Any]:
-        filters: Dict[str, Any] = {"user_id": user_id}
-        if status:
-            filters["status"] = status
-        if symbol:
-            filters["symbol"] = symbol.strip().upper()
-        if direction:
-            filters["direction"] = direction.strip().upper()
-        try:
-            signals = await db.select_many(
-                table="signals", filters=filters, limit=limit,
-                offset=offset, order_by="created_at", ascending=False,
-            ) or []
-            if min_score is not None:
-                signals = [s for s in signals if (s.get("score") or 0) >= min_score]
-            if not include_expired:
-                now_iso = _utcnow().isoformat()
-                signals = [s for s in signals
-                           if not s.get("expires_at") or s["expires_at"] > now_iso]
-            return {"signals": signals, "total": len(signals),
-                    "limit": limit, "offset": offset}
-        except Exception as exc:
-            logger.error("[SignalService.get_signals] error: %s", exc)
-            return {"signals": [], "total": 0, "limit": limit,
-                    "offset": offset, "error": str(exc)}
+    def __init__(self, db) -> None:
+        self._db = db
 
-    async def get_signal_by_id(self, signal_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    async def create_signal(self, user_id, symbol, direction, entry_price, stop_loss,
+                            take_profit, signal_id=None, expires_in_seconds=3600, extra=None):
+        sid = signal_id or str(uuid4())
         try:
-            rows = await db.select_many(
-                table="signals",
-                filters={"id": signal_id, "user_id": user_id},
-                limit=1,
-            )
-            return rows[0] if rows else None
+            r = await self._db_execute(self._db.table("signals").select("*").eq("id", sid)
+                                       .eq("user_id", user_id).limit(1).execute)
+            if r.data:
+                logger.info("create_signal: duplicate signal_id=%s", sid)
+                return r.data[0]
         except Exception as exc:
-            logger.error("[SignalService.get_signal_by_id] error: %s", exc)
-            return None
+            logger.warning("create_signal: idempotency check failed: %s", exc)
+        now = _now_utc(); expires = now + timedelta(seconds=expires_in_seconds)
+        payload = {"id": sid, "user_id": user_id, "symbol": symbol.upper(),
+                   "direction": direction.upper(), "entry_price": entry_price,
+                   "stop_loss": stop_loss, "take_profit": take_profit, "status": "ACTIVE",
+                   "created_at": now.isoformat(), "expires_at": expires.isoformat(),
+                   **(extra or {})}
+        result = await self._db_execute(self._db.table("signals").insert(payload).execute)
+        if not result.data: raise RuntimeError(f"insert empty for id={sid}")
+        return result.data[0]
 
-    async def create_signal(
-        self, user_id: str, symbol: str, direction: str,
-        entry_price: float, stop_loss: float, take_profit: float,
-        score: int = 0, metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        signal = {
-            "id": str(uuid.uuid4()), "user_id": user_id,
-            "symbol": symbol.upper(), "direction": direction.upper(),
-            "entry_price": entry_price, "stop_loss": stop_loss,
-            "take_profit": take_profit, "score": score,
-            "status": SignalStatus.PENDING.value,
-            "metadata": metadata or {}, "created_at": _utcnow().isoformat(),
-        }
-        try:
-            result = await db.insert("signals", signal)
-            await audit_service.log(
-                action=AuditAction.SIGNAL_CREATED, user_id=user_id,
-                resource_id=signal["id"],
-                details={"symbol": symbol, "direction": direction},
-            )
-            return result or signal
-        except Exception as exc:
-            logger.error("[SignalService.create_signal] error: %s", exc)
-            raise
+    async def get_signal_by_id(self, signal_id: str, user_id: str):  # T-19: user_id mandatory
+        r = await self._db_execute(self._db.table("signals").select("*")
+                                   .eq("id", signal_id).eq("user_id", user_id).limit(1).execute)
+        return r.data[0] if r.data else None
 
-    async def update_signal_status(self, signal_id: str, user_id: str, status: str) -> bool:
-        try:
-            existing = await self.get_signal_by_id(signal_id, user_id)
-            if not existing:
-                return False
-            await db.update(
-                table="signals",
-                filters={"id": signal_id, "user_id": user_id},
-                data={"status": status, "updated_at": _utcnow().isoformat()},
-            )
-            return True
-        except Exception as exc:
-            logger.error("[SignalService.update_signal_status] error: %s", exc)
-            return False
+    async def get_active_signals(self, user_id: str, symbol=None):
+        now_iso = _now_utc().isoformat()
+        q = (self._db.table("signals").select("*").eq("user_id", user_id)
+             .eq("status", "ACTIVE").gt("expires_at", now_iso).order("created_at", desc=True))
+        if symbol: q = q.eq("symbol", symbol.upper())
+        r = await self._db_execute(q.execute)
+        return r.data or []
 
-signal_service = SignalService()
+    async def list_signals(self, user_id, status=None, symbol=None, direction=None,
+                           min_score=None, page=1, page_size=50):
+        page_size = min(max(1, page_size), 200); offset = (max(1, page) - 1) * page_size
+        q = (self._db.table("signals").select("*", count="exact").eq("user_id", user_id)
+             .order("created_at", desc=True).range(offset, offset + page_size - 1))
+        if status:    q = q.eq("status",    status.upper())
+        if symbol:    q = q.eq("symbol",    symbol.upper())
+        if direction: q = q.eq("direction", direction.upper())
+        r = await self._db_execute(q.execute)
+        signals = r.data or []
+        if min_score is not None:
+            signals = [s for s in signals if float(s.get("score", 0)) >= min_score]
+        return {"signals": signals, "total": getattr(r, "count", len(signals)),
+                "page": page, "page_size": page_size}
+
+    async def update_signal_status(self, signal_id, user_id, new_status, updated_at=None):
+        now = _now_utc()
+        q = (self._db.table("signals").update({"status": new_status.upper(),
+             "updated_at": now.isoformat()}).eq("id", signal_id).eq("user_id", user_id))
+        if updated_at is not None: q = q.eq("updated_at", updated_at.isoformat())
+        r = await self._db_execute(q.execute)
+        return bool(r.data)
+
+    @staticmethod
+    async def _db_execute(fn):
+        return await asyncio.to_thread(fn)
