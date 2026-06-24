@@ -9,6 +9,9 @@ FIX #8 - Interface Consistency Audit patches:
   ISSUE-4: _run_vol_gate kwarg fix (price_distance/entry_price invalid)
   ISSUE-5: _run_corr_gate kwarg fix (symbol->new_symbol, add base_risk_percent)
   ISSUE-6: LotSizer.calculate kwarg fix (account_balance->balance, lot_multiplier->volatility_ratio)
+FIX #9 - Gate runner interface fixes:
+  BUG-1: _run_equity_gate: EquityProtectionEngine.check() takes 0 args (was TypeError)
+  BUG-2: _run_daily_gate: DailyLimitsEngine.check_limits() not .check() (was AttributeError)
 """
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ from typing import Any, Dict, List, Optional
 try:
     from backend.risk.fail_mode import FailMode, coerce as _coerce
 except ImportError:
-    class FailMode(str, Enum):   # type: ignore[no-redef]
+    class FailMode(str, Enum):    # type: ignore[no-redef]
         FAIL_CLOSED = "FAIL_CLOSED"
         FAIL_OPEN   = "FAIL_OPEN"
 
@@ -325,15 +328,47 @@ class RiskOrchestrator:
     async def _run_equity_gate(self, u, b, ctx):
         r = self._equity
         if hasattr(r, "check"):
-            res = r.check(user_id=u, account_balance=b, **ctx)
+            # BUG-1 FIX: EquityProtectionEngine.check() accepts NO args.
+            # Old call r.check(user_id=u, account_balance=b, **ctx) raised TypeError.
+            # Update equity state first if engine supports it, then call check().
+            if b > 0 and hasattr(r, "update_equity"):
+                eq_val = float(ctx.get("equity", b))
+                r.update_equity(equity=eq_val, balance=b)
+            res = r.check()
             if hasattr(res, "__await__"): res = await res
             return {"can_trade": getattr(res, "can_trade", True), "reason": getattr(res, "reason", "")}
         return {"can_trade": True, "reason": ""}
 
     async def _run_daily_gate(self, u, ctx):
         r = self._daily
+        # BUG-2 FIX: DailyLimitsEngine has check_limits(), NOT check().
+        # Old call r.check(user_id=u) raised AttributeError: has no attribute 'check'.
+        # Prefer check_limits(); fall back to check() for duck-typed adapters.
+        if hasattr(r, "check_limits"):
+            try:
+                from backend.risk.daily_limits import TodayTrades
+            except ImportError:
+                from dataclasses import dataclass as _dc
+                @_dc
+                class TodayTrades:  # type: ignore[no-redef]
+                    trade_count: int; pnl_usd: float; risk_used_percent: float
+            today = TodayTrades(
+                trade_count       = int(ctx.get("today_trades_count", 0)),
+                pnl_usd           = float(ctx.get("today_pnl_usd",   0.0)),
+                risk_used_percent = float(ctx.get("risk_used_percent", 0.0)),
+            )
+            account_balance = float(ctx.get("account_balance",
+                                            ctx.get("balance", 10_000.0)))
+            res = r.check_limits(
+                account_balance = account_balance,
+                today           = today,
+                week_pnl_usd    = float(ctx.get("week_pnl_usd",  0.0)),
+                month_pnl_usd   = float(ctx.get("month_pnl_usd", 0.0)),
+            )
+            if hasattr(res, "__await__"): res = await res
+            return {"can_trade": getattr(res, "can_trade", True), "reason": getattr(res, "reason", "")}
         if hasattr(r, "check"):
-            res = r.check(user_id=u)
+            res = r.check()
             if hasattr(res, "__await__"): res = await res
             return {"can_trade": getattr(res, "can_trade", True), "reason": getattr(res, "reason", "")}
         return {"can_trade": True, "reason": ""}
