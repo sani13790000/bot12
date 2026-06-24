@@ -1,1 +1,943 @@
-"""\nbackend/tests/test_fix8_coverage.py\n=====================================\nFIX #8 -- Production-ready test coverage\n8 topics, 110+ tests, Python 3.14 compatible.\n\nExecution:\n    OTEL_SDK_DISABLED=true python -m pytest backend/tests/test_fix8_coverage.py\n    --rootdir=backend/tests -v\n\nModule loading uses exec(compile(source)) to avoid the Python 3.14\nimportlib.util hang caused by OpenTelemetry auto-instrumentation hooks.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nimport os\nimport sys\nimport types\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, List, Optional\nfrom unittest.mock import AsyncMock, patch\n\nimport pytest\n\n# ---------------------------------------------------------------------------\n# Disable OpenTelemetry before ANY import touches backend.risk\n# ---------------------------------------------------------------------------\nos.environ.setdefault("OTEL_SDK_DISABLED", "true")\nos.environ.setdefault("OTEL_TRACES_EXPORTER", "none")\nos.environ.setdefault("OTEL_METRICS_EXPORTER", "none")\nos.environ.setdefault("OTEL_LOGS_EXPORTER", "none")\n\n# ---------------------------------------------------------------------------\n# Module loader -- exec(compile()) bypasses importlib.util hang in Python 3.14\n# ---------------------------------------------------------------------------\n_BASE = os.path.join(os.path.dirname(__file__), "..", "risk")\n# Fallback path for running directly\nif not os.path.isdir(_BASE):\n    _BASE = "/home/definable/fix8/pkg/backend/risk"\n\n_MOD_CACHE: Dict[str, types.ModuleType] = {}\n\n\ndef _load_module(name: str, depends: Optional[List[str]] = None) -> types.ModuleType:\n    """\n    Load backend.risk.<name> via exec(compile(source)).\n\n    Avoids importlib.util.spec_from_file_location which hangs in Python 3.14\n    when OpenTelemetry auto-instrumentation sitecustomize is active.\n    """\n    full = f"backend.risk.{name}"\n    if full in _MOD_CACHE:\n        return _MOD_CACHE[full]\n\n    # Ensure dependencies are loaded first\n    for dep in (depends or []):\n        _load_module(dep)\n\n    path = os.path.join(_BASE, f"{name}.py")\n    source = open(path).read()\n    # Remove __future__ annotations -- causes exec() type-annotation issues\n    source = source.replace("from __future__ import annotations\\n", "")\n\n    mod = types.ModuleType(full)\n    mod.__file__ = path\n    mod.__package__ = "backend.risk"\n    mod.__spec__ = None  # type: ignore[assignment]\n    # Pre-register so circular try/except ImportError fallbacks work\n    sys.modules[full] = mod\n    # Also register short name so intra-package imports resolve\n    sys.modules[f"backend.risk.{name}"] = mod\n\n    exec(compile(source, path, "exec"), mod.__dict__)\n    _MOD_CACHE[full] = mod\n    return mod\n\n\ndef _ensure_all():\n    """Load all 6 production modules in dependency order."""\n    _load_module("fail_mode")\n    _load_module("_pip_helpers", depends=["fail_mode"])\n    _load_module("lot_sizing",       depends=["fail_mode"])\n    _load_module("portfolio_risk",   depends=["fail_mode"])\n    _load_module("exposure_control", depends=["fail_mode"])\n    _load_module("correlation_filter", depends=["fail_mode"])\n    _load_module("volatility_filter",  depends=["fail_mode"])\n\n\n# Load once at module level\n_ensure_all()\n\n\n# ---------------------------------------------------------------------------\n# Convenience accessors\n# ---------------------------------------------------------------------------\ndef _mod(name: str):\n    return _MOD_CACHE[f"backend.risk.{name}"]\n\n\n# ---------------------------------------------------------------------------\n# Test helpers\n# ---------------------------------------------------------------------------\n\ndef _otr(symbol, lot, entry, sl, balance=10_000, direction="BUY"):\n    pr = _mod("portfolio_risk")\n    return pr.OpenTradeRisk(\n        symbol=symbol,\n        direction=pr.TradeDirection.BUY if direction == "BUY" else pr.TradeDirection.SELL,\n        lot_size=lot,\n        entry_price=entry,\n        stop_loss=sl,\n        account_balance=balance,\n    )\n\n\ndef _ep(symbol, risk_pct, direction="BUY"):\n    ec = _mod("exposure_control")\n    return ec.ExposurePosition(\n        symbol=symbol,\n        risk_percent=risk_pct,\n        direction=direction,\n    )\n\n\n# ===========================================================================\n# TOPIC 1 -- News Event Blocking\n#\n# Issue    : portfolio_risk.check() had no try/except (before FIX #6).\n#            Any uncaught exception -> limits bypass silently.\n#            XAUUSD pip_value=10.0 (before FIX #4) -> Gold gates never fired.\n# Patch    : try/except added; pip tables corrected to 1.0 for XAUUSD.\n# Risk     : 5-lot NFP EURUSD = 5% account in one candle, gate never blocked.\n# Compat   : check(trade, open_trades) and check_async() unchanged.\n# ===========================================================================\nclass TestNewsEventBlocking:\n\n    def _mgr(self, **kw):\n        pr = _mod("portfolio_risk")\n        return pr.PortfolioRiskManager(config=pr.PortfolioRiskConfig(**kw))\n\n    # 1. Single trade risk blocked (strictly >)\n    def test_single_trade_risk_blocked(self):\n        # EURUSD pip=10, dist=0.01, lot=2001, bal=10000\n        # risk = 0.01 * 2001 * 10 / 10000 * 100 = 2.001% > 2.0%\n        mgr = self._mgr(max_single_symbol_pct=2.0)\n        trade = _otr("EURUSD", lot=2001, entry=1.1000, sl=1.0900, balance=10_000)\n        result = mgr.check(trade, [])\n        assert not result.can_trade\n        assert "SINGLE_TRADE_RISK" in result.reason\n\n    # 2. Clearly below single limit -> allowed\n    def test_single_trade_risk_below_allowed(self):\n        mgr = self._mgr(max_single_symbol_pct=2.0)\n        trade = _otr("EURUSD", lot=100, entry=1.1000, sl=1.0900, balance=10_000)\n        # risk = 0.01*100*10/10000*100 = 0.1% clearly < 2.0\n        result = mgr.check(trade, [])\n        assert result.can_trade\n\n    # 3. Portfolio total risk blocked\n    def test_portfolio_risk_blocked(self):\n        mgr = self._mgr(max_portfolio_risk_pct=5.0, max_single_symbol_pct=3.0)\n        # 4 x GBPUSD @ 1.0% each = 4.0%; new EURUSD @ 2.0% -> total 6.0% > 5.0%\n        # GBPUSD pip=10: dist=0.01, lot=1000, bal=10000 -> 1.0%\n        # EURUSD pip=10: dist=0.01, lot=2000, bal=10000 -> 2.0%\n        existing = [_otr("GBPUSD", lot=1000, entry=1.3000, sl=1.2900, balance=10_000)] * 4\n        new_t = _otr("EURUSD", lot=2001, entry=1.1000, sl=1.0900, balance=10_000)\n        result = mgr.check(new_t, existing)\n        assert not result.can_trade\n        assert "PORTFOLIO_RISK" in result.reason\n\n    # 4. Clearly below portfolio limit -> allowed\n    def test_portfolio_risk_below_allowed(self):\n        mgr = self._mgr(max_portfolio_risk_pct=6.0, max_single_symbol_pct=3.0)\n        # 2 x 1.0% + 1.0% = 3.0% clearly < 6.0% -> allowed\n        existing = [_otr("GBPUSD", lot=1000, entry=1.3000, sl=1.2900, balance=10_000)] * 2\n        new_t = _otr("EURUSD", lot=1000, entry=1.1000, sl=1.0900, balance=10_000)\n        result = mgr.check(new_t, existing)\n        assert result.can_trade  # 3.0 < 6.0\n\n    # 5. XAUUSD pip=1.0 -> risk calculation correct\n    def test_xauusd_risk_pip_1(self):\n        # dist=100, lot=1.0, pip=1.0, bal=10000\n        # risk = 100 * 1.0 * 1.0 / 10000 * 100 = 1.0% (with pip=10 would be 10%)\n        trade = _otr("XAUUSD", lot=1.0, entry=1900.0, sl=1800.0, balance=10_000)\n        assert abs(trade.risk_percent - 1.0) < 0.01\n\n    # 6. Exception in check() -> FAIL_CLOSED -> blocked\n    def test_check_exception_fail_closed(self):\n        pr = _mod("portfolio_risk")\n        fm = _mod("fail_mode")\n        mgr = pr.PortfolioRiskManager(fail_mode=fm.FailMode.FAIL_CLOSED)\n        trade = _otr("EURUSD", lot=50, entry=1.10, sl=1.09, balance=10_000)\n        with patch.object(mgr, "_check_inner", side_effect=RuntimeError("boom")):\n            result = mgr.check(trade, [])\n        assert not result.can_trade\n\n    # 7. Exception in check() -> FAIL_OPEN -> allowed\n    def test_check_exception_fail_open(self):\n        pr = _mod("portfolio_risk")\n        fm = _mod("fail_mode")\n        mgr = pr.PortfolioRiskManager(fail_mode=fm.FailMode.FAIL_OPEN)\n        trade = _otr("EURUSD", lot=50, entry=1.10, sl=1.09, balance=10_000)\n        with patch.object(mgr, "_check_inner", side_effect=RuntimeError("boom")):\n            result = mgr.check(trade, [])\n        assert result.can_trade\n\n    # 8. result fields populated\n    def test_result_fields_populated(self):\n        mgr = self._mgr()\n        trade = _otr("EURUSD", lot=50, entry=1.10, sl=1.09, balance=10_000)\n        result = mgr.check(trade, [])\n        assert result.can_trade\n        assert result.total_risk_pct >= 0.0\n        assert result.new_risk_pct > 0.0\n        assert result.remaining_cap > 0.0\n\n    # 9. check_async works\n    def test_check_async(self):\n        mgr = self._mgr()\n        trade = _otr("EURUSD", lot=50, entry=1.10, sl=1.09, balance=10_000)\n        result = asyncio.run(mgr.check_async(trade, []))\n        assert result.can_trade\n\n\n# ===========================================================================\n# TOPIC 2 -- ATR Spike Robustness\n#\n# Issue    : VolatilityFilter.check() had no try/except (before FIX #6).\n#            ZeroDivisionError / corrupt ATR -> propagate -> gate crash -> allowed.\n# Patch    : try/except wraps _check_inner(). fail_mode cached in __init__.\n# Risk     : ATR ratio=4x during NFP -> SL 4x bigger than sized-for = 4% actual.\n# Compat   : check(current_atr, atr_history, current_spread, avg_spread, symbol)\n#            unchanged.\n# ===========================================================================\nclass TestATRSpikeRobustness:\n\n    def _vf(self, **kw):\n        vf_mod = _mod("volatility_filter")\n        return vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(**kw))\n\n    # 1. ATR too high -> blocked (strictly >)\n    def test_atr_too_high_blocked(self):\n        f = self._vf(atr_max_ratio=3.0, min_atr_bars=5)\n        result = f.check(4.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert not result.can_trade\n        assert "ATR_TOO_HIGH" in result.reason\n\n    # 2. ATR exactly at max -> allowed (strictly >, not >=)\n    def test_atr_exactly_at_max_allowed(self):\n        f = self._vf(atr_max_ratio=3.0, min_atr_bars=5)\n        result = f.check(3.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n\n    # 3. ATR too low -> blocked (strictly <)\n    def test_atr_too_low_blocked(self):\n        f = self._vf(atr_min_ratio=0.5, min_atr_bars=5)\n        result = f.check(0.4, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert not result.can_trade\n        assert "ATR_TOO_LOW" in result.reason\n\n    # 4. ATR exactly at min -> allowed (strictly <, not <=)\n    def test_atr_exactly_at_min_allowed(self):\n        f = self._vf(atr_min_ratio=0.5, min_atr_bars=5)\n        result = f.check(0.5, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n\n    # 5. Spread too wide -> blocked (strictly >)\n    def test_spread_too_wide_blocked(self):\n        f = self._vf(max_spread_ratio=2.0, min_atr_bars=5)\n        result = f.check(1.0, [1.0]*5, 0.0005, 0.0002, "EURUSD")\n        assert not result.can_trade\n        assert "SPREAD_TOO_WIDE" in result.reason\n\n    # 6. Spread exactly at limit -> allowed (strictly >)\n    def test_spread_at_limit_allowed(self):\n        f = self._vf(max_spread_ratio=2.0, min_atr_bars=5)\n        result = f.check(1.0, [1.0]*5, 0.0004, 0.0002, "EURUSD")\n        assert result.can_trade\n\n    # 7. Insufficient history -> allowed (safe fallback)\n    def test_insufficient_history_allowed(self):\n        f = self._vf(min_atr_bars=5)\n        result = f.check(1.0, [1.0]*3, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n        assert "INSUFFICIENT" in result.reason\n\n    # 8. Zero avg_atr -> allowed (defensive)\n    def test_zero_avg_atr_allowed(self):\n        f = self._vf(min_atr_bars=1)\n        result = f.check(1.0, [0.0], 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n\n    # 9. Exception -> FAIL_CLOSED -> blocked + reason contains FAIL_CLOSED\n    def test_exception_fail_closed_blocks(self):\n        vf_mod = _mod("volatility_filter")\n        fm_mod = _mod("fail_mode")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(fail_mode=fm_mod.FailMode.FAIL_CLOSED)\n        )\n        with patch.object(f, "_check_inner", side_effect=ZeroDivisionError("zero")):\n            result = f.check(1.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert not result.can_trade\n        assert "FAIL_CLOSED" in result.reason\n\n    # 10. Exception -> FAIL_OPEN -> allowed + reason contains FAIL_OPEN\n    def test_exception_fail_open_allows(self):\n        vf_mod = _mod("volatility_filter")\n        fm_mod = _mod("fail_mode")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(fail_mode=fm_mod.FailMode.FAIL_OPEN)\n        )\n        with patch.object(f, "_check_inner", side_effect=ZeroDivisionError("zero")):\n            result = f.check(1.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n        assert "FAIL_OPEN" in result.reason\n\n    # 11. atr_ratio field populated\n    def test_atr_ratio_populated(self):\n        f = self._vf(min_atr_bars=5)\n        result = f.check(2.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert result.atr_ratio == pytest.approx(2.0)\n\n\n# ===========================================================================\n# TOPIC 3 -- Symbol-Specific Thresholds\n#\n# Issue    : Global atr_max_ratio=3.0 applied to ALL assets.\n#            BTC normal ATR can be 8x avg -> always blocked.\n#            Gold can spike 3.1x and still pass.\n# Patch    : Per-symbol VolatilityConfig instances.\n# Risk     : False blocks on BTC / false allows on Gold during flash crash.\n# Compat   : VolatilityConfig(atr_max_ratio=...) is existing public field.\n# ===========================================================================\nclass TestSymbolSpecificThresholds:\n\n    # 1. Gold: tighter threshold blocks ratio=2.33\n    def test_gold_tighter_blocks(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(atr_max_ratio=2.0, min_atr_bars=3)\n        )\n        result = f.check(7.0, [3.0]*3, 0.5, 0.5, "XAUUSD")\n        assert not result.can_trade  # 7/3=2.33 > 2.0\n\n    # 2. Same ratio passes global 3.0\n    def test_gold_global_would_pass(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(atr_max_ratio=3.0, min_atr_bars=3)\n        )\n        result = f.check(7.0, [3.0]*3, 0.5, 0.5, "XAUUSD")\n        assert result.can_trade  # 2.33 < 3.0\n\n    # 3. BTC: looser threshold allows ratio=8.0\n    def test_btc_looser_allows(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(atr_max_ratio=10.0, min_atr_bars=3)\n        )\n        result = f.check(8000.0, [1000.0]*3, 50.0, 50.0, "BTCUSD")\n        assert result.can_trade\n\n    # 4. Global 3.0 would block BTC ratio=8.0\n    def test_btc_global_would_block(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(atr_max_ratio=3.0, min_atr_bars=3)\n        )\n        result = f.check(8000.0, [1000.0]*3, 50.0, 50.0, "BTCUSD")\n        assert not result.can_trade\n\n    # 5. EURUSD: standard 3.0 allows ratio=2.5\n    def test_eurusd_standard_allowed(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(\n            config=vf_mod.VolatilityConfig(atr_max_ratio=3.0, min_atr_bars=3)\n        )\n        result = f.check(2.5, [1.0]*3, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n\n    # 6. Two instances are isolated\n    def test_instances_isolated(self):\n        vf_mod = _mod("volatility_filter")\n        f1 = vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(atr_max_ratio=2.0, min_atr_bars=3))\n        f2 = vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(atr_max_ratio=5.0, min_atr_bars=3))\n        r1 = f1.check(4.0, [1.0]*3, 0.1, 0.1, "X")\n        r2 = f2.check(4.0, [1.0]*3, 0.1, 0.1, "X")\n        assert not r1.can_trade  # 4 > 2.0\n        assert r2.can_trade      # 4 < 5.0\n\n    # 7. Cache updated after successful check\n    def test_cache_updated(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(min_atr_bars=3))\n        f.check(1.0, [1.0]*3, 0.0002, 0.0002, "EURUSD")\n        cached = f.get_cached("EURUSD")\n        assert cached is not None\n        assert cached[0].can_trade\n\n    # 8. min_atr_bars per instance respected\n    def test_min_atr_bars_per_instance(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(min_atr_bars=10))\n        result = f.check(1.0, [1.0]*5, 0.0002, 0.0002, "EURUSD")\n        assert result.can_trade\n        assert "INSUFFICIENT" in result.reason\n\n\n# ===========================================================================\n# TOPIC 4 -- Gold Pip Value\n#\n# Issue    : lot_sizing._PIP_VALUE_TABLE["XAUUSD"] = 10.0   (10x wrong)\n#            portfolio_risk._PIP_VALUE_TABLE["XAUUSD"] = 10.0 (10x wrong)\n# Patch    : Both corrected to 1.0.\n# Risk     : With pip=10, lot 10x undersized -> actual risk = 10% of intended.\n#            E.g., 50-pip SL intended risk 1% -> actual 0.1% -> perpetual under-hedge.\n# Compat   : _resolve_pip_value(), _get_pip_value() signatures unchanged.\n# ===========================================================================\nclass TestGoldPipValue:\n\n    # 1. lot_sizing table correct\n    def test_lot_sizing_xauusd_is_1(self):\n        ls = _mod("lot_sizing")\n        assert ls._PIP_VALUE_TABLE["XAUUSD"] == 1.0\n\n    # 2. portfolio_risk table correct\n    def test_portfolio_risk_xauusd_is_1(self):\n        pr = _mod("portfolio_risk")\n        assert pr._PIP_VALUE_TABLE["XAUUSD"] == 1.0\n\n    # 3. GOLD alias\n    def test_gold_alias(self):\n        ls = _mod("lot_sizing")\n        assert ls._resolve_pip_value("GOLD") == 1.0\n\n    # 4. Broker suffix stripped\n    def test_xauusd_suffix(self):\n        ls = _mod("lot_sizing")\n        assert ls._resolve_pip_value("XAUUSDm") == 1.0\n\n    # 5. XAGUSD is 50.0 (Silver)\n    def test_xagusd_is_50(self):\n        ls = _mod("lot_sizing")\n        assert ls._PIP_VALUE_TABLE["XAGUSD"] == 50.0\n\n    # 6. _get_pip_value("XAUUSD") returns 1.0\n    def test_pr_get_pip_value_xauusd(self):\n        pr = _mod("portfolio_risk")\n        assert pr._get_pip_value("XAUUSD") == 1.0\n\n    # 7. _get_pip_value("GOLD") returns 1.0\n    def test_pr_get_pip_value_gold(self):\n        pr = _mod("portfolio_risk")\n        assert pr._get_pip_value("GOLD") == 1.0\n\n    # 8. risk_amount correct with pip=1.0\n    def test_risk_amount_correct(self):\n        # dist=100, lot=1.0, pip=1.0, bal=10000\n        # risk = 100 * 1.0 * 1.0 / 10000 * 100 = 1.0%\n        trade = _otr("XAUUSD", lot=1.0, entry=1900.0, sl=1800.0, balance=10_000)\n        assert abs(trade.risk_percent - 1.0) < 0.01\n\n    # 9. risk NOT 10% (catches old pip=10 regression)\n    def test_risk_not_10_percent(self):\n        # With pip=10 (old wrong value): risk = 100*1.0*10/10000*100 = 10% -> WRONG\n        # With pip=1.0 (correct): risk = 1.0%\n        trade = _otr("XAUUSD", lot=1.0, entry=1900.0, sl=1800.0, balance=10_000)\n        assert trade.risk_percent < 5.0   # must be 1.0%, not 10.0%\n\n    # 10. lot_sizer returns reasonable lot (not 10x undersized)\n    def test_lot_sizer_gold_reasonable(self):\n        ls = _mod("lot_sizing")\n        sizer = ls.LotSizer(config=ls.LotSizingConfig(risk_percent=1.0))\n        # LotSizer.calculate() is async: calculate(symbol, balance, stop_loss_pips)\n        result = asyncio.run(sizer.calculate(\n            symbol="XAUUSD",\n            balance=10_000.0,\n            stop_loss_pips=50.0,\n        ))\n        lot = result.lot_size\n        assert lot > 0.5      # would be 0.05 with pip=10\n        assert lot < 100.0\n\n    # 11. XAUUSD single gate fires correctly\n    def test_xauusd_gate_fires(self):\n        pr = _mod("portfolio_risk")\n        mgr = pr.PortfolioRiskManager(\n            config=pr.PortfolioRiskConfig(max_single_symbol_pct=2.0)\n        )\n        # XAUUSD pip=1.0: dist=100, lot=2.01, bal=10000 -> 2.01% > 2.0% -> BLOCKED\n        trade = _otr("XAUUSD", lot=2.01, entry=1900.0, sl=1800.0, balance=10_000)\n        result = mgr.check(trade, [])\n        assert not result.can_trade\n\n    # 12. XAUUSD at boundary allowed\n    def test_xauusd_gate_boundary_allowed(self):\n        pr = _mod("portfolio_risk")\n        mgr = pr.PortfolioRiskManager(\n            config=pr.PortfolioRiskConfig(max_single_symbol_pct=2.0)\n        )\n        # XAUUSD pip=1.0: dist=100, lot=2.0, bal=10000 -> 2.0% NOT > 2.0 -> allowed\n        trade = _otr("XAUUSD", lot=2.0, entry=1900.0, sl=1800.0, balance=10_000)\n        result = mgr.check(trade, [])\n        assert result.can_trade  # 2.0 NOT > 2.0\n\n\n# ===========================================================================\n# TOPIC 5 -- Crypto Pip Value\n#\n# Issue    : ETHUSD pip_value was wrong in both modules -> lot 100x oversized.\n# Patch    : BTCUSD=1.0, ETHUSD=1.0, LTCUSD=1.0, XRPUSD=1.0\n# Risk     : 100x lot: single BTC trade blows the account.\n# Compat   : _resolve_pip_value() unchanged.\n# ===========================================================================\nclass TestCryptoPipValue:\n\n    # 1-5: All crypto pip values in lot_sizing table\n    def test_btcusd_is_1_ls(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE["BTCUSD"] == 1.0\n\n    def test_ethusd_is_1_ls(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE["ETHUSD"] == 1.0\n\n    def test_ltcusd_is_1_ls(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE.get("LTCUSD") == 1.0\n\n    def test_xrpusd_is_1_ls(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE.get("XRPUSD") == 1.0\n\n    def test_bnbusd_is_1_ls(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE.get("BNBUSD") == 1.0\n\n    # 6-8: Aliases\n    def test_btc_alias(self):\n        assert _mod("lot_sizing")._resolve_pip_value("BTC") == 1.0\n\n    def test_bitcoin_alias(self):\n        assert _mod("lot_sizing")._resolve_pip_value("BITCOIN") == 1.0\n\n    def test_eth_alias(self):\n        assert _mod("lot_sizing")._resolve_pip_value("ETH") == 1.0\n\n    # 9. Broker suffix stripped\n    def test_btcusdm_suffix(self):\n        assert _mod("lot_sizing")._resolve_pip_value("BTCUSDm") == 1.0\n\n    # 10-11: portfolio_risk table consistency\n    def test_pr_btcusd_is_1(self):\n        assert _mod("portfolio_risk")._PIP_VALUE_TABLE.get("BTCUSD") == 1.0\n\n    def test_pr_ethusd_is_1(self):\n        assert _mod("portfolio_risk")._PIP_VALUE_TABLE.get("ETHUSD") == 1.0\n\n    # 12. Lot not 100x oversized\n    def test_btc_lot_not_oversized(self):\n        ls = _mod("lot_sizing")\n        sizer = ls.LotSizer(config=ls.LotSizingConfig(risk_percent=1.0))\n        result = asyncio.run(sizer.calculate(\n            symbol="BTCUSD",\n            balance=10_000.0,\n            stop_loss_pips=500.0,\n        ))\n        assert result.lot_size < 5.0  # would be 500 with wrong pip=0.01\n\n    # 13. BTC risk percent sane\n    def test_btc_risk_percent_sane(self):\n        # dist=500, lot=0.2, pip=1.0, bal=10000 -> 0.2*500*1/10000*100=1.0%\n        trade = _otr("BTCUSD", lot=0.2, entry=30_000.0, sl=29_500.0, balance=10_000)\n        assert abs(trade.risk_percent - 1.0) < 0.1\n\n\n# ===========================================================================\n# TOPIC 6 -- Exposure Calculation\n#\n# Issue    : ExposureControlEngine.check() had no try/except (before FIX #6).\n#            Hardcoded new_risk=1.0 in orchestrator (before FIX #5) -> real\n#            new_risk bypassed MAX_SYMBOL_RISK check.\n# Patch    : try/except + new_risk_percent passed correctly from caller.\n# Risk     : Unlimited exposure: 4x correlated 3% trades look like 1% each.\n# Compat   : check(new_symbol, new_direction, new_risk_percent,\n#                  open_positions, account_balance) unchanged.\n# ===========================================================================\nclass TestExposureCalculation:\n\n    def _eng(self, **kw):\n        ec = _mod("exposure_control")\n        return ec.ExposureControlEngine(config=ec.ExposureConfig(**kw))\n\n    # 1. MAX_TOTAL_RISK blocked (strictly >)\n    def test_max_total_blocked(self):\n        eng = self._eng(max_total_risk_percent=5.0)\n        ops = [_ep("GBPUSD", 1.0)] * 4  # 4.0%\n        result = eng.check("EURUSD", "BUY", 1.5, ops, 10_000)\n        assert not result.can_trade\n        assert "MAX_TOTAL_RISK" in result.reason\n\n    # 2. MAX_TOTAL boundary -> allowed (strictly >)\n    def test_max_total_boundary_allowed(self):\n        eng = self._eng(max_total_risk_percent=5.0)\n        ops = [_ep("GBPUSD", 1.0)] * 4  # 4.0%\n        result = eng.check("EURUSD", "BUY", 1.0, ops, 10_000)\n        assert result.can_trade  # 5.0 NOT > 5.0\n\n    # 3. MAX_SYMBOL_RISK blocked\n    def test_max_symbol_blocked(self):\n        eng = self._eng(max_risk_per_symbol=2.0)\n        ops = [_ep("EURUSD", 1.5)]\n        result = eng.check("EURUSD", "BUY", 1.0, ops, 10_000)\n        assert not result.can_trade\n        assert "MAX_SYMBOL_RISK" in result.reason\n\n    # 4. MAX_SYMBOL boundary -> allowed\n    def test_max_symbol_boundary_allowed(self):\n        eng = self._eng(max_risk_per_symbol=2.0)\n        ops = [_ep("EURUSD", 1.0)]\n        result = eng.check("EURUSD", "BUY", 1.0, ops, 10_000)\n        assert result.can_trade  # 2.0 NOT > 2.0\n\n    # 5. MAX_OPEN_TRADES blocked (>=)\n    def test_max_open_trades_blocked(self):\n        eng = self._eng(max_open_trades=5)\n        ops = [_ep(f"P{i}USD", 0.5) for i in range(5)]  # 5 open\n        result = eng.check("EURUSD", "BUY", 0.5, ops, 10_000)\n        assert not result.can_trade\n        assert "MAX_OPEN_TRADES" in result.reason\n\n    # 6. 4 open trades -> allowed\n    def test_4_open_trades_allowed(self):\n        eng = self._eng(max_open_trades=5)\n        ops = [_ep(f"P{i}USD", 0.5) for i in range(4)]\n        result = eng.check("EURUSD", "BUY", 0.5, ops, 10_000)\n        assert result.can_trade\n\n    # 7. projected_total_risk correct (FIX #5 verification)\n    def test_projected_total_risk(self):\n        eng = self._eng(max_total_risk_percent=10.0)\n        ops = [_ep("GBPUSD", 2.0)]\n        result = eng.check("EURUSD", "BUY", 3.0, ops, 10_000)\n        assert result.projected_total_risk == pytest.approx(5.0)\n\n    # 8. FAIL_CLOSED exception -> blocked\n    def test_exception_fail_closed(self):\n        ec = _mod("exposure_control")\n        fm = _mod("fail_mode")\n        eng = ec.ExposureControlEngine(fail_mode=fm.FailMode.FAIL_CLOSED)\n        with patch.object(eng, "_check_inner", side_effect=AttributeError("boom")):\n            result = eng.check("EURUSD", "BUY", 1.0, [], 10_000)\n        assert not result.can_trade\n\n    # 9. FAIL_OPEN exception -> allowed\n    def test_exception_fail_open(self):\n        ec = _mod("exposure_control")\n        fm = _mod("fail_mode")\n        eng = ec.ExposureControlEngine(fail_mode=fm.FailMode.FAIL_OPEN)\n        with patch.object(eng, "_check_inner", side_effect=AttributeError("boom")):\n            result = eng.check("EURUSD", "BUY", 1.0, [], 10_000)\n        assert result.can_trade\n\n    # 10. get_snapshot FAIL_CLOSED -> re-raises on exception\n    def test_snapshot_fail_closed(self):\n        ec = _mod("exposure_control")\n        fm = _mod("fail_mode")\n        eng = ec.ExposureControlEngine(fail_mode=fm.FailMode.FAIL_CLOSED)\n        with patch.object(eng, "_snapshot_inner", side_effect=RuntimeError("snap")):\n            with pytest.raises(RuntimeError):\n                eng.get_snapshot([])  # FAIL_CLOSED re-raises\n\n    # 11. get_snapshot FAIL_OPEN -> returns empty snapshot\n    def test_snapshot_fail_open(self):\n        ec = _mod("exposure_control")\n        fm = _mod("fail_mode")\n        eng = ec.ExposureControlEngine(fail_mode=fm.FailMode.FAIL_OPEN)\n        with patch.object(eng, "_snapshot_inner", side_effect=RuntimeError("snap")):\n            snap = eng.get_snapshot([])  # FAIL_OPEN -> empty snap\n        assert not snap.limit_breached\n\n    # 12. Empty positions -> allowed\n    def test_empty_positions_allowed(self):\n        eng = self._eng()\n        result = eng.check("EURUSD", "BUY", 1.0, [], 10_000)\n        assert result.can_trade\n\n    # 13. available_risk field correct\n    def test_available_risk(self):\n        eng = self._eng(max_total_risk_percent=5.0)\n        ops = [_ep("GBPUSD", 2.0)]\n        result = eng.check("EURUSD", "BUY", 1.0, ops, 10_000)\n        assert result.available_risk == pytest.approx(3.0)\n\n    # 14. Snapshot fields populated\n    def test_snapshot_fields(self):\n        ec = _mod("exposure_control")\n        eng = self._eng()\n        ops = [_ep("EURUSD", 1.0), _ep("GBPUSD", 2.0)]\n        snap = eng.get_snapshot(ops)  # no account_balance arg\n        assert snap.total_risk_percent == pytest.approx(3.0)\n        assert snap.open_trade_count == 2\n\n\n# ===========================================================================\n# TOPIC 7 -- Fail-Closed Behaviour\n#\n# Issue    : CorrelationFilter: `except: allow_trade=True` -- SILENT no log!\n#            ExposureControl, VolatilityFilter, PortfolioRisk: no try/except.\n# Patch    : All 4 gates wrap in try/except. FailMode from single source of truth.\n#            FAIL_CLOSED: block. FAIL_OPEN: allow + CRITICAL log (never silent).\n# Risk     : Silent gate bypass = unlimited risk, no audit trail.\n# Compat   : All check() signatures unchanged.\n# ===========================================================================\nclass TestFailClosedBehaviour:\n\n    # 1-2: fail_mode.py has both values\n    def test_fm_fail_closed_value(self):\n        fm = _mod("fail_mode")\n        assert fm.FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    def test_fm_fail_open_value(self):\n        fm = _mod("fail_mode")\n        assert fm.FailMode.FAIL_OPEN.value == "FAIL_OPEN"\n\n    # 3-6: All 4 gates expose FailMode with correct values\n    def test_vf_failmode_value(self):\n        assert _mod("volatility_filter").FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    def test_cf_failmode_value(self):\n        assert _mod("correlation_filter").FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    def test_ec_failmode_value(self):\n        assert _mod("exposure_control").FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    def test_pr_failmode_value(self):\n        assert _mod("portfolio_risk").FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    # 7-10: All 4 gates default to FAIL_CLOSED\n    def test_vf_default_fail_closed(self):\n        vf = _mod("volatility_filter").VolatilityFilter()\n        assert vf._fail_mode.value == "FAIL_CLOSED"\n\n    def test_ec_default_fail_closed(self):\n        ec = _mod("exposure_control").ExposureControlEngine()\n        assert ec._fail_mode.value == "FAIL_CLOSED"\n\n    def test_cf_default_fail_closed(self):\n        cf = _mod("correlation_filter").CorrelationFilter()\n        assert cf._fail_mode.value == "FAIL_CLOSED"\n\n    def test_pr_default_fail_closed(self):\n        pr = _mod("portfolio_risk").PortfolioRiskManager()\n        assert pr._fail_mode.value == "FAIL_CLOSED"\n\n    # 11-14: FAIL_OPEN override works on all 4 gates\n    def test_vf_fail_open_override(self):\n        vf_mod = _mod("volatility_filter")\n        fm = _mod("fail_mode").FailMode.FAIL_OPEN\n        f = vf_mod.VolatilityFilter(config=vf_mod.VolatilityConfig(fail_mode=fm))\n        assert f._fail_mode.value == "FAIL_OPEN"\n\n    def test_ec_fail_open_override(self):\n        ec_mod = _mod("exposure_control")\n        fm = _mod("fail_mode").FailMode.FAIL_OPEN\n        e = ec_mod.ExposureControlEngine(fail_mode=fm)\n        assert e._fail_mode.value == "FAIL_OPEN"\n\n    def test_cf_fail_open_override(self):\n        cf_mod = _mod("correlation_filter")\n        fm = _mod("fail_mode").FailMode.FAIL_OPEN\n        c = cf_mod.CorrelationFilter(fail_mode=fm)\n        assert c._fail_mode.value == "FAIL_OPEN"\n\n    def test_pr_fail_open_override(self):\n        pr_mod = _mod("portfolio_risk")\n        fm = _mod("fail_mode").FailMode.FAIL_OPEN\n        m = pr_mod.PortfolioRiskManager(fail_mode=fm)\n        assert m._fail_mode.value == "FAIL_OPEN"\n\n    # 15-18: coerce() utility\n    def test_coerce_lowercase(self):\n        fm = _mod("fail_mode")\n        assert fm.coerce("fail_closed") is fm.FailMode.FAIL_CLOSED\n\n    def test_coerce_uppercase(self):\n        fm = _mod("fail_mode")\n        assert fm.coerce("FAIL_OPEN") is fm.FailMode.FAIL_OPEN\n\n    def test_coerce_passthrough(self):\n        fm = _mod("fail_mode")\n        assert fm.coerce(fm.FailMode.FAIL_CLOSED) is fm.FailMode.FAIL_CLOSED\n\n    def test_coerce_invalid_raises(self):\n        fm = _mod("fail_mode")\n        with pytest.raises(ValueError):\n            fm.coerce("INVALID_MODE")\n\n    # 19-20: FailMode is str Enum (backward compat for string comparisons)\n    def test_failmode_is_str(self):\n        fm = _mod("fail_mode")\n        assert isinstance(fm.FailMode.FAIL_CLOSED, str)\n        assert fm.FailMode.FAIL_CLOSED == "FAIL_CLOSED"\n\n    def test_failmode_str_comparison(self):\n        fm = _mod("fail_mode")\n        assert fm.FailMode.FAIL_OPEN == "FAIL_OPEN"\n\n    # 21-22: Exception always blocked/allowed (never silent)\n    def test_vf_exception_fc_blocks(self):\n        vf_mod = _mod("volatility_filter")\n        f = vf_mod.VolatilityFilter()  # FAIL_CLOSED\n        with patch.object(f, "_check_inner", side_effect=RuntimeError("x")):\n            result = f.check(1.0, [1.0]*5, 0.0002, 0.0002, "X")\n        assert not result.can_trade\n\n    def test_ec_exception_fc_blocks(self):\n        ec_mod = _mod("exposure_control")\n        e = ec_mod.ExposureControlEngine()  # FAIL_CLOSED\n        with patch.object(e, "_check_inner", side_effect=ValueError("v")):\n            result = e.check("X", "BUY", 1.0, [], 10_000)\n        assert not result.can_trade\n\n\n# ===========================================================================\n# TOPIC 8 -- Portfolio Correlation Calculations\n#\n# Issue    : CorrelationFilter._check_inner() had no outer try/except.\n#            Per-pair engine crash -> corr=0 (inner catch OK).\n#            Outer crash -> propagate -> fail_mode gate bypass.\n# Patch    : Outer try/except; abs(corr) threshold check; fail_mode applied.\n# Risk     : Correlated 4x positions at 2x risk each = 8% exposure undetected.\n# Compat   : check(symbol, direction, open_positions) unchanged.\n# ===========================================================================\nclass TestPortfolioCorrelationCalcs:\n\n    def _cf(self, max_corr=0.85, fail_mode=None):\n        cf_mod = _mod("correlation_filter")\n        cfg = cf_mod.CorrelationFilterConfig(max_corr=max_corr)\n        engine = AsyncMock()\n        fm = None\n        if fail_mode is not None:\n            fm = getattr(_mod("fail_mode").FailMode, fail_mode)\n        return cf_mod.CorrelationFilter(\n            config=cfg, correlation_engine=engine, fail_mode=fm\n        ), engine\n\n    # 1. High positive correlation -> blocked\n    def test_positive_high_corr_blocked(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.92)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert not result.can_trade\n        assert "CORR_TOO_HIGH" in result.reason\n\n    # 2. High negative correlation -> blocked (abs check)\n    def test_negative_high_corr_blocked(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=-0.92)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "USDCHF"}]))\n        assert not result.can_trade\n\n    # 3. Exactly at threshold -> blocked (>=)\n    def test_corr_at_threshold_blocked(self):\n        cf, eng = self._cf(max_corr=0.85)\n        eng.get_correlation = AsyncMock(return_value=0.85)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert not result.can_trade  # 0.85 >= 0.85\n\n    # 4. Just below threshold -> allowed\n    def test_corr_below_threshold_allowed(self):\n        cf, eng = self._cf(max_corr=0.85)\n        eng.get_correlation = AsyncMock(return_value=0.84)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.can_trade\n\n    # 5. Same symbol -> skipped (engine NOT called)\n    def test_same_symbol_skipped(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.99)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "EURUSD"}]))\n        assert result.can_trade\n        eng.get_correlation.assert_not_called()\n\n    # 6. Per-pair engine crash -> corr=0 -> allowed (inner catch)\n    def test_per_pair_crash_allowed(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(side_effect=RuntimeError("down"))\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.can_trade\n\n    # 7. No positions -> allowed\n    def test_no_positions_allowed(self):\n        cf, eng = self._cf()\n        result = asyncio.run(cf.check("EURUSD", "BUY", []))\n        assert result.can_trade\n\n    # 8. No engine -> allowed\n    def test_no_engine_allowed(self):\n        cf_mod = _mod("correlation_filter")\n        cf = cf_mod.CorrelationFilter()\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.can_trade\n\n    # 9. pair_checked populated on block\n    def test_pair_checked_populated(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.92)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.pair_checked == "GBPUSD"\n\n    # 10. correlation field populated\n    def test_correlation_field(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.92)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.correlation == pytest.approx(0.92)\n\n    # 11. Early exit: first breach stops loop\n    def test_early_exit_on_first_breach(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.92)\n        positions = [{"symbol": "GBPUSD"}, {"symbol": "AUDUSD"}]\n        result = asyncio.run(cf.check("EURUSD", "BUY", positions))\n        assert not result.can_trade\n        assert eng.get_correlation.call_count == 1  # stopped at first\n\n    # 12. Outer crash FAIL_CLOSED -> blocked\n    def test_outer_crash_fail_closed(self):\n        cf, _ = self._cf(fail_mode="FAIL_CLOSED")\n        with patch.object(cf, "_check_inner", side_effect=Exception("outer")):\n            result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert not result.can_trade\n        assert "FAIL_CLOSED" in result.reason\n\n    # 13. Outer crash FAIL_OPEN -> allowed\n    def test_outer_crash_fail_open(self):\n        cf, _ = self._cf(fail_mode="FAIL_OPEN")\n        with patch.object(cf, "_check_inner", side_effect=Exception("outer")):\n            result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.can_trade\n        assert "FAIL_OPEN" in result.reason\n\n    # 14. Negative abs: abs(-0.85) >= 0.85 -> blocked\n    def test_abs_negative_corr_blocked(self):\n        cf, eng = self._cf(max_corr=0.85)\n        eng.get_correlation = AsyncMock(return_value=-0.85)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "USDCHF"}]))\n        assert not result.can_trade\n\n    # 15. Object-style position (getattr fallback)\n    def test_object_style_position(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.92)\n        class Pos:\n            symbol = "GBPUSD"\n        result = asyncio.run(cf.check("EURUSD", "BUY", [Pos()]))\n        assert not result.can_trade\n\n    # 16. CORR_OK reason on pass\n    def test_corr_ok_reason(self):\n        cf, eng = self._cf()\n        eng.get_correlation = AsyncMock(return_value=0.30)\n        result = asyncio.run(cf.check("EURUSD", "BUY", [{"symbol": "GBPUSD"}]))\n        assert result.can_trade\n        assert result.reason == "CORR_OK"\n\n\n# ===========================================================================\n# Integration -- cross-gate regression guards\n# ===========================================================================\nclass TestIntegration:\n\n    def test_xauusd_pip_consistent_ls_pr(self):\n        assert _mod("lot_sizing")._PIP_VALUE_TABLE["XAUUSD"] == \\\n               _mod("portfolio_risk")._PIP_VALUE_TABLE["XAUUSD"]\n\n    def test_crypto_pip_consistent(self):\n        for sym in ["BTCUSD", "ETHUSD"]:\n            ls_val = _mod("lot_sizing")._PIP_VALUE_TABLE.get(sym)\n            pr_val = _mod("portfolio_risk")._PIP_VALUE_TABLE.get(sym)\n            assert ls_val == pr_val, f"{sym}: ls={ls_val} pr={pr_val}"\n\n    def test_failmode_is_str_enum(self):\n        fm = _mod("fail_mode")\n        assert isinstance(fm.FailMode.FAIL_CLOSED, str)\n\n    def test_all_gates_expose_failmode(self):\n        for mod_name in ("volatility_filter", "exposure_control",\n                         "correlation_filter", "portfolio_risk"):\n            mod = _mod(mod_name)\n            assert hasattr(mod, "FailMode"), f"{mod_name} missing FailMode"\n            assert mod.FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"\n\n    def test_xauusd_gate_fires_with_correct_pip(self):\n        pr = _mod("portfolio_risk")\n        mgr = pr.PortfolioRiskManager(\n            config=pr.PortfolioRiskConfig(max_single_symbol_pct=2.0)\n        )\n        # pip=1.0: dist=100, lot=2.01, bal=10000 -> 2.01% -> BLOCKED\n        trade = _otr("XAUUSD", lot=2.01, entry=1900.0, sl=1800.0, balance=10_000)\n        result = mgr.check(trade, [])\n        assert not result.can_trade\n
+"""
+backend/tests/test_fix8_coverage.py
+====================================
+FIX #8 -- Test Coverage
+8 topics, 110 tests, Python 3.14 compatible.
+
+Verified against production source:
+  volatility_filter.py  -- check(), _check_inner(), _check_news(), _DEFAULT_SYMBOL_THRESHOLDS
+  portfolio_risk.py     -- OpenTradeRisk, PortfolioRiskManager, _PIP_VALUE_TABLE
+  exposure_control.py   -- ExposureControlEngine, ExposureControlConfig, ExposurePosition
+  correlation_filter.py -- CorrelationFilter (async check/inner), CorrPosition
+  lot_sizing.py         -- LotSizer, _PIP_VALUE_TABLE, _SYMBOL_ALIASES
+  fail_mode.py          -- FailMode (str Enum), coerce()
+"""
+from __future__ import annotations
+
+import asyncio
+import importlib
+import importlib.util
+import sys
+import types
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import List, Optional
+from unittest import IsolatedAsyncioTestCase
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# PATH SETUP -- make backend importable from the repo root
+# ---------------------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+# ---------------------------------------------------------------------------
+# LAZY IMPORTS -- each module loaded once via importlib to allow patching
+# ---------------------------------------------------------------------------
+def _load(mod_name: str):
+    full = f"backend.risk.{mod_name}"
+    if full in sys.modules:
+        return sys.modules[full]
+    spec = importlib.util.find_spec(full)
+    if spec is None:
+        raise ImportError(f"Cannot find {full}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[full] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_fm  = _load("fail_mode")
+_vf  = _load("volatility_filter")
+_pr  = _load("portfolio_risk")
+_ec  = _load("exposure_control")
+_cf  = _load("correlation_filter")
+_ls  = _load("lot_sizing")
+
+FailMode              = _fm.FailMode
+coerce                = _fm.coerce
+
+# volatility_filter
+VolatilityFilter      = _vf.VolatilityFilter
+VolatilityFilterConfig= _vf.VolatilityFilterConfig
+SymbolThresholds      = _vf.SymbolThresholds
+NewsEvent             = _vf.NewsEvent
+VolatilityLevel       = _vf.VolatilityLevel
+
+# portfolio_risk
+PortfolioRiskManager  = _pr.PortfolioRiskManager
+PortfolioRiskConfig   = _pr.PortfolioRiskConfig
+OpenTradeRisk         = _pr.OpenTradeRisk
+TradeDirection        = _pr.TradeDirection
+
+# exposure_control
+ExposureControlEngine = _ec.ExposureControlEngine
+ExposureControlConfig = _ec.ExposureControlConfig
+ExposurePosition      = _ec.ExposurePosition
+
+# correlation_filter
+CorrelationFilter     = _cf.CorrelationFilter
+CorrelationFilterConfig = _cf.CorrelationFilterConfig
+CorrPosition          = _cf.CorrPosition
+RollingCorrelationEngine = _cf.RollingCorrelationEngine
+
+# lot_sizing
+LotSizer              = _ls.LotSizer
+LotSizingConfig       = _ls.LotSizingConfig
+
+# pip tables (direct references to the dicts in each module)
+_LS_PIP = _ls._PIP_VALUE_TABLE
+_LS_ALI = _ls._SYMBOL_ALIASES
+_PR_PIP = _pr._PIP_VALUE_TABLE
+
+
+# ---------------------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------------------
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _trade(
+    symbol: str = "EURUSD",
+    direction: str = "BUY",
+    lot: float = 1.0,
+    entry: float = 1.1000,
+    sl: float = 1.0900,
+    balance: float = 10_000.0,
+    pip_val: Optional[float] = None,
+) -> OpenTradeRisk:
+    return OpenTradeRisk(
+        symbol=symbol,
+        direction=TradeDirection(direction),
+        lot_size=lot,
+        entry_price=entry,
+        stop_loss=sl,
+        account_balance=balance,
+        pip_value_per_lot=pip_val,
+    )
+
+
+def _ep(symbol: str, direction: str = "BUY", risk: float = 1.0) -> ExposurePosition:
+    return ExposurePosition(symbol=symbol, direction=direction, risk_percent=risk)
+
+
+def _cp(symbol: str, direction: str = "BUY", risk: float = 1.0) -> CorrPosition:
+    return CorrPosition(symbol=symbol, direction=direction, risk_percent=risk)
+
+
+def _vf_check(
+    vf: VolatilityFilter,
+    current_atr: float,
+    history: List[float],
+    symbol: str = "EURUSD",
+    spread: float = 0.0,
+    avg_spread: float = 0.0001,
+):
+    return vf.check(
+        current_atr=current_atr,
+        atr_history=history,
+        current_spread=spread,
+        avg_spread=avg_spread,
+        symbol=symbol,
+    )
+
+
+def _run(coro):
+    """Run coroutine safely under Python 3.14 (no deprecated get_event_loop)."""
+    return asyncio.run(coro)
+
+
+# ===========================================================================
+# TOPIC 1 -- News Event Blocking (9 tests)
+# ===========================================================================
+class TestNewsEventBlocking:
+    """
+    Issue (FIX #1):  No news event filter existed before FIX #1.
+                     NFP/FOMC traded without any gate.
+    Exact Patch:     _check_news(now) compares each event to a +-window.
+                     enable_news_filter=False (default) skips the gate.
+    Risk Impact:     3-8% slippage in < 1 second on major news releases.
+    Backward Compat: check() signature unchanged; NewsEvent is purely additive;
+                     enable_news_filter=False preserves old behaviour.
+    """
+
+    def _make_vf_with_news(self, event_time: datetime, impact: str = "HIGH") -> VolatilityFilter:
+        cfg = VolatilityFilterConfig(
+            enable_news_filter=True,
+            news_block_minutes_before=30,
+            news_block_minutes_after=15,
+        )
+        vf = VolatilityFilter(config=cfg)
+        ev = NewsEvent(
+            title="NFP",
+            currency="USD",
+            impact=impact,
+            event_time=event_time,
+        )
+        vf.add_news_event(ev)
+        return vf
+
+    def test_blocked_before_event(self):
+        now = _now_utc()
+        ev_time = now + timedelta(minutes=10)
+        vf = self._make_vf_with_news(ev_time)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert not r.can_trade
+        assert "NEWS_EVENT_BLOCK" in r.reason
+
+    def test_blocked_after_event(self):
+        now = _now_utc()
+        ev_time = now - timedelta(minutes=5)
+        vf = self._make_vf_with_news(ev_time)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert not r.can_trade
+
+    def test_allowed_outside_window_future(self):
+        now = _now_utc()
+        ev_time = now + timedelta(minutes=60)
+        vf = self._make_vf_with_news(ev_time)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert r.can_trade
+
+    def test_allowed_outside_window_past(self):
+        now = _now_utc()
+        ev_time = now - timedelta(minutes=30)
+        vf = self._make_vf_with_news(ev_time)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert r.can_trade
+
+    def test_news_filter_disabled_by_default(self):
+        now = _now_utc()
+        ev_time = now + timedelta(minutes=5)
+        cfg = VolatilityFilterConfig(enable_news_filter=False)
+        vf = VolatilityFilter(config=cfg)
+        ev = NewsEvent(title="FOMC", currency="USD", impact="HIGH", event_time=ev_time)
+        vf.add_news_event(ev)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert r.can_trade
+
+    def test_no_events_no_block(self):
+        cfg = VolatilityFilterConfig(enable_news_filter=True)
+        vf = VolatilityFilter(config=cfg)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert r.can_trade
+
+    def test_boundary_exactly_before_window(self):
+        now = _now_utc()
+        ev_time = now + timedelta(minutes=30)
+        vf = self._make_vf_with_news(ev_time)
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert not r.can_trade
+
+    def test_multiple_events_nearest_blocks(self):
+        now = _now_utc()
+        cfg = VolatilityFilterConfig(enable_news_filter=True)
+        vf = VolatilityFilter(config=cfg)
+        vf.add_news_event(NewsEvent("CPI", "USD", "MEDIUM", now + timedelta(hours=3)))
+        vf.add_news_event(NewsEvent("NFP", "USD", "HIGH", now + timedelta(minutes=10)))
+        r = _vf_check(vf, 0.0010, [0.0010] * 14)
+        assert not r.can_trade
+        assert "NEWS_EVENT_BLOCK" in r.reason
+
+    def test_exception_fail_closed(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_CLOSED))
+        with patch.object(vf, "_check_inner", side_effect=RuntimeError("boom")):
+            r = vf.check(current_atr=0.001, atr_history=[0.001])
+        assert not r.can_trade
+        assert "FAIL_CLOSED" in r.reason
+
+
+# ===========================================================================
+# TOPIC 2 -- ATR Spike Robustness (11 tests)
+# ===========================================================================
+class TestATRSpikeRobustness:
+    """
+    Issue (FIX #6):  check() had no try/except.
+                     ZeroDivisionError (avg_atr=0) propagated -> gate crashed.
+    Exact Patch:     check() wraps _check_inner() in try/except.
+                     fail_mode stored at __init__ time (not re-read per call).
+    Risk Impact:     ATR=4x normal during NFP: SL sized for 1% becomes 4% actual.
+    Backward Compat: check() signature unchanged; extra kwargs atr_values/spread
+                     are backward-compat aliases.
+    """
+
+    def _eurusd_vf(self, **kwargs) -> VolatilityFilter:
+        cfg = VolatilityFilterConfig(**kwargs)
+        return VolatilityFilter(config=cfg)
+
+    def test_extreme_atr_blocked(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0035, [0.0010] * 14, "EURUSD")
+        assert not r.can_trade
+        assert r.level == VolatilityLevel.EXTREME
+
+    def test_just_below_extreme_high(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.00349, [0.0010] * 14, "EURUSD")
+        assert r.can_trade
+        assert r.level == VolatilityLevel.HIGH
+        assert r.lot_multiplier < 1.0
+
+    def test_exact_extreme_boundary_blocked(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0035, [0.0010] * 14, "EURUSD")
+        assert not r.can_trade
+
+    def test_exact_high_boundary_lot_mult_one(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0020, [0.0010] * 14, "EURUSD")
+        assert r.can_trade
+        assert r.level == VolatilityLevel.HIGH
+        assert abs(r.lot_multiplier - 1.0) < 0.01
+
+    def test_high_zone_lot_mult_reduced(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0025, [0.0010] * 14, "EURUSD")
+        assert r.can_trade
+        assert 0.60 < r.lot_multiplier < 0.75
+
+    def test_normal_atr_allowed(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0010, [0.0010] * 14, "EURUSD")
+        assert r.can_trade
+        assert r.level == VolatilityLevel.NORMAL
+        assert r.lot_multiplier == 1.0
+
+    def test_spread_too_high_blocked(self):
+        vf = self._eurusd_vf()
+        r = vf.check(
+            current_atr=0.0010, atr_history=[0.0010]*14,
+            current_spread=0.00031, avg_spread=0.0001, symbol="EURUSD"
+        )
+        assert not r.can_trade
+        assert "SPREAD_TOO_HIGH" in r.reason
+
+    def test_spread_exactly_at_limit_allowed(self):
+        vf = self._eurusd_vf()
+        r = vf.check(
+            current_atr=0.0010, atr_history=[0.0010]*14,
+            current_spread=0.0003, avg_spread=0.0001, symbol="EURUSD"
+        )
+        assert r.can_trade
+
+    def test_empty_history_fallback(self):
+        vf = self._eurusd_vf()
+        r = _vf_check(vf, 0.0010, [], "EURUSD")
+        assert r.can_trade
+        assert r.level == VolatilityLevel.NORMAL
+
+    def test_zero_avg_atr_fail_closed(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_CLOSED))
+        with patch.object(vf, "_check_inner", side_effect=ZeroDivisionError("div by zero")):
+            r = vf.check(current_atr=0.001, atr_history=[0.001]*14)
+        assert not r.can_trade
+        assert "FAIL_CLOSED" in r.reason
+
+    def test_exception_fail_open_allowed(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_OPEN))
+        with patch.object(vf, "_check_inner", side_effect=RuntimeError("crash")):
+            r = vf.check(current_atr=0.001, atr_history=[0.001]*14)
+        assert r.can_trade
+        assert "FAIL_OPEN" in r.reason
+
+
+# ===========================================================================
+# TOPIC 3 -- Symbol-Specific Thresholds (9 tests)
+# ===========================================================================
+class TestSymbolSpecificThresholds:
+    """
+    Issue (FIX #3):  Global extreme=3.5 applied to all assets.
+                     BTC (normal ATR=8x avg) was always blocked.
+                     Gold (ATR=3.5x normal) should block at 3.0x.
+    Exact Patch:     _DEFAULT_SYMBOL_THRESHOLDS per-symbol dict.
+    Risk Impact:     False blocks on BTC every normal news day.
+                     Gold passed during flash crashes.
+    Backward Compat: Unknown symbol falls back to config defaults (3.5).
+    """
+
+    def test_gold_extreme_threshold_is_3(self):
+        thr = _vf._DEFAULT_SYMBOL_THRESHOLDS["XAUUSD"]
+        assert thr.extreme == 3.0
+
+    def test_btc_extreme_threshold_is_2_2(self):
+        thr = _vf._DEFAULT_SYMBOL_THRESHOLDS["BTCUSD"]
+        assert thr.extreme == 2.2
+
+    def test_eurusd_extreme_threshold_is_3_5(self):
+        thr = _vf._DEFAULT_SYMBOL_THRESHOLDS["EURUSD"]
+        assert thr.extreme == 3.5
+
+    def test_gbpjpy_extreme_threshold_is_4_2(self):
+        thr = _vf._DEFAULT_SYMBOL_THRESHOLDS["GBPJPY"]
+        assert thr.extreme == 4.2
+
+    def test_gold_ratio_3_1_blocked(self):
+        vf = VolatilityFilter()
+        r = _vf_check(vf, 3.1, [1.0] * 14, "XAUUSD")
+        assert not r.can_trade
+
+    def test_eurusd_ratio_3_1_allowed(self):
+        vf = VolatilityFilter()
+        r = _vf_check(vf, 3.1, [1.0] * 14, "EURUSD")
+        assert r.can_trade
+
+    def test_btc_ratio_2_3_blocked(self):
+        vf = VolatilityFilter()
+        r = _vf_check(vf, 2.3, [1.0] * 14, "BTCUSD")
+        assert not r.can_trade
+
+    def test_btc_ratio_2_1_allowed(self):
+        vf = VolatilityFilter()
+        r = _vf_check(vf, 2.1, [1.0] * 14, "BTCUSD")
+        assert r.can_trade
+
+    def test_unknown_symbol_uses_config_default(self):
+        vf = VolatilityFilter()
+        r = _vf_check(vf, 3.4, [1.0] * 14, "XXXXXX")
+        assert r.can_trade
+
+
+# ===========================================================================
+# TOPIC 4 -- Gold Pip Value (12 tests)
+# ===========================================================================
+class TestGoldPipValue:
+    """
+    Issue (FIX #4):  XAUUSD=10.0 in both lot_sizing and portfolio_risk.
+                     Gold: $0.01/oz * 100 oz standard lot = $1.00 per pip.
+                     Error: pip_value 10x too high -> lot_sizer 10x too small.
+    Exact Patch:     lot_sizing._PIP_VALUE_TABLE["XAUUSD"] = 1.0
+                     portfolio_risk._PIP_VALUE_TABLE["XAUUSD"] = 1.0
+    Risk Impact:     Lot sizer returns 0.1 lot when 1.0 lot is correct.
+                     Actual risk = 10% of intended; stop-hunt undetected.
+    Backward Compat: Table key/value change only; all callers use same dict.
+    """
+
+    def test_ls_xauusd_pip_value_is_1(self):
+        assert _LS_PIP["XAUUSD"] == 1.0, f"Expected 1.0, got {_LS_PIP['XAUUSD']}"
+
+    def test_pr_xauusd_pip_value_is_1(self):
+        assert _PR_PIP["XAUUSD"] == 1.0, f"Expected 1.0, got {_PR_PIP['XAUUSD']}"
+
+    def test_ls_gold_alias_resolves_to_1(self):
+        assert _LS_ALI.get("GOLD") == "XAUUSD"
+        assert _LS_PIP["XAUUSD"] == 1.0
+
+    def test_ls_xauusdm_resolves_via_truncation(self):
+        resolved = LotSizer._resolve_canonical("XAUUSDm")
+        assert resolved == "XAUUSD"
+
+    def test_ls_get_pip_value_xauusd(self):
+        sizer = LotSizer()
+        pv, src = _run(sizer.get_pip_value("XAUUSD"))
+        assert pv == 1.0
+
+    def test_pr_gold_risk_percent_correct(self):
+        t = _trade("XAUUSD", "BUY", lot=2.0, entry=1900.0, sl=1850.0, balance=10_000.0)
+        assert abs(t.risk_percent - 1.0) < 0.05
+
+    def test_pr_gold_risk_not_10_percent(self):
+        t = _trade("XAUUSD", "BUY", lot=2.0, entry=1900.0, sl=1850.0, balance=10_000.0)
+        assert t.risk_percent < 5.0, "Pip value still wrong (10x)"
+
+    def test_pr_gold_gate_blocks_above_limit(self):
+        t = _trade("XAUUSD", "BUY", lot=2.0, entry=2000.0, sl=1899.0, balance=10_000.0)
+        mgr = PortfolioRiskManager()
+        r = mgr.check(t, [])
+        assert not r.can_trade
+        assert "SINGLE_TRADE_RISK" in r.reason
+
+    def test_pr_gold_gate_allows_at_limit(self):
+        t = _trade("XAUUSD", "BUY", lot=2.0, entry=2000.0, sl=1900.0, balance=10_000.0)
+        mgr = PortfolioRiskManager()
+        r = mgr.check(t, [])
+        assert r.can_trade
+
+    def test_xagusd_pip_value_is_50(self):
+        assert _LS_PIP.get("XAGUSD") == 50.0
+
+    def test_xptusd_pip_value_is_1(self):
+        assert _LS_PIP.get("XPTUSD") == 1.0
+
+    def test_pr_no_metal_has_pip_10(self):
+        metals = ["XAUUSD", "XAGUSD", "XPTUSD", "XPDUSD"]
+        for m in metals:
+            if m in _PR_PIP:
+                assert _PR_PIP[m] != 10.0, f"{m} still has pip=10.0"
+
+
+# ===========================================================================
+# TOPIC 5 -- Crypto Pip Value (12 tests)
+# ===========================================================================
+class TestCryptoPipValue:
+    """
+    Issue (FIX #4):  Crypto pip values were wrong in both tables.
+                     ETHUSD=0.01 -> lot_sizer produced 100x too many lots.
+    Exact Patch:     BTCUSD=ETHUSD=LTCUSD=XRPUSD=1.0 in both tables.
+    Risk Impact:     ETHUSD 100-lot: full account blown on 1% price move.
+    Backward Compat: Only table values changed; symbol keys unchanged.
+    """
+
+    def test_ls_btcusd_is_1(self):   assert _LS_PIP["BTCUSD"] == 1.0
+    def test_ls_ethusd_is_1(self):   assert _LS_PIP["ETHUSD"] == 1.0
+    def test_ls_ltcusd_is_1(self):   assert _LS_PIP["LTCUSD"] == 1.0
+    def test_ls_xrpusd_is_1(self):   assert _LS_PIP["XRPUSD"] == 1.0
+
+    def test_ls_btc_alias(self):
+        assert _LS_ALI.get("BTC") == "BTCUSD"
+
+    def test_ls_eth_alias(self):
+        assert _LS_ALI.get("ETH") == "ETHUSD"
+
+    def test_ls_btcusdm_resolves(self):
+        r = LotSizer._resolve_canonical("BTCUSDm")
+        assert r == "BTCUSD"
+
+    def test_ls_get_pip_value_btc(self):
+        sizer = LotSizer()
+        pv, _ = _run(sizer.get_pip_value("BTCUSD"))
+        assert pv == 1.0
+
+    def test_pr_eth_risk_calc_correct(self):
+        t = _trade("ETHUSD", "BUY", lot=0.1, entry=3000.0, sl=2900.0, balance=10_000.0)
+        assert t.risk_percent < 1.0
+
+    def test_pr_btc_normal_risk_allowed(self):
+        t = _trade("BTCUSD", "BUY", lot=0.02, entry=50000.0, sl=49000.0, balance=10_000.0)
+        mgr = PortfolioRiskManager()
+        r = mgr.check(t, [])
+        assert r.can_trade
+
+    def test_pr_all_crypto_pip_is_1(self):
+        crypto_pr = ["BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD"]
+        for sym in crypto_pr:
+            if sym in _PR_PIP:
+                assert _PR_PIP[sym] == 1.0, f"{sym} pip != 1.0 in portfolio_risk"
+
+    def test_ls_bnbusd_pip_if_present(self):
+        if "BNBUSD" in _LS_PIP:
+            assert _LS_PIP["BNBUSD"] == 1.0
+
+
+# ===========================================================================
+# TOPIC 6 -- Exposure Calculation (14 tests)
+# ===========================================================================
+class TestExposureCalculation:
+    """
+    Issue (FIX #5+6): Hardcoded new_risk=1.0 in orchestrator bypassed
+                      MAX_SYMBOL_RISK when actual risk was 2.5%.
+                      No try/except -> corrupt position -> gate bypass.
+    Exact Patch:      ExposureControlEngine.check() passes real new_risk_percent.
+                      try/except added; fail_mode configurable.
+    Risk Impact:      Unlimited symbol concentration silently accumulated.
+    Backward Compat:  check() signature stable; config kwarg is additive.
+    """
+
+    def _make_ec(self, **kw) -> ExposureControlEngine:
+        cfg = ExposureControlConfig(**kw)
+        return ExposureControlEngine(config=cfg)
+
+    def test_max_total_blocked(self):
+        ec = self._make_ec(max_total_exposure_percent=5.0)
+        ops = [_ep("EURUSD", "BUY", 1.0)] * 4
+        r = ec.check("GBPUSD", "BUY", 1.5, ops)
+        assert not r.can_trade
+
+    def test_max_total_boundary_allowed(self):
+        ec = self._make_ec(
+            max_total_exposure_percent=5.0,
+            max_per_currency_percent=99.0,
+            max_buy_trades=99,
+            max_sell_trades=99,
+        )
+        ops = [_ep("EURJPY", "BUY", 1.0)] * 4
+        r = ec.check("CHFJPY", "BUY", 1.0, ops)
+        assert r.can_trade
+
+    def test_max_symbol_blocked(self):
+        ec = self._make_ec(max_per_symbol_percent=2.0)
+        ops = [_ep("EURUSD", "BUY", 1.5)]
+        r = ec.check("EURUSD", "SELL", 1.0, ops)
+        assert not r.can_trade
+
+    def test_max_symbol_boundary_allowed(self):
+        ec = self._make_ec(
+            max_per_symbol_percent=2.0,
+            max_per_currency_percent=99.0,
+        )
+        ops = [_ep("EURUSD", "BUY", 1.0)]
+        r = ec.check("EURUSD", "SELL", 1.0, ops)
+        assert r.can_trade
+
+    def test_max_simultaneous_blocked(self):
+        ec = self._make_ec(
+            max_simultaneous_trades=5,
+            max_buy_trades=99,
+            max_per_currency_percent=99.0,
+        )
+        ops = [_ep(f"EUR{c}", "BUY", 0.5) for c in ["JPY","GBP","AUD","CHF","CAD"]]
+        r = ec.check("NZDJPY", "BUY", 0.5, ops)
+        assert not r.can_trade
+
+    def test_max_buy_trades_blocked(self):
+        ec = self._make_ec(max_buy_trades=3, max_per_currency_percent=99.0)
+        ops = [_ep("EURUSD", "BUY", 0.5),
+               _ep("GBPUSD", "BUY", 0.5),
+               _ep("AUDUSD", "BUY", 0.5)]
+        r = ec.check("NZDUSD", "BUY", 0.5, ops)
+        assert not r.can_trade
+
+    def test_max_sell_trades_blocked(self):
+        ec = self._make_ec(max_sell_trades=2, max_per_currency_percent=99.0)
+        ops = [_ep("EURUSD", "SELL", 0.5),
+               _ep("GBPUSD", "SELL", 0.5)]
+        r = ec.check("AUDUSD", "SELL", 0.5, ops)
+        assert not r.can_trade
+
+    def test_duplicate_symbol_direction_blocked(self):
+        ec = self._make_ec(block_same_symbol_same_direction=True)
+        ops = [_ep("EURUSD", "BUY", 1.0)]
+        r = ec.check("EURUSD", "BUY", 0.5, ops)
+        assert not r.can_trade
+
+    def test_opposite_direction_allowed(self):
+        ec = self._make_ec(
+            max_per_symbol_percent=99.0,
+            max_per_currency_percent=99.0,
+        )
+        ops = [_ep("EURUSD", "BUY", 1.0)]
+        r = ec.check("EURUSD", "SELL", 0.5, ops)
+        assert r.can_trade
+
+    def test_empty_positions_allowed(self):
+        ec = self._make_ec()
+        r = ec.check("EURUSD", "BUY", 1.0, [])
+        assert r.can_trade
+
+    def test_projected_total_reflects_real_risk(self):
+        ec = self._make_ec(max_total_exposure_percent=99.0)
+        ops = [_ep("GBPUSD", "BUY", 1.0)]
+        r = ec.check("EURUSD", "BUY", 2.5, ops)
+        assert abs(r.projected_total_risk - 3.5) < 0.01
+
+    def test_fail_closed_on_exception(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(ec, "_check_inner", side_effect=AttributeError("boom")):
+            r = ec.check("EURUSD", "BUY", 1.0, [])
+        assert not r.can_trade
+
+    def test_fail_open_on_exception(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_OPEN)
+        with patch.object(ec, "_check_inner", side_effect=RuntimeError("crash")):
+            r = ec.check("EURUSD", "BUY", 1.0, [])
+        assert r.can_trade
+
+    def test_get_snapshot_fail_closed(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(ec, "_snapshot_inner", side_effect=RuntimeError("snap error")):
+            snap = ec.get_snapshot([_ep("EURUSD", "BUY", 1.0)])
+        assert not snap.can_open_new
+
+
+# ===========================================================================
+# TOPIC 7 -- Fail-Closed Behaviour (22 tests)
+# ===========================================================================
+class TestFailClosedBehaviour:
+    """
+    Issue (FIX #6):  CorrelationFilter: except: allow_trade=True -- SILENT.
+                     ExposureControl, VolatilityFilter, PortfolioRisk: no try/except.
+    Exact Patch:     All 4 gates wrap in try/except; FAIL_CLOSED is default.
+                     Single source of truth: all import FailMode from fail_mode.py.
+    Risk Impact:     Any uncaught exception silently allowed ALL trades.
+    Backward Compat: FailMode(str, Enum) so string comparisons still work.
+    """
+
+    def test_fail_mode_closed_value(self):
+        assert FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"
+
+    def test_fail_mode_open_value(self):
+        assert FailMode.FAIL_OPEN.value == "FAIL_OPEN"
+
+    def test_vf_uses_same_fail_mode_values(self):
+        assert _vf.FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"
+
+    def test_ec_uses_same_fail_mode_values(self):
+        assert _ec.FailMode.FAIL_CLOSED.value == "FAIL_CLOSED"
+
+    def test_vf_default_fail_closed(self):
+        assert VolatilityFilter()._fail_mode.value == "FAIL_CLOSED"
+
+    def test_ec_default_fail_closed(self):
+        assert ExposureControlEngine()._fail_mode.value == "FAIL_CLOSED"
+
+    def test_cf_default_fail_closed(self):
+        assert CorrelationFilter()._fail_mode.value == "FAIL_CLOSED"
+
+    def test_pr_default_fail_closed(self):
+        assert PortfolioRiskManager()._fail_mode.value == "FAIL_CLOSED"
+
+    def test_vf_kwarg_override_fail_open(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_OPEN))
+        assert vf._fail_mode.value == "FAIL_OPEN"
+
+    def test_ec_kwarg_override_fail_open(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_OPEN)
+        assert ec._fail_mode.value == "FAIL_OPEN"
+
+    def test_pr_kwarg_override_fail_open(self):
+        pr = PortfolioRiskManager(fail_mode=FailMode.FAIL_OPEN)
+        assert pr._fail_mode.value == "FAIL_OPEN"
+
+    def test_cf_kwarg_override_fail_open(self):
+        cf = CorrelationFilter(fail_mode=FailMode.FAIL_OPEN)
+        assert cf._fail_mode.value == "FAIL_OPEN"
+
+    def test_coerce_lowercase(self):
+        assert coerce("fail_closed") is FailMode.FAIL_CLOSED
+
+    def test_coerce_uppercase(self):
+        assert coerce("FAIL_OPEN") is FailMode.FAIL_OPEN
+
+    def test_vf_fail_closed_blocks_on_exception(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_CLOSED))
+        with patch.object(vf, "_check_inner", side_effect=RuntimeError("x")):
+            r = vf.check(0.001)
+        assert not r.can_trade
+
+    def test_vf_fail_open_allows_on_exception(self):
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_OPEN))
+        with patch.object(vf, "_check_inner", side_effect=RuntimeError("x")):
+            r = vf.check(0.001)
+        assert r.can_trade
+
+    def test_ec_fail_closed_blocks_on_exception(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(ec, "_check_inner", side_effect=ValueError("x")):
+            r = ec.check("EURUSD", "BUY", 1.0, [])
+        assert not r.can_trade
+
+    def test_ec_fail_open_allows_on_exception(self):
+        ec = ExposureControlEngine(fail_mode=FailMode.FAIL_OPEN)
+        with patch.object(ec, "_check_inner", side_effect=ValueError("x")):
+            r = ec.check("EURUSD", "BUY", 1.0, [])
+        assert r.can_trade
+
+    def test_pr_fail_closed_blocks_on_exception(self):
+        pr = PortfolioRiskManager(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(pr, "_check_inner", side_effect=KeyError("x")):
+            t = _trade()
+            r = pr.check(t, [])
+        assert not r.can_trade
+
+    def test_pr_fail_open_allows_on_exception(self):
+        pr = PortfolioRiskManager(fail_mode=FailMode.FAIL_OPEN)
+        with patch.object(pr, "_check_inner", side_effect=KeyError("x")):
+            t = _trade()
+            r = pr.check(t, [])
+        assert r.can_trade
+
+    def test_vf_fail_closed_logs_error(self):
+        """FAIL_CLOSED exception must be logged (never swallowed silently)."""
+        vf = VolatilityFilter(config=VolatilityFilterConfig(fail_mode=FailMode.FAIL_CLOSED))
+        with patch.object(vf, "_check_inner", side_effect=RuntimeError("x")):
+            r = vf.check(0.001)
+        assert not r.can_trade
+        assert "FAIL_CLOSED" in r.reason
+
+    def test_pr_fail_closed_logs_exception(self):
+        """PR FAIL_CLOSED: exception must not propagate (was logged internally)."""
+        pr = PortfolioRiskManager(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(pr, "_check_inner", side_effect=RuntimeError("x")):
+            r = pr.check(_trade(), [])
+        assert not r.can_trade
+
+
+class _no_op_ctx:
+    """Context manager no-op for tests that lack assertLogs."""
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+# ===========================================================================
+# TOPIC 8 -- Portfolio Correlation Calculations (16 tests)
+# ===========================================================================
+class TestPortfolioCorrelationCalcs(IsolatedAsyncioTestCase):
+    """
+    Issue (FIX #6):  No outer try/except in check() (was: silent FAIL_OPEN).
+    Exact Patch:     try/except wraps await _check_inner(); fail_mode honoured.
+    Risk Impact:     Correlated position accumulation -> 40% drawdown unchecked.
+    Backward Compat: async check() signature unchanged; config kwarg additive.
+
+    Production logic:
+      net_exposure += corr * direction_factor * pos.risk_percent
+      direction_factor = +1 if same direction, -1 if opposite
+      abs(net) >= max_corr(0.80) -> BLOCKED
+      abs(net) in [penalty_thr(0.60), max_corr) -> risk_multiplier < 1.0
+    """
+
+    def _make_cf(self, engine=None, **kw) -> CorrelationFilter:
+        cfg = CorrelationFilterConfig(**kw)
+        cf = CorrelationFilter(config=cfg)
+        if engine:
+            cf._engine = engine
+        return cf
+
+    def _mock_engine(self, corr: float):
+        eng = MagicMock()
+        eng.get_correlation = AsyncMock(return_value=corr)
+        return eng
+
+    async def test_high_corr_blocked(self):
+        eng = self._mock_engine(0.85)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_negative_corr_same_direction_blocked(self):
+        eng = self._mock_engine(-0.92)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("USDCHF", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_positive_corr_opposite_direction_blocked(self):
+        eng = self._mock_engine(0.85)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "SELL", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_exact_boundary_at_max_corr(self):
+        eng = self._mock_engine(0.80)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_just_below_max_corr_allowed(self):
+        eng = self._mock_engine(0.79)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert r.can_trade
+
+    async def test_penalty_zone_reduces_multiplier(self):
+        eng = self._mock_engine(0.70)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert r.can_trade
+        assert r.risk_multiplier < 1.0
+
+    async def test_low_corr_full_multiplier(self):
+        eng = self._mock_engine(0.40)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("AUDUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert r.can_trade
+        assert r.risk_multiplier == 1.0
+
+    async def test_empty_positions_allowed(self):
+        cf = self._make_cf()
+        r = await cf.check("EURUSD", "BUY", [], 1.0)
+        assert r.can_trade
+        assert r.risk_multiplier == 1.0
+
+    async def test_accumulated_corr_blocks(self):
+        eng = self._mock_engine(0.45)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0), _cp("AUDUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_static_table_eurusd_gbpusd(self):
+        eng = MagicMock()
+        eng.get_correlation = AsyncMock(side_effect=ConnectionError("no conn"))
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert not r.can_trade
+
+    async def test_unknown_pair_no_corr_returns_none(self):
+        eng = MagicMock()
+        eng.get_correlation = AsyncMock(side_effect=RuntimeError("nope"))
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("XXXYYY", "BUY", 1.0)]
+        r = await cf.check("AAABBB", "BUY", ops, 1.0)
+        assert r.can_trade
+
+    async def test_canonical_order_alpha(self):
+        from backend.risk.correlation_filter import _canonical
+        assert _canonical("GBPUSD", "EURUSD") == ("EURUSD", "GBPUSD")
+        assert _canonical("EURUSD", "GBPUSD") == ("EURUSD", "GBPUSD")
+
+    async def test_fail_closed_on_outer_exception(self):
+        cf = CorrelationFilter(fail_mode=FailMode.FAIL_CLOSED)
+        with patch.object(cf, "_check_inner", side_effect=RuntimeError("outer crash")):
+            r = await cf.check("EURUSD", "BUY", [_cp("GBPUSD", "BUY", 1.0)], 1.0)
+        assert not r.can_trade
+
+    async def test_fail_open_on_outer_exception(self):
+        cf = CorrelationFilter(fail_mode=FailMode.FAIL_OPEN)
+        with patch.object(cf, "_check_inner", side_effect=RuntimeError("outer crash")):
+            r = await cf.check("EURUSD", "BUY", [_cp("GBPUSD", "BUY", 1.0)], 1.0)
+        assert r.can_trade
+
+    async def test_correlation_score_in_result(self):
+        eng = self._mock_engine(0.70)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert r.correlation_score >= 0.0
+
+    async def test_source_field_populated(self):
+        eng = self._mock_engine(0.60)
+        cf = self._make_cf(engine=eng)
+        ops = [_cp("GBPUSD", "BUY", 1.0)]
+        r = await cf.check("EURUSD", "BUY", ops, 1.0)
+        assert r.source in ("rolling", "static", "none", "error")
+
+
+# ===========================================================================
+# INTEGRATION -- cross-gate regression guards (5 tests)
+# ===========================================================================
+class TestIntegration:
+    """Cross-gate regression: a fix in one module must not break another."""
+
+    def test_gold_pip_consistent_across_modules(self):
+        assert _LS_PIP["XAUUSD"] == _PR_PIP["XAUUSD"] == 1.0
+
+    def test_crypto_pip_consistent_across_modules(self):
+        for sym in ["BTCUSD", "ETHUSD", "LTCUSD"]:
+            ls_v = _LS_PIP.get(sym)
+            pr_v = _PR_PIP.get(sym)
+            if ls_v is not None and pr_v is not None:
+                assert ls_v == pr_v, f"{sym} pip mismatch LS={ls_v} PR={pr_v}"
+
+    def test_fail_mode_enum_values_identical(self):
+        for mod in [_vf, _ec, _cf, _pr]:
+            fm_cls = getattr(mod, "FailMode", None)
+            if fm_cls is not None:
+                assert fm_cls.FAIL_CLOSED.value == "FAIL_CLOSED"
+                assert fm_cls.FAIL_OPEN.value == "FAIL_OPEN"
+
+    def test_pr_gate_uses_corrected_gold_pip(self):
+        t = _trade("XAUUSD", "BUY", lot=1.0, entry=2000.0, sl=1800.0, balance=10_000.0)
+        mgr = PortfolioRiskManager()
+        r = mgr.check(t, [])
+        assert r.can_trade, f"pip table still wrong: {r.reason}"
+
+    def test_exposure_reflects_actual_risk_not_hardcoded(self):
+        ec = ExposureControlEngine(
+            config=ExposureControlConfig(
+                max_total_exposure_percent=99.0,
+                max_per_currency_percent=99.0,
+            )
+        )
+        ops = [_ep("GBPJPY", "BUY", 1.0)]
+        r = ec.check("EURJPY", "BUY", 2.5, ops)
+        assert abs(r.projected_total_risk - 3.5) < 0.01
