@@ -7,6 +7,10 @@ HF-4: Position reconciliation BEFORE every retry
   - DB failure -> alert ONLY, NEVER auto-close orphans
   - Orphan registry with manual-review workflow
   - Async-safe asyncio.Lock
+
+BUG-1 FIX: Added public run_once() delegating to _run_once().
+  ExecutionService._retry_execute() calls self._pr.run_once().
+  Previously only _run_once() (private) existed -> AttributeError at retry time.
 """
 from __future__ import annotations
 import asyncio, os
@@ -149,6 +153,12 @@ class PositionReconciliation:
                 await self._run_once()
             except asyncio.CancelledError: break
             except Exception as exc: logger.error("Reconciliation loop error: %s", exc, exc_info=True)
+
+    async def run_once(self) -> ReconciliationResult:
+        """BUG-1 FIX: Public API for on-demand reconciliation.
+        ExecutionService._retry_execute() calls this before every retry.
+        Previously only _run_once() (private) existed causing AttributeError."""
+        return await self._run_once()
 
     async def _run_once(self) -> ReconciliationResult:
         async with self._lock: return await self._reconcile()

@@ -160,7 +160,16 @@ class ExecutionService:
             if self._risk is None:
                 self._risk = await get_risk_orchestrator()
             mt5_positions = await self._mt5.get_positions()
-            open_positions = [ExposurePosition(symbol=getattr(p, "symbol", ""), direction="BUY" if getattr(p, "type", 0) == 0 else "SELL", risk_percent=1.0, volume=getattr(p, "volume", 0.01)) for p in mt5_positions]
+            # BUG-3 FIX: ExposurePosition has no 'volume' field.
+            # Fields are: symbol, direction, risk_percent, risk_usd (optional).
+            open_positions = [
+                ExposurePosition(
+                    symbol=getattr(p, "symbol", ""),
+                    direction="BUY" if getattr(p, "type", 0) == 0 else "SELL",
+                    risk_percent=1.0,
+                )
+                for p in mt5_positions
+            ]
             acct    = await self._mt5.get_account_info()
             balance = getattr(acct, "balance", 10_000.0) if acct else 10_000.0
             equity  = getattr(acct, "equity",  balance)  if acct else balance
@@ -200,6 +209,8 @@ class ExecutionService:
 
             # Step 1: reconcile
             logger.info("Retry %s: reconciling positions first", order_id[:8] if order_id else "?")
+            # BUG-1 FIX: was self._pr.run_once() -> AttributeError (only _run_once() existed).
+            # run_once() public method added to PositionReconciliation.
             await self._pr.run_once()
 
             # Step 2: check if position already exists
@@ -221,7 +232,28 @@ class ExecutionService:
             # Step 4: submit
             new_order_id = str(uuid.uuid4())
             await _idempotency_register(signal_id, new_order_id)
-            retry_order = ManagedOrder(order_id=new_order_id, signal_id=signal_id, symbol=symbol, action=od.get("action", ""), requested_volume=float(od.get("requested_volume", 0.01)), requested_price=float(od.get("requested_price", 0.0)) or None, stop_loss=float(od.get("stop_loss", 0.0)) or None, take_profit=float(od.get("take_profit", 0.0)) or None)
+
+            # BUG-2 FIX: float(od.get(field, 0.0)) or None crashes when stored value is None.
+            # float(None) raises TypeError. Use _safe_float() helper instead.
+            def _safe_float(val: Any, default: float = 0.0) -> float:
+                """Return float(val) or default if val is None/invalid."""
+                if val is None:
+                    return default
+                try:
+                    return float(val)
+                except (TypeError, ValueError):
+                    return default
+
+            retry_order = ManagedOrder(
+                order_id=new_order_id,
+                signal_id=signal_id,
+                symbol=symbol,
+                action=od.get("action", ""),
+                requested_volume=_safe_float(od.get("requested_volume"), 0.01),
+                requested_price=_safe_float(od.get("requested_price"), 0.0),
+                stop_loss=_safe_float(od.get("stop_loss"), 0.0),
+                take_profit=_safe_float(od.get("take_profit"), 0.0),
+            )
             await self._osm.create_order(retry_order)
             result = await self._submit_order(retry_order)
             success = result.get("status") == "filled"
