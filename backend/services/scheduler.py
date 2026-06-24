@@ -1,4 +1,15 @@
-"""Background Scheduler - Phase Q-28..Q-33 fixes."""
+"""Background Scheduler - Phase Q-28..Q-33 fixes.
+
+HIGH-1 FIX: asyncio.get_event_loop().create_task() -> asyncio.create_task()
+  Python 3.10+: get_event_loop() in non-main thread returns wrong loop or DeprecationWarning.
+  Python 3.12+: raises DeprecationWarning becoming RuntimeError.
+  asyncio.create_task() uses the RUNNING loop -> correct in all Python versions.
+
+HIGH-3 FIX: asyncio.Event() / asyncio.Lock() in __init__ -> lazy init
+  BackgroundScheduler() is often instantiated at module level (get_scheduler() singleton).
+  Event/Lock created outside running loop -> same RuntimeError as above on Python 3.12+.
+  Solution: lazy init in register() which is always called inside running loop.
+"""
 from __future__ import annotations
 import asyncio, logging, random, time
 from dataclasses import dataclass, field
@@ -29,18 +40,37 @@ class BackgroundScheduler:
 
     def __init__(self) -> None:
         self._registry: Dict[str, TaskInfo] = {}
-        self._shutdown = asyncio.Event()
-        self._lock = asyncio.Lock()
+        # HIGH-3 FIX: asyncio.Event() / asyncio.Lock() must NOT be created in __init__.
+        # BackgroundScheduler() is called at module level (get_scheduler() singleton).
+        # Creating Event/Lock outside a running event loop causes:
+        #   Python 3.10: DeprecationWarning: no current event loop
+        #   Python 3.12+: RuntimeError: no running event loop -> import crash
+        # Solution: lazy init in _ensure_primitives(), called from register() and shutdown()
+        # which are always called inside a running loop.
+        self._shutdown: Optional[asyncio.Event] = None
+        self._lock:     Optional[asyncio.Lock]  = None
+
+    def _ensure_primitives(self) -> None:
+        """Lazily create asyncio primitives inside the running event loop."""
+        if self._shutdown is None:
+            self._shutdown = asyncio.Event()
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
     def register(self, name: str, coro_fn: Callable[[], Coroutine[Any, Any, None]],
                  interval_s: float, jitter_s: float = 0.0, startup_delay_s: float = 0.0) -> None:
+        # HIGH-3 FIX: init primitives here (inside running loop, not in __init__)
+        self._ensure_primitives()
         if name in self._registry:
             logger.warning("[Scheduler] '%s' already registered", name); return
         if len(self._registry) >= self._MAX_REGISTRY:
             logger.error("[Scheduler] registry full (%d)", self._MAX_REGISTRY); return
         info = TaskInfo(name=name, interval_s=interval_s)
         self._registry[name] = info
-        info.task = asyncio.get_event_loop().create_task(
+        # HIGH-1 FIX: asyncio.get_event_loop().create_task() -> asyncio.create_task()
+        # get_event_loop() in non-main thread / uvicorn worker returns wrong loop.
+        # asyncio.create_task() always uses the CURRENTLY RUNNING loop.
+        info.task = asyncio.create_task(
             self._run_loop(name, coro_fn, interval_s, jitter_s, startup_delay_s),
             name=f"scheduler:{name}"
         )
@@ -48,6 +78,7 @@ class BackgroundScheduler:
 
     async def _run_loop(self, name: str, coro_fn: Callable[[], Coroutine[Any, Any, None]],
                         interval_s: float, jitter_s: float, startup_delay_s: float) -> None:
+        self._ensure_primitives()
         info = self._registry[name]
         if startup_delay_s > 0: await asyncio.sleep(startup_delay_s)
         while not self._shutdown.is_set():
@@ -76,6 +107,7 @@ class BackgroundScheduler:
         logger.info("[Scheduler] '%s' stopped", name)
 
     async def shutdown(self, timeout_s: float = 10.0) -> None:
+        self._ensure_primitives()
         logger.info("[Scheduler] shutdown %d tasks", len(self._registry))
         self._shutdown.set()
         tasks = [i.task for i in self._registry.values() if i.task and not i.task.done()]
