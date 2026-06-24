@@ -1,5 +1,4 @@
-"""
-Galaxy Vast AI Trading Platform
+"""Galaxy Vast AI Trading Platform
 Execution Service - FIX-1 + FIX-2
 
 FIX-1: Duplicate Order after Retry
@@ -9,10 +8,19 @@ FIX-1: Duplicate Order after Retry
 
 FIX-2: Retry Queue
   - asyncio.Queue passed to FailureRecoveryEngine
+
+CRITICAL-1 FIX: asyncio.Lock() module-level -> lazy init via _get_*_lock()
+  Python 3.12+: asyncio.Lock() at import time raises RuntimeError: no running event loop.
+  Also breaks on uvicorn --reload (lock detached from new loop).
+
+CRITICAL-2 FIX: self._pr.set_mt5(self._mt5) in start()
+  PositionReconciliation._mt5 was always None -> all duplicate checks returned False
+  -> MT5 received duplicate order_send() on every retry.
 """
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from typing import Any, Dict, Optional, Set
 
@@ -30,18 +38,38 @@ logger = get_logger("execution.execution_service")
 
 # FIX-1: idempotency store
 _IDEMPOTENCY_STORE: Dict[str, str] = {}
-_IDEMPOTENCY_LOCK = asyncio.Lock()
 _INFLIGHT_SIGNALS: Set[str] = set()
-_INFLIGHT_LOCK = asyncio.Lock()
 _IDEMPOTENCY_TTL = 600
 _IDEMPOTENCY_TIMESTAMPS: Dict[str, float] = {}
+
+# CRITICAL-1 FIX: asyncio.Lock() must NOT be created at module import time.
+# Python 3.10: DeprecationWarning; Python 3.12+: RuntimeError: no running event loop.
+# Also broken on uvicorn --reload: pre-existing lock detached from new event loop.
+# Solution: lazy init inside running event loop via getter functions.
+_IDEMPOTENCY_LOCK: Optional[asyncio.Lock] = None
+_INFLIGHT_LOCK:    Optional[asyncio.Lock] = None
+
+
+def _get_idempotency_lock() -> asyncio.Lock:
+    """Lazy-init idempotency lock. Always called from within a running event loop."""
+    global _IDEMPOTENCY_LOCK
+    if _IDEMPOTENCY_LOCK is None:
+        _IDEMPOTENCY_LOCK = asyncio.Lock()
+    return _IDEMPOTENCY_LOCK
+
+
+def _get_inflight_lock() -> asyncio.Lock:
+    """Lazy-init inflight lock. Always called from within a running event loop."""
+    global _INFLIGHT_LOCK
+    if _INFLIGHT_LOCK is None:
+        _INFLIGHT_LOCK = asyncio.Lock()
+    return _INFLIGHT_LOCK
 
 
 async def _idempotency_check(signal_id: str) -> Optional[str]:
     """Returns existing order_id if already executed, else None. Evicts stale keys."""
-    import time
     now = time.monotonic()
-    async with _IDEMPOTENCY_LOCK:
+    async with _get_idempotency_lock():
         stale = [k for k, ts in _IDEMPOTENCY_TIMESTAMPS.items() if now - ts > _IDEMPOTENCY_TTL]
         for k in stale:
             _IDEMPOTENCY_STORE.pop(k, None)
@@ -50,14 +78,13 @@ async def _idempotency_check(signal_id: str) -> Optional[str]:
 
 
 async def _idempotency_register(signal_id: str, order_id: str) -> None:
-    import time
-    async with _IDEMPOTENCY_LOCK:
+    async with _get_idempotency_lock():
         _IDEMPOTENCY_STORE[signal_id] = order_id
         _IDEMPOTENCY_TIMESTAMPS[signal_id] = time.monotonic()
 
 
 async def _idempotency_release(signal_id: str) -> None:
-    async with _IDEMPOTENCY_LOCK:
+    async with _get_idempotency_lock():
         _IDEMPOTENCY_STORE.pop(signal_id, None)
         _IDEMPOTENCY_TIMESTAMPS.pop(signal_id, None)
 
@@ -68,6 +95,8 @@ class ExecutionService:
     FIX-1: Idempotency key prevents duplicate orders after retry.
             Position reconciliation before every retry.
     FIX-2: asyncio.Queue in FailureRecoveryEngine.
+    CRITICAL-1: Module-level asyncio.Lock() replaced with lazy init.
+    CRITICAL-2: self._pr.set_mt5(self._mt5) called in start().
     T-1:   RiskOrchestrator.assess() before every order.
     T-2:   Signal dedup via _INFLIGHT_SIGNALS.
     T-3:   semi_auto driven by settings.SEMI_AUTO_MODE.
@@ -89,6 +118,12 @@ class ExecutionService:
         await self._osm.start()
         self._fr.set_retry_callback(self._retry_execute)
         await self._fr.start()
+        # CRITICAL-2 FIX: Wire MT5Connector into PositionReconciliation BEFORE start().
+        # Without this, self._pr._mt5 is always None:
+        #   - check_symbol_already_open() -> returns has_duplicate=False unconditionally
+        #   - verify_position_exists()    -> returns already_filled=False unconditionally
+        # Result: no duplicate detection -> MT5 receives duplicate order_send() on every retry.
+        self._pr.set_mt5(self._mt5)
         await self._pr.start()
         if self._semi_auto_enabled:
             await self._semi_auto.start()
@@ -110,7 +145,7 @@ class ExecutionService:
     async def execute_signal(self, signal: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
         signal_id = str(signal.get("signal_id") or uuid.uuid4())
         # T-2: concurrent dedup
-        async with _INFLIGHT_LOCK:
+        async with _get_inflight_lock():
             if signal_id in _INFLIGHT_SIGNALS:
                 logger.warning("Duplicate signal %s ignored (in-flight)", signal_id[:8])
                 return {"status": "duplicate", "signal_id": signal_id, "message": "Signal already in-flight"}
@@ -123,7 +158,7 @@ class ExecutionService:
                 return {"status": "already_executed", "signal_id": signal_id, "order_id": existing_order_id, "message": "Order was already placed for this signal"}
             return await self._execute_signal_inner(signal, signal_id, user_id)
         finally:
-            async with _INFLIGHT_LOCK:
+            async with _get_inflight_lock():
                 _INFLIGHT_SIGNALS.discard(signal_id)
 
     async def _execute_signal_inner(self, signal: Dict[str, Any], signal_id: str, user_id: Optional[int]) -> Dict[str, Any]:
