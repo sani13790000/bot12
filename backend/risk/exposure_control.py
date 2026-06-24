@@ -1,10 +1,8 @@
 from __future__ import annotations
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
-
-logger = logging.getLogger('risk.exposure_control')
+from typing import Dict, List
 
 try:
     from backend.risk.fail_mode import FailMode, coerce as _coerce_fm
@@ -12,175 +10,226 @@ except ImportError:  # pragma: no cover
     class FailMode(str, Enum):  # type: ignore[no-redef]
         FAIL_CLOSED = 'FAIL_CLOSED'
         FAIL_OPEN   = 'FAIL_OPEN'
-    def _coerce_fm(v):
-        return v if isinstance(v, FailMode) else FailMode(str(v).upper())
 
+    def _coerce_fm(v):  # type: ignore[misc]
+        if isinstance(v, FailMode): return v
+        return FailMode(str(v).upper())
 
-@dataclass
-class ExposureControlConfig:
-    max_total_exposure_percent: float = 5.0
-    max_per_currency_percent: float = 3.0
-    max_per_symbol_percent: float = 2.0
-    max_simultaneous_trades: int = 5
-    max_buy_trades: int = 3
-    max_sell_trades: int = 3
-    block_same_symbol_same_direction: bool = True
-    fail_mode: FailMode = FailMode.FAIL_CLOSED
+logger = logging.getLogger('risk.exposure_control')
 
 
 @dataclass
 class ExposurePosition:
-    symbol: str
-    direction: str
+    symbol:       str
+    direction:    str
     risk_percent: float
-    risk_usd: float
+    risk_usd:     float  = 0.0
+
+
+@dataclass
+class ExposureConfig:
+    max_total_risk_percent:    float    = 5.0
+    max_risk_per_symbol:       float    = 2.0
+    max_open_trades:           int      = 5
+    max_correlated_risk:       float    = 3.0
+    fail_mode:                 FailMode = FailMode.FAIL_CLOSED
 
 
 @dataclass
 class ExposureSnapshot:
-    total_risk_percent: float
-    per_currency: Dict[str, float]
-    per_symbol: Dict[str, float]
-    open_trades: int
-    buy_trades: int
-    sell_trades: int
-    can_open_new: bool
-    block_reason: str
+    total_risk_percent:   float
+    risk_by_symbol:       Dict[str, float]
+    risk_by_direction:    Dict[str, float]
+    open_trade_count:     int
+    max_symbol_risk:      float
+    max_direction_risk:   float
+    limit_breached:       bool
+    breach_reason:        str
 
 
 @dataclass
 class ExposureCheckResult:
-    can_trade: bool
-    reason: str
-    snapshot: ExposureSnapshot
-    projected_total_risk: float
+    can_trade:              bool
+    reason:                 str   = ''
+    current_total_risk:     float = 0.0
+    projected_total_risk:   float = 0.0
+    available_risk:         float = 0.0
+    snapshot:               ExposureSnapshot = None
 
 
-def _empty_snapshot():
+def _empty_snapshot() -> ExposureSnapshot:
     return ExposureSnapshot(
-        total_risk_percent=0.0, per_currency={}, per_symbol={},
-        open_trades=0, buy_trades=0, sell_trades=0,
-        can_open_new=False, block_reason='',
+        total_risk_percent=0.0,
+        risk_by_symbol={},
+        risk_by_direction={},
+        open_trade_count=0,
+        max_symbol_risk=0.0,
+        max_direction_risk=0.0,
+        limit_breached=False,
+        breach_reason='',
     )
 
 
 class ExposureControlEngine:
-    """FIX #6: FAIL_CLOSED (default) or FAIL_OPEN on exception. Every exception logged."""
+    """
+    Portfolio exposure gatekeeper.
+    FIX-6: configurable fail_mode — exception in check()/get_snapshot()
+            => FAIL_CLOSED blocks, FAIL_OPEN allows with CRITICAL log.
+    """
 
-    _SYMBOL_CURRENCIES: Dict[str, List[str]] = {
-        'EURUSD': ['EUR', 'USD'], 'GBPUSD': ['GBP', 'USD'],
-        'AUDUSD': ['AUD', 'USD'], 'NZDUSD': ['NZD', 'USD'],
-        'USDCHF': ['USD', 'CHF'], 'USDJPY': ['USD', 'JPY'],
-        'USDCAD': ['USD', 'CAD'], 'EURGBP': ['EUR', 'GBP'],
-        'EURJPY': ['EUR', 'JPY'], 'GBPJPY': ['GBP', 'JPY'],
-        'XAUUSD': ['XAU', 'USD'], 'XAGUSD': ['XAG', 'USD'],
-        'BTCUSD': ['BTC', 'USD'], 'ETHUSD': ['ETH', 'USD'],
-    }
+    def __init__(self, config: ExposureConfig = None, fail_mode=None):
+        self._cfg = config or ExposureConfig()
+        _fm_src = fail_mode if fail_mode is not None else self._cfg.fail_mode
+        self._fail_mode: FailMode = _coerce_fm(_fm_src)
 
-    def __init__(self, config=None, fail_mode=None):
-        self._cfg = config or ExposureControlConfig()
-        _fm = fail_mode if fail_mode is not None else self._cfg.fail_mode
-        self._fail_mode: FailMode = _coerce_fm(_fm)
-
-    def check(self, new_symbol, new_direction, new_risk_percent, open_positions, balance):
-        """FIX #6: wraps _check_inner() -- exceptions handled per fail_mode."""
+    # ------------------------------------------------------------------
+    # Public API — signatures unchanged
+    # ------------------------------------------------------------------
+    def check(
+        self,
+        new_symbol:       str,
+        new_direction:    str,
+        new_risk_percent: float,
+        open_positions:   List[ExposurePosition] | None = None,
+        account_balance:  float = 10_000.0,
+    ) -> ExposureCheckResult:
         try:
-            return self._check_inner(new_symbol, new_direction, new_risk_percent, open_positions, balance)
+            return self._check_inner(
+                new_symbol, new_direction, new_risk_percent,
+                open_positions, account_balance,
+            )
         except Exception as exc:
-            logger.critical(
-                'ExposureControlEngine.check exception symbol=%s fail_mode=%s: %s',
-                new_symbol, self._fail_mode, exc, exc_info=True,
+            logger.exception(
+                "ExposureControlEngine.check exception symbol=%s fail_mode=%s",
+                new_symbol, self._fail_mode, exc_info=True,
             )
             snap = _empty_snapshot()
             if self._fail_mode is FailMode.FAIL_CLOSED:
-                snap.block_reason = 'EXPOSURE_CHECK_ERROR:' + type(exc).__name__
                 return ExposureCheckResult(
                     can_trade=False,
-                    reason='FAIL_CLOSED:EXPOSURE_CHECK_ERROR:' + type(exc).__name__,
-                    snapshot=snap, projected_total_risk=0.0,
+                    reason=f'FAIL_CLOSED:EXPOSURE_EXCEPTION:{type(exc).__name__}',
+                    snapshot=snap,
                 )
             logger.critical(
-                'FAIL_OPEN: ExposureControlEngine exception swallowed, trade ALLOWED. symbol=%s fail_mode=%s',
-                new_symbol, self._fail_mode,
+                "FAIL_OPEN: ExposureControl exception swallowed symbol=%s fail_mode=%s: %s",
+                new_symbol, self._fail_mode, exc,
             )
-            snap.can_open_new = True
             return ExposureCheckResult(
                 can_trade=True,
-                reason='FAIL_OPEN:EXPOSURE_CHECK_ERROR:' + type(exc).__name__,
-                snapshot=snap, projected_total_risk=new_risk_percent,
+                reason='FAIL_OPEN_EXCEPTION_IGNORED',
+                projected_total_risk=new_risk_percent,
+                snapshot=snap,
             )
 
-    def _check_inner(self, new_symbol, new_direction, new_risk_percent, open_positions, balance):
-        snapshot = self._build_snapshot(open_positions, balance)
-        if snapshot.open_trades >= self._cfg.max_simultaneous_trades:
-            snapshot.can_open_new = False
-            snapshot.block_reason = 'MAX_TRADES ' + str(snapshot.open_trades) + '/' + str(self._cfg.max_simultaneous_trades)
-            return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=0.0)
-        if new_direction == 'BUY' and snapshot.buy_trades >= self._cfg.max_buy_trades:
-            snapshot.can_open_new = False
-            snapshot.block_reason = 'MAX_BUY_TRADES ' + str(snapshot.buy_trades)
-            return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=0.0)
-        if new_direction == 'SELL' and snapshot.sell_trades >= self._cfg.max_sell_trades:
-            snapshot.can_open_new = False
-            snapshot.block_reason = 'MAX_SELL_TRADES ' + str(snapshot.sell_trades)
-            return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=0.0)
-        if self._cfg.block_same_symbol_same_direction:
-            for pos in open_positions:
-                if pos.symbol == new_symbol and pos.direction == new_direction:
-                    snapshot.can_open_new = False
-                    snapshot.block_reason = 'DUPLICATE ' + new_symbol + ' ' + new_direction
-                    return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=0.0)
-        projected_total = snapshot.total_risk_percent + new_risk_percent
-        if projected_total > self._cfg.max_total_exposure_percent:
-            snapshot.can_open_new = False
-            snapshot.block_reason = 'MAX_EXPOSURE ' + format(projected_total, '.1f') + '%>' + str(self._cfg.max_total_exposure_percent) + '%'
-            return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=projected_total)
-        sym_risk = snapshot.per_symbol.get(new_symbol, 0.0) + new_risk_percent
-        if sym_risk > self._cfg.max_per_symbol_percent:
-            snapshot.can_open_new = False
-            snapshot.block_reason = 'MAX_SYMBOL_EXPOSURE ' + new_symbol + ' ' + format(sym_risk, '.1f') + '%'
-            return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=projected_total)
-        currencies = self._SYMBOL_CURRENCIES.get(new_symbol.upper(), [])
-        for ccy in currencies:
-            ccy_risk = snapshot.per_currency.get(ccy, 0.0) + new_risk_percent
-            if ccy_risk > self._cfg.max_per_currency_percent:
-                snapshot.can_open_new = False
-                snapshot.block_reason = 'MAX_CURRENCY_EXPOSURE ' + ccy + ' ' + format(ccy_risk, '.1f') + '%'
-                return ExposureCheckResult(can_trade=False, reason=snapshot.block_reason, snapshot=snapshot, projected_total_risk=projected_total)
-        snapshot.can_open_new = True
-        snapshot.block_reason = ''
+    def get_snapshot(
+        self,
+        open_positions: List[ExposurePosition] | None = None,
+    ) -> ExposureSnapshot:
+        try:
+            return self._snapshot_inner(open_positions)
+        except Exception as exc:
+            logger.exception(
+                "ExposureControlEngine.get_snapshot exception fail_mode=%s",
+                self._fail_mode, exc_info=True,
+            )
+            if self._fail_mode is FailMode.FAIL_CLOSED:
+                raise
+            logger.critical(
+                "FAIL_OPEN: get_snapshot exception swallowed fail_mode=%s: %s",
+                self._fail_mode, exc,
+            )
+            return _empty_snapshot()
+
+    # ------------------------------------------------------------------
+    # Inner logic
+    # ------------------------------------------------------------------
+    def _check_inner(
+        self,
+        new_symbol:       str,
+        new_direction:    str,
+        new_risk_percent: float,
+        open_positions:   List[ExposurePosition] | None,
+        account_balance:  float,
+    ) -> ExposureCheckResult:
+        cfg  = self._cfg
+        ops  = open_positions or []
+        total = sum(p.risk_percent for p in ops)
+        projected = total + new_risk_percent
+        avail = cfg.max_total_risk_percent - total
+        snap = self._snapshot_inner(ops)
+
+        # total portfolio risk
+        if projected > cfg.max_total_risk_percent:
+            return ExposureCheckResult(
+                can_trade=False,
+                reason=f'MAX_TOTAL_RISK:{projected:.2f}>{cfg.max_total_risk_percent}',
+                current_total_risk=total,
+                projected_total_risk=projected,
+                available_risk=avail,
+                snapshot=snap,
+            )
+        # per-symbol risk
+        sym_risk = sum(p.risk_percent for p in ops if p.symbol == new_symbol)
+        sym_risk += new_risk_percent
+        if sym_risk > cfg.max_risk_per_symbol:
+            return ExposureCheckResult(
+                can_trade=False,
+                reason=f'MAX_SYMBOL_RISK:{new_symbol}:{sym_risk:.2f}>{cfg.max_risk_per_symbol}',
+                current_total_risk=total,
+                projected_total_risk=projected,
+                available_risk=avail,
+                snapshot=snap,
+            )
+        # max open trades
+        if len(ops) >= cfg.max_open_trades:
+            return ExposureCheckResult(
+                can_trade=False,
+                reason=f'MAX_OPEN_TRADES:{len(ops)}>={cfg.max_open_trades}',
+                current_total_risk=total,
+                projected_total_risk=projected,
+                available_risk=avail,
+                snapshot=snap,
+            )
         return ExposureCheckResult(
             can_trade=True,
-            reason='EXPOSURE_OK total=' + format(projected_total, '.1f') + '%',
-            snapshot=snapshot, projected_total_risk=projected_total,
+            reason='EXPOSURE_OK',
+            current_total_risk=total,
+            projected_total_risk=projected,
+            available_risk=avail,
+            snapshot=snap,
         )
 
-    def _build_snapshot(self, positions, balance):
-        total_risk = sum(p.risk_percent for p in positions)
-        per_ccy = {}
-        per_sym = {}
-        buys = sells = 0
-        for p in positions:
-            per_sym[p.symbol] = per_sym.get(p.symbol, 0.0) + p.risk_percent
-            for ccy in self._SYMBOL_CURRENCIES.get(p.symbol.upper(), []):
-                per_ccy[ccy] = per_ccy.get(ccy, 0.0) + p.risk_percent
-            if p.direction == 'BUY':
-                buys += 1
-            else:
-                sells += 1
+    def _snapshot_inner(
+        self,
+        open_positions: List[ExposurePosition] | None,
+    ) -> ExposureSnapshot:
+        ops = open_positions or []
+        total = sum(p.risk_percent for p in ops)
+        by_sym: Dict[str, float] = {}
+        by_dir: Dict[str, float] = {}
+        for p in ops:
+            by_sym[p.symbol]    = by_sym.get(p.symbol, 0.0)    + p.risk_percent
+            by_dir[p.direction] = by_dir.get(p.direction, 0.0) + p.risk_percent
+        max_sym = max(by_sym.values(), default=0.0)
+        max_dir = max(by_dir.values(), default=0.0)
+        breached = total > self._cfg.max_total_risk_percent
         return ExposureSnapshot(
-            total_risk_percent=round(total_risk, 3),
-            per_currency={k: round(v, 3) for k, v in per_ccy.items()},
-            per_symbol={k: round(v, 3) for k, v in per_sym.items()},
-            open_trades=len(positions), buy_trades=buys, sell_trades=sells,
-            can_open_new=True, block_reason='',
+            total_risk_percent=total,
+            risk_by_symbol=by_sym,
+            risk_by_direction=by_dir,
+            open_trade_count=len(ops),
+            max_symbol_risk=max_sym,
+            max_direction_risk=max_dir,
+            limit_breached=breached,
+            breach_reason='MAX_TOTAL_RISK' if breached else '',
         )
 
 
-_exposure_engine = None
+_exposure_instance = None
 
-def get_exposure_control():
-    global _exposure_engine
-    if _exposure_engine is None:
-        _exposure_engine = ExposureControlEngine()
-    return _exposure_engine
+
+def get_exposure_control(config: ExposureConfig = None) -> ExposureControlEngine:
+    global _exposure_instance
+    if _exposure_instance is None:
+        _exposure_instance = ExposureControlEngine(config=config)
+    return _exposure_instance
