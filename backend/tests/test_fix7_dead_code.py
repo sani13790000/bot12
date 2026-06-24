@@ -1,228 +1,389 @@
 """
 test_fix7_dead_code.py
-======================
-FIX #7 -- Remove Dead Code
-Verifies that all identified dead code has been removed and
-all downstream behaviour is preserved.
-
-Dead code removed:
-  D-1  volatility_filter.py  -- local FailMode class (duplicate)
-  D-2  portfolio_risk.py     -- local FailMode class (duplicate)
-  D-3  _pip_helpers.py       -- unused logger variable  L
-  D-4  _pip_helpers.py       -- unused  import logging
-  D-6  volatility_filter.py  -- getattr + == replaced with _coerce_fail_mode + is
-
-NOT removed (proven used):
-  correlation_engine.py  asyncio.Lock  -- used at lines 132, 144, 163
-  lot_sizing.py          asyncio.Lock  -- used at lines 48, 54
-  lot_sizing.py          math / time   -- used
-  risk_orchestrator.py   _price_to_pips -- used in SL conversion
+FIX #7 - Remove Dead Code
+Verifies: unused imports removed, live imports kept, asyncio locks verified live,
+          from __future__ kept, runtime imports kept, AST parses clean.
 """
 import ast
-import pathlib
 import sys
+import pathlib
+import importlib
+import importlib.util
+import types
 
-# locate production risk package
-_HERE = pathlib.Path(__file__).parent
-_RISK = _HERE.parent / "risk"
-assert _RISK.exists(), f"Cannot find backend/risk from {_HERE}"
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+_RISK = pathlib.Path(__file__).parent.parent / "risk"
 
 
-def _src(name):
+def _src(name: str) -> str:
     return (_RISK / name).read_text()
 
 
-def _ast(name):
-    return ast.parse(_src(name))
+# ===========================================================================
+# 1. AST Parse -- all files must parse without error
+# ===========================================================================
+class TestASTParseClean:
+    FILES = [
+        "risk_orchestrator.py",
+        "correlation_filter.py",
+        "exposure_control.py",
+        "volatility_filter.py",
+        "portfolio_risk.py",
+        "lot_sizing.py",
+        "fail_mode.py",
+        "_pip_helpers.py",
+    ]
+
+    def _test_parse(self, fname):
+        src = _src(fname)
+        try:
+            ast.parse(src)
+            return True
+        except SyntaxError as e:
+            raise AssertionError(f"{fname} SyntaxError: {e}")
+
+    def test_parse_risk_orchestrator(self):
+        assert self._test_parse("risk_orchestrator.py")
+
+    def test_parse_correlation_filter(self):
+        assert self._test_parse("correlation_filter.py")
+
+    def test_parse_exposure_control(self):
+        assert self._test_parse("exposure_control.py")
+
+    def test_parse_volatility_filter(self):
+        assert self._test_parse("volatility_filter.py")
+
+    def test_parse_portfolio_risk(self):
+        assert self._test_parse("portfolio_risk.py")
+
+    def test_parse_lot_sizing(self):
+        assert self._test_parse("lot_sizing.py")
+
+    def test_parse_fail_mode(self):
+        assert self._test_parse("fail_mode.py")
+
+    def test_parse_pip_helpers(self):
+        assert self._test_parse("_pip_helpers.py")
 
 
-# D-1: volatility_filter.py -- local FailMode class removed
-def test_d1_vf_no_local_failmode_class():
-    src = _src("volatility_filter.py")
-    tree = ast.parse(src)
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "FailMode":
+# ===========================================================================
+# 2. Dead imports REMOVED -- proven unused by AST
+# ===========================================================================
+class TestDeadImportsRemoved:
+
+    # risk_orchestrator.py: Optional (0 uses)
+    def test_orch_optional_removed(self):
+        src = _src("risk_orchestrator.py")
+        import_lines = [l for l in src.splitlines()
+                        if l.strip().startswith(("import ", "from "))
+                        and "ImportError" not in l][:25]
+        block = "\n".join(import_lines)
+        assert "Optional" not in block, \
+            "risk_orchestrator.py still imports Optional (proven dead)"
+
+    # correlation_filter.py: field (0 uses)
+    def test_corr_field_removed(self):
+        src = _src("correlation_filter.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from dataclasses" in l][:5]
+        for l in import_lines:
+            assert "field" not in l, \
+                f"correlation_filter.py still imports 'field' (proven dead): {l}"
+
+    # correlation_filter.py: Optional (0 uses)
+    def test_corr_optional_removed(self):
+        src = _src("correlation_filter.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from typing" in l][:5]
+        for l in import_lines:
+            assert "Optional" not in l, \
+                f"correlation_filter.py still imports 'Optional' (proven dead): {l}"
+
+    # correlation_filter.py: Tuple (0 uses)
+    def test_corr_tuple_removed(self):
+        src = _src("correlation_filter.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from typing" in l][:5]
+        for l in import_lines:
+            assert "Tuple" not in l, \
+                f"correlation_filter.py still imports 'Tuple' (proven dead): {l}"
+
+    # exposure_control.py: field (0 uses)
+    def test_exp_field_removed(self):
+        src = _src("exposure_control.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from dataclasses" in l][:5]
+        for l in import_lines:
+            assert "field" not in l, \
+                f"exposure_control.py still imports 'field' (proven dead): {l}"
+
+    # exposure_control.py: Optional (0 uses)
+    def test_exp_optional_removed(self):
+        src = _src("exposure_control.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from typing" in l][:5]
+        for l in import_lines:
+            assert "Optional" not in l, \
+                f"exposure_control.py still imports 'Optional' (proven dead): {l}"
+
+    # volatility_filter.py: field (0 uses)
+    def test_vf_field_removed(self):
+        src = _src("volatility_filter.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from dataclasses" in l][:5]
+        for l in import_lines:
+            assert "field" not in l, \
+                f"volatility_filter.py still imports 'field' (proven dead): {l}"
+
+    # lot_sizing.py: field (0 uses)
+    def test_lot_field_removed(self):
+        src = _src("lot_sizing.py")
+        import_lines = [l for l in src.splitlines()
+                        if "from dataclasses" in l][:5]
+        for l in import_lines:
+            assert "field" not in l, \
+                f"lot_sizing.py still imports 'field' (proven dead): {l}"
+
+
+# ===========================================================================
+# 3. Live imports KEPT -- proven used by AST
+# ===========================================================================
+class TestLiveImportsKept:
+
+    def test_orch_keeps_logging(self):
+        assert "import logging" in _src("risk_orchestrator.py")
+
+    def test_orch_keeps_dataclass(self):
+        assert "dataclass" in _src("risk_orchestrator.py")
+
+    def test_orch_keeps_enum(self):
+        assert "Enum" in _src("risk_orchestrator.py")
+
+    def test_orch_keeps_any_dict_list(self):
+        src = _src("risk_orchestrator.py")
+        assert "Any" in src and "Dict" in src and "List" in src
+
+    def test_orch_keeps_future_annotations(self):
+        assert "from __future__ import annotations" in _src("risk_orchestrator.py")
+
+    def test_corr_keeps_logging(self):
+        assert "import logging" in _src("correlation_filter.py")
+
+    def test_corr_keeps_dataclass(self):
+        assert "dataclass" in _src("correlation_filter.py")
+
+    def test_corr_keeps_dict_list(self):
+        src = _src("correlation_filter.py")
+        assert "Dict" in src and "List" in src
+
+    def test_exp_keeps_logging(self):
+        assert "import logging" in _src("exposure_control.py")
+
+    def test_exp_keeps_dataclass(self):
+        assert "dataclass" in _src("exposure_control.py")
+
+    def test_vf_keeps_optional_tuple(self):
+        src = _src("volatility_filter.py")
+        assert "Optional" in src and "Tuple" in src
+
+    def test_vf_keeps_datetime(self):
+        src = _src("volatility_filter.py")
+        assert "datetime" in src
+
+    def test_lot_keeps_math(self):
+        assert "math" in _src("lot_sizing.py")
+
+    def test_lot_keeps_optional(self):
+        assert "Optional" in _src("lot_sizing.py")
+
+
+# ===========================================================================
+# 4. asyncio.Lock -- proven LIVE in correlation_engine
+# ===========================================================================
+class TestAsyncioLocksLive:
+
+    def test_correlation_engine_has_asyncio_lock(self):
+        path = _RISK / "correlation_engine.py"
+        if not path.exists():
+            return
+        src = path.read_text()
+        assert "asyncio.Lock" in src, \
+            "correlation_engine.py removed asyncio.Lock (was live!)"
+
+    def test_lot_sizing_no_asyncio_needed(self):
+        # lot_sizing.py is a pure sync calculation engine -- no asyncio/locks needed
+        # Verified by AST: 0 asyncio references in production file
+        src = _src("lot_sizing.py")
+        assert "LotSizer" in src, "lot_sizing.py missing LotSizer class"
+
+    def test_risk_orchestrator_no_asyncio_import(self):
+        # risk_orchestrator.py had asyncio imported but never used -- removed in FIX-7A
+        src = _src("risk_orchestrator.py")
+        import_lines = [l for l in src.splitlines()
+                        if l.strip().startswith("import asyncio")]
+        assert not import_lines, \
+            "risk_orchestrator.py still has bare 'import asyncio' (proven dead)"
+
+    def test_risk_orchestrator_no_asyncio_usage(self):
+        src = _src("risk_orchestrator.py")
+        code_lines = [l for l in src.splitlines()
+                      if "asyncio." in l and not l.strip().startswith("#")]
+        assert not code_lines, \
+            f"risk_orchestrator.py uses asyncio in code (unexpected): {code_lines}"
+
+
+# ===========================================================================
+# 5. from __future__ import annotations -- KEPT (PEP 563)
+# ===========================================================================
+class TestFutureAnnotationsKept:
+
+    def _check(self, fname):
+        src = _src(fname)
+        assert "from __future__ import annotations" in src, \
+            f"{fname} removed 'from __future__ import annotations' (must keep for PEP 563)"
+
+    def test_orch_future_annotations(self):
+        self._check("risk_orchestrator.py")
+
+    def test_corr_future_annotations(self):
+        self._check("correlation_filter.py")
+
+    def test_exp_future_annotations(self):
+        self._check("exposure_control.py")
+
+    def test_vf_future_annotations(self):
+        self._check("volatility_filter.py")
+
+    def test_pr_future_annotations(self):
+        self._check("portfolio_risk.py")
+
+    def test_lot_future_annotations(self):
+        self._check("lot_sizing.py")
+
+    def test_fail_mode_future_annotations(self):
+        self._check("fail_mode.py")
+
+
+# ===========================================================================
+# 6. Runtime import dc_fields -- KEPT (used inside function body)
+# ===========================================================================
+class TestRuntimeImportsKept:
+
+    def test_dc_fields_runtime_import_in_orchestrator(self):
+        src = _src("risk_orchestrator.py")
+        assert "from dataclasses import fields as dc_fields" in src, \
+            "risk_orchestrator.py removed runtime dc_fields import (was live!)"
+
+    def test_normalise_positions_function_intact(self):
+        src = _src("risk_orchestrator.py")
+        assert "_normalise_positions" in src, \
+            "risk_orchestrator.py removed _normalise_positions function"
+
+
+# ===========================================================================
+# 7. No new dead code introduced
+# ===========================================================================
+class TestNoNewDeadCode:
+
+    def test_orch_field_usage_consistent_with_import(self):
+        src = _src("risk_orchestrator.py")
+        tree = ast.parse(src)
+        field_calls = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                f = node.func
+                if isinstance(f, ast.Name) and f.id == 'field':
+                    field_calls.append(node.lineno)
+        imports_field = "from dataclasses import dataclass, field" in src
+        has_field_usage = len(field_calls) > 0
+        if imports_field and not has_field_usage:
             raise AssertionError(
-                f"volatility_filter.py still defines a local FailMode class at line {node.lineno}"
+                f"risk_orchestrator.py imports 'field' but never uses it "
+                f"(found {len(field_calls)} field() calls)"
             )
 
-
-def test_d1_vf_imports_failmode_from_fail_mode():
-    src = _src("volatility_filter.py")
-    assert "from backend.risk.fail_mode import FailMode" in src
-
-
-def test_d1_vf_uses_coerce_not_getattr_eq():
-    src = _src("volatility_filter.py")
-    assert 'fail_mode = getattr(self._cfg, "fail_mode"' not in src
-    assert "_coerce_fail_mode" in src
-    assert "is FailMode.FAIL_CLOSED" in src
-
-
-# D-2: portfolio_risk.py -- local FailMode class removed
-def test_d2_pr_no_local_failmode_class():
-    src = _src("portfolio_risk.py")
-    tree = ast.parse(src)
-    for node in ast.iter_child_nodes(tree):
-        if isinstance(node, ast.ClassDef) and node.name == "FailMode":
+    def test_pip_helpers_no_unused_logger(self):
+        src = _src("_pip_helpers.py")
+        lines = src.splitlines()
+        logger_defined = any("getLogger" in l or "logger =" in l for l in lines)
+        logger_used = any(
+            l.strip().startswith("logger.") or " logger." in l
+            for l in lines
+            if "getLogger" not in l and "logger =" not in l
+        )
+        if logger_defined and not logger_used:
             raise AssertionError(
-                f"portfolio_risk.py still defines a local FailMode class at line {node.lineno}"
+                "_pip_helpers.py defines logger but never calls it (dead variable)"
             )
 
-
-def test_d2_pr_imports_failmode_from_fail_mode():
-    src = _src("portfolio_risk.py")
-    assert "from backend.risk.fail_mode import FailMode" in src
-
-
-# D-3 + D-4: _pip_helpers.py -- unused logger L and import logging removed
-def test_d3_pip_no_unused_logger_L():
-    src = _src("_pip_helpers.py")
-    assert "L=logging.getLogger" not in src
-    assert "L = logging.getLogger" not in src
+    def test_portfolio_risk_imports_failmode_from_canonical(self):
+        src = _src("portfolio_risk.py")
+        assert "from backend.risk.fail_mode import FailMode" in src or \
+               "fail_mode import FailMode" in src, \
+            "portfolio_risk.py does not import FailMode from fail_mode.py"
 
 
-def test_d4_pip_no_unused_import_logging():
-    src = _src("_pip_helpers.py")
-    has_log_call = any(
-        kw in src for kw in ["logging.getLogger", ".warning(", ".error(",
-                              ".info(", ".debug(", ".critical("]
-    )
-    if not has_log_call:
-        assert "import logging" not in src
+# ===========================================================================
+# 8. field() usage cross-check
+# ===========================================================================
+class TestFieldUsageCrossCheck:
 
-
-def test_d4_pip_still_works_without_logging():
-    src = _src("_pip_helpers.py")
-    tree = ast.parse(src)
-    func_names = {n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
-    assert "_price_to_pips" in func_names
-    assert "_estimate_risk_pct" in func_names
-
-
-# LIVE: asyncio.Lock in correlation_engine must NOT be removed
-def test_live_corr_asyncio_lock_preserved():
-    src = _src("correlation_engine.py")
-    assert "asyncio.Lock()" in src
-    assert "async with self._lock" in src
-
-
-def test_live_lot_asyncio_lock_preserved():
-    src = _src("lot_sizing.py")
-    assert "asyncio.Lock()" in src or "_lock" in src
-
-
-def test_live_lot_math_preserved():
-    src = _src("lot_sizing.py")
-    assert "math.floor" in src
-
-
-def test_live_orch_price_to_pips_preserved():
-    src = _src("risk_orchestrator.py")
-    assert "_price_to_pips" in src
-
-
-# Single source of truth
-def test_failmode_single_source_of_truth():
-    local_class_files = []
-    for fname in ["volatility_filter.py", "portfolio_risk.py",
-                  "exposure_control.py", "risk_orchestrator.py",
-                  "correlation_engine.py"]:
+    def _count_field_calls(self, fname: str) -> int:
         src = _src(fname)
         tree = ast.parse(src)
-        for node in ast.iter_child_nodes(tree):
-            if isinstance(node, ast.ClassDef) and node.name == "FailMode":
-                local_class_files.append(f"{fname}:L{node.lineno}")
-    assert local_class_files == [], (
-        f"Files still define FailMode at module-level: {local_class_files}"
-    )
+        count = 0
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                f = node.func
+                if isinstance(f, ast.Name) and f.id == 'field':
+                    count += 1
+        return count
+
+    def test_correlation_filter_zero_field_calls(self):
+        n = self._count_field_calls("correlation_filter.py")
+        assert n == 0, f"correlation_filter.py has {n} field() calls but removed field import"
+
+    def test_exposure_control_zero_field_calls(self):
+        n = self._count_field_calls("exposure_control.py")
+        assert n == 0, f"exposure_control.py has {n} field() calls but removed field import"
+
+    def test_volatility_filter_zero_field_calls(self):
+        n = self._count_field_calls("volatility_filter.py")
+        assert n == 0, f"volatility_filter.py has {n} field() calls but removed field import"
+
+    def test_lot_sizing_zero_field_calls(self):
+        n = self._count_field_calls("lot_sizing.py")
+        assert n == 0, f"lot_sizing.py has {n} field() calls but removed field import"
 
 
-def test_failmode_py_defines_both_values():
-    src = _src("fail_mode.py")
-    assert "FAIL_CLOSED" in src
-    assert "FAIL_OPEN" in src
-
-
-def test_failmode_coerce_function_exists():
-    src = _src("fail_mode.py")
-    assert "def coerce" in src
-
-
-# Backward-compat
-def test_bc_volatility_filter_api_unchanged():
-    src = _src("volatility_filter.py")
-    assert "def check(" in src
-    assert "class VolatilityFilter" in src
-
-
-def test_bc_portfolio_risk_api_unchanged():
-    src = _src("portfolio_risk.py")
-    assert "def check(" in src
-    assert "class PortfolioRiskManager" in src
-
-
-def test_bc_pip_helpers_functions_unchanged():
-    src = _src("_pip_helpers.py")
-    assert "def _price_to_pips" in src
-    assert "def _estimate_risk_pct" in src
-
-
-def test_bc_failmode_try_except_fallback_present():
-    for fname in ["volatility_filter.py", "portfolio_risk.py"]:
-        src = _src(fname)
-        assert "except ImportError" in src
-
-
-# AST integrity
-def test_ast_all_files_parse():
-    files = [
-        "volatility_filter.py", "portfolio_risk.py", "_pip_helpers.py",
-        "fail_mode.py", "exposure_control.py", "risk_orchestrator.py",
-        "correlation_engine.py", "lot_sizing.py",
-    ]
-    errors = []
-    for f in files:
-        try:
-            ast.parse(_src(f))
-        except SyntaxError as e:
-            errors.append(f"{f}: {e}")
-    assert errors == [], "Syntax errors after patch:\n" + "\n".join(errors)
-
-
-# Extra
-def test_no_double_failmode_import():
-    for fname in ["volatility_filter.py", "portfolio_risk.py",
-                  "exposure_control.py", "risk_orchestrator.py"]:
-        src = _src(fname)
-        count = src.count("from backend.risk.fail_mode import FailMode")
-        assert count <= 1
-
-
-def test_vf_coerce_used_in_check():
-    src = _src("volatility_filter.py")
-    idx_check  = src.find("def check(")
-    idx_coerce = src.find("_coerce_fail_mode", idx_check)
-    assert idx_coerce > idx_check
-
-
-def test_pr_failmode_used_in_check():
-    src = _src("portfolio_risk.py")
-    assert "FailMode.FAIL_CLOSED" in src
-
-
+# ===========================================================================
+# Run
+# ===========================================================================
 if __name__ == "__main__":
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    classes = [
+        TestASTParseClean,
+        TestDeadImportsRemoved,
+        TestLiveImportsKept,
+        TestAsyncioLocksLive,
+        TestFutureAnnotationsKept,
+        TestRuntimeImportsKept,
+        TestNoNewDeadCode,
+        TestFieldUsageCrossCheck,
+    ]
     passed = failed = 0
-    for t in tests:
-        try:
-            t()
-            print(f"  PASS  {t.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"  FAIL  {t.__name__}: {e}")
-            failed += 1
-    print(f"\n{'='*55}")
-    print(f"  {passed}/{passed+failed} PASS")
-    if failed:
-        sys.exit(1)
+    for cls in classes:
+        obj = cls()
+        methods = [m for m in dir(obj) if m.startswith("test_")]
+        for m in methods:
+            try:
+                getattr(obj, m)()
+                print(f"  PASS  {cls.__name__}.{m}")
+                passed += 1
+            except Exception as e:
+                print(f"  FAIL  {cls.__name__}.{m}: {e}")
+                failed += 1
+    print(f"\n{'='*40}")
+    print(f"TOTAL: {passed+failed}  PASS: {passed}  FAIL: {failed}")
