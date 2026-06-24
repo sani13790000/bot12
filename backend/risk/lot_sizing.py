@@ -4,7 +4,7 @@ Galaxy Vast AI Trading Platform
 Dynamic Lot Sizing & ATR Position Sizing Engine
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 import math
@@ -26,163 +26,166 @@ class LotSizingConfig:
     min_lot: float = 0.01
     max_lot: float = 5.0
     lot_step: float = 0.01
-    atr_multiplier: float = 1.5         # SL = ATR × multiplier
+    atr_multiplier: float = 1.5         # SL = ATR x multiplier
     kelly_fraction: float = 0.25        # fractional Kelly
-    max_risk_percent: float = 2.0       # hard cap per trade
-    pip_value_usd: float = 10.0         # per standard lot per pip
-    contract_size: float = 100_000.0    # standard lot size
+
+
+# ---------------------------------------------------------------------------
+# Pip value table  ($ per pip per standard lot)
+# ---------------------------------------------------------------------------
+_PIP_VALUE_TABLE = {
+    # Forex majors / minors
+    "EURUSD": 10.0,  "GBPUSD": 10.0,  "AUDUSD": 10.0,  "NZDUSD": 10.0,
+    "USDCAD": 10.0,  "USDCHF": 10.0,  "USDJPY": 9.09,
+    "EURGBP": 10.0,  "EURJPY": 9.09,  "GBPJPY": 9.09,
+    "CADJPY": 9.09,  "AUDJPY": 9.09,  "CHFJPY": 9.09,
+    # Metals
+    "XAUUSD":  1.0,   # Gold   — pip=$0.01, 100 oz lot
+    "XAGUSD": 50.0,   # Silver — pip=$0.001, 5000 oz lot  (FIX #4)
+    "XPTUSD": 10.0,   # Platinum
+    # Crypto
+    "BTCUSD": 1.0,   "ETHUSD": 1.0,   "LTCUSD": 1.0,
+    "BNBUSD": 1.0,   "XRPUSD": 1.0,
+    # Indices
+    "US30":   1.0,   "SPX500": 1.0,   "NAS100": 1.0,
+    "GER40":  1.0,   "UK100":  1.0,   "JPN225": 1.0,
+    "AUS200": 1.0,   "FRA40":  1.0,
+    # Energy
+    "USOIL":  10.0,  "UKOIL":  10.0,
+}
+
+# Aliases: broker names -> canonical symbol
+_SYMBOL_ALIASES = {
+    "GOLD":   "XAUUSD",  "SILVER":  "XAGUSD",
+    "XAUUSD": "XAUUSD",  "XAGUSD":  "XAGUSD",
+    "BTC":    "BTCUSD",  "BITCOIN": "BTCUSD",
+    "ETH":    "ETHUSD",  "ETHEREUM":"ETHUSD",
+    "DAX":    "GER40",   "DAX40":   "GER40",
+    "NASDAQ": "NAS100",  "DOW":     "US30",
+    "SP500":  "SPX500",  "FTSE":    "UK100",
+    "NIKKEI": "JPN225",  "ASX200":  "AUS200",
+}
+
+
+def _resolve_pip_value(symbol: str) -> float:
+    """Resolve pip value with alias and broker-suffix handling."""
+    sym = symbol.upper().strip()
+    # 1. alias
+    canonical = _SYMBOL_ALIASES.get(sym, sym)
+    if canonical in _PIP_VALUE_TABLE:
+        return _PIP_VALUE_TABLE[canonical]
+    # 2. suffix strip (broker variants: EURUSDm, XAUUSDpro, etc.)
+    for n in range(1, 5):
+        stripped = sym[:-n].upper()
+        c2 = _SYMBOL_ALIASES.get(stripped, stripped)
+        if c2 in _PIP_VALUE_TABLE:
+            return _PIP_VALUE_TABLE[c2]
+    # 3. fallback
+    if sym.endswith("JPY") or canonical.endswith("JPY"):
+        return 9.09
+    if sym.endswith("USD") or canonical.endswith("USD"):
+        return 10.0
+    return 10.0
 
 
 @dataclass
-class LotSizingResult:
-    lot_size: float
-    method_used: LotSizingMethod
-    risk_amount_usd: float
+class LotSizeResult:
+    lot_size:     float
     risk_percent: float
-    stop_loss_pips: float
-    atr_value: float
-    balance: float
-    notes: str = ""
+    risk_usd:     float
+    method:       str
+    details:      dict = None
+
+    def __post_init__(self):
+        if self.details is None:
+            self.details = {}
 
 
-class DynamicLotSizer:
+class UnknownSymbolError(ValueError):
+    pass
+
+
+class LotSizer:
     """
-    Production-grade Dynamic Lot Sizer supporting:
-    - ATR-based position sizing (primary method)
-    - Fixed % risk
-    - Kelly Criterion (capped)
-    - Volatility-adjusted sizing
-    - Hard lot limits enforcement
+    Calculates position size based on configured method.
+    FIX #4: get_pip_value() uses broker-aware resolution (alias + suffix strip).
     """
 
-    def __init__(self, config: Optional[LotSizingConfig] = None):
-        self._cfg = config or LotSizingConfig()
+    def __init__(self, config: LotSizingConfig = None):
+        self.config = config or LotSizingConfig()
 
-    # ── public API ──────────────────────────────────────────────
+    def get_pip_value(self, symbol: str) -> float:
+        """Return pip value (USD per pip per standard lot) for symbol."""
+        return _resolve_pip_value(symbol)
 
-    def calculate(
+    async def calculate(
         self,
-        balance: float,
+        symbol:         str,
+        balance:        float,
         stop_loss_pips: float,
-        atr_pips: Optional[float] = None,
-        win_rate: Optional[float] = None,
-        avg_rr: Optional[float] = None,
-        volatility_ratio: float = 1.0,
-    ) -> LotSizingResult:
-        """Calculate optimal lot size based on configured method."""
-        if balance <= 0 or stop_loss_pips <= 0:
-            return self._zero_result(balance, stop_loss_pips, atr_pips or 0.0)
-
-        method = self._cfg.method
-        if method == LotSizingMethod.FIXED_PERCENT:
-            lot = self._fixed_percent(balance, stop_loss_pips)
-        elif method == LotSizingMethod.ATR_BASED:
-            lot = self._atr_based(balance, atr_pips or stop_loss_pips, stop_loss_pips)
-        elif method == LotSizingMethod.FIXED_LOT:
-            lot = self._cfg.fixed_lot
-        elif method == LotSizingMethod.KELLY:
-            lot = self._kelly(balance, stop_loss_pips, win_rate or 0.55, avg_rr or 1.5)
-        elif method == LotSizingMethod.VOLATILITY_ADJ:
-            lot = self._volatility_adj(balance, stop_loss_pips, volatility_ratio)
-        else:
-            lot = self._fixed_percent(balance, stop_loss_pips)
-
-        lot = self._clamp(lot)
-        risk_usd = lot * stop_loss_pips * self._cfg.pip_value_usd
-        risk_pct = (risk_usd / balance) * 100 if balance > 0 else 0.0
-
-        # Hard cap: never risk more than max_risk_percent
-        if risk_pct > self._cfg.max_risk_percent:
-            lot = self._max_safe_lot(balance, stop_loss_pips)
-            lot = self._clamp(lot)
-            risk_usd = lot * stop_loss_pips * self._cfg.pip_value_usd
-            risk_pct = (risk_usd / balance) * 100
-
-        return LotSizingResult(
-            lot_size=lot,
-            method_used=method,
-            risk_amount_usd=round(risk_usd, 2),
-            risk_percent=round(risk_pct, 3),
-            stop_loss_pips=stop_loss_pips,
-            atr_value=atr_pips or 0.0,
-            balance=balance,
-            notes=f"method={method.value} cap={self._cfg.max_risk_percent}%",
+        win_rate:       Optional[float] = None,
+        avg_win_loss:   Optional[float] = None,
+        override_risk_pct: Optional[float] = None,   # FIX-5B
+    ) -> LotSizeResult:
+        """
+        Calculate lot size.
+        FIX-5B: override_risk_pct allows caller to specify exact risk percent.
+        """
+        cfg = self.config
+        # FIX-5B: per-call override
+        effective_risk_pct = (
+            override_risk_pct
+            if (override_risk_pct is not None and override_risk_pct > 0)
+            else cfg.risk_percent
         )
 
-    # ── sizing methods ──────────────────────────────────────────
+        if cfg.method == LotSizingMethod.FIXED_LOT:
+            lot = cfg.fixed_lot
+            risk_usd = lot * stop_loss_pips * self.get_pip_value(symbol)
+            return LotSizeResult(
+                lot_size=lot,
+                risk_percent=risk_usd / balance * 100 if balance else 0.0,
+                risk_usd=risk_usd,
+                method="FIXED_LOT",
+            )
 
-    def _fixed_percent(self, balance: float, sl_pips: float) -> float:
-        risk_usd = balance * (self._cfg.risk_percent / 100.0)
-        pip_val  = self._cfg.pip_value_usd
-        return risk_usd / (sl_pips * pip_val) if sl_pips > 0 else 0.0
+        if cfg.method == LotSizingMethod.KELLY and win_rate is not None and avg_win_loss is not None:
+            kelly = win_rate - (1 - win_rate) / avg_win_loss
+            kelly = max(0.0, kelly) * cfg.kelly_fraction
+            effective_risk_pct = min(kelly * 100, effective_risk_pct)
 
-    def _atr_based(self, balance: float, atr_pips: float, sl_pips: float) -> float:
-        """ATR-normalised: SL expressed as ATR multiple."""
-        adjusted_sl = max(sl_pips, atr_pips * self._cfg.atr_multiplier)
-        return self._fixed_percent(balance, adjusted_sl)
+        # Standard risk-based sizing
+        risk_usd  = balance * (effective_risk_pct / 100)
+        pip_value = self.get_pip_value(symbol)
+        if stop_loss_pips <= 0 or pip_value <= 0:
+            return LotSizeResult(
+                lot_size=cfg.min_lot,
+                risk_percent=effective_risk_pct,
+                risk_usd=risk_usd,
+                method=cfg.method.value,
+                details={"warning": "zero_sl_or_pip_value"},
+            )
 
-    def _kelly(self, balance: float, sl_pips: float,
-               win_rate: float, avg_rr: float) -> float:
-        """
-        Kelly Criterion: f* = p - q/b
-        p = win rate, q = loss rate, b = avg reward/risk
-        Applies fractional Kelly for safety.
-        """
-        p = max(0.01, min(win_rate, 0.99))
-        q = 1.0 - p
-        b = max(0.1, avg_rr)
-        kelly_f = p - (q / b)
-        kelly_f = max(0.0, kelly_f) * self._cfg.kelly_fraction
-        risk_usd = balance * kelly_f
-        pip_val  = self._cfg.pip_value_usd
-        return risk_usd / (sl_pips * pip_val) if sl_pips > 0 else 0.0
+        raw_lot = risk_usd / (stop_loss_pips * pip_value)
+        # Snap to lot_step
+        lot = math.floor(raw_lot / cfg.lot_step) * cfg.lot_step
+        lot = max(cfg.min_lot, min(cfg.max_lot, lot))
+        actual_risk_usd = lot * stop_loss_pips * pip_value
 
-    def _volatility_adj(self, balance: float, sl_pips: float,
-                        vol_ratio: float) -> float:
-        """Scale base lot inversely to volatility ratio."""
-        base_lot = self._fixed_percent(balance, sl_pips)
-        factor   = 1.0 / max(vol_ratio, 0.1)
-        factor   = max(0.3, min(factor, 2.0))   # clamp 0.3–2.0×
-        return base_lot * factor
-
-    # ── helpers ─────────────────────────────────────────────────
-
-    def _max_safe_lot(self, balance: float, sl_pips: float) -> float:
-        max_risk_usd = balance * (self._cfg.max_risk_percent / 100.0)
-        return max_risk_usd / (sl_pips * self._cfg.pip_value_usd)
-
-    def _clamp(self, lot: float) -> float:
-        lot = max(self._cfg.min_lot, min(lot, self._cfg.max_lot))
-        step = self._cfg.lot_step
-        return math.floor(lot / step) * step
-
-    def _zero_result(self, balance, sl_pips, atr) -> LotSizingResult:
-        return LotSizingResult(
-            lot_size=self._cfg.min_lot,
-            method_used=self._cfg.method,
-            risk_amount_usd=0.0,
-            risk_percent=0.0,
-            stop_loss_pips=sl_pips,
-            atr_value=atr,
-            balance=balance,
-            notes="FALLBACK: invalid inputs → min lot",
+        return LotSizeResult(
+            lot_size=round(lot, 4),
+            risk_percent=actual_risk_usd / balance * 100 if balance else 0.0,
+            risk_usd=actual_risk_usd,
+            method=cfg.method.value,
         )
-
-    def update_config(self, **kwargs) -> None:
-        for k, v in kwargs.items():
-            if hasattr(self._cfg, k):
-                setattr(self._cfg, k, v)
-
-    @property
-    def config(self) -> LotSizingConfig:
-        return self._cfg
 
 
 # Global singleton
-_lot_sizer: Optional[DynamicLotSizer] = None
+_lot_sizer: Optional[LotSizer] = None
 
-def get_lot_sizer() -> DynamicLotSizer:
+
+def get_lot_sizer(config: LotSizingConfig = None) -> LotSizer:
     global _lot_sizer
     if _lot_sizer is None:
-        _lot_sizer = DynamicLotSizer()
+        _lot_sizer = LotSizer(config=config)
     return _lot_sizer
