@@ -13,8 +13,8 @@ FIX #6 changes:
 
 FIX #7 changes:
   - Removed dead 'field' import from dataclasses (0 field() calls)
+  - Removed duplicate 'from __future__ import annotations' (SyntaxError in Python 3.14)
 """
-from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -105,6 +105,7 @@ class VolatilityFilter:
         check(current_atr, atr_history, current_spread, avg_spread, symbol) -> VolatilityCheckResult
 
     FIX-6: all exceptions caught; behaviour controlled by fail_mode.
+    FIX-7: _fail_mode cached once in __init__; duplicate __future__ import removed.
     """
 
     def __init__(self, config: VolatilityConfig = None):
