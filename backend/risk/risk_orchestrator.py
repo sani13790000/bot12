@@ -2,21 +2,13 @@
 FIX #5 - Exposure Control Using Real Risk
 FIX #6 - Fail-Closed Mode (configurable per gate)
 FIX #7 - Dead code removal: removed 'import asyncio' (zero usages)
-
-FIX-5 changes:
-  FIX-5A: default_risk_percent kwarg in __init__
-  FIX-5B: _clamp_risk() helper
-  FIX-5C: open_positions dict->ExposurePosition normalisation
-  FIX-5D: _run_exposure_gate passes clamped actual_risk_pct
-  FIX-5E: config_fallback uses default_risk_percent not 1.0
-
-FIX-6 changes:
-  FIX-6A: FailMode enum for ALL gates
-  FIX-6B: 6 per-gate fail_mode kwargs in __init__
-  FIX-6C: EQUITY/DAILY/VOL/LOT gates now respect fail_mode
-  FIX-6D: coerce() accepts str or enum
-  FIX-6E: every except block logs with exc_info=True
-  FIX-6F: FAIL_OPEN: allow + log at CRITICAL level
+FIX #8 - Interface Consistency Audit patches:
+  ISSUE-1: RiskInput dataclass (ImportError fix)
+  ISSUE-2: RiskCheckResult.to_dict() (AttributeError fix)
+  ISSUE-3: RiskOrchestrator.assess() method (AttributeError fix)
+  ISSUE-4: _run_vol_gate kwarg fix (price_distance/entry_price invalid)
+  ISSUE-5: _run_corr_gate kwarg fix (symbol->new_symbol, add base_risk_percent)
+  ISSUE-6: LotSizer.calculate kwarg fix (account_balance->balance, lot_multiplier->volatility_ratio)
 """
 from __future__ import annotations
 
@@ -70,6 +62,45 @@ class RiskCheckResult:
     gates_passed:   List[str]       = field(default_factory=list)
     gates_failed:   List[str]       = field(default_factory=list)
     metadata:       Dict[str, Any]  = field(default_factory=dict)
+
+    # ISSUE-2 FIX: routes_risk calls decision.to_dict()
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "approved":       self.approved,
+            "decision":       self.decision.value,
+            "block_reason":   self.block_reason,
+            "risk_percent":   self.risk_percent,
+            "lot_size":       self.lot_size,
+            "lot_multiplier": self.lot_multiplier,
+            "gates_passed":   self.gates_passed,
+            "gates_failed":   self.gates_failed,
+            "metadata":       self.metadata,
+        }
+
+
+# ISSUE-1 FIX: routes_risk imports RiskInput from this module
+@dataclass
+class RiskInput:
+    """Input DTO for RiskOrchestrator.assess(). Bridges route layer to check()."""
+    symbol:             str
+    direction:          str
+    balance:            float
+    stop_loss_pips:     float
+    entry_price:        float            = 0.0
+    stop_loss:          float            = 0.0
+    equity:             float            = 0.0
+    current_atr:        float            = 10.0
+    atr_history:        List[float]      = field(default_factory=list)
+    current_spread:     float            = 0.0
+    avg_spread:         float            = 0.0
+    open_positions:     List[Any]        = field(default_factory=list)
+    today_trades_count: int              = 0
+    today_pnl_usd:      float            = 0.0
+    week_pnl_usd:       float            = 0.0
+    month_pnl_usd:      float            = 0.0
+    user_id:            str              = ""
+    signal_id:          str              = ""
+    override_risk_pct:  Optional[float]  = None
 
 
 class RiskOrchestrator:
@@ -197,10 +228,10 @@ class RiskOrchestrator:
         if self._lot_sizer is not None:
             try:
                 lot_res = await self._lot_sizer.calculate(
-                    symbol=symbol,
-                    account_balance=account_balance,
+                    balance=account_balance,
                     stop_loss_pips=max(slp, 0.1),
-                    lot_multiplier=lm,
+                    symbol=symbol,
+                    volatility_ratio=lm,
                     override_risk_pct=override_risk_pct,
                 )
                 pl  = getattr(lot_res, "lot_size",     pl)
@@ -254,6 +285,41 @@ class RiskOrchestrator:
             gates_passed=passed, gates_failed=failed, metadata=meta,
         )
 
+    # ISSUE-3 FIX: routes_risk calls RiskOrchestrator().assess(inp)
+    async def assess(self, inp: "RiskInput") -> "RiskCheckResult":
+        """Convenience wrapper: RiskInput -> check().
+        ARCH: routes_risk and external callers use this DTO-based API.
+        """
+        if inp.entry_price == 0.0 and inp.stop_loss == 0.0:
+            # Reconstruct price levels from stop_loss_pips for gates that need them.
+            sl_price_dist = inp.stop_loss_pips / 10_000.0
+            entry_price   = 1.0 + sl_price_dist
+            stop_loss     = 1.0
+        else:
+            entry_price = inp.entry_price
+            stop_loss   = inp.stop_loss
+
+        return await self.check(
+            symbol            = inp.symbol,
+            direction         = inp.direction,
+            entry_price       = entry_price,
+            stop_loss         = stop_loss,
+            account_balance   = inp.balance,
+            user_id           = inp.user_id,
+            signal_id         = inp.signal_id,
+            override_risk_pct = inp.override_risk_pct,
+            # volatility / spread context forwarded via **ctx
+            current_atr       = inp.current_atr,
+            atr_history       = inp.atr_history,
+            current_spread    = inp.current_spread,
+            avg_spread        = inp.avg_spread,
+            open_positions    = inp.open_positions,
+            today_trades_count = inp.today_trades_count,
+            today_pnl_usd     = inp.today_pnl_usd,
+            week_pnl_usd      = inp.week_pnl_usd,
+            month_pnl_usd     = inp.month_pnl_usd,
+        )
+
     # -- Gate runners --
 
     async def _run_equity_gate(self, u, b, ctx):
@@ -275,7 +341,19 @@ class RiskOrchestrator:
     async def _run_vol_gate(self, symbol, pd, entry, ctx):
         r = self._vol
         if hasattr(r, "check"):
-            res = r.check(symbol=symbol, price_distance=pd, entry_price=entry, **ctx)
+            # ISSUE-4 FIX: VolatilityFilter.check(current_atr, atr_history, current_spread, avg_spread, symbol)
+            # price_distance/entry_price are NOT valid VF params; extract valid ones from ctx only.
+            current_atr    = float(ctx.get("current_atr", max(pd * 10_000, 10.0)))
+            atr_history    = ctx.get("atr_history", None)
+            current_spread = float(ctx.get("current_spread", 0.0))
+            avg_spread     = float(ctx.get("avg_spread", 0.0))
+            res = r.check(
+                current_atr    = current_atr,
+                atr_history    = atr_history,
+                current_spread = current_spread,
+                avg_spread     = avg_spread,
+                symbol         = symbol,
+            )
             if hasattr(res, "__await__"): res = await res
             return {
                 "can_trade":      getattr(res, "can_trade",      True),
@@ -287,7 +365,17 @@ class RiskOrchestrator:
     async def _run_corr_gate(self, symbol, direction, ctx):
         r = self._corr
         if hasattr(r, "check"):
-            res = r.check(symbol=symbol, direction=direction, **ctx)
+            # ISSUE-5 FIX: CorrelationFilter.check(new_symbol, new_direction, open_positions, base_risk_percent)
+            # Keyword names differ from orchestrator locals; map explicitly.
+            open_positions    = _normalise_positions(ctx.get("open_positions", []))
+            base_risk_percent = float(ctx.get("base_risk_percent",
+                                              ctx.get("risk_percent", self._default_risk)))
+            res = r.check(
+                new_symbol        = symbol,
+                new_direction     = direction,
+                open_positions    = open_positions,
+                base_risk_percent = base_risk_percent,
+            )
             if hasattr(res, "__await__"): res = await res
             return {"can_trade": getattr(res, "can_trade", True), "reason": getattr(res, "reason", "")}
         return {"can_trade": True, "reason": ""}
