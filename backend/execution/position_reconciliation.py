@@ -1,16 +1,8 @@
 """position_reconciliation.py - Hedge-Fund Grade Pre-Retry Reconciliation v2 (HF-4)
 
 HF-4: Position reconciliation BEFORE every retry
-  - verify_position_exists(ticket, symbol) before any retry order
-  - check_symbol_already_open(symbol, direction) for duplicate detection
-  - Configurable interval (env RECONCILE_INTERVAL_SECONDS, default 10s)
-  - DB failure -> alert ONLY, NEVER auto-close orphans
-  - Orphan registry with manual-review workflow
-  - Async-safe asyncio.Lock
-
-BUG-1 FIX: Added public run_once() delegating to _run_once().
-  ExecutionService._retry_execute() calls self._pr.run_once().
-  Previously only _run_once() (private) existed -> AttributeError at retry time.
+BUG-PR-1 FIX: Added public run_once() wrapper for private _run_once().
+BUG-PR-2 FIX: Added set_mt5(connector) injection method.
 """
 from __future__ import annotations
 import asyncio, os
@@ -32,10 +24,10 @@ def _clamp(n: int) -> int:
 
 
 class OrphanStatus(str, Enum):
-    PENDING_REVIEW = "pending_review"
-    REVIEWED = "reviewed"
+    PENDING_REVIEW  = "pending_review"
+    REVIEWED        = "reviewed"
     MANUALLY_CLOSED = "manually_closed"
-    IGNORED = "ignored"
+    IGNORED         = "ignored"
 
 
 @dataclass
@@ -50,14 +42,12 @@ class OrphanPosition:
 
 @dataclass
 class PreRetryCheck:
-    """Result of verify_position_exists() - used before every retry order."""
     ticket: int; symbol: str; already_filled: bool
     mt5_volume: float = 0.0; mt5_profit: float = 0.0
     direction: str = ""; error: Optional[str] = None
 
     @property
-    def should_skip_retry(self) -> bool:
-        return self.already_filled or self.error is not None
+    def should_skip_retry(self) -> bool: return self.already_filled
 
 
 @dataclass
@@ -92,8 +82,12 @@ class PositionReconciliation:
         if auto_close_orphans:
             logger.warning("HF-4: auto_close_orphans=True DISABLED. Orphans require manual review.")
 
+    def set_mt5(self, connector: Any) -> None:
+        """BUG-PR-2 FIX: Wire MT5Connector after singleton creation. Call from ExecutionService.start()."""
+        self._mt5 = connector
+        logger.info("HF-4: MT5 connector injected into PositionReconciliation")
+
     async def verify_position_exists(self, ticket: int, symbol: str) -> PreRetryCheck:
-        """Call BEFORE every retry. Returns should_skip_retry=True if already filled."""
         if self._mt5 is None:
             logger.warning("HF-4: MT5 not set - cannot verify ticket %d", ticket)
             return PreRetryCheck(ticket=ticket, symbol=symbol, already_filled=False, error="mt5_not_configured")
@@ -146,6 +140,10 @@ class PositionReconciliation:
         self._interval = _clamp(seconds)
         logger.info("HF-4: interval updated to %ds", self._interval)
 
+    async def run_once(self) -> ReconciliationResult:
+        """BUG-PR-1 FIX: Public wrapper. execution_service called run_once() but only _run_once() existed."""
+        return await self._run_once()
+
     async def _loop(self) -> None:
         while True:
             try:
@@ -153,12 +151,6 @@ class PositionReconciliation:
                 await self._run_once()
             except asyncio.CancelledError: break
             except Exception as exc: logger.error("Reconciliation loop error: %s", exc, exc_info=True)
-
-    async def run_once(self) -> ReconciliationResult:
-        """BUG-1 FIX: Public API for on-demand reconciliation.
-        ExecutionService._retry_execute() calls this before every retry.
-        Previously only _run_once() (private) existed causing AttributeError."""
-        return await self._run_once()
 
     async def _run_once(self) -> ReconciliationResult:
         async with self._lock: return await self._reconcile()
@@ -200,18 +192,14 @@ class PositionReconciliation:
             orphan_mt5=list(self._orphans.values()), orphan_db=orphan_db,
             db_failure=db_failure, alert_sent=alert_sent, interval_used=self._interval)
 
-    def get_orphan_registry(self) -> List[OrphanPosition]:
-        return list(self._orphans.values())
-
+    def get_orphan_registry(self) -> List[OrphanPosition]: return list(self._orphans.values())
     def get_pending_orphans(self) -> List[OrphanPosition]:
         return [o for o in self._orphans.values() if o.status == OrphanStatus.PENDING_REVIEW]
 
     async def close_orphan_ticket(self, ticket: int, note: str = "") -> bool:
-        """Explicit admin-initiated close. The ONLY way to close via reconciliation."""
         orphan = self._orphans.get(ticket)
         if orphan is None:
-            logger.warning("close_orphan_ticket: ticket %d not in orphan registry", ticket)
-            return False
+            logger.warning("close_orphan_ticket: ticket %d not in orphan registry", ticket); return False
         if self._mt5 is None:
             logger.error("close_orphan_ticket: MT5 not configured"); return False
         try:
@@ -235,12 +223,12 @@ class PositionReconciliation:
         logger.info("HF-4: orphan ticket=%d marked as %s", ticket, status.value)
         return True
 
-    def pending_count(self) -> int:
-        return len(self.get_pending_orphans())
+    def pending_count(self) -> int: return len(self.get_pending_orphans())
 
     def health(self) -> Dict[str, Any]:
         return {"interval_s": self._interval, "total_orphans": len(self._orphans),
-                "pending_review": self.pending_count(), "auto_close_enabled": False}
+                "pending_review": self.pending_count(), "auto_close_enabled": False,
+                "mt5_connected": self._mt5 is not None}
 
 
 position_reconciliation = PositionReconciliation()

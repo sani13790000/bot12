@@ -1,11 +1,13 @@
 """
 Galaxy Vast AI Trading Platform
-Semi-Auto Execution Mode — Production Reliability v2
+Semi-Auto Execution Mode - Production Reliability v2
 
 FIXES:
-  R-5: Memory leak fix — APPROVED/REJECTED/EXECUTED/EXPIRED signals evicted
-       from _pending cache after processing. Prevents unbounded RAM growth.
-  T-11: datetime.utcnow() replaced with datetime.now(timezone.utc)
+  R-5:     Memory leak fix - terminal signals evicted after TTL.
+  T-11:    datetime.utcnow() -> datetime.now(timezone.utc)
+  BUG-SA-1: Race condition in _sweep_terminal_signals.
+            After releasing self._lock, self._pending.get(sid) was called
+            outside the lock. FIX: snapshot (sid, sig, cb) tuple inside lock.
 """
 from __future__ import annotations
 
@@ -14,14 +16,14 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from ..core.config import settings
 from ..core.logger import get_logger
 
 logger = get_logger("execution.semi_auto")
 
-_TERMINAL_SIGNAL_TTL_S: int = 300   # evict terminal signals after 5 min
+_TERMINAL_SIGNAL_TTL_S: int = 300
 
 
 class PendingSignalStatus(str, Enum):
@@ -60,7 +62,7 @@ class PendingSignal:
     approved_by:      Optional[int]      = None
     approved_at:      Optional[datetime] = None
     message_id:       Optional[int]      = None
-    terminal_at:      Optional[datetime] = None   # R-5
+    terminal_at:      Optional[datetime] = None
 
     def __post_init__(self) -> None:
         timeout_seconds = getattr(settings, "SEMI_AUTO_CONFIRMATION_TIMEOUT_SECONDS", 300)
@@ -79,11 +81,11 @@ class PendingSignal:
 
 class SemiAutoManager:
     def __init__(self) -> None:
-        self._pending:              Dict[str, PendingSignal] = {}
-        self._lock                = asyncio.Lock()
-        self._on_approved_callbacks: Dict[str, Callable] = {}
-        self._on_rejected_callbacks: Dict[str, Callable] = {}
-        self._cleanup_task:        Optional[asyncio.Task] = None
+        self._pending:               Dict[str, PendingSignal] = {}
+        self._lock                 = asyncio.Lock()
+        self._on_approved_callbacks: Dict[str, Callable]      = {}
+        self._on_rejected_callbacks: Dict[str, Callable]      = {}
+        self._cleanup_task:          Optional[asyncio.Task]   = None
         logger.info("SemiAutoManager initialised (R-5: terminal-state eviction enabled)")
 
     async def start(self) -> None:
@@ -96,7 +98,9 @@ class SemiAutoManager:
             try: await self._cleanup_task
             except asyncio.CancelledError: pass
 
-    async def submit_for_approval(self, signal: PendingSignal, on_approved=None, on_rejected=None) -> str:
+    async def submit_for_approval(self, signal: PendingSignal,
+                                   on_approved: Optional[Callable] = None,
+                                   on_rejected: Optional[Callable] = None) -> str:
         async with self._lock:
             self._pending[signal.signal_id] = signal
             if on_approved: self._on_approved_callbacks[signal.signal_id] = on_approved
@@ -117,7 +121,7 @@ class SemiAutoManager:
         logger.info("Signal %s approved by %d", signal_id[:8], approved_by_user_id)
         cb = self._on_approved_callbacks.get(signal_id)
         if cb: asyncio.create_task(cb(signal))
-        asyncio.create_task(self._deferred_evict(signal_id, delay=5.0))  # R-5
+        asyncio.create_task(self._deferred_evict(signal_id, delay=5.0))
         return signal
 
     async def reject_signal(self, signal_id: str, rejected_by_user_id: int) -> Optional[PendingSignal]:
@@ -129,11 +133,10 @@ class SemiAutoManager:
         logger.info("Signal %s rejected by %d", signal_id[:8], rejected_by_user_id)
         cb = self._on_rejected_callbacks.get(signal_id)
         if cb: asyncio.create_task(cb(signal))
-        asyncio.create_task(self._deferred_evict(signal_id, delay=5.0))  # R-5
+        asyncio.create_task(self._deferred_evict(signal_id, delay=5.0))
         return signal
 
     async def mark_executed(self, signal_id: str) -> None:
-        """R-5: Call after order fill. Marks EXECUTED and schedules eviction."""
         async with self._lock:
             signal = self._pending.get(signal_id)
             if signal and signal.status == PendingSignalStatus.APPROVED:
@@ -149,12 +152,9 @@ class SemiAutoManager:
     async def get_signal(self, signal_id: str) -> Optional[PendingSignal]:
         async with self._lock: return self._pending.get(signal_id)
 
-    def pending_count(self) -> int:
-        """Diagnostic: total signals in memory across all states."""
-        return len(self._pending)
+    def pending_count(self) -> int: return len(self._pending)
 
     async def _deferred_evict(self, signal_id: str, delay: float = 5.0) -> None:
-        """R-5: Wait for callbacks to finish, then evict."""
         await asyncio.sleep(delay)
         await self._evict_signal(signal_id)
 
@@ -163,8 +163,7 @@ class SemiAutoManager:
             removed = self._pending.pop(signal_id, None)
             self._on_approved_callbacks.pop(signal_id, None)
             self._on_rejected_callbacks.pop(signal_id, None)
-        if removed:
-            logger.debug("R-5: Signal %s (%s) evicted", signal_id[:8], removed.status)
+        if removed: logger.debug("R-5: Signal %s (%s) evicted", signal_id[:8], removed.status)
 
     async def _cleanup_loop(self) -> None:
         while True:
@@ -173,29 +172,30 @@ class SemiAutoManager:
             except Exception as exc: logger.error("SemiAuto cleanup error: %s", exc)
 
     async def _sweep_terminal_signals(self) -> None:
-        """R-5: Periodic sweep for missed evictions and expired WAITING signals."""
         now = datetime.now(timezone.utc)
-        to_expire: List[str] = []
+        # BUG-SA-1 FIX: snapshot (sid, sig, cb) INSIDE lock so no dict access
+        # after lock release. Old code: released lock then called .get(sid) outside.
+        to_expire: List[Tuple[str, PendingSignal, Optional[Callable]]] = []
         to_evict:  List[str] = []
         async with self._lock:
             for sid, sig in list(self._pending.items()):
                 if sig.status == PendingSignalStatus.WAITING and sig.is_expired:
                     sig.status = PendingSignalStatus.EXPIRED
                     sig.terminal_at = now
-                    to_expire.append(sid)
+                    cb = self._on_rejected_callbacks.get(sid)
+                    to_expire.append((sid, sig, cb))
                 elif sig.is_terminal and sig.terminal_at:
                     if (now - sig.terminal_at).total_seconds() >= _TERMINAL_SIGNAL_TTL_S:
                         to_evict.append(sid)
-        for sid in to_expire:
-            cb  = self._on_rejected_callbacks.get(sid)
-            sig = self._pending.get(sid)
-            if cb and sig: asyncio.create_task(cb(sig))
+        for sid, sig, cb in to_expire:
+            if cb: asyncio.create_task(cb(sig))
             logger.info("Signal %s expired", sid[:8])
             asyncio.create_task(self._deferred_evict(sid, delay=5.0))
         for sid in to_evict:
             await self._evict_signal(sid)
         if to_expire or to_evict:
-            logger.info("R-5: sweep expired=%d evicted=%d remaining=%d", len(to_expire), len(to_evict), len(self._pending))
+            logger.info("R-5: sweep expired=%d evicted=%d remaining=%d",
+                        len(to_expire), len(to_evict), len(self._pending))
 
 
 semi_auto_manager = SemiAutoManager()

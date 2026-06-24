@@ -1,1 +1,330 @@
-"""\nGalaxy Vast AI Trading Platform\nMT5 Async Connector — Production Reliability v2\n\nFIXES:\n  R-1: Health revalidation after initialize() — verifies real connection\n  R-2: Login failure propagation — NEVER marks connected on login fail\n  R-3: Dynamic slippage deviation via ATR/spread/volatility\n  T-6: close_position validates position exists and strips SL/TP\n  T-7: DEADLOCK removed — _is_connected() lock-free\n  T-14: type_filling from MT5_ORDER_FILLING env var\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport os\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\nfrom enum import Enum\nfrom typing import Any, Callable, Dict, List, Optional\n\nfrom ..core.logger import get_logger\n\nlogger = get_logger(\"execution.mt5_connector\")\n_DEFAULT_TYPE_FILLING = os.environ.get(\"MT5_ORDER_FILLING\", \"ORDER_FILLING_IOC\")\n\n# R-1\n_REVALIDATE_TIMEOUT_S: float = float(os.environ.get(\"MT5_REVALIDATE_TIMEOUT\", \"5\"))\n_REVALIDATE_RETRIES:   int   = int(os.environ.get(\"MT5_REVALIDATE_RETRIES\",  \"3\"))\n\n# R-3\n_SLIPPAGE_BASE:         int   = int(os.environ.get(\"MT5_SLIPPAGE_BASE\",    \"10\"))\n_SLIPPAGE_MAX:          int   = int(os.environ.get(\"MT5_SLIPPAGE_MAX\",     \"50\"))\n_SLIPPAGE_SPREAD_MULT:  float = float(os.environ.get(\"MT5_SLIPPAGE_SPREAD_MULT\", \"1.5\"))\n_SLIPPAGE_ATR_MULT:     float = float(os.environ.get(\"MT5_SLIPPAGE_ATR_MULT\",   \"2.0\"))\n_SLIPPAGE_VOL_HIGH_ADD: int   = int(os.environ.get(\"MT5_SLIPPAGE_VOL_HIGH_ADD\", \"10\"))\n\n\nclass MT5ConnectionStatus(str, Enum):\n    DISCONNECTED = \"disconnected\"\n    CONNECTING   = \"connecting\"\n    CONNECTED    = \"connected\"\n    ERROR        = \"error\"\n\n\n@dataclass\nclass MT5OrderRequest:\n    symbol:       str\n    action:       str\n    volume:       float\n    price:        Optional[float] = None\n    sl:           Optional[float] = None\n    tp:           Optional[float] = None\n    deviation:    int  = _SLIPPAGE_BASE\n    magic:        int  = 0\n    comment:      str  = \"\"\n    type_filling: str  = _DEFAULT_TYPE_FILLING\n    current_atr:     Optional[float] = None\n    avg_atr:         Optional[float] = None\n    current_spread:  Optional[float] = None\n    avg_spread:      Optional[float] = None\n    volatility_high: bool            = False\n\n\n@dataclass\nclass MT5OrderResult:\n    success:   bool\n    retcode:   int             = 0\n    deal:      int             = 0\n    order:     int             = 0\n    volume:    float           = 0.0\n    price:     float           = 0.0\n    deviation: int             = 0\n    comment:   str             = \"\"\n    request:   Optional[Dict[str, Any]] = None\n    error:     Optional[str]   = None\n    timestamp: datetime        = field(default_factory=lambda: datetime.now(timezone.utc))\n\n\ndef compute_dynamic_deviation(request: MT5OrderRequest) -> int:\n    \"\"\"\n    R-3: Dynamic slippage using ATR ratio + spread ratio + volatility flag.\n    Returns int clamped to [_SLIPPAGE_BASE, _SLIPPAGE_MAX].\n    \"\"\"\n    deviation = float(_SLIPPAGE_BASE)\n    try:\n        if request.current_atr and request.avg_atr and request.avg_atr > 0:\n            atr_ratio  = request.current_atr / request.avg_atr\n            atr_add    = (atr_ratio - 1.0) * _SLIPPAGE_ATR_MULT * _SLIPPAGE_BASE\n            deviation += max(0.0, atr_add)\n            logger.debug(\"DynamicSlippage ATR: ratio=%.2f add=%.1f\", atr_ratio, atr_add)\n        if request.current_spread and request.avg_spread and request.avg_spread > 0:\n            spread_ratio = request.current_spread / request.avg_spread\n            spread_add   = (spread_ratio - 1.0) * _SLIPPAGE_SPREAD_MULT * _SLIPPAGE_BASE\n            deviation   += max(0.0, spread_add)\n            logger.debug(\"DynamicSlippage Spread: ratio=%.2f add=%.1f\", spread_ratio, spread_add)\n        if request.volatility_high:\n            deviation += _SLIPPAGE_VOL_HIGH_ADD\n            logger.debug(\"DynamicSlippage VOL_HIGH: +%d\", _SLIPPAGE_VOL_HIGH_ADD)\n    except Exception as exc:\n        logger.warning(\"compute_dynamic_deviation error: %s\", exc)\n        return _SLIPPAGE_BASE\n    result = max(_SLIPPAGE_BASE, min(int(round(deviation)), _SLIPPAGE_MAX))\n    logger.info(\"DynamicSlippage: %d pts\", result)\n    return result\n\n\nclass MT5Connector:\n    def __init__(self, exe_path=None, timeout_seconds=30, max_retries=3, retry_delay=1.0):\n        self.exe_path    = exe_path or os.environ.get(\"MT5_EXE_PATH\", \"\")\n        self.timeout     = timeout_seconds\n        self.max_retries = max_retries\n        self.retry_delay = retry_delay\n        self._status     = MT5ConnectionStatus.DISCONNECTED\n        self._lock       = asyncio.Lock()\n        self._last_error: Optional[str] = None\n        self._mt5:        Optional[Any] = None\n        self._connection_attempts       = 0\n\n    @property\n    def status(self) -> MT5ConnectionStatus:\n        return self._status\n\n    def _is_connected(self) -> bool:\n        return self._status == MT5ConnectionStatus.CONNECTED and self._mt5 is not None\n\n    async def initialize(self) -> bool:\n        \"\"\"R-1 + R-2: initialize with revalidation and login failure propagation.\"\"\"\n        async with self._lock:\n            if self._is_connected():\n                return True\n            self._status = MT5ConnectionStatus.CONNECTING\n            self._connection_attempts += 1\n            try:\n                self._mt5 = await asyncio.to_thread(self._import_mt5)\n                if self._mt5 is None:\n                    self._status = MT5ConnectionStatus.ERROR\n                    self._last_error = \"MT5 package not installed\"\n                    logger.error(self._last_error)\n                    return False\n                kwargs: Dict[str, Any] = {}\n                if self.exe_path:\n                    kwargs[\"path\"] = self.exe_path\n                ok = await asyncio.to_thread(self._mt5.initialize, **kwargs)\n                if not ok:\n                    err = self._mt5.last_error()\n                    self._status = MT5ConnectionStatus.ERROR\n                    self._last_error = f\"MT5 initialize() failed: {err}\"\n                    logger.error(self._last_error)\n                    return False\n                # R-2: propagate login failure\n                login_ok = await self._login_from_env()\n                if not login_ok:\n                    self._status = MT5ConnectionStatus.ERROR\n                    self._last_error = \"MT5 login failed — trading blocked\"\n                    logger.error(\"R-2: %s\", self._last_error)\n                    try:\n                        await asyncio.to_thread(self._mt5.shutdown)\n                    except Exception:\n                        pass\n                    return False\n                # R-1: revalidate\n                revalidated = await self._revalidate()\n                if not revalidated:\n                    self._status = MT5ConnectionStatus.ERROR\n                    self._last_error = \"MT5 revalidation failed after initialize()\"\n                    logger.error(\"R-1: %s\", self._last_error)\n                    return False\n                self._status = MT5ConnectionStatus.CONNECTED\n                self._last_error = None\n                self._connection_attempts = 0\n                logger.info(\"MT5 connector initialized and revalidated\")\n                return True\n            except Exception as exc:\n                self._status = MT5ConnectionStatus.ERROR\n                self._last_error = str(exc)\n                logger.exception(\"MT5 initialize exception\")\n                return False\n\n    async def _revalidate(self) -> bool:\n        \"\"\"R-1: Verify real connection post-initialize with retries.\"\"\"\n        for attempt in range(1, _REVALIDATE_RETRIES + 1):\n            try:\n                info = await asyncio.wait_for(\n                    asyncio.to_thread(self._mt5.terminal_info),\n                    timeout=_REVALIDATE_TIMEOUT_S,\n                )\n                if info and info.connected:\n                    logger.info(\"R-1: Revalidation OK (attempt %d)\", attempt)\n                    return True\n                logger.warning(\"R-1: Revalidation attempt %d: not connected\", attempt)\n            except asyncio.TimeoutError:\n                logger.warning(\"R-1: Revalidation attempt %d timed out\", attempt)\n            except Exception as exc:\n                logger.warning(\"R-1: Revalidation attempt %d error: %s\", attempt, exc)\n            if attempt < _REVALIDATE_RETRIES:\n                await asyncio.sleep(1.0)\n        return False\n\n    def _import_mt5(self) -> Optional[Any]:\n        try:\n            import MetaTrader5 as mt5\n            return mt5\n        except Exception:\n            logger.warning(\"MetaTrader5 package not available\")\n            return None\n\n    async def _login_from_env(self) -> bool:\n        \"\"\"R-2: Returns the real login result. Missing env = False.\"\"\"\n        login    = os.environ.get(\"MT5_LOGIN\")\n        password = os.environ.get(\"MT5_PASSWORD\")\n        server   = os.environ.get(\"MT5_SERVER\")\n        if not (login and password and server):\n            logger.warning(\"R-2: MT5 credentials not set — login failed\")\n            return False\n        try:\n            ok = bool(await asyncio.to_thread(self._mt5.login, int(login), password, server))\n            if ok:\n                logger.info(\"MT5 login OK (account %s @ %s)\", login, server)\n            else:\n                logger.error(\"MT5 login FAILED: %s\", self._mt5.last_error())\n            return ok\n        except Exception as exc:\n            logger.error(\"MT5 login exception: %s\", exc)\n            return False\n\n    async def shutdown(self) -> None:\n        async with self._lock:\n            if self._mt5:\n                try:\n                    await asyncio.to_thread(self._mt5.shutdown)\n                except Exception as exc:\n                    logger.warning(\"MT5 shutdown error: %s\", exc)\n                finally:\n                    self._mt5 = None\n            self._status = MT5ConnectionStatus.DISCONNECTED\n\n    async def health_check(self) -> bool:\n        if not self._is_connected():\n            return False\n        async with self._lock:\n            if not self._is_connected():\n                return False\n            try:\n                info = await asyncio.to_thread(self._mt5.terminal_info)\n                ok   = bool(info and info.connected)\n                if not ok:\n                    self._status = MT5ConnectionStatus.ERROR\n                return ok\n            except Exception as exc:\n                logger.warning(\"MT5 health_check failed: %s\", exc)\n                self._status = MT5ConnectionStatus.ERROR\n                return False\n\n    async def get_account_info(self) -> Optional[Any]:\n        if not await self.health_check():\n            return None\n        async with self._lock:\n            if not self._is_connected():\n                return None\n            return await asyncio.to_thread(self._mt5.account_info)\n\n    async def get_positions(self) -> List[Any]:\n        if not await self.health_check():\n            return []\n        async with self._lock:\n            if not self._is_connected():\n                return []\n            return await asyncio.to_thread(self._mt5.positions_get) or []\n\n    async def get_orders(self) -> List[Any]:\n        if not await self.health_check():\n            return []\n        async with self._lock:\n            if not self._is_connected():\n                return []\n            return await asyncio.to_thread(self._mt5.orders_get) or []\n\n    async def send_order(self, request: MT5OrderRequest, retry_policy=None) -> MT5OrderResult:\n        request.deviation = compute_dynamic_deviation(request)  # R-3\n        if not await self.health_check():\n            await self.initialize()\n        last_error: Optional[str] = None\n        for attempt in range(1, self.max_retries + 1):\n            try:\n                result = await asyncio.wait_for(self._send_order_sync(request), timeout=self.timeout)\n                if result.success:\n                    return result\n                last_error = result.error\n                if retry_policy and not retry_policy(result):\n                    break\n            except asyncio.TimeoutError:\n                last_error = f\"MT5 order timeout attempt {attempt}\"\n                logger.warning(last_error)\n            except Exception as exc:\n                last_error = str(exc)\n                logger.exception(\"MT5 send_order error attempt %s\", attempt)\n            if attempt < self.max_retries:\n                await asyncio.sleep(self.retry_delay * attempt)\n        return MT5OrderResult(success=False, error=last_error or \"unknown\", deviation=request.deviation)\n\n    async def _send_order_sync(self, request: MT5OrderRequest) -> MT5OrderResult:\n        def _send() -> MT5OrderResult:\n            if not self._mt5:\n                return MT5OrderResult(success=False, error=\"MT5 not initialized\")\n            order_type   = (self._mt5.ORDER_TYPE_BUY if request.action.upper() == \"BUY\" else self._mt5.ORDER_TYPE_SELL)\n            filling_attr = getattr(self._mt5, request.type_filling, None) or getattr(self._mt5, \"ORDER_FILLING_IOC\", 1)\n            req: Dict[str, Any] = {\n                \"action\": self._mt5.TRADE_ACTION_DEAL, \"symbol\": request.symbol,\n                \"volume\": float(request.volume), \"type\": order_type,\n                \"deviation\": request.deviation, \"magic\": request.magic,\n                \"comment\": request.comment, \"type_filling\": filling_attr,\n            }\n            if request.price is not None: req[\"price\"] = float(request.price)\n            if request.sl   is not None: req[\"sl\"]    = float(request.sl)\n            if request.tp   is not None: req[\"tp\"]    = float(request.tp)\n            result = self._mt5.order_send(req)\n            if result is None:\n                return MT5OrderResult(success=False, retcode=-1, error=f\"MT5 None: {self._mt5.last_error()}\", deviation=request.deviation)\n            success = result.retcode == self._mt5.TRADE_RETCODE_DONE\n            return MT5OrderResult(\n                success=success, retcode=result.retcode,\n                deal=getattr(result, \"deal\", 0), order=getattr(result, \"order\", 0),\n                volume=getattr(result, \"volume\", 0.0), price=getattr(result, \"price\", 0.0),\n                comment=getattr(result, \"comment\", \"\"), request=req,\n                deviation=request.deviation,\n                error=None if success else f\"retcode={result.retcode}\",\n            )\n        return await asyncio.to_thread(_send)\n\n    async def close_position(self, ticket: int, deviation: int = 10) -> MT5OrderResult:\n        if not await self.health_check():\n            return MT5OrderResult(success=False, error=\"MT5 not connected\")\n        def _close() -> MT5OrderResult:\n            if not self._mt5:\n                return MT5OrderResult(success=False, error=\"MT5 not initialized\")\n            position_list = self._mt5.positions_get(ticket=ticket)\n            if not position_list:\n                return MT5OrderResult(success=False, error=f\"Position {ticket} not found or already closed\")\n            pos = position_list[0]\n            order_type = (self._mt5.ORDER_TYPE_SELL if pos.type == self._mt5.ORDER_TYPE_BUY else self._mt5.ORDER_TYPE_BUY)\n            tick = self._mt5.symbol_info_tick(pos.symbol)\n            if tick is None:\n                return MT5OrderResult(success=False, error=f\"Cannot get tick for {pos.symbol}\")\n            price = tick.bid if order_type == self._mt5.ORDER_TYPE_SELL else tick.ask\n            req = {\"action\": self._mt5.TRADE_ACTION_DEAL, \"position\": ticket, \"symbol\": pos.symbol,\n                   \"volume\": pos.volume, \"type\": order_type, \"price\": price, \"deviation\": deviation, \"comment\": \"bot_close\"}\n            result  = self._mt5.order_send(req)\n            success = getattr(result, \"retcode\", -1) == self._mt5.TRADE_RETCODE_DONE\n            return MT5OrderResult(success=success, retcode=getattr(result, \"retcode\", -1),\n                deal=getattr(result, \"deal\", 0), comment=getattr(result, \"comment\", \"\"),\n                error=None if success else f\"retcode={getattr(result, 'retcode', -1)}\")\n        return await asyncio.to_thread(_close)\n\n\nmt5_connector = MT5Connector()\n
+"""
+Galaxy Vast AI Trading Platform
+MT5 Async Connector - Production Reliability v2
+
+FIXES:
+  R-1:      Health revalidation after initialize()
+  R-2:      Login failure propagation
+  R-3:      Dynamic slippage deviation via ATR/spread/volatility
+  T-6:      close_position validates position exists
+  T-7:      DEADLOCK removed - _is_connected() lock-free
+  T-14:     type_filling from MT5_ORDER_FILLING env var
+  BUG-MT5-1: Race condition - concurrent send_order() on MT5 C++ lib.
+             FIX: acquire self._lock for entire _send_order_sync_unlocked.
+  BUG-MT5-2: Race condition - close_position() vs shutdown() use-after-free.
+             FIX: acquire self._lock in close_position before to_thread.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
+
+from ..core.logger import get_logger
+
+logger = get_logger("execution.mt5_connector")
+_DEFAULT_TYPE_FILLING = os.environ.get("MT5_ORDER_FILLING", "ORDER_FILLING_IOC")
+
+_REVALIDATE_TIMEOUT_S: float = float(os.environ.get("MT5_REVALIDATE_TIMEOUT", "5"))
+_REVALIDATE_RETRIES:   int   = int(os.environ.get("MT5_REVALIDATE_RETRIES",  "3"))
+
+_SLIPPAGE_BASE:         int   = int(os.environ.get("MT5_SLIPPAGE_BASE",    "10"))
+_SLIPPAGE_MAX:          int   = int(os.environ.get("MT5_SLIPPAGE_MAX",     "50"))
+_SLIPPAGE_SPREAD_MULT:  float = float(os.environ.get("MT5_SLIPPAGE_SPREAD_MULT", "1.5"))
+_SLIPPAGE_ATR_MULT:     float = float(os.environ.get("MT5_SLIPPAGE_ATR_MULT",   "2.0"))
+_SLIPPAGE_VOL_HIGH_ADD: int   = int(os.environ.get("MT5_SLIPPAGE_VOL_HIGH_ADD", "10"))
+
+
+class MT5ConnectionStatus(str, Enum):
+    DISCONNECTED = "disconnected"
+    CONNECTING   = "connecting"
+    CONNECTED    = "connected"
+    ERROR        = "error"
+
+
+@dataclass
+class MT5OrderRequest:
+    symbol:          str
+    action:          str
+    volume:          float
+    price:           Optional[float] = None
+    sl:              Optional[float] = None
+    tp:              Optional[float] = None
+    deviation:       int             = _SLIPPAGE_BASE
+    magic:           int             = 0
+    comment:         str             = ""
+    type_filling:    str             = _DEFAULT_TYPE_FILLING
+    current_atr:     Optional[float] = None
+    avg_atr:         Optional[float] = None
+    current_spread:  Optional[float] = None
+    avg_spread:      Optional[float] = None
+    volatility_high: bool            = False
+
+
+@dataclass
+class MT5OrderResult:
+    success:   bool
+    retcode:   int                   = 0
+    deal:      int                   = 0
+    order:     int                   = 0
+    volume:    float                 = 0.0
+    price:     float                 = 0.0
+    deviation: int                   = 0
+    comment:   str                   = ""
+    request:   Optional[Dict[str, Any]] = None
+    error:     Optional[str]         = None
+    timestamp: datetime              = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def compute_dynamic_deviation(request: MT5OrderRequest) -> int:
+    deviation = float(_SLIPPAGE_BASE)
+    try:
+        if request.current_atr and request.avg_atr and request.avg_atr > 0:
+            atr_ratio  = request.current_atr / request.avg_atr
+            atr_add    = (atr_ratio - 1.0) * _SLIPPAGE_ATR_MULT * _SLIPPAGE_BASE
+            deviation += max(0.0, atr_add)
+        if request.current_spread and request.avg_spread and request.avg_spread > 0:
+            spread_ratio = request.current_spread / request.avg_spread
+            spread_add   = (spread_ratio - 1.0) * _SLIPPAGE_SPREAD_MULT * _SLIPPAGE_BASE
+            deviation   += max(0.0, spread_add)
+        if request.volatility_high:
+            deviation += _SLIPPAGE_VOL_HIGH_ADD
+    except Exception as exc:
+        logger.warning("compute_dynamic_deviation error: %s", exc)
+        return _SLIPPAGE_BASE
+    result = max(_SLIPPAGE_BASE, min(int(round(deviation)), _SLIPPAGE_MAX))
+    logger.info("DynamicSlippage: %d pts", result)
+    return result
+
+
+class MT5Connector:
+    def __init__(self, exe_path=None, timeout_seconds=30, max_retries=3, retry_delay=1.0):
+        self.exe_path    = exe_path or os.environ.get("MT5_EXE_PATH", "")
+        self.timeout     = timeout_seconds
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self._status     = MT5ConnectionStatus.DISCONNECTED
+        self._lock       = asyncio.Lock()
+        self._last_error: Optional[str] = None
+        self._mt5:        Optional[Any] = None
+        self._connection_attempts       = 0
+
+    @property
+    def status(self) -> MT5ConnectionStatus: return self._status
+
+    def _is_connected(self) -> bool:
+        return self._status == MT5ConnectionStatus.CONNECTED and self._mt5 is not None
+
+    async def initialize(self) -> bool:
+        async with self._lock:
+            if self._is_connected(): return True
+            self._status = MT5ConnectionStatus.CONNECTING
+            self._connection_attempts += 1
+            try:
+                self._mt5 = await asyncio.to_thread(self._import_mt5)
+                if self._mt5 is None:
+                    self._status = MT5ConnectionStatus.ERROR
+                    self._last_error = "MT5 package not installed"
+                    logger.error(self._last_error); return False
+                kwargs: Dict[str, Any] = {}
+                if self.exe_path: kwargs["path"] = self.exe_path
+                ok = await asyncio.to_thread(self._mt5.initialize, **kwargs)
+                if not ok:
+                    err = self._mt5.last_error()
+                    self._status = MT5ConnectionStatus.ERROR
+                    self._last_error = f"MT5 initialize() failed: {err}"
+                    logger.error(self._last_error); return False
+                login_ok = await self._login_from_env()
+                if not login_ok:
+                    self._status = MT5ConnectionStatus.ERROR
+                    self._last_error = "MT5 login failed - trading blocked"
+                    logger.error("R-2: %s", self._last_error)
+                    try: await asyncio.to_thread(self._mt5.shutdown)
+                    except Exception: pass
+                    return False
+                revalidated = await self._revalidate()
+                if not revalidated:
+                    self._status = MT5ConnectionStatus.ERROR
+                    self._last_error = "MT5 revalidation failed after initialize()"
+                    logger.error("R-1: %s", self._last_error); return False
+                self._status = MT5ConnectionStatus.CONNECTED
+                self._last_error = None
+                self._connection_attempts = 0
+                logger.info("MT5 connector initialized and revalidated")
+                return True
+            except Exception as exc:
+                self._status = MT5ConnectionStatus.ERROR
+                self._last_error = str(exc)
+                logger.exception("MT5 initialize exception")
+                return False
+
+    async def _revalidate(self) -> bool:
+        for attempt in range(1, _REVALIDATE_RETRIES + 1):
+            try:
+                info = await asyncio.wait_for(
+                    asyncio.to_thread(self._mt5.terminal_info),
+                    timeout=_REVALIDATE_TIMEOUT_S)
+                if info and info.connected:
+                    logger.info("R-1: Revalidation OK (attempt %d)", attempt); return True
+                logger.warning("R-1: Revalidation attempt %d: not connected", attempt)
+            except asyncio.TimeoutError:
+                logger.warning("R-1: Revalidation attempt %d timed out", attempt)
+            except Exception as exc:
+                logger.warning("R-1: Revalidation attempt %d error: %s", attempt, exc)
+            if attempt < _REVALIDATE_RETRIES: await asyncio.sleep(1.0)
+        return False
+
+    def _import_mt5(self) -> Optional[Any]:
+        try:
+            import MetaTrader5 as mt5
+            return mt5
+        except Exception:
+            logger.warning("MetaTrader5 package not available")
+            return None
+
+    async def _login_from_env(self) -> bool:
+        login    = os.environ.get("MT5_LOGIN")
+        password = os.environ.get("MT5_PASSWORD")
+        server   = os.environ.get("MT5_SERVER")
+        if not (login and password and server):
+            logger.warning("R-2: MT5 credentials not set - login failed"); return False
+        try:
+            ok = bool(await asyncio.to_thread(self._mt5.login, int(login), password, server))
+            if ok: logger.info("MT5 login OK (account %s @ %s)", login, server)
+            else: logger.error("MT5 login FAILED: %s", self._mt5.last_error())
+            return ok
+        except Exception as exc:
+            logger.error("MT5 login exception: %s", exc); return False
+
+    async def shutdown(self) -> None:
+        async with self._lock:
+            if self._mt5:
+                try: await asyncio.to_thread(self._mt5.shutdown)
+                except Exception as exc: logger.warning("MT5 shutdown error: %s", exc)
+                finally: self._mt5 = None
+            self._status = MT5ConnectionStatus.DISCONNECTED
+
+    async def health_check(self) -> bool:
+        if not self._is_connected(): return False
+        async with self._lock:
+            if not self._is_connected(): return False
+            try:
+                info = await asyncio.to_thread(self._mt5.terminal_info)
+                ok   = bool(info and info.connected)
+                if not ok: self._status = MT5ConnectionStatus.ERROR
+                return ok
+            except Exception as exc:
+                logger.warning("MT5 health_check failed: %s", exc)
+                self._status = MT5ConnectionStatus.ERROR
+                return False
+
+    async def get_account_info(self) -> Optional[Any]:
+        if not await self.health_check(): return None
+        async with self._lock:
+            if not self._is_connected(): return None
+            return await asyncio.to_thread(self._mt5.account_info)
+
+    async def get_positions(self) -> List[Any]:
+        if not await self.health_check(): return []
+        async with self._lock:
+            if not self._is_connected(): return []
+            return await asyncio.to_thread(self._mt5.positions_get) or []
+
+    async def get_orders(self) -> List[Any]:
+        if not await self.health_check(): return []
+        async with self._lock:
+            if not self._is_connected(): return []
+            return await asyncio.to_thread(self._mt5.orders_get) or []
+
+    async def send_order(self, request: MT5OrderRequest, retry_policy=None) -> MT5OrderResult:
+        request.deviation = compute_dynamic_deviation(request)
+        if not await self.health_check():
+            await self.initialize()
+        last_error: Optional[str] = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                # BUG-MT5-1 FIX: hold self._lock for entire MT5 C++ send.
+                # MT5 is NOT thread-safe for concurrent order_send() calls.
+                async with self._lock:
+                    if not self._is_connected():
+                        last_error = "MT5 disconnected before send"; break
+                    result = await asyncio.wait_for(
+                        self._send_order_sync_unlocked(request),
+                        timeout=self.timeout)
+                if result.success: return result
+                last_error = result.error
+                if retry_policy and not retry_policy(result): break
+            except asyncio.TimeoutError:
+                last_error = f"MT5 order timeout attempt {attempt}"
+                logger.warning(last_error)
+            except Exception as exc:
+                last_error = str(exc)
+                logger.exception("MT5 send_order error attempt %s", attempt)
+            if attempt < self.max_retries:
+                await asyncio.sleep(self.retry_delay * attempt)
+        return MT5OrderResult(success=False, error=last_error or "unknown", deviation=request.deviation)
+
+    async def _send_order_sync_unlocked(self, request: MT5OrderRequest) -> MT5OrderResult:
+        """Must be called while holding self._lock (BUG-MT5-1)."""
+        def _send() -> MT5OrderResult:
+            if not self._mt5: return MT5OrderResult(success=False, error="MT5 not initialized")
+            order_type   = (self._mt5.ORDER_TYPE_BUY if request.action.upper() == "BUY" else self._mt5.ORDER_TYPE_SELL)
+            filling_attr = getattr(self._mt5, request.type_filling, None) or getattr(self._mt5, "ORDER_FILLING_IOC", 1)
+            req: Dict[str, Any] = {
+                "action": self._mt5.TRADE_ACTION_DEAL, "symbol": request.symbol,
+                "volume": float(request.volume), "type": order_type,
+                "deviation": request.deviation, "magic": request.magic,
+                "comment": request.comment, "type_filling": filling_attr,
+            }
+            if request.price is not None: req["price"] = float(request.price)
+            if request.sl   is not None: req["sl"]    = float(request.sl)
+            if request.tp   is not None: req["tp"]    = float(request.tp)
+            result = self._mt5.order_send(req)
+            if result is None:
+                return MT5OrderResult(success=False, retcode=-1,
+                    error=f"MT5 None: {self._mt5.last_error()}", deviation=request.deviation)
+            success = result.retcode == self._mt5.TRADE_RETCODE_DONE
+            return MT5OrderResult(
+                success=success, retcode=result.retcode,
+                deal=getattr(result, "deal", 0), order=getattr(result, "order", 0),
+                volume=getattr(result, "volume", 0.0), price=getattr(result, "price", 0.0),
+                comment=getattr(result, "comment", ""), request=req,
+                deviation=request.deviation,
+                error=None if success else f"retcode={result.retcode}",
+            )
+        return await asyncio.to_thread(_send)
+
+    async def close_position(self, ticket: int, deviation: int = 10) -> MT5OrderResult:
+        if not await self.health_check():
+            return MT5OrderResult(success=False, error="MT5 not connected")
+        # BUG-MT5-2 FIX: hold lock so shutdown() cannot set self._mt5=None
+        # concurrently with the close thread.
+        async with self._lock:
+            if not self._is_connected():
+                return MT5OrderResult(success=False, error="MT5 disconnected before close")
+            def _close() -> MT5OrderResult:
+                if not self._mt5: return MT5OrderResult(success=False, error="MT5 not initialized")
+                position_list = self._mt5.positions_get(ticket=ticket)
+                if not position_list:
+                    return MT5OrderResult(success=False, error=f"Position {ticket} not found or already closed")
+                pos = position_list[0]
+                order_type = (self._mt5.ORDER_TYPE_SELL if pos.type == self._mt5.ORDER_TYPE_BUY else self._mt5.ORDER_TYPE_BUY)
+                tick = self._mt5.symbol_info_tick(pos.symbol)
+                if tick is None:
+                    return MT5OrderResult(success=False, error=f"Cannot get tick for {pos.symbol}")
+                price = tick.bid if order_type == self._mt5.ORDER_TYPE_SELL else tick.ask
+                req = {"action": self._mt5.TRADE_ACTION_DEAL, "position": ticket, "symbol": pos.symbol,
+                       "volume": pos.volume, "type": order_type, "price": price,
+                       "deviation": deviation, "comment": "bot_close"}
+                result  = self._mt5.order_send(req)
+                success = getattr(result, "retcode", -1) == self._mt5.TRADE_RETCODE_DONE
+                return MT5OrderResult(success=success, retcode=getattr(result, "retcode", -1),
+                    deal=getattr(result, "deal", 0), comment=getattr(result, "comment", ""),
+                    error=None if success else f"retcode={getattr(result, 'retcode', -1)}")
+            return await asyncio.to_thread(_close)
+
+
+mt5_connector = MT5Connector()
