@@ -3,93 +3,72 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional
 
 logger = logging.getLogger("services.audit")
 
 _FLUSH_INTERVAL_S = 5
-_BUFFER_MAX       = 500
-_FLUSH_BATCH      = 100
+_FLUSH_BATCH      = 50
 _MAX_RETRIES      = 3
+_BUFFER_CAP       = 5_000
 
 
 class AuditAction(str, Enum):
-    LOGIN              = "login"
-    LOGOUT             = "logout"
-    TOKEN_REFRESH      = "token_refresh"
-    TOKEN_REVOKED      = "token_revoked"
-    TRADE_OPEN         = "trade_open"
-    TRADE_CLOSE        = "trade_close"
-    TRADE_MODIFY       = "trade_modify"
-    SIGNAL_CREATE      = "signal_create"
-    SIGNAL_CREATED     = "signal_create"   # alias — backward compat (patch S-21)
-    SIGNAL_EXECUTE     = "signal_execute"
-    SIGNAL_EXPIRE      = "signal_expire"
-    DECISION_MADE      = "decision_made"
-    RISK_BLOCKED       = "risk_blocked"
-    CIRCUIT_OPEN       = "circuit_open"
-    CIRCUIT_CLOSE      = "circuit_close"
-    ADMIN_ACTION       = "admin_action"
-    CONFIG_CHANGE      = "config_change"
-    USER_CREATED       = "user_created"
-    USER_DELETED       = "user_deleted"
-    ROLE_CHANGED       = "role_changed"
-    SECURITY_EVENT     = "security_event"
-    RATE_LIMIT_HIT     = "rate_limit_hit"
-    SUSPICIOUS_REQUEST = "suspicious_request"
-    SYSTEM_STARTUP     = "system_startup"
-    SYSTEM_SHUTDOWN    = "system_shutdown"
+    LOGIN          = "login"
+    LOGOUT         = "logout"
+    SIGNAL_CREATE  = "signal_create"
+    SIGNAL_CREATED = "signal_create"   # alias — backward compat (patch S-21)
+    SIGNAL_EXECUTE = "signal_execute"
+    SIGNAL_CANCEL  = "signal_cancel"
+    TRADE_OPEN     = "trade_open"
+    TRADE_CLOSE    = "trade_close"
+    RISK_BLOCK     = "risk_block"
+    RISK_HALT      = "risk_halt"
+    RISK_RESUME    = "risk_resume"
+    SETTINGS_CHANGE = "settings_change"
+    USER_DELETE    = "user_delete"
+    ADMIN_ACTION   = "admin_action"
+    SYSTEM_START   = "system_start"
+    SYSTEM_STOP    = "system_stop"
 
 
+@dataclass
 class AuditEntry:
-    __slots__ = ("action", "user_id", "resource", "detail", "ip", "ts", "success")
-
-    def __init__(
-        self,
-        action:   AuditAction,
-        user_id:  Optional[str]       = None,
-        resource: Optional[str]       = None,
-        detail:   Optional[Dict[str, Any]] = None,
-        ip:       Optional[str]       = None,
-        success:  bool                = True,
-    ) -> None:
-        self.action   = action
-        self.user_id  = user_id
-        self.resource = resource
-        self.detail   = detail or {}
-        self.ip       = ip
-        self.ts       = datetime.now(timezone.utc).isoformat()
-        self.success  = success
+    action:    AuditAction
+    user_id:   Optional[str]       = None
+    resource:  Optional[str]       = None
+    detail:    Optional[Dict[str, Any]] = None
+    ip:        Optional[str]       = None
+    success:   bool                = True
+    timestamp: datetime            = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "action":   self.action.value,
-            "user_id":  self.user_id,
-            "resource": self.resource,
-            "detail":   self.detail,
-            "ip":       self.ip,
-            "timestamp": self.ts,
-            "success":  self.success,
+            "action":    self.action.value,
+            "user_id":   self.user_id,
+            "resource":  self.resource,
+            "detail":    self.detail or {},
+            "ip":        self.ip,
+            "success":   self.success,
+            "timestamp": self.timestamp.isoformat(),
         }
 
 
 class AuditService:
-    """Buffered async audit logger with retry-on-failure flush."""
+    """Async buffered audit log with DB flush."""
 
-    def __init__(self) -> None:
-        self._buffer: deque = deque(maxlen=_BUFFER_MAX)
+    def __init__(self, db: Any = None) -> None:
+        self._db     = db
+        self._buffer: Deque[AuditEntry] = deque(maxlen=_BUFFER_CAP)
         self._lock   = asyncio.Lock()
-        self._task:  Optional[asyncio.Task] = None
-        self._db:    Any = None
+        self._task: Optional[asyncio.Task] = None
 
-    def set_db(self, db: Any) -> None:
-        self._db = db
-
-    async def start(self) -> None:
-        self._task = asyncio.create_task(self._flush_loop(), name="audit_flush")
-        logger.info("[AuditService] started")
+    def start(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._flush_loop())
 
     async def stop(self) -> None:
         if self._task:
@@ -141,11 +120,19 @@ class AuditService:
                     logger.error("[AuditService] dropping %d entries after %d retries", len(batch), _MAX_RETRIES)
 
     async def _flush_all(self) -> None:
+        """H-7 FIX: flush with error guard to prevent infinite loop on shutdown."""
         while True:
             async with self._lock:
                 if not self._buffer:
                     break
-            await self._flush_batch()
+            try:
+                await self._flush_batch()
+            except Exception as exc:
+                logger.error(
+                    "[AuditService] _flush_all error — stopping flush to prevent data loss",
+                    exc_info=True,
+                )
+                break
 
     async def get_recent(self, limit: int = 100) -> List[Dict[str, Any]]:
         async with self._lock:
@@ -162,16 +149,3 @@ def get_audit_service() -> AuditService:
     if _audit_service is None:
         _audit_service = AuditService()
     return _audit_service
-
-
-async def log_audit(
-    action:   AuditAction,
-    user_id:  Optional[str]       = None,
-    resource: Optional[str]       = None,
-    detail:   Optional[Dict[str, Any]] = None,
-    ip:       Optional[str]       = None,
-    success:  bool                = True,
-) -> None:
-    """Module-level convenience wrapper."""
-    svc = get_audit_service()
-    await svc.log_async(action, user_id, resource, detail, ip, success)
