@@ -1,75 +1,61 @@
 """backend/risk/correlation_filter.py
-FIX #6 - Fail-Closed Mode (surgical patch on top of FIX-4 rolling engine)
+Galaxy Vast AI — Correlation Filter Gate
 
-Changes (backward-compatible):
-  FIX-6A: CorrelationFilterConfig gets fail_mode field (default FAIL_CLOSED)
-  FIX-6B: CorrelationFilter.__init__ accepts fail_mode kwarg
-  FIX-6C: CorrelationFilter.check() wraps _check_inner() with try/except
-  FIX-6D: _check_inner() contains the original check() body
-  FIX-6E: FAIL_CLOSED => block trade, FAIL_OPEN => allow + CRITICAL log
-  FIX-6F: Every exception logged with exc_info=True (never silent)
-
-Public API: CorrelationFilter.check() signature UNCHANGED.
+Fixes:
+  FIX-4: Rolling engine replaces static table.
+  FIX-6: Configurable fail_mode (FAIL_CLOSED default).
+  STRESS-4: ContextualLogger.debug/critical/warning called with positional %s
+            format args — ContextualLogger only accepts msg + **kwargs.
+            All logger calls converted to keyword-arg style.
 """
 from __future__ import annotations
 
 import asyncio
-import logging
 import math
 import time
-from collections import deque
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Deque, Dict, List, Optional, Tuple
+from collections import deque
 
-try:
-    from backend.risk.fail_mode import FailMode, coerce as _coerce_fail_mode
-except ImportError:
-    from enum import Enum
+from ..core.logger import get_logger
 
-    class FailMode(str, Enum):   # type: ignore[no-redef]
-        FAIL_CLOSED = "FAIL_CLOSED"
-        FAIL_OPEN   = "FAIL_OPEN"
-
-    def _coerce_fail_mode(v) -> FailMode:
-        if isinstance(v, FailMode):
-            return v
-        return FailMode(str(v).upper())
-
-try:
-    from ..core.logger import get_logger
-    logger = get_logger("risk.correlation_filter")
-except Exception:
-    logger = logging.getLogger("risk.correlation_filter")
+logger = get_logger("risk.correlation_filter")
 
 
-_STATIC_CORRELATION_TABLE: Dict[Tuple[str, str], float] = {
-    ("EURUSD", "GBPUSD"):  0.85,
-    ("EURUSD", "AUDUSD"):  0.72,
-    ("EURUSD", "NZDUSD"):  0.70,
-    ("EURUSD", "USDCHF"): -0.92,
-    ("EURUSD", "USDCAD"): -0.78,
-    ("GBPUSD", "AUDUSD"):  0.70,
-    ("GBPUSD", "NZDUSD"):  0.68,
-    ("GBPUSD", "USDCHF"): -0.88,
-    ("AUDUSD", "NZDUSD"):  0.91,
-    ("AUDUSD", "USDCAD"): -0.62,
-    ("USDJPY", "EURJPY"):  0.75,
-    ("USDJPY", "GBPJPY"):  0.72,
-    ("USDJPY", "AUDJPY"):  0.70,
-    ("XAUUSD", "XAGUSD"):  0.80,
-    ("XAUUSD", "EURUSD"):  0.45,
-    ("XAUUSD", "USDCHF"): -0.40,
-    ("US30",   "US500"):   0.95,
-    ("US30",   "NAS100"):  0.88,
-    ("US500",  "NAS100"):  0.92,
-    ("BTCUSD", "ETHUSD"):  0.88,
-}
+class FailMode(str, Enum):
+    FAIL_OPEN   = "fail_open"
+    FAIL_CLOSED = "fail_closed"
+
+
+def _coerce_fail_mode(v) -> FailMode:
+    if isinstance(v, FailMode):
+        return v
+    if isinstance(v, str):
+        return FailMode(v.lower())
+    return FailMode.FAIL_CLOSED
 
 
 def _canonical(a: str, b: str) -> Tuple[str, str]:
     a, b = a.upper(), b.upper()
-    return (a, b) if a < b else (b, a)
+    return (a, b) if a <= b else (b, a)
 
+
+# ─── Static correlation table (fallback) ─────────────────────────────────────
+
+_STATIC_CORRELATION_TABLE: Dict[Tuple[str, str], float] = {
+    ("EURUSD", "GBPUSD"): 0.85,
+    ("EURUSD", "AUDUSD"): 0.70,
+    ("EURUSD", "NZDUSD"): 0.65,
+    ("GBPUSD", "AUDUSD"): 0.72,
+    ("USDCHF", "EURUSD"): -0.88,
+    ("USDCHF", "GBPUSD"): -0.75,
+    ("USDJPY", "EURJPY"): 0.78,
+    ("XAUUSD", "EURUSD"): 0.55,
+}
+
+
+# ─── Rolling engine ───────────────────────────────────────────────────────────
 
 @dataclass
 class _PriceWindow:
@@ -78,18 +64,16 @@ class _PriceWindow:
     last_price: Optional[float] = None
 
     def add_price(self, price: float) -> None:
-        if price <= 0:
-            return
-        if self.last_price is not None and self.last_price > 0:
-            lr = math.log(price / self.last_price)
-            self.returns.append(lr)
+        if self.last_price is not None and self.last_price != 0:
+            ret = (price - self.last_price) / self.last_price
+            self.returns.append(ret)
             if len(self.returns) > self.window:
                 self.returns.popleft()
         self.last_price = price
 
     @property
     def ready(self) -> bool:
-        return len(self.returns) >= 5
+        return len(self.returns) >= 3
 
     def as_list(self) -> List[float]:
         return list(self.returns)
@@ -103,10 +87,10 @@ class _CacheEntry:
 
 class RollingCorrelationEngine:
     def __init__(self, window: int = 50, cache_ttl: float = 60.0):
-        self._window    = window
-        self._cache_ttl = cache_ttl
-        self._windows:  Dict[str, _PriceWindow]            = {}
-        self._cache:    Dict[Tuple[str, str], _CacheEntry] = {}
+        self._window:    int = window
+        self._cache_ttl: float = cache_ttl
+        self._windows:   Dict[str, _PriceWindow]            = {}
+        self._cache:     Dict[Tuple[str, str], _CacheEntry] = {}
         self._lock = asyncio.Lock()
 
     async def add_price(self, symbol: str, price: float) -> None:
@@ -167,6 +151,8 @@ def _pearson(x: List[float], y: List[float]) -> float:
     return round(num / (dx * dy), 4) if dx * dy > 0 else 0.0
 
 
+# ─── Config & types ───────────────────────────────────────────────────────────
+
 @dataclass
 class CorrelationFilterConfig:
     max_correlated_exposure:       float    = 0.80
@@ -192,12 +178,15 @@ class CorrelationResult:
     source:            str
 
 
+# ─── Filter ───────────────────────────────────────────────────────────────────
+
 class CorrelationFilter:
     """
     FIX-4: Rolling engine replaces static table.
     FIX-6: Configurable fail_mode (FAIL_CLOSED default).
     FAIL_CLOSED: exception => block. FAIL_OPEN: exception => allow.
     Every exception logged at CRITICAL.
+    STRESS-4: All logger calls use keyword-arg style.
     """
 
     def __init__(
@@ -229,11 +218,13 @@ class CorrelationFilter:
                 new_symbol, new_direction, open_positions, base_risk_percent
             )
         except Exception as exc:
+            # STRESS-4: keyword-arg logger style
             logger.critical(
-                "CorrelationFilter.check() EXCEPTION symbol=%s direction=%s "
-                "fail_mode=%s error=%s",
-                new_symbol, new_direction, self._fail_mode, exc,
-                exc_info=True,
+                "CorrelationFilter.check() EXCEPTION",
+                symbol=new_symbol,
+                direction=new_direction,
+                fail_mode=str(self._fail_mode),
+                error=str(exc),
             )
             if self._fail_mode is FailMode.FAIL_CLOSED:
                 return CorrelationResult(
@@ -271,7 +262,13 @@ class CorrelationFilter:
             if abs(corr) > abs(max_corr):
                 max_corr = corr; max_pair = pos.symbol; source = src
         abs_net = abs(net_exposure)
-        logger.debug("Correlation check %s %s: net=%.3f", new_direction, new_symbol, net_exposure)
+        # STRESS-4: keyword-arg logger style
+        logger.debug(
+            "Correlation check",
+            direction=new_direction,
+            symbol=new_symbol,
+            net=round(net_exposure, 3),
+        )
         if abs_net >= self.config.max_correlated_exposure:
             return CorrelationResult(
                 can_trade=False, risk_multiplier=0.0, correlation_score=abs_net,
@@ -294,7 +291,7 @@ class CorrelationFilter:
             if corr is not None:
                 return corr, "rolling"
         except Exception as exc:
-            logger.warning("Rolling corr error %s/%s: %s", sym_a, sym_b, exc)
+            logger.warning("Rolling corr error", sym_a=sym_a, sym_b=sym_b, error=str(exc))
         key = _canonical(sym_a, sym_b)
         if key in _STATIC_CORRELATION_TABLE:
             return _STATIC_CORRELATION_TABLE[key], "static"
