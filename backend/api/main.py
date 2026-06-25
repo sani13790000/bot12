@@ -8,6 +8,9 @@ Fixes applied:
   CONFLICT-FIX-4 CB locks pre-warmed in lifespan
   HIGH-FIX silent exception swallow replaced with debug logging
   HIGH-FIX risk route registered explicitly
+  PROD-FIX-1 CORS uses settings.ALLOWED_ORIGINS (was CORS_ORIGINS — nonexistent field)
+  PROD-FIX-2 auth + license routes explicitly registered
+  PROD-FIX-3 allow_methods restricted to safe list in production
 """
 from __future__ import annotations
 
@@ -113,17 +116,22 @@ def create_app() -> FastAPI:
     )
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    allowed_origins = (
-        settings.CORS_ORIGINS.split(",")
-        if hasattr(settings, "CORS_ORIGINS") and settings.CORS_ORIGINS
-        else ["http://localhost:3000"]
+    # PROD-FIX-1: was settings.CORS_ORIGINS (nonexistent) → always fell back to localhost only
+    allowed_origins = settings.ALLOWED_ORIGINS or ["http://localhost:3000"]
+
+    # PROD-FIX-3: restrict methods in production
+    allowed_methods = (
+        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+        if settings.ENVIRONMENT == "production"
+        else ["*"]
     )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=allowed_methods,
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
     )
 
     # ── Rate Limit ─────────────────────────────────────────────────────────────
@@ -139,13 +147,20 @@ def create_app() -> FastAPI:
     from .health import router as health_router
     app.include_router(health_router, tags=["Health"])
 
+    # PROD-FIX-2: auth + license routes explicitly registered (were missing before)
     _route_map = [
+        ("routes.auth",     f"{_prefix}/auth",     ["Authentication"]),
+        ("routes.license",  f"{_prefix}/license",  ["License"]),
         ("routes.signals",  f"{_prefix}/signals",  ["Signals"]),
         ("routes.trades",   f"{_prefix}/trades",   ["Trades"]),
         ("routes.users",    f"{_prefix}/users",    ["Users"]),
         ("routes.risk",     f"{_prefix}/risk",     ["Risk"]),
         ("routes.agents",   f"{_prefix}/agents",   ["Agents"]),
         ("routes.analytics",f"{_prefix}/analytics",["Analytics"]),
+        ("routes.backtest", f"{_prefix}/backtest", ["Backtest"]),
+        ("routes.ai_prediction", f"{_prefix}/ai-prediction", ["AI Prediction"]),
+        ("routes.intelligence",  f"{_prefix}/intelligence",  ["Intelligence"]),
+        ("routes.dashboard",     f"{_prefix}/dashboard",     ["Dashboard"]),
     ]
     for module, prefix, tags in _route_map:
         try:
