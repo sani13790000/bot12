@@ -7,6 +7,10 @@ HF-1: 5 failures within 60s -> OPEN (trading halted)
   - Global trading-halt flag
   - Async-safe asyncio.Lock only
   - Prometheus snapshot() + CircuitOpenError
+
+CONFLICT-FIX-1 (2026-06-25): _HALT_LOCK and _REGISTRY_LOCK were module-level
+  asyncio.Lock() objects, causing RuntimeError on Python 3.12+ at import time.
+  Fixed to lazy-init pattern (_get_halt_lock / _get_registry_lock).
 """
 from __future__ import annotations
 import asyncio, logging, time
@@ -68,14 +72,25 @@ class BreakerStats:
         self.total_calls += 1
 
 
+# ─── Global trading-halt state ───────────────────────────────────────────────
 _TRADING_HALTED = False
 _HALT_REASON = ""
-_HALT_LOCK = asyncio.Lock()
+_HALT_LOCK: "asyncio.Lock | None" = None  # CONFLICT-FIX-1: lazy init
+
+
+def _get_halt_lock() -> asyncio.Lock:
+    """Return (creating if needed) the global halt asyncio.Lock.
+    Must be called inside a running event loop.
+    """
+    global _HALT_LOCK
+    if _HALT_LOCK is None:
+        _HALT_LOCK = asyncio.Lock()
+    return _HALT_LOCK
 
 
 async def halt_trading(reason: str) -> None:
     global _TRADING_HALTED, _HALT_REASON
-    async with _HALT_LOCK:
+    async with _get_halt_lock():
         _TRADING_HALTED = True
         _HALT_REASON = reason
     logger.critical("TRADING HALTED: %s", reason)
@@ -83,7 +98,7 @@ async def halt_trading(reason: str) -> None:
 
 async def resume_trading(reason: str = "") -> None:
     global _TRADING_HALTED, _HALT_REASON
-    async with _HALT_LOCK:
+    async with _get_halt_lock():
         _TRADING_HALTED = False
         _HALT_REASON = ""
     logger.warning("TRADING RESUMED: %s", reason)
@@ -97,13 +112,24 @@ def halt_reason() -> str:
     return _HALT_REASON
 
 
+# ─── Breaker registry ─────────────────────────────────────────────────────────
 _REGISTRY: Dict[str, "CircuitBreaker"] = {}
-_REGISTRY_LOCK = asyncio.Lock()
+_REGISTRY_LOCK: "asyncio.Lock | None" = None  # CONFLICT-FIX-1: lazy init
+
+
+def _get_registry_lock() -> asyncio.Lock:
+    """Return (creating if needed) the registry asyncio.Lock.
+    Must be called inside a running event loop.
+    """
+    global _REGISTRY_LOCK
+    if _REGISTRY_LOCK is None:
+        _REGISTRY_LOCK = asyncio.Lock()
+    return _REGISTRY_LOCK
 
 
 async def get_breaker(name: str, config: Optional[BreakerConfig] = None) -> "CircuitBreaker":
     """Get-or-create a named circuit breaker. LRU eviction at 500 entries."""
-    async with _REGISTRY_LOCK:
+    async with _get_registry_lock():
         if name in _REGISTRY:
             return _REGISTRY[name]
         if len(_REGISTRY) >= _MAX_REGISTRY_SIZE:
