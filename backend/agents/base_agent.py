@@ -1,107 +1,61 @@
-"""Galaxy Vast AI Trading Platform
-BaseAgent v2 — MS-4 + MS-5 timeout & failover support
-"""
 from __future__ import annotations
-
-import asyncio
-import time
-from abc import ABC, abstractmethod
+import abc, time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
+from ..core.logger import get_logger
 
-from backend.core.logger import get_logger
-
-
-class AgentStatus(str, Enum):
-    OK      = "OK"
-    WARNING = "WARNING"
-    ERROR   = "ERROR"
-    SKIP    = "SKIP"
-
+class VoteSignal(str, Enum):
+    BUY     = 'BUY'
+    SELL    = 'SELL'
+    NEUTRAL = 'NEUTRAL'
+    ABSTAIN = 'ABSTAIN'
 
 @dataclass
-class AgentVote:
-    score:      float
+class VoteResult:
+    agent_id:   str
+    signal:     VoteSignal
     confidence: float
-    direction:  Optional[str]  = None
-    status:     AgentStatus    = AgentStatus.OK
-    reason:     str            = ""
+    weight:     float
+    latency_ms: float = 0.0
+    reason:     str  = ''
     metadata:   Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        self.score      = max(0.0, min(100.0, float(self.score)))
-        self.confidence = max(0.0, min(100.0, float(self.confidence)))
-
-
-@dataclass
-class AgentResult:
-    agent_name: str
-    vote:       AgentVote
-    elapsed_ms: float          = 0.0
     error:      Optional[str]  = None
+    @property
+    def weighted_confidence(self) -> float: return self.confidence * self.weight
+    def to_dict(self) -> Dict[str, Any]:
+        return {'agent_id': self.agent_id, 'signal': self.signal.value, 'confidence': round(self.confidence, 4), 'weight': round(self.weight, 4), 'weighted_confidence': round(self.weighted_confidence, 4), 'latency_ms': round(self.latency_ms, 2), 'reason': self.reason, 'metadata': self.metadata, 'error': self.error}
 
-
-class BaseAgent(ABC):
-    """
-    Base interface for all trading agents.
-
-    Safety (MS-4 / MS-5):
-      run() wraps analyze() with try/except + optional asyncio.wait_for.
-      A timeout or crash returns neutral AgentResult — never raises.
-    """
-
-    def __init__(self, name: str, weight: float = 1.0, enabled: bool = True) -> None:
-        self.name    = name
-        self.weight  = max(0.0, float(weight))
-        self.enabled = enabled
-        self._logger = get_logger(f"agent.{name.lower().replace(' ', '_')}")
-
-    @abstractmethod
-    async def analyze(self, context: Dict[str, Any]) -> AgentVote: ...
-
-    async def run(
-        self,
-        context:   Dict[str, Any],
-        timeout_s: Optional[float] = None,
-    ) -> AgentResult:
-        if not self.enabled:
-            return AgentResult(
-                agent_name=self.name,
-                vote=AgentVote(score=50.0, confidence=0.0,
-                               status=AgentStatus.SKIP, reason="Agent disabled"),
-                elapsed_ms=0.0,
-            )
-        t0 = time.perf_counter()
+class BaseAgent(abc.ABC):
+    DEFAULT_WEIGHT: float = 1.0
+    _SLOW_THRESHOLD_MS: float = 500.0
+    def __init__(self) -> None:
+        self._logger = get_logger(f'agent.{self.agent_id}')
+    @property
+    def agent_id(self) -> str: return type(self).__name__.lower().replace('agent', '')
+    @property
+    def weight(self) -> float: return self.DEFAULT_WEIGHT
+    @abc.abstractmethod
+    async def _analyze(self, context: Dict[str, Any]) -> VoteResult: ...
+    async def analyze(self, context: Dict[str, Any]) -> VoteResult:
+        t0 = time.monotonic()
         try:
-            if timeout_s is not None:
-                vote = await asyncio.wait_for(self.analyze(context), timeout=timeout_s)
-            else:
-                vote = await self.analyze(context)
-            elapsed = (time.perf_counter() - t0) * 1000
-            self._logger.debug("score=%.1f conf=%.1f [%.1fms]",
-                               vote.score, vote.confidence, elapsed)
-            return AgentResult(agent_name=self.name, vote=vote, elapsed_ms=elapsed)
-        except asyncio.TimeoutError:
-            elapsed = (time.perf_counter() - t0) * 1000
-            msg = f"Timeout after {timeout_s}s"
-            self._logger.warning("MS-4 %s: %s", self.name, msg)
-            return AgentResult(
-                agent_name=self.name,
-                vote=AgentVote(score=50.0, confidence=0.0, status=AgentStatus.ERROR,
-                               reason=msg, direction="NEUTRAL"),
-                elapsed_ms=elapsed, error=f"timeout after {timeout_s}s",
-            )
+            result = await self._analyze(context)
+            result.latency_ms = (time.monotonic() - t0) * 1000
+            if result.latency_ms > self._SLOW_THRESHOLD_MS:
+                self._logger.warning('Slow agent analysis', latency_ms=round(result.latency_ms, 1))
+            self._logger.debug('Agent vote', signal=result.signal.value, confidence=round(result.confidence, 3), latency_ms=round(result.latency_ms, 1))
+            self._emit_metrics(result)
+            return result
         except Exception as exc:
-            elapsed = (time.perf_counter() - t0) * 1000
-            self._logger.error("MS-5 %s crash: %s", self.name, exc, exc_info=True)
-            return AgentResult(
-                agent_name=self.name,
-                vote=AgentVote(score=50.0, confidence=0.0, status=AgentStatus.ERROR,
-                               reason=f"Crash: {exc}", direction="NEUTRAL"),
-                elapsed_ms=elapsed, error=str(exc),
-            )
-
-    def __repr__(self) -> str:
-        return (f"<{self.__class__.__name__} name={self.name!r} "
-                f"weight={self.weight} enabled={self.enabled}>")
+            latency_ms = (time.monotonic() - t0) * 1000
+            self._logger.error('Agent error -> ABSTAIN', error=str(exc), latency_ms=round(latency_ms, 1))
+            return VoteResult(agent_id=self.agent_id, signal=VoteSignal.ABSTAIN, confidence=0.0, weight=self.weight, latency_ms=latency_ms, reason=f'agent_error: {exc}', error=str(exc))
+    def _emit_metrics(self, result: VoteResult) -> None:
+        try:
+            from ..observability.metrics import metrics_registry
+            metrics_registry.increment(f'agent.{self.agent_id}.votes.{result.signal.value.lower()}')
+            metrics_registry.histogram(f'agent.{self.agent_id}.latency_ms', result.latency_ms)
+        except Exception: pass
+    async def health(self) -> Dict[str, Any]:
+        return {'agent_id': self.agent_id, 'weight': self.weight, 'status': 'ok'}
