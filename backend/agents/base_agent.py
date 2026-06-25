@@ -1,19 +1,16 @@
 """backend/agents/base_agent.py
 Galaxy Vast AI Trading Platform — Enterprise Base Agent
 
-Fix STRESS-1: AgentVote, AgentResult, AgentStatus were missing — VotingEngine
-could not import them from base_agent, causing ImportError on startup.
+Fix STRESS-1: AgentVote, AgentResult, AgentStatus were missing.
+Fix STRESS-6: enabled=True added to BaseAgent — VotingEngine._normalise_weights requires it.
 """
 from __future__ import annotations
 
 import abc
 import logging
-import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
-
-from ..core.logger import get_logger
 
 _LOG = logging.getLogger(__name__)
 
@@ -25,6 +22,7 @@ class AgentStatus(str, Enum):
     OK    = "ok"
     SKIP  = "skip"
     ERROR = "error"
+    VETO  = "veto"  # blocks all other agents
 
 
 # ─── AgentVote (per-agent raw vote) ──────────────────────────────────────────
@@ -54,6 +52,8 @@ class AgentResult:
     agent_name: str
     vote:       AgentVote
     latency_ms: float = 0.0
+    elapsed_ms: float = 0.0
+    error:      Optional[str] = None
 
 
 # ─── VoteSignal (legacy compat) ───────────────────────────────────────────────
@@ -104,6 +104,7 @@ class BaseAgent(abc.ABC):
     agent_id:  str   = "base"
     weight:    float = 1.0
     has_veto:  bool  = False
+    enabled:   bool  = True   # STRESS-6: required by VotingEngine._normalise_weights()
 
     def __init__(
         self,
@@ -117,15 +118,21 @@ class BaseAgent(abc.ABC):
         self._log = logging.getLogger(f"{__name__}.{self.agent_id}")
 
     @abc.abstractmethod
+    async def _analyze(self, context: Dict[str, Any]) -> VoteResult:
+        """Analyse market context and return a vote."""
+        ...
+
     async def analyze(self, context: Dict[str, Any]) -> VoteResult:
-        """Analyse market context and return a vote.
-
-        Args:
-            context: Market data, account info, risk parameters.
-
-        Returns:
-            VoteResult with signal direction, confidence, and reasoning.
-        """
+        """Public wrapper with error handling."""
+        try:
+            return await self._analyze(context)
+        except Exception as exc:
+            _LOG.error("agent_error agent=%s: %s", self.agent_id, exc)
+            return VoteResult(
+                agent_id=self.agent_id, signal=VoteSignal.ABSTAIN,
+                confidence=0.0, weight=self.weight,
+                reason=f"agent_error: {exc}", error=str(exc),
+            )
 
     def _emit_metrics(self, result: VoteResult) -> None:
         """Emit vote metrics. Metrics are optional — never crash agent on failure."""
@@ -137,4 +144,5 @@ class BaseAgent(abc.ABC):
             _LOG.debug("agent_metrics failed agent=%s: %s", self.agent_id, _me)
 
     async def health(self) -> Dict[str, Any]:
-        return {"agent_id": self.agent_id, "weight": self.weight, "status": "ok"}
+        return {"agent_id": self.agent_id, "weight": self.weight,
+                "enabled": self.enabled, "status": "ok"}
