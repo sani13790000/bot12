@@ -1,131 +1,116 @@
-"""
-Galaxy Vast AI Trading Platform
-pytest conftest — shared fixtures
-"""
+"""conftest.py — Global pytest fixtures for Galaxy Vast AI Trading Platform."""
 from __future__ import annotations
-import asyncio
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock
-
+import asyncio, sys, os
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
+# ── isolate from real backend imports ─────────────────────────────────────────
+sys.path.insert(0, os.path.dirname(__file__))
+
+# ── asyncio mode ──────────────────────────────────────────────────────────────
+def pytest_configure(config):
+    config.addinivalue_line("markers", "unit: fast, no I/O")
+    config.addinivalue_line("markers", "integration: cross-module")
+    config.addinivalue_line("markers", "e2e: full pipeline")
+    config.addinivalue_line("markers", "security: security tests")
+    config.addinivalue_line("markers", "load: load tests")
 
 @pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-class AgentStatus(str, Enum):
-    OK = "OK"
-    ERROR = "ERROR"
-    SKIP = "SKIP"
-
-
-@dataclass
-class _AgentVote:
-    score: float
-    confidence: float
-    direction: str
-    status: AgentStatus
-    reason: str
-
-
-@dataclass
-class _AgentResult:
-    agent_name: str
-    vote: _AgentVote
-    elapsed_ms: float = 0.0
-    error: str = ""
-
+def event_loop_policy():
+    return asyncio.DefaultEventLoopPolicy()
 
 @pytest.fixture
-def make_vote():
-    def _make(score=70.0, confidence=80.0, direction="BUY",
-              status="OK", reason="test ok"):
-        return _AgentVote(
-            score=score,
-            confidence=confidence,
-            direction=direction,
-            status=AgentStatus(status),
-            reason=reason,
-        )
-    return _make
-
+def mock_broker():
+    b = AsyncMock()
+    b.initialize.return_value = True
+    b.shutdown.return_value = None
+    b.health_check.return_value = True
+    b.send_order.return_value = MagicMock(retcode=10009, order=12345, volume=0.01, price=1.1000, comment="ok")
+    b.get_positions.return_value = []
+    b.close_position.return_value = True
+    return b
 
 @pytest.fixture
-def make_agent(make_vote):
-    """Factory: stub BaseAgent."""
-    def _make(name="agent", weight=0.5, score=70.0,
-              direction="BUY", status="OK", enabled=True):
-        agent = MagicMock()
-        agent.name = name
-        agent.weight = weight
-        agent.enabled = enabled
-        vote = make_vote(score=score, direction=direction, status=status)
-
-        async def run(ctx):
-            return _AgentResult(agent_name=name, vote=vote, elapsed_ms=1.0)
-
-        agent.run = run
-        return agent
-    return _make
-
+def mock_osm():
+    osm = AsyncMock()
+    order = MagicMock()
+    order.order_id = "test-order-001"
+    order.symbol = "EURUSD"
+    order.direction = "BUY"
+    order.lot_size = 0.01
+    order.entry_price = 1.1000
+    order.stop_loss = 1.0950
+    order.take_profit = 1.1100
+    osm.create_order.return_value = order
+    osm.start.return_value = None
+    osm.transition.return_value = True
+    return osm
 
 @pytest.fixture
-def market_context():
+def mock_failure_recovery():
+    fr = AsyncMock()
+    fr.start.return_value = None
+    fr.stop.return_value = None
+    fr.handle_failure.return_value = None
+    fr.set_retry_callback = MagicMock()
+    return fr
+
+@pytest.fixture
+def mock_reconciliation():
+    pr = AsyncMock()
+    pr.start.return_value = None
+    pr.stop.return_value = None
+    pr.run_once.return_value = MagicMock(orphans=[], mismatches=[])
+    pr.set_mt5 = MagicMock()
+    return pr
+
+@pytest.fixture
+def mock_risk():
+    r = AsyncMock()
+    result = MagicMock()
+    result.approved = True
+    result.decision = MagicMock(value="APPROVED")
+    result.block_reason = None
+    result.risk_percent = 1.0
+    result.lot_size = 0.01
+    result.lot_multiplier = 1.0
+    result.gates_passed = ["vol", "corr", "exposure"]
+    result.gates_failed = []
+    result.metadata = {}
+    result.to_dict.return_value = {
+        "approved": True, "decision": "APPROVED",
+        "block_reason": None, "risk_percent": 1.0,
+        "lot_size": 0.01, "lot_multiplier": 1.0,
+        "gates_passed": ["vol","corr","exposure"],
+        "gates_failed": [], "metadata": {}
+    }
+    r.assess.return_value = result
+    r.check.return_value = result
+    return r
+
+@pytest.fixture
+def base_signal() -> Dict[str, Any]:
     return {
-        "symbol": "XAUUSD",
-        "timeframe": "M15",
-        "close": [1900.0 + i * 0.5 for i in range(100)],
-        "high":  [1901.0 + i * 0.5 for i in range(100)],
-        "low":   [1899.0 + i * 0.5 for i in range(100)],
-        "open":  [1900.0 + i * 0.4 for i in range(100)],
-        "volume": [1000 + i * 10 for i in range(100)],
-        "bid": 1950.0,
-        "ask": 1950.5,
-        "spread": 0.5,
-        "atr": 5.0,
-        "session": "LONDON",
-        "upcoming_news": [],
+        "signal_id": "sig-001",
+        "symbol": "EURUSD",
+        "direction": "BUY",
         "balance": 10000.0,
         "equity": 10000.0,
-    }
-
-
-@pytest.fixture
-def sample_candles():
-    candles = []
-    price = 1900.0
-    for i in range(200):
-        price += 0.5 if i % 3 != 0 else -0.3
-        candles.append({
-            "time": f"2024-01-{(i // 24) + 1:02d}T{(i % 24):02d}:00:00",
-            "open":  round(price - 0.2, 2),
-            "high":  round(price + 0.8, 2),
-            "low":   round(price - 0.8, 2),
-            "close": round(price, 2),
-            "volume": 1000 + i,
-        })
-    return candles
-
-
-@pytest.fixture
-def ml_features():
-    return {
-        "rsi": 55.0,
-        "macd": 0.5,
-        "atr": 5.0,
-        "bb_upper": 1960.0,
-        "bb_lower": 1940.0,
-        "ema_20": 1950.0,
-        "ema_50": 1948.0,
-        "volume_ratio": 1.2,
-        "session_london": 1.0,
-        "session_new_york": 0.0,
-        "hour_of_day": 10.0,
-        "day_of_week": 2.0,
+        "entry_price": 1.10000,
+        "stop_loss": 1.09500,
+        "take_profit": 1.11000,
+        "stop_loss_pips": 50.0,
+        "current_atr": 15.0,
+        "atr_history": [12.0, 13.0, 14.0, 15.0, 16.0],
+        "current_spread": 1.5,
+        "avg_spread": 1.2,
+        "open_positions": [],
+        "today_trades_count": 0,
+        "today_pnl_usd": 0.0,
+        "week_pnl_usd": 0.0,
+        "month_pnl_usd": 0.0,
+        "win_rate": 0.55,
+        "avg_rr": 1.5,
+        "user_id": "user-001",
     }
