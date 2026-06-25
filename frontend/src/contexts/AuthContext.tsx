@@ -1,9 +1,11 @@
 /**
  * frontend/src/contexts/AuthContext.tsx
  *
- * FIX: localStorage key 'auth_token' -> 'gv_token' (inconsistency with api.ts)
- * FIX: localStorage key 'refresh_token' -> 'gv_refresh' (same)
- * This was causing logout in api.ts to not clear AuthContext state.
+ * FIX: localStorage key 'auth_token' -> 'gv_token'
+ * FIX: localStorage key 'refresh_token' -> 'gv_refresh'
+ * PROD-FIX-7: API_URL corrected — was 'http://localhost:8000/api' (extra /api suffix causing 404)
+ * PROD-FIX-8: register() reads tokens directly from response (no redundant login() call)
+ * PROD-FIX-9: All fetch paths updated to /api/v1/* prefix
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -16,7 +18,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
+  register: (email: string, password: string, full_name?: string) => Promise<void>;
   logout: () => void;
   updateSettings: (settings: Partial<UserSettings>) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -24,7 +26,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_URL = (import.meta.env?.VITE_API_URL as string | undefined) || 'http://localhost:8000/api';
+// PROD-FIX-7: removed /api suffix — routes include /api/v1 prefix already
+const API_URL = (import.meta.env?.VITE_API_URL as string | undefined) || 'http://localhost:8000';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]         = useState<User | null>(null);
@@ -33,7 +36,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // FIX: was 'auth_token' - inconsistent with api.ts which uses 'gv_token'
     const storedToken = localStorage.getItem('gv_token');
     if (storedToken) {
       setToken(storedToken);
@@ -45,7 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCurrentUser = async (authToken: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/me`, {
+      // PROD-FIX-9: /api/v1/auth/me
+      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (response.ok) {
@@ -66,7 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchSettings = async (authToken: string) => {
     try {
-      const response = await fetch(`${API_URL}/users/settings`, {
+      // PROD-FIX-9: /api/v1/users/settings
+      const response = await fetch(`${API_URL}/api/v1/users/settings`, {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (response.ok) {
@@ -74,31 +78,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.success && data.data) setSettings(data.data);
       }
     } catch {
-      /* settings are optional, ignore errors */
+      /* settings are optional */
     }
   };
 
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      // PROD-FIX-9: /api/v1/auth/login
+      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data: ApiResponse<{ access_token: string; refresh_token: string; user: User }> =
-        await response.json();
-
-      if (data.success && data.data) {
-        setToken(data.data.access_token);
-        setUser(data.data.user);
-        // FIX: was 'auth_token' and 'refresh_token' - now matches api.ts keys
-        localStorage.setItem('gv_token', data.data.access_token);
-        localStorage.setItem('gv_refresh', data.data.refresh_token);
-        await fetchSettings(data.data.access_token);
-      } else {
-        throw new Error(data.error || '\u062e\u0637\u0627 \u062f\u0631 \u0648\u0631\u0648\u062f');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'خطا در ورود');
       }
+      // PROD-FIX-4: backend now returns access_token + refresh_token + user in body
+      setToken(data.access_token);
+      setUser(data.user);
+      localStorage.setItem('gv_token', data.access_token);
+      localStorage.setItem('gv_refresh', data.refresh_token);
+      await fetchSettings(data.access_token);
     } finally {
       setIsLoading(false);
     }
@@ -107,29 +109,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (
     email: string,
     password: string,
-    firstName?: string,
-    lastName?: string,
+    full_name?: string,
   ) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      // PROD-FIX-8: read tokens from register response directly (was calling login() again)
+      // PROD-FIX-9: /api/v1/auth/register
+      const response = await fetch(`${API_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, first_name: firstName, last_name: lastName }),
+        body: JSON.stringify({ email, password, full_name: full_name || '' }),
       });
       const data = await response.json();
-      if (!data.success) throw new Error(data.error || '\u062e\u0637\u0627 \u062f\u0631 \u062b\u0628\u062a\u200c\u0646\u0627\u0645');
-      await login(email, password);
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'خطا در ثبت‌نام');
+      }
+      setToken(data.access_token);
+      setUser(data.user);
+      localStorage.setItem('gv_token', data.access_token);
+      localStorage.setItem('gv_refresh', data.refresh_token);
+      await fetchSettings(data.access_token);
     } finally {
       setIsLoading(false);
     }
-  }, [login]);
+  }, []);
 
   const logout = useCallback(() => {
     setUser(null);
     setSettings(null);
     setToken(null);
-    // FIX: was 'auth_token' and 'refresh_token'
     localStorage.removeItem('gv_token');
     localStorage.removeItem('gv_refresh');
   }, []);
@@ -137,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateSettings = useCallback(async (newSettings: Partial<UserSettings>) => {
     if (!token) return;
     try {
-      const response = await fetch(`${API_URL}/users/settings`, {
+      const response = await fetch(`${API_URL}/api/v1/users/settings`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings),
@@ -168,6 +176,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth \u0628\u0627\u06cc\u062f \u062f\u0627\u062e\u0644 AuthProvider \u0627\u0633\u062a\u0641\u0627\u062f\u0647 \u0634\u0648\u062f');
+  if (!context) throw new Error('useAuth باید داخل AuthProvider استفاده شود');
   return context;
 }
