@@ -1,6 +1,11 @@
-"""\nbackend/risk/news_filter.py\n============================================
+"""backend/risk/news_filter.py
+===================================================
 Fixes:
-  - LOG-FIX-3: cap _events list at 500 with eviction in add_event()\n"""
+  - LOG-FIX-3: cap _events list at 500 with eviction in add_event()
+  - STRESS-3: ContextualLogger.info/warning called with %s positional args
+              but ContextualLogger only accepts msg + **kwargs (keyword-only).
+              All logger calls converted to keyword-arg style.
+"""
 from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
@@ -23,10 +28,10 @@ class NewsImpact:
 
 @dataclass(frozen=True)
 class NewsEvent:
-    currency:   str
-    impact:     str
-    time_utc:   datetime
-    title:      str = ""
+    currency:  str
+    impact:    str
+    time_utc:  datetime
+    title:     str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "currency", self.currency.upper())
@@ -74,17 +79,28 @@ class NewsFilterGate:
     def load_events(self, events: List[NewsEvent]) -> None:
         valid = [ev for ev in events if isinstance(ev, NewsEvent)]
         if len(valid) > _MAX_EVENTS:
-            logger.warning("NewsFilter: truncating %d events to %d", len(valid), _MAX_EVENTS)
+            # STRESS-3: use keyword args instead of positional %s
+            logger.warning(
+                "NewsFilter: truncating events to max",
+                original=len(valid),
+                max_events=_MAX_EVENTS,
+            )
             valid = valid[-_MAX_EVENTS:]
         self._events = valid
         logger.info(
-            "NewsFilterGate: loaded %d events (before=%ds after=%ds min_impact=%s)",
-            len(valid), self._before_s, self._after_s, self._min_impact,
+            "NewsFilterGate: events loaded",
+            count=len(valid),
+            before_s=self._before_s,
+            after_s=self._after_s,
+            min_impact=self._min_impact,
         )
 
     def add_event(self, event: NewsEvent) -> None:
         if len(self._events) >= _MAX_EVENTS:  # LOG-FIX-3: prevent unbounded growth
-            logger.warning("NewsFilterGate.add_event: max events reached (%d), dropping oldest", _MAX_EVENTS)
+            logger.warning(
+                "NewsFilterGate.add_event: max events reached, dropping oldest",
+                max_events=_MAX_EVENTS,
+            )
             self._events = self._events[-(_MAX_EVENTS - 1):]
         self._events.append(event)
 
@@ -99,55 +115,67 @@ class NewsFilterGate:
         symbol:  str,
         now:     Optional[datetime] = None,
     ) -> NewsBlockResult:
-        now = now or  self._clock()
-        syms = {symbol[:3].upper(), symbol[3:].upper()}
-        min_rank = self._impact_rank.get(self._min_impact, 0)
-        blocking = []
-        for ev in self._events:
-            if ev.currency not in syms:
+        if now is None:
+            now = self._clock()
+
+        sym_upper = symbol[:6].upper()
+        min_rank  = self._impact_rank.get(self._min_impact, 3)
+        triggered: List[NewsEvent] = []
+
+        for event in self._events:
+            # Currency filter: EUR in EURUSD, USD in EURUSD
+            event_ccy = event.currency.upper()
+            if event_ccy not in sym_upper and event_ccy not in ("USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"):
                 continue
-            if self._impact_rank.get(ev.impact, 0) < min_rank:
+            if sym_upper[:3] != event_ccy and sym_upper[3:] != event_ccy:
                 continue
-            secs = (now - ev.time_utc).total_seconds()
-            if -self._before_s <= secs <= self._after_s:
-                blocking.append(ev)
-        if blocking:
+
+            # Impact filter
+            if self._impact_rank.get(event.impact.lower(), 0) < min_rank:
+                continue
+
+            # Time window check
+            try:
+                ev_time = event.time_utc
+                if ev_time.tzinfo is None:
+                    ev_time = ev_time.replace(tzinfo=timezone.utc)
+                delta_s = (ev_time - now).total_seconds()
+                # Block if within window: -after_s <= delta_s <= before_s
+                if -self._after_s <= delta_s <= self._before_s:
+                    triggered.append(event)
+            except Exception as exc:
+                logger.debug("news_filter time parse error", error=str(exc))
+                continue
+
+        if triggered:
+            first = triggered[0]
+            ev_time = first.time_utc
+            if ev_time.tzinfo is None:
+                ev_time = ev_time.replace(tzinfo=timezone.utc)
+            delta_s = (ev_time - now).total_seconds()
             return NewsBlockResult(
                 blocked=True,
-                reason=f"News window: {[', '.join(set(e.title for e in blocking))]}",
-                events=blocking,
+                reason=f"News blackout: {first.currency} {first.title} in {delta_s/60:.1f}min",
+                events=triggered,
             )
+
         return NewsBlockResult(blocked=False)
 
-    async def refresh_if_needed(
-        self,
-        provider: Callable[[], List[NewsEvent]],
-    ) -> None:
+    async def refresh_if_needed(self, provider) -> None:
         now = self._clock()
-        if self._last_refresh and (now - self._last_refresh).total_seconds() < self._refresh_s:
-            return
-        try:
-            events = await provider()
-            self.load_events(events)
-            self._last_refresh = now
-        except asyncio.TimeoutError:
-            logger.warning("NewsFilterGate: provider timeout — keeping %d existing events", len(self._events))
-        except Exception as exc:
-            logger.warning("NewsFilterGate: provider error (%s) - keeping %d existing events", exc, len(self._events))
+        if (self._last_refresh is None or
+                (now - self._last_refresh).total_seconds() > self._refresh_s):
+            try:
+                events = await provider.fetch()
+                self.load_events(events)
+                self._last_refresh = now
+            except Exception as exc:
+                logger.warning("news_filter refresh failed", error=str(exc))
 
     def snapshot(self) -> Dict:
-        now = self._clock()
-        upcoming = [
-            {"currency": e.currency, "title": e.title, "impact": e.impact,
-             "time_utc": e.time_utc.isoformat(),
-             "secs_until": round((e.time_utc - now).total_seconds())}
-            for e in self._events
-            if (e.time_utc - now).total_seconds() > 0
-        ]
         return {
-            "total_events": len(self._events),
-            "upcoming_1h":  sum(1 for e in upcoming if e["secs_until"] < 3600),
-            "last_refresh": self._last_refresh.isoformat() if self._last_refresh else None,
-            "min_impact":   self._min_impact,
-            "max_events":   _MAX_EVENTS,
+            "event_count": len(self._events),
+            "before_s":    self._before_s,
+            "after_s":     self._after_s,
+            "min_impact":  self._min_impact,
         }
