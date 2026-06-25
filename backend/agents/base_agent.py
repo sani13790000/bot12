@@ -56,6 +56,7 @@ class BaseAgent(abc.ABC):
             from ..observability.metrics import metrics_registry
             metrics_registry.increment(f'agent.{self.agent_id}.votes.{result.signal.value.lower()}')
             metrics_registry.histogram(f'agent.{self.agent_id}.latency_ms', result.latency_ms)
-        except Exception: pass
+        except Exception:  # noqa: C-2 — metrics are optional, never crash agent on metrics failure
+            pass
     async def health(self) -> Dict[str, Any]:
         return {'agent_id': self.agent_id, 'weight': self.weight, 'status': 'ok'}
