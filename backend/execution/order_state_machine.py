@@ -3,7 +3,8 @@ Order State Machine with enterprise fixes.
 
 Fixes:
   - BUG-OSM-1: lock reentrancy deadlock (collect IDs, release lock, then transition)
-  - LOG-FIX-4: asyncio.create_task(result) ⁵ track with done_callback error handler
+  - LOG-FIX-4: asyncio.create_task(result) → track with done_callback error handler
+  - STRESS-2: NameError _ORDER_TTL_HOURS → use _COMPLETED_ORDER_TTL_HOURS
 """
 from __future__ import annotations
 import asyncio
@@ -48,16 +49,16 @@ _VALID_TRANSITIONS: Dict[OrderState, Set[OrderState]] = {
 
 @dataclass
 class ManagedOrder:
-    order_id:        str
-    symbol:          str
-    direction:       str
-    lots:            float
-    state:           OrderState = OrderState.PENDING
-    metadata:        Dict[rstr, Any] = field(default_factory=dict)
-    created_at:      datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at:    Optional[datetime] = None
-    retcode:         int = 0
-    ticket:          Optional[str] = None
+    order_id:     str
+    symbol:       str
+    direction:    str
+    lots:         float
+    state:        OrderState = OrderState.PENDING
+    metadata:     Dict[str, Any] = field(default_factory=dict)
+    created_at:   datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: Optional[datetime] = None
+    retcode:      int = 0
+    ticket:       Optional[str] = None
 
     def is_terminal(self) -> bool:
         return self.state in _TERMINAL_STATES
@@ -79,12 +80,12 @@ class OrderStateMachine:
         order_timeout_seconds: int = 300,
         completed_ttl_hours:   int = _COMPLETED_ORDER_TTL_HOURS,
     ) -> None:
-        self._orders:        Dict[str, ManagedOrder] = {}
-        self._lock           = asyncio.Lock()
-        self._callbacks:     List[Callable]          = []
-        self._order_timeout  = order_timeout_seconds
-        self._completed_ttl  = timedelta(hours=completed_ttl_hours)
-        self._monitor_task:  Optional[asyncio.Task]  = None
+        self._orders:       Dict[str, ManagedOrder] = {}
+        self._lock          = asyncio.Lock()
+        self._callbacks:    List[Callable]          = []
+        self._order_timeout = order_timeout_seconds
+        self._completed_ttl = timedelta(hours=completed_ttl_hours)
+        self._monitor_task: Optional[asyncio.Task]  = None
 
     def register_callback(self, cb: Callable) -> None:
         self._callbacks.append(cb)
@@ -94,7 +95,8 @@ class OrderStateMachine:
             self._monitor_loop(), name="osm:monitor"
         )
         self._monitor_task.add_done_callback(_handle_task_exc("osm:monitor"))
-        logger.info("OrderStateMachine monitor started ttl=%dh", _COMPLETED=_ORDER_TTL_HOURS)
+        # STRESS-2 fix: use correct variable name _COMPLETED_ORDER_TTL_HOURS
+        logger.info("OrderStateMachine monitor started", ttl_hours=_COMPLETED_ORDER_TTL_HOURS)
 
     async def stop(self) -> None:
         if self._monitor_task and not self._monitor_task.done():
