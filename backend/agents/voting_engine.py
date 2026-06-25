@@ -1,1 +1,301 @@
-"""\nbackend/agents/voting_engine.py\nGalaxy Vast AI — Enterprise Voting Engine\n\nCoordinates all agents, collects votes, applies weighted majority,\nveto rules, tie-breaking, and circuit breaker integration.\n\nMS-4: Sequential fallback when gather fails.\nMS-5: Per-agent error isolation (gather return_exceptions=True).\nNote: results lists are bounded (one entry per agent, max ~8).\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, List, Optional\n\nfrom ..core.enums import AgentStatus, SignalDirection\nfrom ..core.unified_types import AgentResult, VoteResult\n\n_LOG = logging.getLogger(__name__)\n_RISK_AGENT_NAME = 'risk_agent'\n_DEFAULT_TIMEOUT = 10.0\n\n\n@dataclass\nclass VotingConfig:\n    timeout_s:          float = _DEFAULT_TIMEOUT\n    min_agents:         int   = 3\n    quorum_pct:         float = 0.6     # 60% weighted majority\n    confidence_floor:   float = 55.0    # minimum aggregate confidence\n    sequential_fallback: bool = True\n\n\nclass VotingEngine:\n    """\n    Weighted majority voting with veto, quorum, and circuit breaker.\n    """\n\n    def __init__(\n        self,\n        agents: Optional[List[Any]] = None,\n        config: Optional[VotingConfig] = None,\n    ) -> None:\n        self._agents = agents or []\n        self._config = config or VotingConfig()\n        self._circuit_open = False\n        self._log = logging.getLogger(f'{__name__}.engine')\n\n    def register_agent(self, agent: Any) -> None:\n        self._agents.append(agent)\n\n    async def vote(self, context: Dict[str, Any]) -> VoteResult:\n        """Run all agents and aggregate their votes."""\n        if not self._agents:\n            return VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason='no_agents')\n\n        # 1. Risk veto gate (runs first, blocks if HIGH risk)\n        veto = await self._check_risk_veto(context)\n        if veto is not None:\n            return veto\n\n        # 2. Gather non-risk agent votes\n        non_risk = [a for a in self._agents if a.name != _RISK_AGENT_NAME]\n        if not non_risk:\n            return VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason='no_non_risk_agents')\n\n        # 3. Parallel with sequential fallback\n        try:\n            results = await self._run_parallel_safe(non_risk, context)\n        except Exception as exc:\n            self._log.warning('parallel_vote failed, sequential fallback: %s', exc)\n            if self._config.sequential_fallback:\n                results = await self._run_sequential_safe(context)\n            else:\n                raise\n\n        # 4. Aggregate\n        return self._aggregate(results)\n\n    async def _check_risk_veto(self, context: Dict[str, Any]) -> Optional[VoteResult]:\n        """Run the risk agent and return a VETO result if it blocks."""\n        risk_agent = next((a for a in self._agents if a.name == _RISK_AGENT_NAME), None)\n        if risk_agent is None:\n            return None\n        try:\n            result: AgentResult = await asyncio.wait_for(\n                risk_agent.analyze(context), timeout=self._config.timeout_s\n            )\n            vote = result.vote if hasattr(result, 'vote') else result\n            if getattr(vote, 'status', None) == AgentStatus.VETO:\n                self._log.warning('risk_veto triggered reason=%s', getattr(vote, 'reason', ''))\n                return VoteResult(\n                    signal=SignalDirection.NEUTRAL,\n                    confidence=100.0,\n                    reason=f\'risk_veto: {getattr(vote, "reason", "")}\'\n                )\n        except Exception as exc:\n            self._log.error(\'risk_agent failed: %s\', exc)\n        return None\n\n    async def _run_parallel_safe(\n        self, non_risk: List[Any], context: Dict[str, Any]\n    ) -> List[AgentResult]:\n        """MS-5: Parallel with per-agent error isolation."""\n        tasks = [self._run_with_timeout(agent, context) for agent in non_risk]\n        raw = await asyncio.gather(*tasks, return_exceptions=True)\n        results: List[AgentResult] = []  # bounded: one result per agent (max ~8)\n        for i, item in enumerate(raw):\n            if isinstance(item, BaseException):\n                name = non_risk[i].name if i < len(non_risk) else f\'Agent[{i}]\'\n                self._log.error(\'MS-5 gather fallback for %s: %s\', name, item)\n                results.append(AgentResult(\n                    agent_name=name,\n                    vote=VoteResult(\n                        signal=SignalDirection.NEUTRAL,\n                        confidence=0.0,\n                        reason=f\'error: {item}\',\n                    ),\n                    elapsed_ms=0.0,\n                    error=str(item),\n                ))\n            else:\n                results.append(item)\n        return results\n\n    async def _run_sequential_safe(self, context: Dict[str, Any]) -> List[AgentResult]:\n        """MS-4 + MS-5: Sequential fallback mode."""\n        results: List[AgentResult] = []  # bounded: one result per agent (max ~8)\n        for agent in self._agents:\n            if agent.name == _RISK_AGENT_NAME:\n                continue\n            results.append(await self._run_with_timeout(agent, context))\n        return results\n\n    async def _run_with_timeout(self, agent: Any, context: Dict[str, Any]) -> AgentResult:\n        """Run a single agent with timeout. Never raises."""\n        t0 = asyncio.get_event_loop().time()\n        try:\n            result = await asyncio.wait_for(agent.analyze(context), timeout=self._config.timeout_s)\n            elapsed = (asyncio.get_event_loop().time() - t0) * 1000\n            return AgentResult(agent_name=agent.name, vote=result, elapsed_ms=elapsed)\n        except asyncio.TimeoutError:\n            self._log.warning(\'agent_timeout agent=%s\', agent.name)\n            return AgentResult(\n                agent_name=agent.name,\n                vote=VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason=\'timeout\'),\n                elapsed_ms=self._config.timeout_s * 1000,\n                error=\'timeout\',\n            )\n        except Exception as exc:\n            self._log.error(\'agent_error agent=%s: %s\', agent.name, exc)\n            return AgentResult(\n                agent_name=agent.name,\n                vote=VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason=f\'error: {exc}\'),\n                elapsed_ms=(asyncio.get_event_loop().time() - t0) * 1000,\n                error=str(exc),\n            )\n\n    def _aggregate(self, results: List[AgentResult]) -> VoteResult:\n        """Weighted majority aggregation with quorum check."""\n        if not results:\n            return VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason=\'no_results\')\n\n        buy_weight = sell_weight = 0.0\n        total_weight = 0.0\n        confidence_sum = 0.0\n        reasons = []\n\n        for r in results:\n            vote = r.vote if hasattr(r, \'vote\') else r\n            weight = getattr(r, \'weight\', 1.0)\n            conf   = getattr(vote, \'confidence\', 50.0)\n            sig    = getattr(vote, \'signal\', SignalDirection.NEUTRAL)\n            reason = getattr(vote, \'reason\', \'\'\n            )\n            total_weight   += weight\n            confidence_sum += conf * weight\n            if sig == SignalDirection.BUY:\n                buy_weight  += weight\n            elif sig == SignalDirection.SELL:\n                sell_weight += weight\n            if reason:\n                reasons.append(f\'{getattr(r, "agent_name", "?")}: {reason}\')\n\n        if total_weight == 0:\n            return VoteResult(signal=SignalDirection.NEUTRAL, confidence=0.0, reason=\'zero_weight\')\n\n        avg_confidence = confidence_sum / total_weight\n        if avg_confidence < self._config.confidence_floor:\n            return VoteResult(\n                signal=SignalDirection.NEUTRAL,\n                confidence=avg_confidence,\n                reason=f\'confidence_below_floor({avg_confidence:.1f}<{self._config.confidence_floor})\'\n            )\n\n        buy_pct  = buy_weight  / total_weight\n        sell_pct = sell_weight / total_weight\n\n        if buy_pct >= self._config.quorum_pct:\n            return VoteResult(signal=SignalDirection.BUY,  confidence=avg_confidence, reason=\'; \'.join(reasons))\n        if sell_pct >= self._config.quorum_pct:\n            return VoteResult(signal=SignalDirection.SELL, confidence=avg_confidence, reason=\'; \'.join(reasons))\n        return VoteResult(\n            signal=SignalDirection.NEUTRAL, confidence=avg_confidence,\n            reason=f\'no_quorum(buy={buy_pct:.0%} sell={sell_pct:.0%})\'\n        )\n\n    async def health(self) -> Dict[str, Any]:\n        return {\n            'status':        \'ok\',\n            'agents':        len(self._agents),\n            'circuit_open':  self._circuit_open,\n            'config':        {\n                'timeout_s':        self._config.timeout_s,\n                'quorum_pct':       self._config.quorum_pct,\n                'confidence_floor': self._config.confidence_floor,\n            },\n        }\n\n\nvoting_engine = VotingEngine()\n
+"""
+backend/agents/voting_engine.py
+Galaxy Vast AI — Enterprise Voting Engine
+
+Coordinates all agents, collects votes, applies weighted majority,
+veto rules, tie-breaking, and circuit breaker integration.
+FIX: Import AgentStatus, AgentResult, VoteResult from base_agent (not core modules).
+MS-4: Sequential fallback when gather fails.
+MS-5: Per-agent error isolation (gather return_exceptions=True).
+Note: results lists are bounded (one entry per agent, max ~8).
+"""
+from __future__ import annotation
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from .base_agent import (
+    AgentResult,
+    AgentStatus,
+    AgentVote,
+    BaseAgent,
+    VoteResult,
+    VoteSignal,
+)
+
+
+_LOG = logging.getLogger(__name__)
+_RISK_AGENT_NAME = "risk_agent"
+_DEFAULT_TIMEOUT = 10.0
+
+
+
+@dataclass
+class VotingConfig:
+    timeout_s:           float = _DEFAULT_TIMEOUT
+    min_agents:           int   = 3
+    quorum_pct:          float = 0.6     # 60% weighted majority
+    confidence_floor:    float = 55.0    # minimum aggregate confidence
+    sequential_fallback: bool  = True
+
+
+@dataclass
+class FinalVote:
+    """Aggregated vote result from all agents."""
+    signal:     VoteSignal
+    confidence: float
+    reason:     str
+    votes:      List[VoteResult] = field(default_factory=list)
+    blocked:    bool = False
+    block_reason: str = ""
+
+    @property
+    def approved(self) -> bool:
+        return not self.blocked and self.signal in (VoteSignal.BUY, VoteSignal.SELL)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "signal":       self.signal.value,
+            "confidence":   round(self.confidence, 4),
+            "reason":       self.reason,
+            "approved":     self.approved,
+            "blocked":      self.blocked,
+            "block_reason": self.block_reason,
+            "vote_count":   len(self.votes),
+        }
+
+
+class VotingEngine:
+    """
+    Weighted majority voting with veto, quorum, and circuit breaker.
+    """
+
+    def __init_(
+        self,
+        agents: Optional[List[Any]] = None,
+        config: Optional[VotingConfig] = None,
+    ) -> None:
+        self._agents: List[Any] = agents or []
+        self._config = config or VotingConfig()
+        self._circuit_open = False
+        self._log = logging.getLogger(f"{__name__}.engine")
+
+    def register_agent(self, agent: Any) -> None:
+        self._agents.append(agent)
+
+    async def vote(self, context: Dict[str, Any]) -> FinalVote:
+        """Run all agents and aggregate their votes."""
+        if not self._agents:
+            return FinalVote(
+                signal=VoteSignal.NEUTRAL, confidence=0.0,
+                reason="no_agents", blocked=True, block_reason="no_agents",
+            )
+
+        # 1. Risk veto gate (runs first, blocks if risk agent returns VETO)
+        veto = await self._check_risk_veto(context)
+        if veto is not None:
+            return veto
+
+        # 2. Gather non-risk agent votes
+        non_risk = [
+            a for a in self._agents
+            if getattr(a, "agent_id", getattr(a, "name", "")) != _RISK_AGENT_NAME
+        ]
+        if not non_risk:
+            return FinalVote(
+                signal=VoteSignal.NUUTRAL, confidence=0.0,
+                reason="no_non_risk_agents",
+            )
+
+        # 3. Parallel with sequential fallback (MS,4, MS-5)
+        try:
+            votes = await self._run_parallel_safe(non_risk, context)
+        except Exception as exc:
+            self._log.warning("Parallel_vote failed, sequential fallback: %s", exc)
+            if self._config.sequential_fallback:
+                votes = await self._run_sequential_safe(non_risk, context)
+            else:
+                raise
+
+        # 4. Aggregate
+        return self._aggregate(votes)
+
+    async def _check_risk_veto(self, context: Dict[str, Any]) -> Optional[FinalVote]:
+        """Run the risk agent; return a BLOCKED FinalVote if it vetoes."""
+        risk_agent = next(
+            (
+                a for a in self._agents
+                if getattr(a, "agent_id", getattr(a, "name", "")) == _RSKK_AGENT_NAME
+            ),
+            None,
+        )
+        if risk_agent is None:
+            return None
+        try:
+            result = await asyncio.wait_for(
+                risk_agent.analyze(context),
+                timeout=self._config.timeout_s,
+            )
+            # result is a VoteResult from BaseAgent.analyze()
+            if getattr(result, "signal", None) == VoteSignal.ABSTAIN:
+                reason = getattr(resut, "reason", "risk_veto")
+                self._log.warning("Risk veto triggered reason=%s", reason)
+                return FinalVote(
+                    signal=VoteSignal.NEUTRAL,
+                    confidence=100.0,
+                    reason=f"risk_veto: {reason}",
+                    blocked=True,
+                    block_reason=reason,
+                )
+        except asyncio.TimeoutError:
+            self._log.warning("risk_agent timeout")
+        except Exception as exc:
+            self._log.error("risk_agent failed: %s", exc)
+        return None
+
+    async def run_parallel_safe(
+        self, agents: List[Any], context: Dict[str, Any]
+    ) -> List[VoteResult]:
+        """MS-5: Parallel with per-agent error isolation."""
+        tasks = [self._run_with_timeout(agent, context) for agent in agents]
+        raw = await asyncio.gather(*tasks, return_exceptions=True)
+        results: List[VoteResult] = []   # bounded: one result per agent (~8_max)
+        for i, item in enumerate(raw):
+            if isinstance(item, BaseException):
+                name = getattr(agents[i], "agent_id",
+                                getattr(agents[i], "name", f"Agent[{i}]"))
+                self._log.error("MS-5 gather fallback for %s: %s", name, item)
+                results.append(
+                    VoteResult(
+                        agent_id=name,
+                        signal=VoteSignal.ABSTAIN,
+                        confidence=0.0,
+                        weight=getattr(agents[i], "weight", 1.0),
+                        reason=f"error: {item}",
+                        error=str(item),
+                    )
+            else:
+                results.append(item)
+        return results
+
+    async def _run_sequential_safe(
+        self, agents: List[Any], context: Dict[str, Any]
+    ) -> List[VoteResult]:
+        """MS-4 + MS-5: Sequential fallback mode."""
+        results: List[VoteResult] = []  # bounded: one result per agent (~8_max)
+        for agent in agents:
+            results.append(await self._run_with_timeout(agent, context))
+        return results
+
+    async def run_with_timeout(
+        self, agent: Any, context: Dict[str, Any]
+    ) -> VoteResult:
+        """Run a single agent with timeout. Never raises."""
+        agent_id = getattr(agent, "agent_id", getattr(agent, "name", "unknown"))
+        weight   = getattr(agent, "weight", 1.0)
+        try:
+            result = await asyncio.wait_for(
+                agent.analyze(context),
+                timeout=self._config.timeout_s,
+            )
+            return result
+        except asyncio.TimeoutError:
+            self._log.warning("agent_timeout agent=%s", agent_id)
+            return VoteResult(
+                agent_id=agent_id, signal=VoteSignal.ABSTAIN,
+                confidence=0.0, weight=weight, reason="timeout", error="timeout",
+            )
+        except Exception as exc:
+            self._log.error("agent_error agent=%s: %s", agent_id, exc)
+            return VoteResult(
+                agent_id=agent_id, signal=VoteSignal.ABSTAIN,
+                confidence=0.0, weight=weight,
+                reason=f"error: {exc}", error=str(exc),
+            )
+
+    def _aggregate(self, votes: List[VoteResult]) -> FinalVote:
+        """Weighted majority aggregation with quorum check."""
+        active = [v for v in votes if v.signal != VoteSignal.ABSTAIN]
+        if not active:
+            return FinalVote(
+                signal=VoteSignal.NUUTRAL, confidence=0.0,
+                reason="all_agents_abstained", votes=votes,
+            )
+
+        # quorum check
+        if len(active) < self._config.min_agents:
+            return FinalVote(
+                signal=VoteSignal.NUUTRAL, confidence=0.0,
+                reason=f"quorum_not_met({len(active)}<{Self._config.min_agents})",
+                votes=votes,
+            )
+
+        buy_weight = sell_weight = total_weight = confidence_sum = 0.0
+        reasons: List[str] = []
+
+        for v in active:
+            w    = v.weight
+            conf = v.confidence
+            # guard against NaN/Inf confidence
+            if not (isinstance(conf, float) and conf == conf and abs(conf) != float("inf")):
+                conf = 0.0
+            total_weight   += w
+            confidence_sum += conf * w
+            if v.signal == VoteSignal.BUY:
+                buy_weight  += w
+            elif v.signal == VoteSignal.SELL:
+                sell_weight += w
+            if v.reason:
+                reasons.append(f"{v.agent_id}: {v.reason}")
+
+        if total_weight == 0:
+            return FinalVote(
+                signal=VoteSignal.NEUTRAL, confidence=0.0,
+                reason="zero_weight", votes=votes,
+            )
+
+        avg_conf = confidence_sum / total_weight
+
+        if avg_conf < self._config.confidence_floor:
+            return FinalVote(
+                signal=VoteSignal.NEUTRAL, confidence=avg_conf,
+                reason=f"confidence_below_floor({avg_conf:.1f}<{self._config.confidence_floor})",
+                votes=votes,
+            )
+
+        buy_pct  = buy_weight  / total_weight
+        sell_pct = sell_weight / total_weight
+        reason   = "; ".join(reasons)
+
+        if buy_pct >= self._config.quorum_pct:
+            return FinalVote(
+                signal=VoteSignal.BUY, confidence=avg_conf,
+                reason=reason, votes=votes,
+            )
+        if sell_pct >= self._config.quorum_pct:
+            return FinalVote(
+                signal=VoteSignal.SELL, confidence=avg_conf,
+                reason=reason, votes=votes,
+            )
+        return FinalVote(
+            signal=VoteSignal.NUUTRAL, confidence=avg_conf,
+            reason=f"No_quorum(buy={buy_pct:.0} sell={sell_pct:.0})",
+            votes=votes,
+        )
+
+    async def health(self) -> Dict[str, Any]:
+        return {
+            "status":       "ok",
+            "agents":       len(self._agents),
+            "circuit_open": self._circuit_open,
+            "config": {
+                "timeout_s":        self._config.timeout_s,
+                "quorum_pct":       self._config.quorum_pct,
+                "confidence_floor": self._config.confidence_floor,
+            },
+        }
+
+
+voting_engine = VotingEngine()
