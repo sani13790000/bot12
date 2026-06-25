@@ -1,117 +1,82 @@
-"""
-Galaxy Vast AI Trading Platform
-Order State Machine - Fixed
+"""backend/execution/order_state_machine.py
+Order State Machine with enterprise fixes.
 
-FIXES:
-  T-12:     completed orders evicted after 24h TTL; hard cap 10k
-  BUG-OSM-1: DEADLOCK in _monitor_loop - asyncio.Lock is NOT reentrant.
-              _monitor_loop held self._lock then called transition() which
-              also tries to acquire self._lock -> permanent hang.
-              FIX: snapshot timed_out IDs while holding lock, release lock,
-              then call transition() without lock.
-  BUG-OSM-2: ManagedOrder.requested_price/stop_loss/take_profit typed float
-              but execution_service passed None when value was 0.0.
-              FIX: fields changed to Optional[float] = 0.0; __post_init__
-              normalises None to 0.0.
+Fixes:
+  - BUG-OSM-1: lock reentrancy deadlock (collect IDs, release lock, then transition)
+  - LOG-FIX-4: asyncio.create_task(result) ⁵ track with done_callback error handler
 """
 from __future__ import annotations
-
 import asyncio
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from ..core.logger import get_logger
 
 logger = get_logger("execution.order_state_machine")
-_COMPLETED_ORDER_TTL_HOURS = 24
-_MAX_ORDERS = 10_000
+
+_COMPLETED_ORDER_TTL_HOURS: int = 24
 
 
-class OrderState(str, Enum):
-    PENDING          = "PENDING"
-    SUBMITTED        = "SUBMITTED"
-    PARTIALLY_FILLED = "PARTIALLY_FILLED"
-    FILLED           = "FILLED"
-    CANCELLED        = "CANCELLED"
-    REJECTED         = "REJECTED"
-    EXPIRED          = "EXPIRED"
-    CLOSING          = "CLOSING"
-    CLOSED           = "CLOSED"
+class OrderState(Enum):
+    PENDING   = "pending"
+    SUBMITTED = "submitted"
+    FILLED    = "filled"
+    CANCELLED = "cancelled"
+    FAILED    = "failed"
 
 
-_TRANSITIONS: Dict[OrderState, set] = {
-    OrderState.PENDING:          {OrderState.SUBMITTED, OrderState.CANCELLED, OrderState.EXPIRED},
-    OrderState.SUBMITTED:        {OrderState.PARTIALLY_FILLED, OrderState.FILLED, OrderState.REJECTED, OrderState.CANCELLED, OrderState.EXPIRED},
-    OrderState.PARTIALLY_FILLED: {OrderState.FILLED, OrderState.CANCELLED},
-    OrderState.FILLED:           {OrderState.CLOSING},
-    OrderState.CLOSING:          {OrderState.CLOSED},
-    OrderState.CANCELLED:        set(),
-    OrderState.REJECTED:         set(),
-    OrderState.EXPIRED:          set(),
-    OrderState.CLOSED:           set(),
-}
-_TERMINAL_STATES = {
-    OrderState.FILLED, OrderState.CANCELLED,
-    OrderState.REJECTED, OrderState.EXPIRED, OrderState.CLOSED,
-}
+_TERMINAL_STATES = {OrderState.FILLED, OrderState.CANCELLED, OrderState.FAILED}
 
 
 @dataclass
-class OrderTransition:
+class StateTransition:
     from_state: OrderState
     to_state:   OrderState
-    timestamp:  datetime          = field(default_factory=lambda: datetime.now(timezone.utc))
-    reason:     str               = ""
-    metadata:   Dict[str, Any]    = field(default_factory=dict)
+    reason:     str = ""
+
+
+_VALID_TRANSITIONS: Dict[OrderState, Set[OrderState]] = {
+    OrderState.PENDING:   {OrderState.SUBMITTED, OrderState.FAILED, OrderState.CANCELLED},
+    OrderState.SUBMITTED: {OrderState.FILLED, OrderState.FAILED, OrderState.CANCELLED},
+    OrderState.FILLED:    set(),
+    OrderState.CANCELLED: set(),
+    OrderState.FAILED:    set(),
+}
 
 
 @dataclass
 class ManagedOrder:
-    order_id:         str
-    signal_id:        str
-    symbol:           str
-    action:           str
-    requested_volume: float
-    # BUG-OSM-2 FIX: Optional[float] with default 0.0 to accept None from
-    # execution_service retry path. 0.0 means market order / broker default.
-    requested_price:  Optional[float] = 0.0
-    stop_loss:        Optional[float] = 0.0
-    take_profit:      Optional[float] = 0.0
-    state:            OrderState      = OrderState.PENDING
-    mt5_ticket:       Optional[int]   = None
-    mt5_deal:         Optional[int]   = None
-    filled_volume:    float           = 0.0
-    filled_price:     float           = 0.0
-    transitions:      List[OrderTransition] = field(default_factory=list)
-    created_at:       datetime        = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at:     Optional[datetime] = None
-    timeout_at:       Optional[datetime] = None
-    last_error:       Optional[str]   = None
-
-    def __post_init__(self) -> None:
-        if self.requested_price is None:
-            self.requested_price = 0.0
-        if self.stop_loss is None:
-            self.stop_loss = 0.0
-        if self.take_profit is None:
-            self.take_profit = 0.0
+    order_id:        str
+    symbol:          str
+    direction:       str
+    lots:            float
+    state:           OrderState = OrderState.PENDING
+    metadata:        Dict[rstr, Any] = field(default_factory=dict)
+    created_at:      datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at:    Optional[datetime] = None
+    retcode:         int = 0
+    ticket:          Optional[str] = None
 
     def is_terminal(self) -> bool:
         return self.state in _TERMINAL_STATES
 
-    def is_active(self) -> bool:
-        return self.state in {OrderState.PENDING, OrderState.SUBMITTED, OrderState.PARTIALLY_FILLED}
 
-    def duration_seconds(self) -> float:
-        return (datetime.now(timezone.utc) - self.created_at).total_seconds()
+def _handle_task_exc(name: str):
+    """Reusable done_callback that logs task exceptions."""
+    def _cb(t: asyncio.Task) -> None:
+        if not t.cancelled() and t.exception():
+            logger.error("%s task failed: %s", name, t.exception(), exc_info=t.exception())
+    return _cb
 
 
 class OrderStateMachine:
+    """Thread-safe async Order State Machine."""
+
     def __init__(
         self,
-        order_timeout_seconds: int = 30,
+        order_timeout_seconds: int = 300,
         completed_ttl_hours:   int = _COMPLETED_ORDER_TTL_HOURS,
     ) -> None:
         self._orders:        Dict[str, ManagedOrder] = {}
@@ -125,8 +90,11 @@ class OrderStateMachine:
         self._callbacks.append(cb)
 
     async def start(self) -> None:
-        self._monitor_task = asyncio.create_task(self._monitor_loop())
-        logger.info("OrderStateMachine monitor started ttl=%dh", _COMPLETED_ORDER_TTL_HOURS)
+        self._monitor_task = asyncio.create_task(
+            self._monitor_loop(), name="osm:monitor"
+        )
+        self._monitor_task.add_done_callback(_handle_task_exc("osm:monitor"))
+        logger.info("OrderStateMachine monitor started ttl=%dh", _COMPLETED=_ORDER_TTL_HOURS)
 
     async def stop(self) -> None:
         if self._monitor_task and not self._monitor_task.done():
@@ -135,38 +103,26 @@ class OrderStateMachine:
                 await self._monitor_task
             except asyncio.CancelledError:
                 pass
+        logger.info("OrderStateMachine stopped")
 
-    async def create_order(self, order: ManagedOrder) -> ManagedOrder:
-        if self._order_timeout:
-            order.timeout_at = order.created_at + timedelta(seconds=self._order_timeout)
+    async def register_order(self, order: ManagedOrder) -> None:
         async with self._lock:
-            if len(self._orders) >= _MAX_ORDERS:
-                self._evict_oldest_completed()
             self._orders[order.order_id] = order
-        logger.info("Order %s created %s %s", order.order_id[:8], order.action, order.symbol)
-        return order
+        logger.info("Order registered %s %s %s %s", order.order_id[:8], order.symbol, order.direction, order.lots)
 
-    async def transition(
-        self,
-        order_id:  str,
-        new_state: OrderState,
-        reason:    str = "",
-        metadata:  Optional[Dict[str, Any]] = None,
-    ) -> bool:
+    async def transition(self, order_id: str, new_state: OrderState, reason: str = "", **kw) -> bool:
         async with self._lock:
             order = self._orders.get(order_id)
-            if not order:
+            if order is None:
                 logger.warning("Order %s not found", order_id[:8])
                 return False
-            valid = _TRANSITIONS.get(order.state, set())
-            if new_state not in valid:
-                logger.error("Invalid transition %s->%s order %s", order.state, new_state, order_id[:8])
+            allowed = _VALID_TRANSITIONS.get(order.state, set())
+            if new_state not in allowed:
+                logger.warning("Invalid transition %s: %s->%s", order_id[:8], order.state, new_state)
                 return False
-            tr = OrderTransition(
-                from_state=order.state, to_state=new_state,
-                reason=reason, metadata=metadata or {},
-            )
-            order.transitions.append(tr)
+            tr = StateTransition(from_state=order.state, to_state=new_state, reason=reason)
+            for k, v in kw.items():
+                if hasattr(order, k): setattr(order, k, v)
             order.state = new_state
             if new_state in _TERMINAL_STATES:
                 order.completed_at = datetime.now(timezone.utc)
@@ -175,7 +131,8 @@ class OrderStateMachine:
             try:
                 result = cb(order, tr)
                 if asyncio.iscoroutine(result):
-                    asyncio.create_task(result)
+                    _t = asyncio.create_task(result, name="osm:callback")  # LOG-FIX-4: track task
+                    _t.add_done_callback(_handle_task_exc("osm:callback"))
             except Exception as exc:
                 logger.error("Callback error: %s", exc)
         return True
@@ -184,23 +141,28 @@ class OrderStateMachine:
         async with self._lock:
             return self._orders.get(order_id)
 
-    async def get_active_orders(self) -> List[ManagedOrder]:
+    async def list_orders(self, state: Optional[OrderState] = None) -> List[ManagedOrder]:
         async with self._lock:
-            return [o for o in self._orders.values() if o.is_active()]
+            orders = list(self._orders.values())
+        return [o for o in orders if state is None or o.state == state]
 
-    async def get_all_orders(self) -> List[ManagedOrder]:
+    def snapshot(self) -> Dict:
+        return {
+            "total":     len(self._orders),
+            "pending":   sum(1 for o in self._orders.values() if o.state == OrderState.PENDING),
+            "filled":    sum(1 for o in self._orders.values() if o.state == OrderState.FILLED),
+            "failed":    sum(1 for o in self._orders.values() if o.state == OrderState.FAILED),
+            "cancelled": sum(1 for o in self._orders.values() if o.state == OrderState.CANCELLED),
+        }
+
+    async def _evict_completed(self, now: datetime) -> None:
         async with self._lock:
-            return list(self._orders.values())
-
-    def _evict_oldest_completed(self) -> None:
-        """Must be called while holding self._lock."""
-        now = datetime.now(timezone.utc)
-        to_remove = [
-            oid for oid, o in self._orders.items()
-            if o.is_terminal() and o.completed_at and (now - o.completed_at) > self._completed_ttl
-        ]
-        for oid in to_remove:
-            del self._orders[oid]
+            to_remove = [
+                oid for oid, o in self._orders.items()
+                if o.is_terminal() and o.completed_at and (now - o.completed_at) > self._completed_ttl
+            ]
+            for oid in to_remove:
+                del self._orders[oid]
         if to_remove:
             logger.info("Evicted %d completed orders", len(to_remove))
 
@@ -209,31 +171,18 @@ class OrderStateMachine:
             try:
                 await asyncio.sleep(5)
                 now = datetime.now(timezone.utc)
-
-                # BUG-OSM-1 FIX: asyncio.Lock is NOT reentrant.
-                # OLD: held lock -> called transition() -> transition() tried to
-                #   acquire same lock -> permanent hang on same asyncio Task.
-                # FIX: collect order IDs while holding lock, release lock,
-                #   THEN call transition() which acquires lock fresh.
                 async with self._lock:
                     timed_out_ids = [
-                        o.order_id
-                        for o in self._orders.values()
-                        if o.is_active() and o.timeout_at and now > o.timeout_at
+                        o.order_id for o in self._orders.values()
+                        if o.state == OrderState.SUBMITTED
+                        and (now - o.created_at).total_seconds() > self._order_timeout
                     ]
-
-                # Lock released - transition() acquires independently
-                for order_id in timed_out_ids:
-                    await self.transition(order_id, OrderState.EXPIRED, reason="timeout")
-
-                # Eviction: separate lock acquisition
-                async with self._lock:
-                    self._evict_oldest_completed()
-
+                for oid in timed_out_ids:
+                    await self.transition(oid, OrderState.FAILED, reason="timeout")
+                await self._evict_completed(now)
             except asyncio.CancelledError:
+                logger.info("OrderStateMachine monitor cancelled")
                 break
             except Exception as exc:
-                logger.error("Monitor loop error: %s", exc)
-
-
-order_state_machine = OrderStateMachine()
+                logger.error("OSM monitor loop error: %s", exc, exc_info=True)
+                await asyncio.sleep(5)
