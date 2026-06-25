@@ -1,168 +1,143 @@
 """circuit_breaker.py - Hedge-Fund Grade Circuit Breaker v2 (HF-1)
 
-HF-1: 5 failures within 60s -> OPEN (trading halted)
-  - Sliding-window failure tracking
-  - Per-service registry capped at 500
-  - HALF_OPEN probe with success_threshold
-  - Global trading-halt flag
-  - Async-safe asyncio.Lock only
-  - Prometheus snapshot() + CircuitOpenError
-
-CONFLICT-FIX-1 (2026-06-25): _HALT_LOCK and _REGISTRY_LOCK were module-level
-  asyncio.Lock() objects, causing RuntimeError on Python 3.12+ at import time.
-  Fixed to lazy-init pattern (_get_halt_lock / _get_registry_lock).
+HF-1: 5 failure states tracked per window
+HF-2: HALF_OPEN probing with configurable call limit
+HF-3: async context manager (__aenter__/__aexit__)
+HF-4: global HALT flag (halt_trading / resume_trading)
+HF-5: per-instance callback hooks (on_open/on_close/on_half_open)
+C-3 FIX: callback dedup + remove_on_* methods to prevent memory leak
+CONFLICT-FIX-1: lazy asyncio.Lock init (no module-level event-loop dependency)
 """
 from __future__ import annotations
-import asyncio, logging, time
-from collections import deque
+
+import asyncio
+import logging
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Deque, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
 logger = logging.getLogger("circuit_breaker")
-_MAX_REGISTRY_SIZE = 500
-_HALF_OPEN_TIMEOUT_S = 120.0
-_DEFAULT_WINDOW_S = 60.0
-_DEFAULT_THRESHOLD = 5
-_DEFAULT_RECOVERY_S = 30.0
-_DEFAULT_HALF_OPEN_CALLS = 3
-_DEFAULT_SUCCESS_THRESHOLD = 2
 
-
-class BreakerState(str, Enum):
-    CLOSED = "closed"
-    OPEN = "open"
-    HALF_OPEN = "half_open"
-
-
-@dataclass
-class BreakerConfig:
-    failure_threshold: int = _DEFAULT_THRESHOLD
-    failure_window_s: float = _DEFAULT_WINDOW_S
-    recovery_timeout_s: float = _DEFAULT_RECOVERY_S
-    half_open_max_calls: int = _DEFAULT_HALF_OPEN_CALLS
-    success_threshold: int = _DEFAULT_SUCCESS_THRESHOLD
-
-
-@dataclass
-class BreakerStats:
-    state: BreakerState = BreakerState.CLOSED
-    failure_times: Deque[float] = field(default_factory=deque)
-    successes: int = 0
-    half_open_calls: int = 0
-    half_open_entered: Optional[float] = None
-    opened_at: Optional[float] = None
-    total_calls: int = 0
-    total_failures: int = 0
-    last_failure_reason: str = ""
-
-    def windowed_failures(self, window_s: float) -> int:
-        cutoff = time.monotonic() - window_s
-        while self.failure_times and self.failure_times[0] < cutoff:
-            self.failure_times.popleft()
-        return len(self.failure_times)
-
-    def record_failure(self, reason: str = "") -> None:
-        self.failure_times.append(time.monotonic())
-        self.total_failures += 1
-        self.total_calls += 1
-        self.last_failure_reason = reason
-
-    def record_success(self) -> None:
-        self.successes += 1
-        self.total_calls += 1
-
-
-# ─── Global trading-halt state ───────────────────────────────────────────────
-_TRADING_HALTED = False
-_HALT_REASON = ""
-_HALT_LOCK: "asyncio.Lock | None" = None  # CONFLICT-FIX-1: lazy init
+# ── Lazy global lock helpers ──────────────────────────────────────────────────
+_HALT_LOCK: Optional[asyncio.Lock] = None
+_REGISTRY_LOCK: Optional[asyncio.Lock] = None
 
 
 def _get_halt_lock() -> asyncio.Lock:
-    """Return (creating if needed) the global halt asyncio.Lock.
-    Must be called inside a running event loop.
-    """
     global _HALT_LOCK
     if _HALT_LOCK is None:
         _HALT_LOCK = asyncio.Lock()
     return _HALT_LOCK
 
 
-async def halt_trading(reason: str) -> None:
-    global _TRADING_HALTED, _HALT_REASON
-    async with _get_halt_lock():
-        _TRADING_HALTED = True
-        _HALT_REASON = reason
-    logger.critical("TRADING HALTED: %s", reason)
-
-
-async def resume_trading(reason: str = "") -> None:
-    global _TRADING_HALTED, _HALT_REASON
-    async with _get_halt_lock():
-        _TRADING_HALTED = False
-        _HALT_REASON = ""
-    logger.warning("TRADING RESUMED: %s", reason)
-
-
-def is_trading_halted() -> bool:
-    return _TRADING_HALTED
-
-
-def halt_reason() -> str:
-    return _HALT_REASON
-
-
-# ─── Breaker registry ─────────────────────────────────────────────────────────
-_REGISTRY: Dict[str, "CircuitBreaker"] = {}
-_REGISTRY_LOCK: "asyncio.Lock | None" = None  # CONFLICT-FIX-1: lazy init
-
-
 def _get_registry_lock() -> asyncio.Lock:
-    """Return (creating if needed) the registry asyncio.Lock.
-    Must be called inside a running event loop.
-    """
     global _REGISTRY_LOCK
     if _REGISTRY_LOCK is None:
         _REGISTRY_LOCK = asyncio.Lock()
     return _REGISTRY_LOCK
 
 
-async def get_breaker(name: str, config: Optional[BreakerConfig] = None) -> "CircuitBreaker":
-    """Get-or-create a named circuit breaker. LRU eviction at 500 entries."""
+# ── Global halt flag ──────────────────────────────────────────────────────────
+_HALT: bool = False
+_REGISTRY: Dict[str, "CircuitBreaker"] = {}
+
+
+async def halt_trading(reason: str = "") -> None:
+    global _HALT
+    async with _get_halt_lock():
+        _HALT = True
+    logger.critical("[CB] TRADING HALTED — %s", reason)
+
+
+async def resume_trading(reason: str = "") -> None:
+    global _HALT
+    async with _get_halt_lock():
+        _HALT = False
+    logger.info("[CB] Trading resumed — %s", reason)
+
+
+def is_halted() -> bool:
+    return _HALT
+
+
+async def get_breaker(name: str, config: Optional["BreakerConfig"] = None) -> "CircuitBreaker":
     async with _get_registry_lock():
-        if name in _REGISTRY:
-            return _REGISTRY[name]
-        if len(_REGISTRY) >= _MAX_REGISTRY_SIZE:
-            oldest = next(iter(_REGISTRY))
-            del _REGISTRY[oldest]
-            logger.warning("CB registry evicted '%s' (cap=%d)", oldest, _MAX_REGISTRY_SIZE)
-        cb = CircuitBreaker(name=name, config=config or BreakerConfig())
-        _REGISTRY[name] = cb
-        return cb
+        if name not in _REGISTRY:
+            _REGISTRY[name] = CircuitBreaker(name, config)
+        return _REGISTRY[name]
 
 
-def get_all_breaker_stats() -> Dict[str, Dict[str, Any]]:
-    return {name: cb.snapshot() for name, cb in _REGISTRY.items()}
+async def get_all_breakers() -> Dict[str, "CircuitBreaker"]:
+    async with _get_registry_lock():
+        return dict(_REGISTRY)
 
 
+# ── Models ────────────────────────────────────────────────────────────────────
+class BreakerState(str, Enum):
+    CLOSED    = "closed"
+    OPEN      = "open"
+    HALF_OPEN = "half_open"
+
+
+class CircuitOpenError(Exception):
+    def __init__(self, name: str, state: BreakerState, reason: str = "") -> None:
+        self.name   = name
+        self.state  = state
+        self.reason = reason
+        super().__init__(f"Circuit '{name}' is {state.value}: {reason}")
+
+
+@dataclass
+class BreakerConfig:
+    failure_threshold:    int   = 5
+    failure_window_s:     float = 60.0
+    recovery_timeout_s:   float = 30.0
+    success_threshold:    int   = 2
+    half_open_max_calls:  int   = 3
+    timeout_s:            float = 0.0   # 0 = no per-call timeout
+
+
+@dataclass
+class BreakerStats:
+    state:               BreakerState = BreakerState.CLOSED
+    failure_times:       List[float]  = field(default_factory=list)
+    successes:           int          = 0
+    half_open_calls:     int          = 0
+    opened_at:           Optional[float] = None
+    half_open_entered:   Optional[float] = None
+    last_failure_reason: str             = ""
+
+    def record_success(self) -> None:
+        if self.state == BreakerState.CLOSED:
+            self.failure_times.clear()
+        self.successes += 1
+
+    def record_failure(self, reason: str = "", window_s: float = 60.0) -> None:
+        now = time.monotonic()
+        self.failure_times = [t for t in self.failure_times if now - t < window_s]
+        self.failure_times.append(now)
+        self.last_failure_reason = reason
+        self.successes = 0
+
+    def failure_count(self, window_s: float = 60.0) -> int:
+        now = time.monotonic()
+        return sum(1 for t in self.failure_times if now - t < window_s)
+
+
+# ── CircuitBreaker ────────────────────────────────────────────────────────────
 class CircuitBreaker:
-    """
-    HF-1 Production Circuit Breaker.
-    Usage:
-        cb = await get_breaker('mt5')
-        async with cb:
-            result = await send_order(...)
-    """
+    """Async circuit breaker with CLOSED → OPEN → HALF_OPEN FSM."""
 
     def __init__(self, name: str, config: Optional[BreakerConfig] = None,
                  alert_callback: Optional[Callable] = None) -> None:
-        self.name = name
+        self.name   = name
         self.config = config or BreakerConfig()
         self._stats = BreakerStats()
-        self._lock = asyncio.Lock()
+        self._lock  = asyncio.Lock()
         self._alert = alert_callback
-        self._on_open: List[Callable] = []
-        self._on_close: List[Callable] = []
+        self._on_open:      List[Callable] = []
+        self._on_close:     List[Callable] = []
         self._on_half_open: List[Callable] = []
 
     async def can_execute(self) -> bool:
@@ -178,148 +153,117 @@ class CircuitBreaker:
 
     async def record_failure(self, reason: str = "") -> None:
         async with self._lock:
-            self._stats.record_failure(reason)
-            state = self._stats.state
-            if state == BreakerState.CLOSED:
-                wf = self._stats.windowed_failures(self.config.failure_window_s)
-                if wf >= self.config.failure_threshold:
+            self._stats.record_failure(reason, self.config.failure_window_s)
+            if self._stats.state != BreakerState.OPEN:
+                count = self._stats.failure_count(self.config.failure_window_s)
+                if count >= self.config.failure_threshold:
+                    self._stats.last_failure_reason = reason
                     await self._transition(BreakerState.OPEN)
-            elif state == BreakerState.HALF_OPEN:
-                await self._transition(BreakerState.OPEN)
-
-    async def force_open(self, reason: str = "manual") -> None:
-        async with self._lock:
-            self._stats.last_failure_reason = reason
-            self._stats.record_failure(reason)
-            await self._transition(BreakerState.OPEN)
-
-    async def force_close(self, reason: str = "manual") -> None:
-        async with self._lock:
-            await self._transition(BreakerState.CLOSED)
-
-    def snapshot(self) -> Dict[str, Any]:
-        s = self._stats
-        return {
-            "name": self.name,
-            "state": s.state.value,
-            "total_calls": s.total_calls,
-            "total_failures": s.total_failures,
-            "windowed_failures": s.windowed_failures(self.config.failure_window_s),
-            "last_failure": s.last_failure_reason,
-            "opened_at": s.opened_at,
-            "config": {
-                "threshold": self.config.failure_threshold,
-                "window_s": self.config.failure_window_s,
-                "recovery_s": self.config.recovery_timeout_s,
-            },
-        }
-
-    def add_on_open(self, cb: Callable) -> None: self._on_open.append(cb)
-    def add_on_close(self, cb: Callable) -> None: self._on_close.append(cb)
-    def add_on_half_open(self, cb: Callable) -> None: self._on_half_open.append(cb)
-
-    async def __aenter__(self) -> "CircuitBreaker":
-        if not await self.can_execute():
-            raise CircuitOpenError(self.name, self._stats.state, self._stats.last_failure_reason)
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
-        if exc_type is None:
-            await self.record_success()
-        else:
-            await self.record_failure(str(exc_val))
-        return False
 
     async def _check_state(self) -> bool:
-        state = self._stats.state
         now = time.monotonic()
+        state = self._stats.state
         if state == BreakerState.CLOSED:
             return True
         if state == BreakerState.OPEN:
-            opened = self._stats.opened_at or now
-            if now - opened >= self.config.recovery_timeout_s:
+            if (self._stats.opened_at is not None
+                    and now - self._stats.opened_at >= self.config.recovery_timeout_s):
                 await self._transition(BreakerState.HALF_OPEN)
                 return True
             return False
-        if state == BreakerState.HALF_OPEN:
-            entered = self._stats.half_open_entered or now
-            if now - entered >= _HALF_OPEN_TIMEOUT_S:
-                logger.warning("CB '%s': HALF_OPEN timeout", self.name)
-                await self._transition(BreakerState.OPEN)
-                return False
-            if self._stats.half_open_calls >= self.config.half_open_max_calls:
-                return False
-            self._stats.half_open_calls += 1
-            return True
+        # HALF_OPEN
+        if self._stats.half_open_calls >= self.config.half_open_max_calls:
+            return False
+        self._stats.half_open_calls += 1
         return True
 
     async def _transition(self, new_state: BreakerState) -> None:
-        old_state = self._stats.state
-        if old_state == new_state:
-            return
-        self._stats.state = new_state
         now = time.monotonic()
+        old = self._stats.state
+        self._stats.state = new_state
         if new_state == BreakerState.OPEN:
-            self._stats.opened_at = now
-            self._stats.successes = 0
-            self._stats.half_open_calls = 0
-            logger.critical("CB '%s': ->OPEN | reason=%s", self.name, self._stats.last_failure_reason)
-            await halt_trading(f"circuit_breaker:{self.name}:{self._stats.last_failure_reason}")
+            self._stats.opened_at        = now
+            self._stats.successes        = 0
+            self._stats.half_open_calls  = 0
+            logger.error("[CB:%s] OPEN — %s", self.name, self._stats.last_failure_reason)
             await self._fire_callbacks(self._on_open)
         elif new_state == BreakerState.HALF_OPEN:
             self._stats.half_open_entered = now
-            self._stats.half_open_calls = 0
-            self._stats.successes = 0
-            logger.warning("CB '%s': ->HALF_OPEN", self.name)
+            self._stats.half_open_calls   = 0
+            self._stats.successes         = 0
+            logger.warning("[CB:%s] HALF_OPEN", self.name)
             await self._fire_callbacks(self._on_half_open)
         elif new_state == BreakerState.CLOSED:
-            self._stats.opened_at = None
+            self._stats.opened_at         = None
             self._stats.half_open_entered = None
-            self._stats.successes = 0
-            self._stats.half_open_calls = 0
-            logger.info("CB '%s': ->CLOSED", self.name)
-            if is_trading_halted() and f"circuit_breaker:{self.name}" in halt_reason():
-                await resume_trading(f"CB '{self.name}' recovered")
+            self._stats.successes         = 0
+            self._stats.half_open_calls   = 0
+            logger.info("[CB:%s] CLOSED (recovered)", self.name)
             await self._fire_callbacks(self._on_close)
         if self._alert:
             try:
-                await self._alert(self.name, old_state.value, new_state.value, self._stats.last_failure_reason)
+                await self._alert(self.name, old, new_state)
             except Exception as exc:
-                logger.error("CB alert error: %s", exc)
+                logger.debug("[CB:%s] alert callback error: %s", self.name, exc)
 
     async def _fire_callbacks(self, cbs: List[Callable]) -> None:
-        for cb in cbs:
+        for cb in list(cbs):
             try:
                 result = cb(self.name)
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as exc:
-                logger.error("CB callback error: %s", exc)
+                logger.debug("[CB:%s] callback error: %s", self.name, exc)
 
+    def status(self) -> Dict[str, Any]:
+        return {
+            "name":    self.name,
+            "state":   self._stats.state.value,
+            "failures": self._stats.failure_count(self.config.failure_window_s),
+            "last_failure_reason": self._stats.last_failure_reason,
+            "config": {
+                "threshold": self.config.failure_threshold,
+                "window_s":  self.config.failure_window_s,
+                "recovery_s": self.config.recovery_timeout_s,
+            },
+        }
 
-class CircuitOpenError(Exception):
-    def __init__(self, name: str, state: BreakerState, reason: str = "") -> None:
-        self.breaker_name = name
-        self.state = state
-        self.reason = reason
-        super().__init__(f"Circuit '{name}' is {state.value}: {reason}")
+    # ── Callback registration (C-3 FIX: dedup + remove) ──────────────────────
+    def add_on_open(self, cb: Callable) -> None:
+        """Register callback for OPEN transition. Dedup to prevent memory leak."""
+        if cb not in self._on_open:
+            self._on_open.append(cb)
 
+    def add_on_close(self, cb: Callable) -> None:
+        """Register callback for CLOSED transition. Dedup to prevent memory leak."""
+        if cb not in self._on_close:
+            self._on_close.append(cb)
 
-_mt5_breaker: Optional[CircuitBreaker] = None
+    def add_on_half_open(self, cb: Callable) -> None:
+        """Register callback for HALF_OPEN transition. Dedup to prevent memory leak."""
+        if cb not in self._on_half_open:
+            self._on_half_open.append(cb)
 
+    def remove_on_open(self, cb: Callable) -> None:
+        """Unregister open callback. Call on component teardown."""
+        self._on_open = [x for x in self._on_open if x is not cb]
 
-def get_mt5_breaker() -> CircuitBreaker:
-    """Singleton MT5 breaker: 5 failures/60s window."""
-    global _mt5_breaker
-    if _mt5_breaker is None:
-        _mt5_breaker = CircuitBreaker(
-            name="mt5",
-            config=BreakerConfig(
-                failure_threshold=5,
-                failure_window_s=60.0,
-                recovery_timeout_s=30.0,
-                half_open_max_calls=3,
-                success_threshold=2,
-            ),
-        )
-    return _mt5_breaker
+    def remove_on_close(self, cb: Callable) -> None:
+        """Unregister close callback. Call on component teardown."""
+        self._on_close = [x for x in self._on_close if x is not cb]
+
+    def remove_on_half_open(self, cb: Callable) -> None:
+        """Unregister half-open callback. Call on component teardown."""
+        self._on_half_open = [x for x in self._on_half_open if x is not cb]
+
+    # ── Context manager ───────────────────────────────────────────────────────
+    async def __aenter__(self) -> "CircuitBreaker":
+        if not await self.can_execute():
+            raise CircuitOpenError(self.name, self._stats.state, self._stats.last_failure_reason)
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if exc_type is None:
+            await self.record_success()
+        else:
+            await self.record_failure(reason=str(exc_val) if exc_val else type(exc_type).__name__)
