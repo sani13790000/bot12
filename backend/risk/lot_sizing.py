@@ -60,6 +60,9 @@ class LotSizer:
         sym=symbol.upper().strip()
         if stop_loss_pips<=0: raise ValueError(f'stop_loss_pips>0 required,got {stop_loss_pips}')
         if balance<=0: raise ValueError(f'balance>0 required,got {balance}')
+        # STRESS-NaN-1 FIX: NaN bypasses <= 0 check (nan<=0 is False); must explicitly check finite
+        if not math.isfinite(balance): raise ValueError(f'balance must be finite, got {balance}')
+        if not math.isfinite(stop_loss_pips): raise ValueError(f'stop_loss_pips must be finite, got {stop_loss_pips}')
         pip_val,source=await self.get_pip_value(sym)
         eff_risk=(override_risk_pct if (override_risk_pct is not None and override_risk_pct>0)
                   else self.config.risk_percent)
