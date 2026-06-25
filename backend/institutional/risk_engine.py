@@ -1,188 +1,171 @@
-"""Institutional Risk Engine — VaR, CVaR, position sizing, circuit breakers."""
-
-from __future__ import annotations
-import math
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-
-
-@dataclass
-class RiskReport:
-    # VaR / CVaR
-    var_95_usd: float        # 95% Value at Risk
-    var_99_usd: float        # 99% Value at Risk
-    cvar_95_usd: float       # Conditional VaR (Expected Shortfall)
-    # Position
-    recommended_lot: float
-    max_allowed_lot: float
-    risk_usd: float          # dollar risk on this trade
-    risk_pct: float          # % of equity at risk
-    # Portfolio
-    total_exposure_usd: float
-    total_exposure_pct: float
-    open_trades_count: int
-    # Circuit breakers
-    daily_loss_usd: float
-    daily_loss_pct: float
-    daily_limit_hit: bool
-    weekly_loss_usd: float
-    weekly_limit_hit: bool
-    circuit_breaker_active: bool
-    circuit_breaker_reason: str
-    # Regime
-    volatility_regime: str   # LOW | NORMAL | HIGH | EXTREME
-    suggested_risk_multiplier: float  # scale down in high vol
-
-
-class InstitutionalRiskEngine:
-    """
-    Institutional Risk Engine.
-
-    Features:
-    - Historical VaR and CVaR (no normal distribution assumption)
-    - Dynamic position sizing based on ATR
-    - Daily/weekly loss circuit breakers
-    - Volatility regime detection
-    - Correlation-adjusted portfolio exposure
-    """
-
-    def __init__(
-        self,
-        initial_equity: float = 10_000.0,
-        max_risk_pct: float = 1.0,
-        max_daily_loss_pct: float = 3.0,
-        max_weekly_loss_pct: float = 6.0,
-        max_total_exposure_pct: float = 10.0,
-        max_open_trades: int = 5,
-        pip_value: float = 1.0,    # USD per pip per lot (XAUUSD)
-    ):
-        self.initial_equity = initial_equity
-        self.current_equity = initial_equity
-        self.max_risk_pct = max_risk_pct
-        self.max_daily_loss_pct = max_daily_loss_pct
-        self.max_weekly_loss_pct = max_weekly_loss_pct
-        self.max_total_exposure_pct = max_total_exposure_pct
-        self.max_open_trades = max_open_trades
-        self.pip_value = pip_value
-        self._daily_pnl: List[float] = []
-        self._weekly_pnl: List[float] = []
-        self._recent_returns: List[float] = []  # for VaR
-        self._open_trades: List[Dict] = []
-        self._circuit_breaker: bool = False
-        self._circuit_reason: str = ""
-
-    def update_equity(self, equity: float) -> None:
-        ret = (equity - self.current_equity) / self.current_equity if self.current_equity > 0 else 0
-        self._recent_returns.append(ret)
-        if len(self._recent_returns) > 500:
-            self._recent_returns.pop(0)
-        self.current_equity = equity
-
-    def record_trade_pnl(self, pnl: float) -> None:
-        self._daily_pnl.append(pnl)
-        self._weekly_pnl.append(pnl)
-        if len(self._daily_pnl) > 100:
-            self._daily_pnl.pop(0)
-        if len(self._weekly_pnl) > 500:
-            self._weekly_pnl.pop(0)
-        self._check_circuit_breakers()
-
-    def add_open_trade(self, trade: Dict) -> None:
-        self._open_trades.append(trade)
-
-    def remove_open_trade(self, trade_id: int) -> None:
-        self._open_trades = [t for t in self._open_trades if t.get("trade_id") != trade_id]
-
-    def reset_daily(self) -> None:
-        self._daily_pnl.clear()
-        if not self._circuit_breaker or "daily" in self._circuit_reason:
-            self._circuit_breaker = False
-            self._circuit_reason = ""
-
-    def assess_trade(
-        self,
-        stop_loss_pips: float,
-        current_atr: float = 10.0,
-        symbol: str = "XAUUSD",
-    ) -> RiskReport:
-
-        # ---- Position sizing ----
-        risk_usd = self.current_equity * (self.max_risk_pct / 100)
-        lot = risk_usd / (stop_loss_pips * self.pip_value) if stop_loss_pips > 0 else 0
-        lot = round(max(0.01, min(100.0, lot)), 2)
-
-        # Volatility regime adjustment
-        vol_regime, vol_mult = self._volatility_regime(current_atr)
-        adjusted_lot = round(lot * vol_mult, 2)
-
-        # ---- Exposure ----
-        total_exp = sum(t.get("exposure_usd", 0) for t in self._open_trades)
-        exp_pct = total_exp / self.current_equity * 100 if self.current_equity > 0 else 0
-
-        # ---- Daily / Weekly loss ----
-        daily_loss = abs(min(0, sum(self._daily_pnl)))
-        weekly_loss = abs(min(0, sum(self._weekly_pnl)))
-        daily_loss_pct = daily_loss / self.initial_equity * 100
-        weekly_loss_pct = weekly_loss / self.initial_equity * 100
-        daily_hit = daily_loss_pct >= self.max_daily_loss_pct
-        weekly_hit = weekly_loss_pct >= self.max_weekly_loss_pct
-
-        # ---- VaR ----
-        var95, var99, cvar95 = self._compute_var()
-
-        return RiskReport(
-            var_95_usd=round(var95, 2),
-            var_99_usd=round(var99, 2),
-            cvar_95_usd=round(cvar95, 2),
-            recommended_lot=adjusted_lot,
-            max_allowed_lot=lot,
-            risk_usd=round(risk_usd, 2),
-            risk_pct=self.max_risk_pct,
-            total_exposure_usd=round(total_exp, 2),
-            total_exposure_pct=round(exp_pct, 2),
-            open_trades_count=len(self._open_trades),
-            daily_loss_usd=round(daily_loss, 2),
-            daily_loss_pct=round(daily_loss_pct, 2),
-            daily_limit_hit=daily_hit,
-            weekly_loss_usd=round(weekly_loss, 2),
-            weekly_limit_hit=weekly_hit,
-            circuit_breaker_active=self._circuit_breaker,
-            circuit_breaker_reason=self._circuit_reason,
-            volatility_regime=vol_regime,
-            suggested_risk_multiplier=vol_mult,
-        )
-
-    def _check_circuit_breakers(self) -> None:
-        daily_loss = abs(min(0, sum(self._daily_pnl)))
-        weekly_loss = abs(min(0, sum(self._weekly_pnl)))
-        if daily_loss / self.initial_equity * 100 >= self.max_daily_loss_pct:
-            self._circuit_breaker = True
-            self._circuit_reason = f"Daily loss limit {self.max_daily_loss_pct}% hit"
-        elif weekly_loss / self.initial_equity * 100 >= self.max_weekly_loss_pct:
-            self._circuit_breaker = True
-            self._circuit_reason = f"Weekly loss limit {self.max_weekly_loss_pct}% hit"
-
-    def _compute_var(self) -> Tuple[float, float, float]:
-        """Historical VaR and CVaR."""
-        if len(self._recent_returns) < 10:
-            return 0.0, 0.0, 0.0
-        losses = sorted([-r * self.current_equity for r in self._recent_returns])
-        n = len(losses)
-        idx95 = int(n * 0.95)
-        idx99 = int(n * 0.99)
-        var95 = losses[min(idx95, n - 1)]
-        var99 = losses[min(idx99, n - 1)]
-        tail = losses[idx95:]
-        cvar95 = sum(tail) / len(tail) if tail else var95
-        return max(0, var95), max(0, var99), max(0, cvar95)
-
-    @staticmethod
-    def _volatility_regime(atr: float) -> Tuple[str, float]:
-        if atr < 5:
-            return "LOW", 1.2       # increase size in low vol
-        elif atr < 15:
-            return "NORMAL", 1.0
-        elif atr < 30:
-            return "HIGH", 0.7      # reduce size in high vol
-        else:
-            return "EXTREME", 0.4   # extreme reduction
+IiIiSW5zdGl0dXRpb25hbCBSaXNrIEVuZ2luZSDigJQgVmFSLCBDVmFSLCBw
+b3NpdGlvbiBzaXppbmcsIGNpcmN1aXQgYnJlYWtlcnMuIiIiCgpmcm9tIF9f
+ZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmltcG9ydCBsb2dnaW5nCmlt
+cG9ydCBtYXRoCmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcywg
+ZmllbGQKZnJvbSB0eXBpbmcgaW1wb3J0IERpY3QsIExpc3QsIE9wdGlvbmFs
+LCBUdXBsZQoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18p
+CgoKQGRhdGFjbGFzcwpjbGFzcyBSaXNrUmVwb3J0OgogICAgIyBWYVIgLyBD
+VmFSCiAgICB2YXJfOTVfdXNkOiBmbG9hdCAgICAgICAgIyA5NSUgVmFsdWUg
+YXQgUmlzawogICAgdmFyXzk5X3VzZDogZmxvYXQgICAgICAgICMgOTklIFZh
+bHVlIGF0IFJpc2sKICAgIGN2YXJfOTVfdXNkOiBmbG9hdCAgICAgICAjIENv
+bmRpdGlvbmFsIFZhUiAoRXhwZWN0ZWQgU2hvcnRmYWxsKQogICAgIyBQb3Np
+dGlvbgogICAgcmVjb21tZW5kZWRfbG90OiBmbG9hdAogICAgbWF4X2FsbG93
+ZWRfbG90OiBmbG9hdAogICAgcmlza191c2Q6IGZsb2F0ICAgICAgICAgICMg
+ZG9sbGFyIHJpc2sgb24gdGhpcyB0cmFkZQogICAgcmlza19wY3Q6IGZsb2F0
+ICAgICAgICAgICMgJSBvZiBlcXVpdHkgYXQgcmlzawogICAgIyBQb3J0Zm9s
+aW8KICAgIHRvdGFsX2V4cG9zdXJlX3VzZDogZmxvYXQKICAgIHRvdGFsX2V4
+cG9zdXJlX3BjdDogZmxvYXQKICAgIG9wZW5fdHJhZGVzX2NvdW50OiBpbnQK
+ICAgICMgQ2lyY3VpdCBicmVha2VycwogICAgZGFpbHlfbG9zc191c2Q6IGZs
+b2F0CiAgICBkYWlseV9sb3NzX3BjdDogZmxvYXQKICAgIGRhaWx5X2xpbWl0
+X2hpdDogYm9vbAogICAgd2Vla2x5X2xvc3NfdXNkOiBmbG9hdAogICAgd2Vl
+a2x5X2xpbWl0X2hpdDogYm9vbAogICAgY2lyY3VpdF9icmVha2VyX2FjdGl2
+ZTogYm9vbAogICAgY2lyY3VpdF9icmVha2VyX3JlYXNvbjogc3RyCiAgICAj
+IFJlZ2ltZQogICAgdm9sYXRpbGl0eV9yZWdpbWU6IHN0ciAgICMgTE9XIHwg
+Tk9STUFMICB8IEhJR0ggfCBFWFRSRU1FCiAgICBzdWdnZXN0ZWRfcmlza19t
+dWx0aXBsaWVyOiBmbG9hdCAgIyBzY2FsZSBkb3duIGluIGhpZ2ggdm9sCgoK
+Y2xhc3MgSW5zdGl0dXRpb25hbFJpc2tFbmdpbmU6CiAgICAiIiIKICAgIElu
+c3RpdHV0aW9uYWwgUmlzayBFbmdpbmUuCgogICAgRmVhdHVyZXM6CiAgICAt
+IEhpc3RvcmljYWwgVmFSIGFuZCBDVmFSIChubyBub3JtYWwgZGlzdHJpYnV0
+aW9uIGFzc3VtcHRpb24pCiAgICAtIER5bmFtaWMgcG9zaXRpb24gc2l6aW5n
+IGJhc2VkIG9uIEFUUgogICAgLSBEYWlseS93ZWVrbHkgbG9zcyBjaXJjdWl0
+IGJyZWFrZXJzCiAgICAtIFZvbGF0aWxpdHkgcmVnaW1lIGRldGVjdGlvbgog
+ICAgLSBDb3JyZWxhdGlvbi1hZGp1c3RlZCBwb3J0Zm9saW8gZXhwb3N1cmUK
+ICAgICIiIgoKICAgIGRlZiBfX2luaXRfXygKICAgICAgICBzZWxmLAogICAg
+ICAgIGluaXRpYWxfZXF1aXR5OiBmbG9hdCA9IDEwXzAwMC4wLAogICAgICAg
+IG1heF9yaXNrX3BjdDogZmxvYXQgPSAxLjAsCiAgICAgICAgbWF4X2RhaWx5
+X2xvc3NfcGN0OiBmbG9hdCA9IDMuMCwKICAgICAgICBtYXhfd2Vla2x5X2xv
+c3NfcGN0OiBmbG9hdCA9IDYuMCwKICAgICAgICBtYXhfdG90YWxfZXhwb3N1
+cmVfcGN0OiBmbG9hdCA9IDEwLjAsCiAgICAgICAgbWF4X29wZW5fdHJhZGVz
+OiBpbnQgPSA1LAogICAgICAgIHBpcF92YWx1ZTogZmxvYXQgPSAxLjAsICAg
+ICMgVVNEIHBlciBwaXAgcGVyIGxvdCAoWEFVVVNEKQogICAgKToKICAgICAg
+ICBzZWxmLmluaXRpYWxfZXF1aXR5ID0gaW5pdGlhbF9lcXVpdHkKICAgICAg
+ICBzZWxmLmN1cnJlbnRfZXF1aXR5ID0gaW5pdGlhbF9lcXVpdHkKICAgICAg
+ICBzZWxmLm1heF9yaXNrX3BjdCA9IG1heF9yaXNrX3BjdAogICAgICAgIHNl
+bGYubWF4X2RhaWx5X2xvc3NfcGN0ID0gbWF4X2RhaWx5X2xvc3NfcGN0CiAg
+ICAgICAgc2VsZi5tYXhfd2Vla2x5X2xvc3NfcGN0ID0gbWF4X3dlZWtseV9s
+b3NzX3BjdAogICAgICAgIHNlbGYubWF4X3RvdGFsX2V4cG9zdXJlX3BjdCA9
+IG1heF90b3RhbF9leHBvc3VyZV9wY3QKICAgICAgICBzZWxmLm1heF9vcGVu
+X3RyYWRlcyA9IG1heF9vcGVuX3RyYWRlcwogICAgICAgIHNlbGYucGlwX3Zh
+bHVlID0gcGlwX3ZhbHVlCiAgICAgICAgc2VsZi5fZGFpbHlfcG5sOiBMaXN0
+W2Zsb2F0XSA9IFtdCiAgICAgICAgc2VsZi5fd2Vla2x5X3BubDogTGlzdFtm
+bG9hdF0gPSBbXQogICAgICAgIHNlbGYuX3JlY2VudF9yZXR1cm5zOiBMaXN0
+W2Zsb2F0XSA9IFtdICAjIGZvciBWYVIKICAgICAgICBzZWxmLl9vcGVuX3Ry
+YWRlczogTGlzdFtEaWN0XSA9IFtdCiAgICAgICAgc2VsZi5fY2lyY3VpdF9i
+cmVha2VyOiBib29sID0gRmFsc2UKICAgICAgICBzZWxmLl9jaXJjdWl0X3Jl
+YXNvbjogc3RyID0gIiIKCiAgICBkZWYgdXBkYXRlX2VxdWl0eShzZWxmLCBl
+cXVpdHk6IGZsb2F0KSAtPiBOb25lOgogICAgICAgIHJldCA9IChlcXVpdHkg
+LSBzZWxmLmN1cnJlbnRfZXF1aXR5KSAvIHNlbGYuY3VycmVudF9lcXVpdHkg
+aWYgc2VsZi5jdXJyZW50X2VxdWl0eSA+IDAgZWxzZSAwCiAgICAgICAgc2Vs
+Zi5fcmVjZW50X3JldHVybnMuYXBwZW5kKHJldCkKICAgICAgICBpZiBsZW4o
+c2VsZi5fcmVjZW50X3JldHVybnMpID4gNTAwOgogICAgICAgICAgICBzZWxm
+Ll9yZWNlbnRfcmV0dXJucy5wb3AoMCkKICAgICAgICBzZWxmLmN1cnJlbnRf
+ZXF1aXR5ID0gZXF1aXR5CgogICAgZGVmIHJlY29yZF90cmFkZV9wbmwoc2Vs
+ZiwgcG5sOiBmbG9hdCkgLT4gTm9uZToKICAgICAgICBzZWxmLl9kYWlseV9w
+bmwuYXBwZW5kKHBubCkKICAgICAgICBzZWxmLl93ZWVrbHlfcG5sLmFwcGVu
+ZChwbmwpCiAgICAgICAgaWYgbGVuKHNlbGYuX2RhaWx5X3BubCkgPiAxMDA6
+CiAgICAgICAgICAgIHNlbGYuX2RhaWx5X3BubC5wb3AoMCkKICAgICAgICBp
+ZiBsZW4oc2VsZi5fd2Vla2x5X3BubCkgPiA1MDA6CiAgICAgICAgICAgIHNl
+bGYuX3dlZWtseV9wbmwucG9wKDApCiAgICAgICAgc2VsZi5fY2hlY2tfY2ly
+Y3VpdF9icmVha2VycygpCgogICAgZGVmIGFkZF9vcGVuX3RyYWRlKHNlbGYs
+IHRyYWRlOiBEaWN0KSAtPiBOb25lOgogICAgICAgICMgQVVESVQtRklYLTM6
+IGd1YXJkIGFnYWluc3QgdW5ib3VuZGVkIGdyb3d0aCDigJQgY2FwIGF0IG1h
+eF9vcGVuX3RyYWRlcyAqIDMKICAgICAgICAjICgzeCBidWZmZXIgYWxsb3dz
+IGZvciBzdGFsZSBlbnRyaWVzIGJlZm9yZSByZWNvbmNpbGlhdGlvbikKICAg
+ICAgICBtYXhfY2FwID0gbWF4KHNlbGYubWF4X29wZW5fdHJhZGVzICogMywg
+MzApCiAgICAgICAgaWYgbGVuKHNlbGYuX29wZW5fdHJhZGVzKSA+PSBtYXhf
+Y2FwOgogICAgICAgICAgICBsb2dnZXIud2FybmluZygKICAgICAgICAgICAgICAg
+ICJbSW5zdGl0dXRpb25hbFJpc2tdIF9vcGVuX3RyYWRlcyBhdCBjYXAgJWQg
+4oCUIGRyb3BwaW5nIG9sZGVzdCBlbnRyeSIsCiAgICAgICAgICAgICAgICBt
+YXhfY2FwLAogICAgICAgICAgICApCiAgICAgICAgICAgIHNlbGYuX29wZW5f
+dHJhZGVzID0gc2VsZi5fb3Blbl90cmFkZXNbLShtYXhfY2FwIC0gMSk6XQog
+ICAgICAgIHNlbGYuX29wZW5fdHJhZGVzLmFwcGVuZCh0cmFkZSkKCiAgICBk
+ZWYgcmVtb3ZlX29wZW5fdHJhZGUoc2VsZiwgdHJhZGVfaWQ6IGludCkgLT4g
+Tm9uZToKICAgICAgICBzZWxmLl9vcGVuX3RyYWRlcyA9IFt0IGZvciB0IGlu
+IHNlbGYuX29wZW5fdHJhZGVzIGlmIHQuZ2V0KCJ0cmFkZV9pZCIpICE9IHRy
+YWRlX2lkXQoKICAgIGRlZiByZXNldF9kYWlseShzZWxmKSAtPiBOb25lOgog
+ICAgICAgIHNlbGYuX2RhaWx5X3BubC5jbGVhcigpCiAgICAgICAgaWYgbm90
+IHNlbGYuX2NpcmN1aXRfYnJlYWtlciBvciAiZGFpbHkiIGluIHNlbGYuX2Np
+cmN1aXRfcmVhc29uOgogICAgICAgICAgICBzZWxmLl9jaXJjdWl0X2JyZWFr
+ZXIgPSBGYWxzZQogICAgICAgICAgICBzZWxmLl9jaXJjdWl0X3JlYXNvbiA9
+ICIiCgogICAgZGVmIGFzc2Vzc190cmFkZSgKICAgICAgICBzZWxmLAogICAg
+ICAgIHN0b3BfbG9zc19waXBzOiBmbG9hdCwKICAgICAgICBjdXJyZW50X2F0
+cjogZmxvYXQgPSAxMC4wLAogICAgICAgIHN5bWJvbDogc3RyID0gIlhBVVVT
+RCIsCiAgICApIC0+IFJpc2tSZXBvcnQ6CgogICAgICAgICMgLS0tLSBQb3Np
+dGlvbiBzaXppbmcgLS0tLQogICAgICAgIHJpc2tfdXNkID0gc2VsZi5jdXJy
+ZW50X2VxdWl0eSAqIChzZWxmLm1heF9yaXNrX3BjdCAvIDEwMCkKICAgICAg
+ICBsb3QgPSByaXNrX3VzZCAvIChzdG9wX2xvc3NfcGlwcyAqIHNlbGYucGlw
+X3ZhbHVlKSBpZiBzdG9wX2xvc3NfcGlwcyA+IDAgZWxzZSAwCiAgICAgICAg
+bG90ID0gcm91bmQobWF4KDAuMDEsIG1pbigxMDAuMCwgbG90KSksIDIpCgog
+ICAgICAgICMgVm9sYXRpbGl0eSByZWdpbWUgYWRqdXN0bWVudAogICAgICAg
+IHZvbF9yZWdpbWUsIHZvbF9tdWx0ID0gc2VsZi5fdm9sYXRpbGl0eV9yZWdp
+bWUoY3VycmVudF9hdHIpCiAgICAgICAgYWRqdXN0ZWRfbG90ID0gcm91bmQo
+bG90ICogdm9sX211bHQsIDIpCgogICAgICAgICMgLS0tLSBFeHBvc3VyZSAt
+LS0tCiAgICAgICAgdG90YWxfZXhwID0gc3VtKHQuZ2V0KCJleHBvc3VyZV91
+c2QiLCAwKSBmb3IgdCBpbiBzZWxmLl9vcGVuX3RyYWRlcykKICAgICAgICBl
+eHBfcGN0ID0gdG90YWxfZXhwIC8gc2VsZi5jdXJyZW50X2VxdWl0eSAqIDEw
+MCBpZiBzZWxmLmN1cnJlbnRfZXF1aXR5ID4gMCBlbHNlIDAKCiAgICAgICAg
+IyAtLS0tIERhaWx5IC8gV2Vla2x5IGxvc3MgLS0tLQogICAgICAgIGRhaWx5
+X2xvc3MgPSBhYnMobWluKDAsIHN1bShzZWxmLl9kYWlseV9wbmwpKSkKICAg
+ICAgICB3ZWVrbHlfbG9zcyA9IGFicyhtaW4oMCwgc3VtKHNlbGYuX3dlZWts
+eV9wbmwpKSkKICAgICAgICBkYWlseV9sb3NzX3BjdCA9IGRhaWx5X2xvc3Mg
+LyBzZWxmLmluaXRpYWxfZXF1aXR5ICogMTAwCiAgICAgICAgd2Vla2x5X2xv
+c3NfcGN0ID0gd2Vla2x5X2xvc3MgLyBzZWxmLmluaXRpYWxfZXF1aXR5ICog
+MTAwCiAgICAgICAgZGFpbHlfaGl0ID0gZGFpbHlfbG9zc19wY3QgPj0gc2Vs
+Zi5tYXhfZGFpbHlfbG9zc19wY3QKICAgICAgICB3ZWVrbHlfaGl0ID0gd2Vl
+a2x5X2xvc3NfcGN0ID49IHNlbGYubWF4X3dlZWtseV9sb3NzX3BjdAoKICAg
+ICAgICAjIC0tLS0gVmFSIC0tLS0KICAgICAgICB2YXI5NSwgdmFyOTksIGN2
+YXI5NSA9IHNlbGYuX2NvbXB1dGVfdmFyKCkKCiAgICAgICAgcmV0dXJuIFJp
+c2tSZXBvcnQoCiAgICAgICAgICAgIHZhcl85NV91c2Q9cm91bmQodmFyOTUs
+IDIpLAogICAgICAgICAgICB2YXJfOTlfdXNkPXJvdW5kKHZhcjk5LCAyKSwK
+ICAgICAgICAgICAgY3Zhcl85NV91c2Q9cm91bmQoY3Zhcjk1LCAyKSwKICAg
+ICAgICAgICAgcmVjb21tZW5kZWRfbG90PWFkanVzdGVkX2xvdCwKICAgICAg
+ICAgICAgbWF4X2FsbG93ZWRfbG90PWxvdCwKICAgICAgICAgICAgcmlza191
+c2Q9cm91bmQocmlza191c2QsIDIpLAogICAgICAgICAgICByaXNrX3BjdD1z
+ZWxmLm1heF9yaXNrX3BjdCwKICAgICAgICAgICAgdG90YWxfZXhwb3N1cmVf
+dXNkPXJvdW5kKHRvdGFsX2V4cCwgMiksCiAgICAgICAgICAgIHRvdGFsX2V4
+cG9zdXJlX3BjdD1yb3VuZChleHBfcGN0LCAyKSwKICAgICAgICAgICAgb3Bl
+bl90cmFkZXNfY291bnQ9bGVuKHNlbGYuX29wZW5fdHJhZGVzKSwKICAgICAg
+ICAgICAgZGFpbHlfbG9zc191c2Q9cm91bmQoZGFpbHlfbG9zcywgMiksCiAg
+ICAgICAgICAgIGRhaWx5X2xvc3NfcGN0PXJvdW5kKGRhaWx5X2xvc3NfcGN0
+LCAyKSwKICAgICAgICAgICAgZGFpbHlfbGltaXRfaGl0PWRhaWx5X2hpdCwK
+ICAgICAgICAgICAgd2Vla2x5X2xvc3NfdXNkPXJvdW5kKHdlZWtseV9sb3Nz
+LCAyKSwKICAgICAgICAgICAgd2Vla2x5X2xpbWl0X2hpdD13ZWVrbHlfaGl0
+LAogICAgICAgICAgICBjaXJjdWl0X2JyZWFrZXJfYWN0aXZlPXNlbGYuX2Np
+cmN1aXRfYnJlYWtlciwKICAgICAgICAgICAgY2lyY3VpdF9icmVha2VyX3Jl
+YXNvbj1zZWxmLl9jaXJjdWl0X3JlYXNvbiwKICAgICAgICAgICAgdm9sYXRp
+bGl0eV9yZWdpbWU9dm9sX3JlZ2ltZSwKICAgICAgICAgICAgc3VnZ2VzdGVk
+X3Jpc2tfbXVsdGlwbGllcj12b2xfbXVsdCwKICAgICAgICApCgogICAgZGVm
+IF9jaGVja19jaXJjdWl0X2JyZWFrZXJzKHNlbGYpIC0+IE5vbmU6CiAgICAg
+ICAgZGFpbHlfbG9zcyA9IGFicyhtaW4oMCwgc3VtKHNlbGYuX2RhaWx5X3Bu
+bCkpKQogICAgICAgIHdlZWtseV9sb3NzID0gYWJzKG1pbigwLCBzdW0oc2Vs
+Zi5fd2Vla2x5X3BubCkpKQogICAgICAgIGlmIGRhaWx5X2xvc3MgLyBzZWxm
+LmluaXRpYWxfZXF1aXR5ICogMTAwID49IHNlbGYubWF4X2RhaWx5X2xvc3Nf
+cGN0OgogICAgICAgICAgICBzZWxmLl9jaXJjdWl0X2JyZWFrZXIgPSBUcnVl
+CiAgICAgICAgICAgIHNlbGYuX2NpcmN1aXRfcmVhc29uID0gZiJEYWlseSBs
+b3NzIGxpbWl0IHtzZWxmLm1heF9kYWlseV9sb3NzX3BjdH0lIGhpdCIKICAg
+ICAgICBlbGlmIHdlZWtseV9sb3NzIC8gc2VsZi5pbml0aWFsX2VxdWl0eSAq
+IDEwMCA+PSBzZWxmLm1heF93ZWVrbHlfbG9zc19wY3Q6CiAgICAgICAgICAg
+IHNlbGYuX2NpcmN1aXRfYnJlYWtlciA9IFRydWUKICAgICAgICAgICAgc2Vs
+Zi5fY2lyY3VpdF9yZWFzb24gPSBmIldlZWtseSBsb3NzIGxpbWl0IHtzZWxm
+Lm1heF93ZWVrbHlfbG9zc19wY3R9JSBoaXQiCgogICAgZGVmIF9jb21wdXRl
+X3ZhcihzZWxmKSAtPiBUdXBsZVtmbG9hdCwgZmxvYXQsIGZsb2F0XToKICAg
+ICAgICAiIiJIaXN0b3JpY2FsIFZhUiBhbmQgQ1ZhUi4iIiIKICAgICAgICBp
+ZiBsZW4oc2VsZi5fcmVjZW50X3JldHVybnMpIDwgMTA6CiAgICAgICAgICAg
+IHJldHVybiAwLjAsIDAuMCwgMC4wCiAgICAgICAgbG9zc2VzID0gc29ydGVk
+KFstciAqIHNlbGYuY3VycmVudF9lcXVpdHkgZm9yIHIgaW4gc2VsZi5fcmVj
+ZW50X3JldHVybnNdKQogICAgICAgIG4gPSBsZW4obG9zc2VzKQogICAgICAg
+IGlkeDk1ID0gaW50KG4gKiAwLjk1KQogICAgICAgIGlkeDk5ID0gaW50KG4g
+KiAwLjk5KQogICAgICAgIHZhcjk1ID0gbG9zc2VzW21pbihpZHg5NSwgbiAt
+IDEpXQogICAgICAgIHZhcjk5ID0gbG9zc2VzW21pbihpZHg5OSwgbiAtIDEp
+XQogICAgICAgIHRhaWwgPSBsb3NzZXNbaWR4OTU6XQogICAgICAgIGN2YXI5
+NSA9IHN1bSh0YWlsKSAvIGxlbih0YWlsKSBpZiB0YWlsIGVsc2UgdmFyOTUK
+ICAgICAgICByZXR1cm4gbWF4KDAsIHZhcjk1KSwgbWF4KDAsIHZhcjk5KSwg
+bWF4KDAsIGN2YXI5NSkKCiAgICBAc3RhdGljbWV0aG9kCiAgICBkZWYgX3Zv
+bGF0aWxpdHlfcmVnaW1lKGF0cjogZmxvYXQpIC0+IFR1cGxlW3N0ciwgZmxv
+YXRdOgogICAgICAgIGlmIGF0ciA8IDU6CiAgICAgICAgICAgIHJldHVybiAi
+TE9XIiwgMS4yICAgICAgIyBpbmNyZWFzZSBzaXplIGluIGxvdyB2b2wKICAg
+ICAgICBlbGlmIGF0ciA8IDE1OgogICAgICAgICAgICByZXR1cm4gIk5PUk1B
+TCIsIDEuMAogICAgICAgIGVsaWYgYXRyIDwgMzA6CiAgICAgICAgICAgIHJl
+dHVybiAiSElHSCIsIDAuNyAgICAgICMgcmVkdWNlIHNpemUgaW4gaGlnaCB2
+b2wKICAgICAgICBlbHNlOgogICAgICAgICAgICByZXR1cm4gIkVYVFJFTUUi
+LCAwLjQgICAjIGV4dHJlbWUgcmVkdWN0aW9uCg==
