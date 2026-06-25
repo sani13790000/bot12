@@ -1,22 +1,16 @@
-"""
-Enum‌های سیستم
+"""backend/core/enums.py — Central enum definitions for Galaxy Vast AI.
 
-این فایل تمام Enumeration‌های مورد استفاده در سیستم را تعریف می‌کند.
-استفاده از Enum باعث خوانایی بیشتر و کاهش خطا می‌شود.
+CONFLICT-FIX-2 (2026-06-25): TrendDirection.UNDEFINED added to match
+  decision_engine.TrendDirection.UNDEFINED. Without this, cross-module
+  comparison fails with AttributeError.
 """
-
+from __future__ import annotations
 from enum import Enum, IntEnum
 
 
-# =====================================================
-# سطوح دسترسی
-# =====================================================
+# ─── Access control ───────────────────────────────────────────────────────────
 class PermissionLevel(IntEnum):
-    """
-    سطوح دسترسی کاربران
-
-    هر سطح عددی بالاتر از سطوح پایین‌تر دسترسی دارد.
-    """
+    """سطح دسترسی عددی"""
     SUPER_ADMIN = 100      # دسترسی کامل
     ADMIN = 80             # مدیریت کاربران
     TRADER = 60            # معامله‌گر حرفه‌ای
@@ -25,11 +19,8 @@ class PermissionLevel(IntEnum):
     BANNED = 0             # مسدود شده
 
 
-# =====================================================
-# وضعیت کاربر
-# =====================================================
 class UserStatus(str, Enum):
-    """وضعیت حساب کاربری"""
+    """وضعیت کاربر"""
     ACTIVE = "active"
     SUSPENDED = "suspended"
     BANNED = "banned"
@@ -44,9 +35,7 @@ class UserRole(str, Enum):
     SUPER_ADMIN = "super_admin"
 
 
-# =====================================================
-# لایسنس
-# =====================================================
+# ─── License ──────────────────────────────────────────────────────────────────
 class LicenseType(str, Enum):
     """نوع لایسنس"""
     TRIAL = "trial"
@@ -67,24 +56,24 @@ class LicenseStatus(str, Enum):
 
 
 class LicenseFeature(str, Enum):
-    """کدهای ویژگی‌های لایسنس"""
-    # موتورهای تحلیل
+    """ویژگی‌های لایسنس"""
+    # Analysis
     SMC_ENGINE = "smc_engine"
     PRICE_ACTION_ENGINE = "price_action_engine"
     DECISION_ENGINE = "decision_engine"
 
-    # تحلیل پیشرفته
+    # Features
     MULTI_TIMEFRAME = "multi_timeframe"
     KILLZONE_ALERTS = "killzone_alerts"
     LIQUIDITY_VIZ = "liquidity_visualization"
     ORDERBLOCK_VIZ = "orderblock_visualization"
     FVG_VIZ = "fvg_visualization"
 
-    # مدیریت
+    # Risk
     RISK_MANAGER = "risk_manager"
     CUSTOM_STRATEGIES = "custom_strategies"
 
-    # ارتباطات
+    # Integrations
     TELEGRAM_BOT = "telegram_bot"
     DASHBOARD = "dashboard"
 
@@ -92,9 +81,7 @@ class LicenseFeature(str, Enum):
     API_ACCESS = "api_access"
 
 
-# =====================================================
-# معاملات
-# =====================================================
+# ─── Trading ──────────────────────────────────────────────────────────────────
 class TradeDirection(str, Enum):
     """جهت معامله"""
     BUY = "buy"
@@ -107,6 +94,7 @@ class TradeType(str, Enum):
     MARKET = "market"
     LIMIT = "limit"
     STOP = "stop"
+    STOP_LIMIT = "stop_limit"
 
 
 class TradeStatus(str, Enum):
@@ -115,122 +103,112 @@ class TradeStatus(str, Enum):
     OPEN = "open"
     CLOSED = "closed"
     CANCELLED = "cancelled"
-
-
-class CloseReason(str, Enum):
-    """دلیل بسته شدن معامله"""
-    MANUAL = "manual"
-    SL = "sl"
-    TP = "tp"
-    TRAILING_STOP = "trailing_stop"
-    STOP_OUT = "stop_out"
-    SIGNAL_REVERSAL = "signal_reversal"
-    TIMEOUT = "timeout"
-
-
-# =====================================================
-# سیگنال
-# =====================================================
-class SignalType(str, Enum):
-    """نوع سیگنال"""
-    ENTRY = "entry"
-    EXIT = "exit"
-    CLOSE = "close"
-    MODIFY = "modify"
-
-
-class SignalStrength(str, Enum):
-    """قدرت سیگنال"""
-    WEAK = "weak"
-    MODERATE = "moderate"
-    STRONG = "strong"
-    VERY_STRONG = "very_strong"
+    REJECTED = "rejected"
+    PARTIAL = "partial"
 
 
 class SignalStatus(str, Enum):
     """وضعیت سیگنال"""
-    GENERATED = "generated"
-    SENT = "sent"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     EXECUTED = "executed"
-    EXPIRED = "expired"
     CANCELLED = "cancelled"
-
-
-# =====================================================
-# ساختار بازار (Smart Money)
-# =====================================================
-class MarketStructure(str, Enum):
-    """نوع رویداد ساختار بازار"""
-    BOS = "bos"                  # Break of Structure
-    CHOCH = "choch"              # Change of Character
-    MSS = "mss"                  # Market Structure Shift
-    SWING_HIGH = "swing_high"
-    SWING_LOW = "swing_low"
-
-
-class BlockType(str, Enum):
-    """نوع بلاک"""
-    ORDER_BLOCK = "order_block"
-    MITIGATION_BLOCK = "mitigation_block"
-    BREAKER_BLOCK = "breaker_block"
-    REJECTION_BLOCK = "rejection_block"
-
-
-class BlockStatus(str, Enum):
-    """وضعیت بلاک"""
-    ACTIVE = "active"
-    TESTED = "tested"
-    MITIGATED = "mitigated"
-    BROKEN = "broken"
     EXPIRED = "expired"
+
+
+class SignalDirection(str, Enum):
+    """جهت سیگنال"""
+    BUY = "buy"
+    SELL = "sell"
+    NEUTRAL = "neutral"
+
+
+class OrderType(str, Enum):
+    """نوع سفارش"""
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP = "stop"
+    STOP_LIMIT = "stop_limit"
+
+
+class OrderStatus(str, Enum):
+    """وضعیت سفارش"""
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    FILLED = "filled"
+    PARTIALLY_FILLED = "partially_filled"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+
+class PositionSide(str, Enum):
+    """طرف پوزیشن"""
+    LONG = "long"
+    SHORT = "short"
+    FLAT = "flat"
+
+
+# ─── Analysis ─────────────────────────────────────────────────────────────────
+class MarketSession(str, Enum):
+    """سشن بازار"""
+    SYDNEY = "sydney"
+    TOKYO = "tokyo"
+    LONDON = "london"
+    NEW_YORK = "new_york"
+    OVERLAP_LONDON_NY = "overlap_london_ny"
+    OVERLAP_TOKYO_LONDON = "overlap_tokyo_london"
+    CLOSED = "closed"
+
+
+class TimeframeCategory(str, Enum):
+    """دسته‌بندی تایم‌فریم"""
+    SCALP = "scalp"
+    INTRADAY = "intraday"
+    SWING = "swing"
+    POSITION = "position"
+
+
+class MarketStructure(str, Enum):
+    """ساختار بازار"""
+    BULLISH_BOS = "bullish_bos"
+    BEARISH_BOS = "bearish_bos"
+    BULLISH_CHOCH = "bullish_choch"
+    BEARISH_CHOCH = "bearish_choch"
+    RANGING = "ranging"
+    UNDEFINED = "undefined"
+
+
+class LiquidityType(str, Enum):
+    """نوع نقدینگی"""
+    EQUAL_HIGHS = "equal_highs"
+    EQUAL_LOWS = "equal_lows"
+    BUY_SIDE = "buy_side"
+    SELL_SIDE = "sell_side"
+    STOP_HUNT = "stop_hunt"
 
 
 class FVGType(str, Enum):
     """نوع Fair Value Gap"""
     BULLISH = "bullish_fvg"
     BEARISH = "bearish_fvg"
-    IFVG = "ifvg"
 
 
-class LiquidityType(str, Enum):
-    """نوع نقدینگی"""
-    BUY_SIDE = "buy_side_liq"
-    SELL_SIDE = "sell_side_liq"
-    INTERNAL = "internal_liq"
-    EXTERNAL = "external_liq"
-    SESSION = "session_liq"
-    EQUIDISTANT = "equidistant_liq"
-
-
-# =====================================================
-# سشن‌های معاملاتی
-# =====================================================
-class TradingSession(str, Enum):
-    """سشن‌های معاملاتی"""
-    SYDNEY = "sydney"
-    TOKYO = "tokyo"
-    LONDON = "london"
-    NEW_YORK = "new_york"
-
-
-class SessionState(str, Enum):
-    """وضعیت سشن"""
-    INACTIVE = "inactive"
-    PRE_OPEN = "pre_open"
-    OPEN = "open"
-    KILLZONE = "killzone"
-    CLOSING = "closing"
-
-
-# =====================================================
-# تحلیل و امتیازدهی
-# =====================================================
+# ─── Trend / Direction ────────────────────────────────────────────────────────
 class TrendDirection(str, Enum):
-    """جهت روند"""
-    BULLISH = "bullish"
-    BEARISH = "bearish"
-    NEUTRAL = "neutral"
-    RANGING = "ranging"
+    """جهت روند
+
+    CONFLICT-FIX-2: UNDEFINED added to match decision_engine.TrendDirection.UNDEFINED.
+    decision_engine.py defines TrendDirection locally with UNDEFINED; callers using
+    enums.TrendDirection.UNDEFINED would get AttributeError without this.
+    NEUTRAL preserved for API backward compatibility.
+    """
+    BULLISH   = "bullish"
+    BEARISH   = "bearish"
+    NEUTRAL   = "neutral"
+    RANGING   = "ranging"
+    UNDEFINED = "undefined"  # CONFLICT-FIX-2: added for decision_engine compatibility
 
 
 class TradeQuality(str, Enum):
@@ -238,72 +216,55 @@ class TradeQuality(str, Enum):
     EXCELLENT = "excellent"
     GOOD = "good"
     MODERATE = "moderate"
-    WEAK = "weak"
-    REJECTED = "rejected"
-
-
-class Confidence(str, Enum):
-    """سطح اعتماد"""
-    VERY_HIGH = "very_high"
-    HIGH = "high"
-    MODERATE = "moderate"
     LOW = "low"
-    NONE = "none"
+    POOR = "poor"
 
 
-class Decision(str, Enum):
-    """تصمیم نهایی"""
-    NO_TRADE = "no_trade"
-    BUY = "buy"
-    SELL = "sell"
+class ConfidenceLevel(str, Enum):
+    """سطح اطمینان"""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
-# =====================================================
-# لاگ
-# =====================================================
-class LogLevel(str, Enum):
-    """سطح لاگ"""
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
+class RiskLevel(str, Enum):
+    """سطح ریسک"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    EXTREME = "extreme"
 
 
-class ActionType(str, Enum):
-    """نوع فعالیت"""
-    # احراز هویت
-    LOGIN = "login"
-    LOGOUT = "logout"
-    REGISTER = "register"
-
-    # معاملات
-    TRADE_OPEN = "trade_open"
-    TRADE_CLOSE = "trade_close"
-    TRADE_MODIFY = "trade_modify"
-
-    # سیگنال
-    SIGNAL_GENERATED = "signal_generated"
-    SIGNAL_EXECUTED = "signal_executed"
-
-    # لایسنس
-    LICENSE_ACTIVATED = "license_activated"
-    LICENSE_VALIDATED = "license_validated"
-
-    # تنظیمات
-    SETTINGS_CHANGED = "settings_changed"
+# ─── System ───────────────────────────────────────────────────────────────────
+class AlertSeverity(str, Enum):
+    """شدت هشدار"""
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
-# =====================================================
-# تایم‌فریم
-# =====================================================
-class TimeFrame(str, Enum):
-    """تایم‌فریم‌های پشتیبانی شده"""
-    M1 = "M1"
-    M5 = "M5"
-    M15 = "M15"
-    M30 = "M30"
-    H1 = "H1"
-    H4 = "H4"
-    D1 = "D1"
-    W1 = "W1"
+class AlertCategory(str, Enum):
+    """دسته هشدار"""
+    TRADING = "trading"
+    RISK = "risk"
+    SYSTEM = "system"
+    SECURITY = "security"
+    PERFORMANCE = "performance"
+
+
+class BacktestStatus(str, Enum):
+    """وضعیت بک‌تست"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class HealthStatus(str, Enum):
+    """وضعیت سلامت"""
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
