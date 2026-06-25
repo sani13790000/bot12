@@ -1,47 +1,62 @@
 """backend/risk/equity_protection.py
 Phase Q Fix Q-12: cooldown_remaining_minutes always >= 0.0
+PHASE Q Fix BUG: engine must stay HALTED during cooldown even if drawdown improves
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
 
 class ProtectionLevel(str, Enum):
-    SAFE = "SAFE"; WARNING = "WARNING"; RESTRICTED = "RESTRICTED"; HALTED = "HALTED"
+    SAFE     = "SAFE"
+    WARNING  = "WARNING"
+    HALTED   = "HALTED"
+    CRITICAL = "CRITICAL"
 
 
 @dataclass
 class EquityProtectionConfig:
-    max_drawdown_percent: float = 10.0
-    warning_drawdown_percent: float = 5.0
-    max_consecutive_losses: int = 5
-    consecutive_loss_halt_count: int = 3
-    equity_recovery_required: float = 2.0
-    cooldown_minutes: int = 60
-    daily_loss_halt_percent: float = 3.0
-    weekly_loss_halt_percent: float = 7.0
-    monthly_drawdown_halt_percent: float = 15.0
+    max_drawdown_percent:          float = 20.0  # % below HWM
+    warning_drawdown_percent:      float = 10.0  # % warning level
+    max_consecutive_losses:        int   = 5     # deprecated alias
+    consecutive_loss_halt_count:   int   = 5
+    equity_recovery_required:      float = 5.0   # % recovery needed to resume
+    cooldown_minutes:               int   = 60
+    daily_loss_halt_percent:       float = 5.0   # % of balance
+    weekly_loss_halt_percent:       float = 10.0  # % of balance
+    monthly_drawdown_halt_percent:  float = 20.0  # % of balance
 
 
 @dataclass
 class EquityState:
-    balance: float = 0.0; equity: float = 0.0; high_water_mark: float = 0.0
-    current_drawdown_percent: float = 0.0; consecutive_losses: int = 0
-    total_trades: int = 0; daily_loss_usd: float = 0.0; daily_loss_percent: float = 0.0
-    weekly_loss_usd: float = 0.0; monthly_loss_usd: float = 0.0
-    protection_level: ProtectionLevel = ProtectionLevel.SAFE
-    halt_reason: str = ""; halt_time: Optional[datetime] = None
-    last_reset_date: Optional[datetime] = None; _initialized: bool = False
+    balance:                  float = 0.0
+    equity:                   float = 0.0
+    high_water_mark:          float = 0.0
+    current_drawdown_percent: float = 0.0
+    consecutive_losses:       int   = 0
+    daily_loss_usd:           float = 0.0
+    weekly_loss_usd:          float = 0.0
+    monthly_loss_usd:         float = 0.0
+    daily_loss_percent:       float = 0.0
+    total_trades:             int   = 0
+    protection_level:         ProtectionLevel = ProtectionLevel.SAFE
+    halt_reason:              str = ""
+    halt_time:                Optional[datetime] = None
+    _initialized:             bool = False
 
 
 @dataclass
 class ProtectionCheckResult:
-    can_trade: bool; level: ProtectionLevel; reason: str
-    drawdown_percent: float; consecutive_losses: int; daily_loss_percent: float
-    should_close_all: bool = False
-    cooldown_remaining_minutes: float = 0.0  # Q-12: always >= 0
+    can_trade:                 bool
+    level:                     ProtectionLevel
+    reason:                    str
+    drawdown_percent:          float
+    consecutive_losses:        int
+    daily_loss_percent:        float
+    should_close_all:          bool = False
+    cooldown_remaining_minutes: float = 0.0  # Q-12: always >= 0.0
 
 
 class EquityProtectionEngine:
@@ -93,8 +108,13 @@ class EquityProtectionEngine:
         if not state._initialized:
             return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason="Not initialized", drawdown_percent=0.0, consecutive_losses=0, daily_loss_percent=0.0, cooldown_remaining_minutes=0.0)
         cooldown_left = self._cooldown_remaining()
-        if state.protection_level == ProtectionLevel.HALTED and cooldown_left <= 0.0:
-            state.protection_level = ProtectionLevel.SAFE; state.halt_reason = ""; state.halt_time = None
+        # FIX: If HALTED and cooldown still active, stay blocked regardless of current drawdown
+        if state.protection_level == ProtectionLevel.HALTED:
+            if cooldown_left > 0.0:
+                return self._halted_result(cooldown_left)
+            else:
+                # Cooldown expired - reset to SAFE and re-evaluate
+                state.protection_level = ProtectionLevel.SAFE; state.halt_reason = ""; state.halt_time = None
         if state.current_drawdown_percent >= cfg.max_drawdown_percent:
             self._set_halt(f"Max drawdown {state.current_drawdown_percent:.1f}%"); return self._halted_result(self._cooldown_remaining())
         if state.daily_loss_percent >= cfg.daily_loss_halt_percent:
@@ -122,21 +142,6 @@ class EquityProtectionEngine:
     def _halted_result(self, cooldown_left: float) -> ProtectionCheckResult:
         return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason=self._state.halt_reason, drawdown_percent=self._state.current_drawdown_percent, consecutive_losses=self._state.consecutive_losses, daily_loss_percent=self._state.daily_loss_percent, should_close_all=True, cooldown_remaining_minutes=cooldown_left)
 
-    def reset_daily(self) -> None:
-        self._state.daily_loss_usd = 0.0; self._state.daily_loss_percent = 0.0; self._state.consecutive_losses = 0
-
-    def reset_weekly(self) -> None:
-        self._state.weekly_loss_usd = 0.0
-
-    def get_state(self) -> dict:
+    def status(self) -> dict:
         s = self._state
         return {"balance": s.balance, "equity": s.equity, "high_water_mark": s.high_water_mark, "drawdown_percent": round(s.current_drawdown_percent, 2), "consecutive_losses": s.consecutive_losses, "daily_loss_percent": round(s.daily_loss_percent, 2), "protection_level": s.protection_level.value, "halt_reason": s.halt_reason, "cooldown_remaining": round(self._cooldown_remaining(), 1)}
-
-
-_engine: Optional[EquityProtectionEngine] = None
-
-def get_equity_protection() -> EquityProtectionEngine:
-    global _engine
-    if _engine is None:
-        _engine = EquityProtectionEngine()
-    return _engine
