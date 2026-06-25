@@ -1,94 +1,65 @@
-"""Structured logging for Galaxy Vast AI Trading Platform.
-
-Provides:
-- JSON structured logging in production
-- Human-readable logging in development
-- Correlation ID propagation via contextvars
-- Log sanitization (no secrets in logs)
-"""
 from __future__ import annotations
+import json, logging, os, sys, time
+from typing import Any, Dict, Optional
 
-import logging
-import os
-import sys
-from contextvars import ContextVar
-from typing import Any
+_LOG_LEVEL_MAP: Dict[str, int] = {'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING, 'ERROR': logging.ERROR, 'CRITICAL': logging.CRITICAL}
+_DEFAULT_LEVEL = 'INFO'
+_FMT_HUMAN = '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+_FMT_DATE  = '%Y-%m-%dT%H:%M:%S'
 
-# ContextVar for request correlation ID
-_correlation_id: ContextVar[str] = ContextVar("correlation_id", default="-")
+class _JSONFormatter(logging.Formatter):
+    _SKIP = frozenset({'name','msg','args','created','filename','funcName','levelname','levelno','lineno','module','msecs','pathname','process','processName','relativeCreated','stack_info','thread','threadName','exc_info','exc_text','message'})
+    def format(self, record: logging.LogRecord) -> str:
+        record.message = record.getMessage()
+        payload: Dict[str, Any] = {'ts': self.formatTime(record, _FMT_DATE), 'level': record.levelname, 'logger': record.name, 'msg': record.message}
+        if record.exc_info: payload['exc'] = self.formatException(record.exc_info)
+        for k, v in record.__dict__.items():
+            if k not in self._SKIP and not k.startswith('_'):
+                try: json.dumps(v); payload[k] = v
+                except (TypeError, ValueError): payload[k] = str(v)
+        try: return json.dumps(payload, ensure_ascii=False)
+        except Exception: return json.dumps({'level': 'ERROR', 'msg': 'log serialization failed'})
 
+class ContextualLogger:
+    def __init__(self, logger: logging.Logger, **context: Any) -> None:
+        self._logger = logger; self._context = context
+    def bind(self, **kwargs: Any) -> 'ContextualLogger':
+        return ContextualLogger(self._logger, **{**self._context, **kwargs})
+    def _emit(self, level: int, msg: str, **kwargs: Any) -> None:
+        if not self._logger.isEnabledFor(level): return
+        self._logger.log(level, msg, extra={**self._context, **kwargs}, stacklevel=3)
+    def debug(self, msg: str, **kwargs: Any) -> None: self._emit(logging.DEBUG, msg, **kwargs)
+    def info(self, msg: str, **kwargs: Any) -> None: self._emit(logging.INFO, msg, **kwargs)
+    def warning(self, msg: str, **kwargs: Any) -> None: self._emit(logging.WARNING, msg, **kwargs)
+    def error(self, msg: str, **kwargs: Any) -> None: self._emit(logging.ERROR, msg, **kwargs)
+    def critical(self, msg: str, **kwargs: Any) -> None: self._emit(logging.CRITICAL, msg, **kwargs)
+    def exception(self, msg: str, **kwargs: Any) -> None: self._logger.exception(msg, extra={**self._context, **kwargs}, stacklevel=2)
 
-def get_correlation_id() -> str:
-    return _correlation_id.get()
+class AuditLogger:
+    def __init__(self) -> None: self._log = logging.getLogger('audit')
+    def record(self, action: str, actor: str, resource: str, result: str, *, detail: Optional[Dict[str, Any]] = None) -> None:
+        self._log.info('AUDIT', extra={'audit': True, 'action': action, 'actor': actor, 'resource': resource, 'result': result, 'epoch': time.time(), **(({'detail': detail}) if detail else {})})
 
-
-def set_correlation_id(cid: str) -> None:
-    _correlation_id.set(cid)
-
-
-class _SanitizeFilter(logging.Filter):
-    """Strip secrets from log records."""
-
-    _REDACT = frozenset({
-        "password", "secret", "token", "key", "authorization",
-        "supabase_key", "jwt_secret", "license_salt", "license_secret",
-    })
-
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
-        msg = str(record.getMessage())
-        for word in self._REDACT:
-            if word in msg.lower():
-                record.msg = "[REDACTED — contains sensitive data]"
-                record.args = ()
-                break
-        return True
-
-
-class _CorrelationFilter(logging.Filter):
-    """Inject correlation_id into every log record."""
-
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
-        record.correlation_id = get_correlation_id()  # type: ignore[attr-defined]
-        return True
-
-
-def _configure_logging() -> None:
-    environment = os.getenv("ENVIRONMENT", "production")
-    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
-    level = getattr(logging, level_name, logging.INFO)
-
-    # Reset handlers
+_configured = False
+def _configure_root() -> None:
+    global _configured
+    if _configured: return
+    _configured = True
+    env = os.environ.get('ENVIRONMENT', 'production').lower()
+    level = _LOG_LEVEL_MAP.get(os.environ.get('LOG_LEVEL', _DEFAULT_LEVEL).upper(), logging.INFO)
     root = logging.getLogger()
-    root.handlers.clear()
-    root.setLevel(level)
-
+    if root.handlers: return
     handler = logging.StreamHandler(sys.stdout)
-    handler.addFilter(_SanitizeFilter())
-    handler.addFilter(_CorrelationFilter())
+    handler.setFormatter(logging.Formatter(_FMT_HUMAN, datefmt=_FMT_DATE) if env == 'development' else _JSONFormatter())
+    root.setLevel(level); root.addHandler(handler)
+    for name in ('httpcore', 'httpx', 'asyncio', 'urllib3'): logging.getLogger(name).setLevel(logging.WARNING)
 
-    if environment == "production":
-        # JSON structured for log aggregators (Loki, CloudWatch, etc.)
-        fmt = (
-            '{"time": "%(asctime)s", "level": "%(levelname)s", '
-            '"logger": "%(name)s", "correlation_id": "%(correlation_id)s", '
-            '"message": "%(message)s"}'
-        )
-        handler.setFormatter(logging.Formatter(fmt, datefmt="%Y-%m-%dT%H:%M:%S"))
-    else:
-        # Human-readable in development
-        fmt = "%(asctime)s | %(levelname)-8s | %(name)s | [%(correlation_id)s] %(message)s"
-        handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
+def get_logger(name: str) -> ContextualLogger:
+    _configure_root()
+    return ContextualLogger(logging.getLogger(name))
 
-    root.addHandler(handler)
-
-    # Silence noisy third-party loggers
-    for name in ("uvicorn.access", "httpx", "httpcore", "supabase", "postgrest"):
-        logging.getLogger(name).setLevel(logging.WARNING)
-
-
-_configure_logging()
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Return a logger with sanitize + correlation filters attached."""
-    return logging.getLogger(name)
+_audit_logger: Optional[AuditLogger] = None
+def get_audit_logger() -> AuditLogger:
+    global _audit_logger
+    if _audit_logger is None: _configure_root(); _audit_logger = AuditLogger()
+    return _audit_logger
