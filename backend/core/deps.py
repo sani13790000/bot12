@@ -1,135 +1,85 @@
-"""backend/core/deps.py — Security Audit Fix (Phase H)
-
-SEC-8  get_current_user: ValueError from validate_access_token properly caught
-SEC-9  get_db: dependency was missing — now defined and returns DatabaseWrapper
-SEC-10 get_db returns DatabaseWrapper (async-safe)
-SEC-11 require_permission: new endpoint-level RBAC dependency
-"""
 from __future__ import annotations
-
-from functools import lru_cache
-from typing import Annotated
-
+from typing import AsyncGenerator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from backend.core.config import settings  # noqa: F401
-from backend.core.security import validate_access_token
-from backend.core.logger import get_logger
-
-decode_access_token = validate_access_token
-
-logger = get_logger("core.deps")
+from .config import get_settings
+from .logger import get_logger, get_audit_logger, AuditLogger, ContextualLogger
 
 _bearer = HTTPBearer(auto_error=False)
 
+async def get_db() -> AsyncGenerator:
+    from ..database.connection import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback(); raise
+        finally:
+            await session.close()
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> dict:
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)) -> dict:
     if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authorization header missing', headers={'WWW-Authenticate': 'Bearer'})
     try:
-        payload = validate_access_token(credentials.credentials)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
-    return payload
+        from .auth import verify_token
+        payload = verify_token(credentials.credentials)
+        if not payload: raise ValueError('Invalid token payload')
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f'Invalid authentication: {exc}', headers={'WWW-Authenticate': 'Bearer'}) from exc
 
-
-async def get_current_admin(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("role") not in ("admin", "super_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required",
-        )
+async def get_current_active_user(user: dict = Depends(get_current_user)) -> dict:
+    if user.get('status') in ('suspended', 'banned', 'deleted'):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Account is {user.get('status')}")
     return user
 
+async def require_admin(user: dict = Depends(get_current_active_user)) -> dict:
+    if user.get('role') not in ('admin', 'super_admin'):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Administrator access required')
+    return user
 
-async def get_db():
-    from backend.database import db
-    return db
+async def require_super_admin(user: dict = Depends(get_current_active_user)) -> dict:
+    if user.get('role') != 'super_admin':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Super-administrator access required')
+    return user
 
+async def get_risk_orchestrator_dep():
+    from ..risk.risk_orchestrator import get_risk_orchestrator
+    return await get_risk_orchestrator()
 
-def require_permission(permission: str):
-    async def _check(user: dict = Depends(get_current_user)) -> None:
-        from backend.services.rbac_service import rbac_service
-        user_id = user.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing user identifier",
-            )
-        has_perm = await rbac_service.check_permission(user_id, permission)
-        if not has_perm:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission required: {permission}",
-            )
-    return _check
+def get_execution_service():
+    from ..execution.execution_service import get_execution_service as _ges
+    return _ges()
 
+def get_mt5_connector():
+    from ..execution.mt5_connector import mt5_connector
+    return mt5_connector
 
-@lru_cache(maxsize=1)
-def get_agent_service():
-    from backend.agents.agent_service import get_agent_service as _get
-    return _get()
+def get_metrics():
+    from ..observability.metrics import metrics_registry
+    return metrics_registry
 
+def get_audit_log() -> AuditLogger:
+    return get_audit_logger()
 
-@lru_cache(maxsize=1)
-def get_voting_engine():
-    from backend.agents.voting_engine import VotingEngine
-    agent_svc = get_agent_service()
-    agents = getattr(agent_svc, "agents", None) or []
-    if not agents:
-        logger.warning("get_voting_engine: empty agents list")
-    engine = VotingEngine(agents=agents) if agents else VotingEngine()
-    logger.info("VotingEngine init with %d agents", len(agents))
-    return engine
+def get_structured_logger(name: str) -> ContextualLogger:
+    return get_logger(name)
 
+def get_circuit_breaker():
+    from ..circuit_breaker import get_mt5_breaker
+    return get_mt5_breaker()
 
-@lru_cache(maxsize=1)
-def get_decision_service():
-    from backend.services.decision_service import DecisionService
-    agent_svc = get_agent_service()
-    agents = getattr(agent_svc, "agents", None) or []
-    return DecisionService(agents=agents)
+def get_scheduler_dep():
+    from ..services.scheduler import get_scheduler
+    return get_scheduler()
 
+def get_settings_dep():
+    return get_settings()
 
-@lru_cache(maxsize=1)
-def get_analytics_service():
-    from backend.analytics.analytics_service import AnalyticsService
-    return AnalyticsService()
+def get_mt5_retry_config():
+    from .retry import MT5_RETRY
+    return MT5_RETRY
 
-
-@lru_cache(maxsize=1)
-def get_cache():
-    from backend.core.cache import Cache
-    return Cache()
-
-
-@lru_cache(maxsize=1)
-def get_risk_service():
-    try:
-        from backend.risk.risk_orchestrator import RiskOrchestrator
-        return RiskOrchestrator()
-    except ImportError:
-        logger.warning("RiskOrchestrator not available")
-        return None
-
-
-CurrentUser         = Annotated[dict, Depends(get_current_user)]
-CurrentAdmin        = Annotated[dict, Depends(get_current_admin)]
-DbDep               = Annotated[object, Depends(get_db)]
-AgentServiceDep     = Annotated[object, Depends(get_agent_service)]
-VotingEngineDep     = Annotated[object, Depends(get_voting_engine)]
-DecisionServiceDep  = Annotated[object, Depends(get_decision_service)]
-AnalyticsServiceDep = Annotated[object, Depends(get_analytics_service)]
-CacheDep            = Annotated[object, Depends(get_cache)]
-RiskServiceDep      = Annotated[object, Depends(get_risk_service)]
+def get_db_retry_config():
+    from .retry import DB_RETRY
+    return DB_RETRY
