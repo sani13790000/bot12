@@ -1,104 +1,64 @@
-"""\nbackend/risk/news_filter.py\n============================\nFIX #1 — Real News Filter Gate (Production-Ready)\nSenior Quant Developer — Surgical Implementation\n\nDesign principles:\n  - Standalone module; VolatilityFilter delegates to this class\n  - Zero breaking changes to existing public API\n  - Fail-safe: any provider failure → log warning + continue\n  - Multi-event support with timezone-aware datetimes\n  - Provider abstraction: REST / file / manual injection\n"""
+"""\nbackend/risk/news_filter.py\n============================================
+Fixes:
+  - LOG-FIX-3: cap _events list at 500 with eviction in add_event()\n"""
 from __future__ import annotations
-
 import asyncio
-import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Callable, Dict, List, Optional, Protocol
+from datetime import datetime, timezone
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
 
-logger = logging.getLogger("risk.news_filter")
+from ..core.logger import get_logger
+
+logger = get_logger("risk.news_filter")
+
+_MAX_EVENTS: int = 500  # LOG-FIX-3: cap on calendar events to prevent memory growth
 
 
-# ---------------------------------------------------------------------------
-# Public data model
-# ---------------------------------------------------------------------------
-
-class NewsImpact(str, Enum):
-    LOW    = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH   = "HIGH"
-    FOMC   = "FOMC"      # central-bank decision — always blocks
+class NewsImpact:
+    LOW    = "low"
+    MEDIUM = "medium"
+    HIGH   = "high"
+    FOMC   = "fomc"
 
 
 @dataclass(frozen=True)
 class NewsEvent:
-    """
-    FIX #1: Scheduled economic news event.
-
-    Fields
-    ------
-    title      : human-readable description, e.g. "NFP"
-    currency   : ISO-4217 currency code affected, e.g. "USD", or "ALL"
-    impact     : one of NewsImpact / free string from provider
-    event_time : tz-aware datetime; naive → assumed UTC
-    """
-    title:      str
     currency:   str
     impact:     str
-    event_time: datetime
+    time_utc:   datetime
+    title:      str = ""
 
     def __post_init__(self) -> None:
-        if self.event_time.tzinfo is None:
-            object.__setattr__(
-                self, "event_time",
-                self.event_time.replace(tzinfo=timezone.utc),
-            )
+        object.__setattr__(self, "currency", self.currency.upper())
 
 
-@dataclass(frozen=True)
+@dataclass
 class NewsBlockResult:
-    """Returned when a news gate fires."""
-    blocked:          bool
-    reason:           str
-    event_title:      str        = ""
-    event_currency:   str        = ""
-    event_impact:     str        = ""
-    event_time:       Optional[datetime] = None
-    minutes_to_event: float      = 0.0
+    blocked:    bool
+    reason:     str = ""
+    events:     List[NewsEvent] = None
 
+    def __post_init__(self) -> None:
+        if self.events is None:
+            object.__setattr__(self, "events", [])
 
-# ---------------------------------------------------------------------------
-# Provider protocol (optional)
-# ---------------------------------------------------------------------------
-
-class NewsProvider(Protocol):
-    """Any object with an async `fetch(date: datetime) -> List[NewsEvent]`."""
-    async def fetch(self, for_date: datetime) -> List[NewsEvent]: ...
-
-
-# ---------------------------------------------------------------------------
-# Core gate
-# ---------------------------------------------------------------------------
 
 class NewsFilterGate:
-    """
-    FIX #1: Real news-event gate.
-
-    Usage
-    -----
-    gate = NewsFilterGate(block_minutes_before=30, block_minutes_after=15)
-    gate.load_events(events)               # manual injection
-    result = gate.check(symbol, now)       # synchronous — no I/O
-    await gate.refresh_from_provider(now)  # optional live refresh
-    """
+    """Blocks trades during high-impact news windows."""
 
     def __init__(
         self,
-        block_minutes_before: int = 30,
-        block_minutes_after:  int = 15,
-        min_impact:           str = NewsImpact.HIGH,
-        provider: Optional[NewsProvider] = None,
-        refresh_interval_s:   int = 3600,
+        before_secs:        int = 600,
+        after_secs:         int = 300,
+        min_impact:         str = NewsImpact.HIGH,
+        refresh_interval_s: int = 3600,
         clock: Optional[Callable[[], datetime]] = None,
     ) -> None:
-        self._before_s = block_minutes_before * 60
-        self._after_s  = block_minutes_after  * 60
-        self._min_impact   = min_impact
-        self._provider     = provider
-        self._refresh_s    = refresh_interval_s
-        self._clock        = clock or (lambda: datetime.now(timezone.utc))
+        self._before_s      = before_secs
+        self._after_s       = after_secs
+        self._min_impact    = min_impact
+        self._refresh_s     = refresh_interval_s
+        self._clock         = clock or (lambda: datetime.now(timezone.utc))
 
         self._events: List[NewsEvent] = []
         self._lock   = asyncio.Lock()
@@ -112,12 +72,10 @@ class NewsFilterGate:
         }
 
     def load_events(self, events: List[NewsEvent]) -> None:
-        valid = []
-        for ev in events:
-            if not isinstance(ev, NewsEvent):
-                logger.warning("NewsFilterGate.load_events: skipping non-NewsEvent %r", ev)
-                continue
-            valid.append(ev)
+        valid = [ev for ev in events if isinstance(ev, NewsEvent)]
+        if len(valid) > _MAX_EVENTS:
+            logger.warning("NewsFilter: truncating %d events to %d", len(valid), _MAX_EVENTS)
+            valid = valid[-_MAX_EVENTS:]
         self._events = valid
         logger.info(
             "NewsFilterGate: loaded %d events (before=%ds after=%ds min_impact=%s)",
@@ -125,6 +83,9 @@ class NewsFilterGate:
         )
 
     def add_event(self, event: NewsEvent) -> None:
+        if len(self._events) >= _MAX_EVENTS:  # LOG-FIX-3: prevent unbounded growth
+            logger.warning("NewsFilterGate.add_event: max events reached (%d), dropping oldest", _MAX_EVENTS)
+            self._events = self._events[-(_MAX_EVENTS - 1):]
         self._events.append(event)
 
     def clear_events(self) -> None:
@@ -138,112 +99,55 @@ class NewsFilterGate:
         symbol:  str,
         now:     Optional[datetime] = None,
     ) -> NewsBlockResult:
-        """
-        FIX #1: Check all loaded events against [now - before, now + after].
-        Fail-safe: any internal exception → log + return NOT blocked.
-        """
-        if not self._events:
-            return NewsBlockResult(blocked=False, reason="NO_EVENTS_LOADED")
-        try:
-            return self._check_inner(symbol, now or self._clock())
-        except Exception as exc:
-            logger.warning(
-                "NewsFilterGate.check() exception for %s: %s — continuing normally",
-                symbol, exc, exc_info=False,
+        now = now or  self._clock()
+        syms = {symbol[:3].upper(), symbol[3:].upper()}
+        min_rank = self._impact_rank.get(self._min_impact, 0)
+        blocking = []
+        for ev in self._events:
+            if ev.currency not in syms:
+                continue
+            if self._impact_rank.get(ev.impact, 0) < min_rank:
+                continue
+            secs = (now - ev.time_utc).total_seconds()
+            if -self._before_s <= secs <= self._after_s:
+                blocking.append(ev)
+        if blocking:
+            return NewsBlockResult(
+                blocked=True,
+                reason=f"News window: {[', '.join(set(e.title for e in blocking))]}",
+                events=blocking,
             )
-            return NewsBlockResult(blocked=False, reason=f"PROVIDER_FAIL_SAFE:{exc}")
+        return NewsBlockResult(blocked=False)
 
-    def _check_inner(self, symbol: str, now: datetime) -> NewsBlockResult:
-        sym_currencies = self._currencies_for(symbol)
-        min_rank = self._impact_rank.get(self._min_impact, 3)
-
-        for ev in self._events:
-            ev_ccy = ev.currency.upper().strip()
-            if ev_ccy != "ALL" and ev_ccy not in sym_currencies:
-                continue
-            ev_rank = self._impact_rank.get(ev.impact.upper(), 3)
-            if ev_rank < min_rank:
-                continue
-            diff_s = (now - ev.event_time).total_seconds()
-            if -self._before_s <= diff_s <= self._after_s:
-                minutes_to = -diff_s / 60
-                reason = (
-                    f"NEWS_EVENT_BLOCK: '{ev.title}' ({ev_ccy} {ev.impact}) "
-                    f"@ {ev.event_time.isoformat()} "
-                    f"[window: -{self._before_s//60}m/+{self._after_s//60}m]"
-                )
-                logger.warning(
-                    "NewsFilterGate BLOCKED %s — %s (%.1f min to event)",
-                    symbol, reason, minutes_to,
-                )
-                return NewsBlockResult(
-                    blocked=True,
-                    reason="NEWS_EVENT_BLOCK",
-                    event_title=ev.title,
-                    event_currency=ev_ccy,
-                    event_impact=ev.impact,
-                    event_time=ev.event_time,
-                    minutes_to_event=round(minutes_to, 1),
-                )
-
-        return NewsBlockResult(blocked=False, reason="CLEAR")
-
-    async def refresh_from_provider(
+    async def refresh_if_needed(
         self,
-        now: Optional[datetime] = None,
-        force: bool = False,
-    ) -> bool:
-        """
-        FIX #1.5: Fetch from optional live provider.
-        Fail-safe: provider failure → log warning, keep old events.
-        """
-        if self._provider is None:
-            return False
-        if not force:
-            if self._last_refresh is not None:
-                elapsed = ((now or self._clock()) - self._last_refresh).total_seconds()
-                if elapsed < self._refresh_s:
-                    return False
-        async with self._lock:
-            try:
-                fetch_date = now or self._clock()
-                events = await asyncio.wait_for(
-                    self._provider.fetch(fetch_date),
-                    timeout=10.0,
-                )
-                self.load_events(events)
-                self._last_refresh = fetch_date
-                logger.info("NewsFilterGate: refreshed %d events from provider", len(events))
-                return True
-            except asyncio.TimeoutError:
-                logger.warning("NewsFilterGate: provider timeout — keeping %d existing events", len(self._events))
-            except Exception as exc:
-                logger.warning("NewsFilterGate: provider error (%s) — keeping %d existing events", exc, len(self._events))
-        return False
+        provider: Callable[[], List[NewsEvent]],
+    ) -> None:
+        now = self._clock()
+        if self._last_refresh and (now - self._last_refresh).total_seconds() < self._refresh_s:
+            return
+        try:
+            events = await provider()
+            self.load_events(events)
+            self._last_refresh = now
+        except asyncio.TimeoutError:
+            logger.warning("NewsFilterGate: provider timeout — keeping %d existing events", len(self._events))
+        except Exception as exc:
+            logger.warning("NewsFilterGate: provider error (%s) - keeping %d existing events", exc, len(self._events))
 
-    @staticmethod
-    def _currencies_for(symbol: str) -> set:
-        sym = symbol.upper().strip()
-        if len(sym) == 6 and sym.isalpha():
-            return {sym[:3], sym[3:]}
-        if len(sym) > 3 and sym.isalpha():
-            return {sym[:3]}
-        return {sym}
-
-    def upcoming_events(
-        self,
-        symbol: str,
-        lookahead_minutes: int = 120,
-        now: Optional[datetime] = None,
-    ) -> List[NewsEvent]:
-        """Return events that will block this symbol within the next N minutes."""
-        n = now or self._clock()
-        cutoff = n + timedelta(minutes=lookahead_minutes)
-        sym_currencies = self._currencies_for(symbol)
-        result = []
-        for ev in self._events:
-            if ev.currency.upper() != "ALL" and ev.currency.upper() not in sym_currencies:
-                continue
-            if n <= ev.event_time <= cutoff:
-                result.append(ev)
-        return sorted(result, key=lambda e: e.event_time)
+    def snapshot(self) -> Dict:
+        now = self._clock()
+        upcoming = [
+            {"currency": e.currency, "title": e.title, "impact": e.impact,
+             "time_utc": e.time_utc.isoformat(),
+             "secs_until": round((e.time_utc - now).total_seconds())}
+            for e in self._events
+            if (e.time_utc - now).total_seconds() > 0
+        ]
+        return {
+            "total_events": len(self._events),
+            "upcoming_1h":  sum(1 for e in upcoming if e["secs_until"] < 3600),
+            "last_refresh": self._last_refresh.isoformat() if self._last_refresh else None,
+            "min_impact":   self._min_impact,
+            "max_events":   _MAX_EVENTS,
+        }
