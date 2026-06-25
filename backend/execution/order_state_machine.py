@@ -2,9 +2,10 @@
 Order State Machine with enterprise fixes.
 
 Fixes:
-  - BUG-OSM-1: lock reentrancy deadlock (collect IDs, release lock, then transition)
-  - LOG-FIX-4: asyncio.create_task(result) → track with done_callback error handler
-  - STRESS-2: NameError _ORDER_TTL_HOURS → use _COMPLETED_ORDER_TTL_HOURS
+  - BUG-OSM-1: lock reentrancy deadlock
+  - LOG-FIX-4: asyncio.create_task done_callback error handler
+  - STRESS-2: NameError _ORDER_TTL_HOURS → _COMPLETED_ORDER_TTL_HOURS
+  - STRESS-7: ContextualLogger is keyword-only — all %s calls converted
 """
 from __future__ import annotations
 import asyncio
@@ -68,7 +69,7 @@ def _handle_task_exc(name: str):
     """Reusable done_callback that logs task exceptions."""
     def _cb(t: asyncio.Task) -> None:
         if not t.cancelled() and t.exception():
-            logger.error("%s task failed: %s", name, t.exception(), exc_info=t.exception())
+            logger.error("task_failed", name=name, error=str(t.exception()))
     return _cb
 
 
@@ -95,8 +96,7 @@ class OrderStateMachine:
             self._monitor_loop(), name="osm:monitor"
         )
         self._monitor_task.add_done_callback(_handle_task_exc("osm:monitor"))
-        # STRESS-2 fix: use correct variable name _COMPLETED_ORDER_TTL_HOURS
-        logger.info("OrderStateMachine monitor started", ttl_hours=_COMPLETED_ORDER_TTL_HOURS)
+        logger.info("OSM monitor started", ttl_hours=_COMPLETED_ORDER_TTL_HOURS)
 
     async def stop(self) -> None:
         if self._monitor_task and not self._monitor_task.done():
@@ -105,45 +105,56 @@ class OrderStateMachine:
                 await self._monitor_task
             except asyncio.CancelledError:
                 pass
-        logger.info("OrderStateMachine stopped")
+        logger.info("OSM monitor stopped")
 
-    async def register_order(self, order: ManagedOrder) -> None:
+    async def create_order(self, order: "ManagedOrder") -> "ManagedOrder":
+        """Register a new order (alias for register_order)."""
         async with self._lock:
             self._orders[order.order_id] = order
-        logger.info("Order registered %s %s %s %s", order.order_id[:8], order.symbol, order.direction, order.lots)
+        logger.info("Order created", oid=order.order_id[:8],
+                    symbol=order.symbol, direction=order.direction)
+        return order
 
-    async def transition(self, order_id: str, new_state: OrderState, reason: str = "", **kw) -> bool:
+    async def register_order(self, order: "ManagedOrder") -> None:
+        """Register a new order."""
+        await self.create_order(order)
+
+    async def transition(self, order_id: str, new_state: OrderState,
+                         reason: str = "", **kw) -> bool:
         async with self._lock:
             order = self._orders.get(order_id)
             if order is None:
-                logger.warning("Order %s not found", order_id[:8])
+                logger.warning("Order not found", oid=order_id[:8])
                 return False
             allowed = _VALID_TRANSITIONS.get(order.state, set())
             if new_state not in allowed:
-                logger.warning("Invalid transition %s: %s->%s", order_id[:8], order.state, new_state)
+                logger.warning("Invalid transition", oid=order_id[:8],
+                               from_s=str(order.state), to_s=str(new_state))
                 return False
-            tr = StateTransition(from_state=order.state, to_state=new_state, reason=reason)
+            tr = StateTransition(from_state=order.state, to_state=new_state,
+                                 reason=reason)
             for k, v in kw.items():
                 if hasattr(order, k): setattr(order, k, v)
             order.state = new_state
             if new_state in _TERMINAL_STATES:
                 order.completed_at = datetime.now(timezone.utc)
-        logger.info("Order %s: %s->%s | %s", order_id[:8], tr.from_state, tr.to_state, reason)
+        logger.info("Order transitioned", oid=order_id[:8],
+                    from_s=str(tr.from_state), to_s=str(tr.to_state), reason=reason)
         for cb in self._callbacks:
             try:
                 result = cb(order, tr)
                 if asyncio.iscoroutine(result):
-                    _t = asyncio.create_task(result, name="osm:callback")  # LOG-FIX-4: track task
+                    _t = asyncio.create_task(result, name="osm:callback")
                     _t.add_done_callback(_handle_task_exc("osm:callback"))
             except Exception as exc:
-                logger.error("Callback error: %s", exc)
+                logger.error("Callback error", error=str(exc))
         return True
 
-    async def get_order(self, order_id: str) -> Optional[ManagedOrder]:
+    async def get_order(self, order_id: str) -> Optional["ManagedOrder"]:
         async with self._lock:
             return self._orders.get(order_id)
 
-    async def list_orders(self, state: Optional[OrderState] = None) -> List[ManagedOrder]:
+    async def list_orders(self, state: Optional[OrderState] = None) -> List["ManagedOrder"]:
         async with self._lock:
             orders = list(self._orders.values())
         return [o for o in orders if state is None or o.state == state]
@@ -151,22 +162,27 @@ class OrderStateMachine:
     def snapshot(self) -> Dict:
         return {
             "total":     len(self._orders),
-            "pending":   sum(1 for o in self._orders.values() if o.state == OrderState.PENDING),
-            "filled":    sum(1 for o in self._orders.values() if o.state == OrderState.FILLED),
-            "failed":    sum(1 for o in self._orders.values() if o.state == OrderState.FAILED),
-            "cancelled": sum(1 for o in self._orders.values() if o.state == OrderState.CANCELLED),
+            "pending":   sum(1 for o in self._orders.values()
+                             if o.state == OrderState.PENDING),
+            "filled":    sum(1 for o in self._orders.values()
+                             if o.state == OrderState.FILLED),
+            "failed":    sum(1 for o in self._orders.values()
+                             if o.state == OrderState.FAILED),
+            "cancelled": sum(1 for o in self._orders.values()
+                             if o.state == OrderState.CANCELLED),
         }
 
     async def _evict_completed(self, now: datetime) -> None:
         async with self._lock:
             to_remove = [
                 oid for oid, o in self._orders.items()
-                if o.is_terminal() and o.completed_at and (now - o.completed_at) > self._completed_ttl
+                if o.is_terminal() and o.completed_at
+                and (now - o.completed_at) > self._completed_ttl
             ]
             for oid in to_remove:
                 del self._orders[oid]
         if to_remove:
-            logger.info("Evicted %d completed orders", len(to_remove))
+            logger.info("Evicted completed orders", count=len(to_remove))
 
     async def _monitor_loop(self) -> None:
         while True:
@@ -183,8 +199,8 @@ class OrderStateMachine:
                     await self.transition(oid, OrderState.FAILED, reason="timeout")
                 await self._evict_completed(now)
             except asyncio.CancelledError:
-                logger.info("OrderStateMachine monitor cancelled")
+                logger.info("OSM monitor cancelled")
                 break
             except Exception as exc:
-                logger.error("OSM monitor loop error: %s", exc, exc_info=True)
+                logger.error("OSM monitor error", error=str(exc))
                 await asyncio.sleep(5)
