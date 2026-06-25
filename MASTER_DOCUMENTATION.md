@@ -1,978 +1,751 @@
-# 🌌 Galaxy Vast AI Trading Platform
-## MASTER DOCUMENTATION — نسخه ۲.۰.۰
+# Galaxy Vast AI Trading Platform — Master Documentation
 
-> **راهنمای جامع برای توسعه‌دهنده، DevOps، و کاربر نهایی**
-> آخرین بروزرسانی: ۲۰۲۶-۰۶-۲۵ | Python 3.11 | FastAPI 0.115
+> **نسخه:** 2.0.0 | **آخرین به‌روزرسانی:** 2026-06-25 | **Python:** 3.11+
 
 ---
 
 ## فهرست مطالب
 
-1. [معرفی پروژه](#-۱-معرفی-پروژه)
-2. [معماری کامل](#-۲-معماری-کامل)
-3. [ساختار پوشه‌ها](#-۳-ساختار-پوشه‌ها)
-4. [تمام ماژول‌ها، کلاس‌ها و توابع](#-۴-تمام-ماژول‌ها-کلاس‌ها-و-توابع)
-5. [نحوه نصب](#-۵-نحوه-نصب)
-6. [نحوه اجرا](#-۶-نحوه-اجرا)
-7. [متغیرهای ENV](#-۷-متغیرهای-env)
-8. [تنظیمات سیستم](#-۸-تنظیمات-سیستم)
-9. [Docker](#-۹-docker)
-10. [CI/CD](#-۱۰-cicd)
-11. [نحوه توسعه](#-۱۱-نحوه-توسعه)
-12. [نحوه دیباگ](#-۱۲-نحوه-دیباگ)
-13. [نحوه بکاپ](#-۱۳-نحوه-بکاپ)
-14. [نحوه آپدیت](#-۱۴-نحوه-آپدیت)
-15. [آموزش مدل‌های ML](#-۱۵-آموزش-مدل‌های-ml)
-16. [اتصال به صرافی‌ها و بروکرها](#-۱۶-اتصال-به-صرافی‌ها-و-بروکرها)
-17. [مدیریت ریسک](#-۱۷-مدیریت-ریسک)
-18. [راهنمای رفع خطا](#-۱۸-راهنمای-رفع-خطا)
-19. [API Reference](#-۱۹-api-reference)
-20. [Glossary](#-۲۰-glossary)
+1. [معرفی پروژه](#1)
+2. [معماری کامل](#2)
+3. [ساختار پوشه‌ها](#3)
+4. [تمام ماژول‌ها](#4)
+5. [تمام کلاس‌ها و توابع](#5)
+6. [نحوه نصب](#6)
+7. [نحوه اجرا](#7)
+8. [تنظیمات سیستم](#8)
+9. [متغیرهای محیطی ENV](#9)
+10. [Docker و Docker Compose](#10)
+11. [CI/CD Pipeline](#11)
+12. [نحوه توسعه](#12)
+13. [نحوه دیباگ](#13)
+14. [نحوه بکاپ](#14)
+15. [نحوه آپدیت](#15)
+16. [نحوه آموزش مدل‌های ML](#16)
+17. [نحوه اتصال بروکرها](#17)
+18. [مدیریت ریسک](#18)
+19. [راهنمای رفع خطا](#19)
+20. [Glossary](#20)
 
 ---
 
-## 🌟 ۱. معرفی پروژه
+## 1. معرفی پروژه <a name="1"></a>
 
-### Galaxy Vast AI Trading Platform چیست؟
+### Galaxy Vast چیست؟
 
-Galaxy Vast یک پلتفرم معاملاتی **هوش مصنوعی** سازمانی است که برای معامله خودکار (Automated Trading) در بازارهای فارکس (Forex) طراحی شده. این سیستم:
+Galaxy Vast یک پلتفرم هوش مصنوعی معاملاتی سطح Enterprise است که برای معاملات خودکار و نیمه‌خودکار در بازارهای فارکس و CFD طراحی شده است. این سیستم با ترکیب تحلیل SMC (Smart Money Concept)، یادگیری ماشین و مدیریت ریسک چندلایه، سیگنال‌های معاملاتی با کیفیت بالا تولید کرده و آن‌ها را از طریق MetaTrader 5 اجرا می‌کند.
 
-- 📊 **سیگنال‌های معاملاتی** را از ۱۳ agent هوش مصنوعی دریافت می‌کند
-- 🛡️ **ریسک** هر معامله را با ۷ لایه فیلتر بررسی می‌کند
-- ⚡ **سفارش‌ها** را از طریق MetaTrader 5 (MT5) اجرا می‌کند
-- 📱 **ربات تلگرام** برای کنترل و مانیتورینگ دارد
-- 🤖 **یادگیری ماشین** مداوم برای بهبود عملکرد دارد
-
-### ویژگی‌های کلیدی
+### ویژگی‌های اصلی
 
 | ویژگی | توضیح |
-|-------|--------|
-| **Multi-Agent AI** | ۱۳ agent مستقل، یک نتیجه نهایی از voting |
-| **۷-Layer Risk** | Daily Limits, Equity Protection, Volatility, Correlation, Exposure, Portfolio, Lot Sizing |
-| **MT5 Integration** | اتصال مستقیم به MetaTrader 5 از طریق API |
-| **Self-Learning** | مدل‌ها پس از هر معامله آپدیت می‌شوند |
-| **Semi-Auto Mode** | معامله‌گر انسانی می‌تواند سیگنال‌ها را تایید یا رد کند |
-| **Circuit Breaker** | در صورت شکست‌های متوالی، سیستم auto-halt می‌شود |
-| **Telegram Bot** | کنترل کامل از طریق تلگرام |
-| **Enterprise Logging** | Structured JSON logging با full audit trail |
-| **Health Checks** | Kubernetes-compatible liveness/readiness probes |
+|-------|-------|
+| **AI Multi-Agent Voting** | 13 agent هوشمند که با vote وزن‌دار به توافق می‌رسند |
+| **Risk Engine چندلایه** | 7 gate ریسک که هر signal را بررسی می‌کنند |
+| **Circuit Breaker** | توقف خودکار سیستم در صورت ضرر غیرعادی |
+| **Semi-Auto Trading** | تأیید دستی سیگنال‌ها قبل اجرا |
+| **Self-Learning** | بهبود خودکار مدل‌ها بر اساس نتایج واقعی |
+| **Telegram Integration** | کنترل کامل از طریق ربات تلگرام |
+| **Real-time Dashboard** | داشبورد Streamlit برای مانیتورینگ زنده |
+| **Backtest Engine** | بک‌تست با داده‌های واقعی و Monte Carlo |
 
 ### Stack فناوری
 
 ```
-Backend:   Python 3.11 + FastAPI 0.115 + Pydantic v2
-Database:  Supabase (PostgreSQL) + Redis 7.4
-ML:        PyTorch 2.4 + XGBoost 2.1 + scikit-learn 1.5
-Trading:   MetaTrader 5 (MQL5 EA)
-Bot:       aiogram 3.13 (Telegram)
-Deploy:    Docker + Docker Compose
-CI/CD:     GitHub Actions
-Monitor:   Prometheus + structured logging
+Backend:    Python 3.11 + FastAPI + Uvicorn
+Database:   Supabase (PostgreSQL)
+Cache:      Redis 7.4
+ML:         XGBoost + scikit-learn + PyTorch (CPU)
+Broker:     MetaTrader 5 (MT5)
+Telegram:   aiogram 3.x
+Dashboard:  Streamlit
+Container:  Docker + Docker Compose
+Monitoring: Prometheus + custom metrics
 ```
 
 ---
 
-## 🏗️ ۲. معماری کامل
+## 2. معماری کامل <a name="2"></a>
 
-### نمودار معماری سیستم
+### نمودار جریان سیگنال
 
 ```
-+---------------------------------------------------------------+
-|                    EXTERNAL SIGNALS                           |
-|         (MQL5 EA / Telegram / REST API / WebSocket)           |
-+-------------------------------+-------------------------------+
-                                |
-                                v
-+---------------------------------------------------------------+
-|              FastAPI Gateway (Port 8000)                      |
-|  SecurityMW -> RateLimitMW (Redis) -> ObservabilityMW        |
-|  CORS | JWT Auth | Rate Limiting | Request Tracing            |
-+-------------------+---------------------------+---------------+
-                    |                           |
-                    v                           v
-       +------------------------+  +------------------------+
-       |    REST API Routes     |  |   WebSocket Routes     |
-       |  /api/v1/signals       |  | /ws/signals /ws/trades |
-       |  /api/v1/risk          |  +------------------------+
-       |  /api/v1/trades        |
-       |  ... 25 route files    |
-       +----------+-------------+
-                  |
-                  v
-+---------------------------------------------------------------+
-|                   AGENT VOTING LAYER                          |
-|                                                               |
-|  [SMC Agent] [ML Agent] [Risk Agent] [News Agent]            |
-|  [Market Struct] [Liquidity] [Execution] [AI Prediction]     |
-|  [Security AI] [Institutional] ...13 agents total            |
-|                                                               |
-|         VotingEngine.vote() -> VoteResult (BUY/SELL/HOLD)    |
-+------------------------------+--------------------------------+
-                               |
-                               v
-+---------------------------------------------------------------+
-|                    DECISION ENGINE                            |
-|  SMCEngine (3077L) + PriceActionEngine + SessionManager      |
-|  -> TradingDecision (symbol, direction, entry, sl, tp, lot)  |
-+------------------------------+--------------------------------+
-                               |
-                               v
-+---------------------------------------------------------------+
-|            RISK ORCHESTRATOR -- 7 Gates (FAIL_CLOSED)        |
-|                                                               |
-|  Gate 1: DailyLimitsEngine     max trades/day, P&L limits    |
-|  Gate 2: EquityProtectionEngine drawdown halt (HWM)          |
-|  Gate 3: VolatilityFilter       ATR + spread + news events   |
-|  Gate 4: CorrelationFilter      cross-asset correlation      |
-|  Gate 5: ExposureControl        total exposure % of balance  |
-|  Gate 6: PortfolioRisk          portfolio-level risk budget  |
-|  Gate 7: LotSizer (Kelly)       optimal position sizing      |
-|                                                               |
-|  CircuitBreaker: 5 fails/60s -> OPEN -> halt ALL trading     |
-+------------------------------+--------------------------------+
-                               |  RiskCheckResult(approved=True)
-                               v
-+---------------------------------------------------------------+
-|                   EXECUTION SERVICE                           |
-|                                                               |
-|  Idempotency Check (TTL=600s) -> In-flight dedup             |
-|  OrderStateMachine: PENDING->SUBMITTED->FILLED->CLOSED       |
-|  MT5Connector (thread-safe): health->send_order->confirm     |
-|  FailureRecovery: exponential backoff retry (max 3)          |
-|  PositionReconciliation: duplicate check before retry        |
-+------------------------------+--------------------------------+
-                               |
-                               v
-+---------------------------------------------------------------+
-|                    MetaTrader 5 (MT5)                         |
-|  MQL5 Expert Advisor -> POST /api/v1/signals -> JSON resp    |
-|  order_send() -> position opened in live broker account      |
-+------------------------------+--------------------------------+
-                               |
-                               v
-+---------------------------------------------------------------+
-|                 SELF-LEARNING PIPELINE                        |
-|  TradeDatasetGenerator -> FeaturePipeline -> TrainingPipeline|
-|  XGBoost / PyTorch retrain -> ModelManager update            |
-|  PerformanceTracker -> WeightAdjuster -> Agent weight update |
-+---------------------------------------------------------------+
+MT5 EA --> POST /api/v1/signals/execute
+            |
+            v
+     [Auth Middleware]  JWT verify + User lookup
+     [Rate Limiter]     100 req/min per IP
+     [Security MW]      XSS/Injection scan
+            |
+            v
+   ExecutionService.execute_signal()
+            |
+   +---------+---------------------------+
+   |    RISK GATE PIPELINE (7 gates)     |
+   |                                     |
+   | Gate 1: EquityProtectionEngine      |
+   | Gate 2: DailyLimitsEngine           |
+   | Gate 3: VolatilityFilter            |
+   | Gate 4: NewsFilterGate              |
+   | Gate 5: CorrelationFilter           |
+   | Gate 6: ExposureControlEngine       |
+   | Gate 7: LotSizer.calculate()        |
+   |                                     |
+   | X Any gate BLOCKS -> rejected       |
+   | V All gates PASS  -> proceed        |
+   +----------+--------------------------+
+              |
+              v
+   CircuitBreaker.check()  OPEN? -> halt
+              |
+              v
+   VotingEngine.vote()
+    +- SMCAgent      weight: 0.25
+    +- MLAgent       weight: 0.20
+    +- RiskAgent     weight: 0.15
+    +- TechnicalAgent weight: 0.15
+    +- NewsAgent     weight: 0.10
+    +- LiquidityAgent weight: 0.08
+    +- SecurityAgent weight: 0.07
+              |
+        confidence >= 0.65?
+              |
+              v
+   OrderStateMachine
+   PENDING -> SUBMITTED -> FILLED -> CLOSING -> CLOSED
+              |
+              v
+   MT5Connector.send_order()
+    +- asyncio.to_thread (no GIL)
+    +- Lock: no concurrent sends
+    +- timeout: 30s
+              |
+              v
+   PositionReconciliation.run_once()
+    +- duplicate check before retry
+    +- orphan detection
+              |
+        failed? -> FailureRecoveryEngine
+              +- IMMEDIATE / EXPONENTIAL / DEAD_LETTER
+              +- max 3 retries
+              |
+              v
+   OrderJournal.record()    audit trail
+   MetricsRegistry          Prometheus
+   AuditLogger              compliance log
+   Telegram alert           user notification
 ```
 
-### اصول طراحی معماری
+### معماری لایه‌ای (Clean Architecture)
 
-| اصل | پیاده‌سازی |
-|-----|----------|
-| **SOLID** | هر class یک مسئولیت؛ Protocol interfaces در `core/interfaces.py`؛ DI در constructor |
-| **Clean Architecture** | `core/` <- `risk/` <- `execution/` <- `api/` -- هرگز برعکس |
-| **Dependency Injection** | `core/deps.py` -- همه singletons از یک مکان inject می‌شوند |
-| **Fail-Safe** | FAIL_CLOSED default -- هر خطا = trade block (ایمن‌ترین حالت) |
-| **Idempotency** | هر `signal_id` فقط یکبار execute می‌شود (TTL=600 ثانیه) |
-| **Circuit Breaker** | 5 شکست در 60 ثانیه -> سیستم halt می‌شود |
+```
+Presentation : FastAPI Routes | Telegram Bot | Streamlit
+Application  : ExecutionService | AgentService | LearningService
+Domain       : RiskOrchestrator | VotingEngine | DecisionEngine
+Infrastructure: MT5Connector | Database | Redis | Telegram API
+```
+
+### اصول طراحی
+
+- **SOLID**: هر کلاس یک مسئولیت، open/closed، dependency injection
+- **Fail-Safe**: همه risk gates در صورت خطا، trade را BLOCK می‌کنند
+- **Idempotency**: هر signal_id فقط یک‌بار اجرا می‌شود
+- **Singleton with DI**: singletons از `core/deps.py` inject می‌شوند
 
 ---
 
-## 📁 ۳. ساختار پوشه‌ها
+## 3. ساختار پوشه‌ها <a name="3"></a>
 
 ```
 bot12/
++-- backend/
+|   +-- agents/                  # 13 AI agent
+|   |   +-- base_agent.py        # کلاس پایه
+|   |   +-- voting_engine.py     # رای‌گیری وزن‌دار
+|   |   +-- agent_service.py     # singleton factory
+|   |   +-- smc_agent.py         # SMC analysis
+|   |   +-- ml_agent.py          # ML prediction
+|   |   +-- risk_agent.py        # risk scoring
+|   |   +-- news_agent.py        # news impact
+|   |   +-- liquidity_agent.py   # liquidity levels
+|   |
+|   +-- ai_prediction/           # ML prediction
+|   |   +-- prediction_service.py
+|   |   +-- model_manager.py
+|   |   +-- feature_pipeline.py
+|   |   +-- xgboost_trainer.py
+|   |
+|   +-- analysis/                # تحلیل بازار
+|   |   +-- decision_engine.py   # 746 خط
+|   |   +-- smc_engine.py        # 3077 خط
+|   |
+|   +-- api/                     # REST API
+|   |   +-- main.py              # FastAPI app
+|   |   +-- health.py            # health checks
+|   |   +-- routes/              # 20+ route
+|   |
+|   +-- circuit_breaker.py       # halt trading
+|   |
+|   +-- core/                    # هسته مشترک
+|   |   +-- config.py            # Settings
+|   |   +-- enums.py             # 26 Enum
+|   |   +-- exceptions.py        # error hierarchy
+|   |   +-- interfaces.py        # Protocol/ABC
+|   |   +-- logger.py            # JSON logger
+|   |   +-- retry.py             # backoff retry
+|   |   +-- deps.py              # DI
+|   |   +-- auth.py              # JWT
+|   |
+|   +-- execution/               # لایه اجرا
+|   |   +-- execution_service.py
+|   |   +-- mt5_connector.py
+|   |   +-- order_state_machine.py
+|   |   +-- position_reconciliation.py
+|   |   +-- failure_recovery.py
+|   |   +-- semi_auto.py
+|   |   +-- order_journal.py
+|   |
+|   +-- intelligence/            # ML engine
+|   |   +-- ml_engine.py
+|   |   +-- trade_memory.py
+|   |
+|   +-- middleware/
+|   |   +-- rate_limit.py
+|   |   +-- security.py
+|   |
+|   +-- observability/
+|   |   +-- metrics.py
+|   |   +-- alert_manager.py
+|   |
+|   +-- risk/                    # 7 Risk Gates
+|   |   +-- risk_orchestrator.py
+|   |   +-- lot_sizing.py
+|   |   +-- volatility_filter.py
+|   |   +-- correlation_filter.py
+|   |   +-- equity_protection.py
+|   |   +-- daily_limits.py
+|   |   +-- exposure_control.py
+|   |   +-- news_filter.py
+|   |
+|   +-- self_learning/
+|   |   +-- learning_service.py
+|   |   +-- training_pipeline.py
+|   |
+|   +-- services/
+|   |   +-- scheduler.py
+|   |   +-- trade_service.py
+|   |   +-- audit_service.py
+|   |
+|   +-- telegram/
+|   |   +-- bot.py
+|   |   +-- handlers/
+|   |
+|   +-- tests/                   # 249 test
+|       +-- conftest.py
+|       +-- test_01_unit_risk.py  # 86 test
+|       +-- test_02_unit_execution.py # 59 test
+|       +-- test_03_integration.py    # 54 test
+|       +-- test_04_security.py       # 50 test
 |
-+-- .env.example                 <- نمونه متغیرهای محیطی (copy -> .env)
-+-- .github/workflows/
-|   +-- ci-cd.yml                <- Pipeline کامل CI/CD
-|   +-- ci.yml                   <- CI سریع برای PR
-+-- Dockerfile                   <- API server (multi-stage, non-root)
-+-- Dockerfile.bot               <- Telegram bot image
-+-- docker-compose.yml           <- Development stack
-+-- docker-compose.prod.yml      <- Production stack
-+-- requirements.txt             <- Python dependencies (pinned)
-+-- pytest.ini                   <- Test configuration
-+-- startup_check.py             <- Health check قبل از start
-|
-+-- backend/                     <- کد اصلی Python (294 فایل)
-|   |
-|   +-- core/                    <- زیرساخت مشترک (هیچ dependency به سایر packages)
-|   |   +-- config.py            <- Settings (Pydantic BaseSettings)
-|   |   +-- interfaces.py        <- Protocol definitions (SOLID/DI)
-|   |   +-- exceptions.py        <- Exception hierarchy
-|   |   +-- logger.py            <- Structured JSON logging
-|   |   +-- retry.py             <- Retry mechanism (exponential/fixed)
-|   |   +-- deps.py              <- Dependency injection
-|   |   +-- enums.py             <- Shared enumerations
-|   |   +-- auth.py              <- JWT authentication
-|   |   +-- security.py          <- Security utilities
-|   |   +-- cache.py             <- Redis cache helper
-|   |   +-- validators.py        <- Input validation
-|   |
-|   +-- api/                     <- FastAPI layer
-|   |   +-- main.py              <- App entry point + lifespan
-|   |   +-- health.py            <- /health /health/ready /health/deep
-|   |   +-- websocket_manager.py <- WebSocket management
-|   |   +-- routes/              <- 25 route files
-|   |       +-- auth.py          <- POST /auth/login, /register
-|   |       +-- signals.py       <- POST /signals (from MQL5)
-|   |       +-- trades.py        <- GET/POST/DELETE /trades
-|   |       +-- risk.py          <- POST /risk/assess
-|   |       +-- agents.py        <- GET /agents/status
-|   |       +-- analysis.py      <- POST /analysis/analyze
-|   |       +-- ... 19 more
-|   |
-|   +-- risk/                    <- موتور ریسک (7 gate)
-|   |   +-- risk_orchestrator.py <- هماهنگ‌کننده + RiskInput + RiskCheckResult
-|   |   +-- lot_sizing.py        <- Kelly Criterion sizing
-|   |   +-- daily_limits.py      <- محدودیت‌های روزانه
-|   |   +-- equity_protection.py <- Drawdown halt
-|   |   +-- volatility_filter.py <- ATR + spread + news
-|   |   +-- correlation_filter.py<- Cross-asset correlation
-|   |   +-- exposure_control.py  <- Total exposure control
-|   |   +-- portfolio_risk.py    <- Portfolio-level risk
-|   |   +-- news_filter.py       <- High-impact news filter
-|   |
-|   +-- execution/               <- موتور اجرا
-|   |   +-- execution_service.py <- سرویس اصلی (idempotency + retry)
-|   |   +-- mt5_connector.py     <- اتصال MT5 (thread-safe)
-|   |   +-- order_state_machine.py <- State machine سفارش‌ها
-|   |   +-- position_reconciliation.py <- تطابق MT5
-|   |   +-- failure_recovery.py  <- Retry + dead letter queue
-|   |   +-- semi_auto.py         <- حالت نیمه‌خودکار
-|   |   +-- order_journal.py     <- Audit trail سفارش‌ها
-|   |
-|   +-- agents/                  <- Agent‌های هوش مصنوعی (13 agent)
-|   |   +-- base_agent.py        <- BaseAgent ABC + VoteResult
-|   |   +-- voting_engine.py     <- Weighted voting
-|   |   +-- smc_agent.py         <- Smart Money Concept
-|   |   +-- ml_agent.py          <- Machine Learning
-|   |   +-- risk_agent.py        <- Risk assessment
-|   |   +-- news_agent.py        <- News sentiment
-|   |   +-- market_structure_agent.py <- Market structure
-|   |   +-- liquidity_agent.py   <- Liquidity zones
-|   |   +-- execution_agent.py   <- Execution timing
-|   |   +-- ai_prediction_agent.py <- AI prediction
-|   |   +-- security_ai_agent.py <- Security monitoring
-|   |
-|   +-- analysis/                <- موتور تحلیل بازار
-|   |   +-- smc_engine.py        <- Smart Money Concept (3077 خط)
-|   |   +-- decision_engine.py   <- تصمیم نهایی
-|   |   +-- price_action_engine.py <- Price action
-|   |   +-- session_manager.py   <- London/NY/Tokyo sessions
-|   |
-|   +-- intelligence/            <- یادگیری ماشین
-|   |   +-- ml_engine.py         <- موتور ML (XGBoost + PyTorch)
-|   |   +-- trade_memory.py      <- حافظه بلندمدت معاملات
-|   |   +-- learning_service.py  <- سرویس یادگیری
-|   |   +-- weight_adjuster.py   <- تنظیم وزن agent‌ها
-|   |
-|   +-- ai_prediction/           <- پیش‌بینی قیمت
-|   |   +-- prediction_service.py <- سرویس پیش‌بینی
-|   |   +-- model_manager.py     <- مدیریت مدل‌ها (LRU cache)
-|   |   +-- feature_pipeline.py  <- Feature engineering (50+)
-|   |   +-- xgboost_trainer.py   <- XGBoost training
-|   |
-|   +-- institutional/           <- ابزارهای سازمانی
-|   |   +-- monte_carlo.py       <- Monte Carlo simulation
-|   |   +-- portfolio_manager.py <- مدیریت portfolio
-|   |   +-- risk_engine.py       <- VAR + CVaR
-|   |   +-- rl_agent.py          <- Reinforcement Learning
-|   |   +-- correlation_engine.py<- تحلیل همبستگی
-|   |
-|   +-- self_learning/           <- بازآموزی خودکار
-|   |   +-- learning_service.py  <- سرویس یادگیری مستمر
-|   |   +-- training_pipeline.py <- Pipeline آموزش
-|   |   +-- performance_tracker.py <- ردیابی KPI
-|   |   +-- trade_dataset_generator.py <- تولید dataset
-|   |
-|   +-- backtest_engine/         <- موتور بک‌تست
-|   |   +-- multi_symbol_engine.py <- بک‌تست چند نماد
-|   |   +-- walk_forward_advanced.py <- Walk-forward analysis
-|   |   +-- monte_carlo_advanced.py <- Monte Carlo پیشرفته
-|   |   +-- parameter_optimizer.py <- بهینه‌سازی پارامتر
-|   |
-|   +-- database/                <- لایه پایگاه داده
-|   |   +-- connection.py        <- Supabase client + connection pool
-|   |   +-- connection_health.py <- بررسی سلامت DB
-|   |
-|   +-- middleware/              <- میان‌افزارهای FastAPI
-|   |   +-- security.py          <- Security headers + IP blocking
-|   |   +-- rate_limit.py        <- Rate limiting (Redis)
-|   |   +-- observability.py     <- Request tracing
-|   |
-|   +-- observability/           <- مانیتورینگ
-|   |   +-- metrics.py           <- Prometheus metrics
-|   |   +-- alert_manager.py     <- مدیریت alert‌ها
-|   |   +-- structured_logger.py <- JSON logging
-|   |   +-- tracing.py           <- Distributed tracing
-|   |
-|   +-- services/                <- سرویس‌های business مشترک
-|   |   +-- scheduler.py         <- Background task scheduler
-|   |   +-- trade_service.py     <- Trade CRUD
-|   |   +-- signal_service.py    <- Signal management
-|   |   +-- audit_service.py     <- Immutable audit trail
-|   |   +-- rbac_service.py      <- Role-Based Access Control
-|   |
-|   +-- telegram/                <- ربات تلگرام
-|   |   +-- bot.py               <- Entry point
-|   |   +-- handlers/            <- 11 handler files
-|   |   +-- routers/             <- 7 router files
-|   |
-|   +-- circuit_breaker.py       <- Circuit breaker
-|   +-- tests/                   <- Test suite (55 فایل، 249+ test)
-|
-+-- mql5/                        <- کد MetaTrader 5
-+-- supabase/migrations/         <- 30+ SQL migration files
++-- supabase/migrations/         # SQL (30+)
++-- mql5/                        # MQL5 EA code
++-- docker-compose.yml
++-- Dockerfile
++-- requirements.txt
++-- .env.example
 ```
 
 ---
 
-## 📚 ۴. تمام ماژول‌ها، کلاس‌ها و توابع
+## 4. تمام ماژول‌ها <a name="4"></a>
 
-### 4.1 -- backend/core/
+### Core
 
-#### config.py
+| فایل | مسئولیت |
+|------|----------|
+| config.py | تمام تنظیمات از ENV با validation |
+| enums.py | 26 Enum مرکزی |
+| exceptions.py | AppError > Retryable/NonRetryable |
+| interfaces.py | IRiskGate, IOrderBroker, ILotSizer, IAgent |
+| logger.py | JSON structured logging + AuditLogger |
+| retry.py | @async_retry decorator با exponential backoff |
+| deps.py | FastAPI DI |
+| auth.py | JWT decode, TokenPayload |
+
+### Risk (7 Gate)
+
+| فایل | Gate | مسئولیت |
+|------|------|----------|
+| equity_protection.py | 1 | Max Daily/Weekly/Total drawdown |
+| daily_limits.py | 2 | حداکثر معامله + P&L روزانه |
+| volatility_filter.py | 3 | ATR ratio و spread check |
+| news_filter.py | 4 | بلاک 30 دقیقه قبل/بعد اخبار High Impact |
+| correlation_filter.py | 5 | Pearson correlation rolling window |
+| exposure_control.py | 6 | کل ریسک باز به تفکیک ارز |
+| lot_sizing.py | 7 | Kelly Criterion + ATR-adjusted lot |
+| risk_orchestrator.py | Orchestrator | Singleton هماهنگ‌کننده |
+
+### Execution
+
+| فایل | مسئولیت |
+|------|----------|
+| execution_service.py | Pipeline اصلی |
+| mt5_connector.py | Thread-safe asyncio wrapper برای MT5 |
+| order_state_machine.py | FSM: PENDING -> FILLED -> CLOSED |
+| position_reconciliation.py | تطابق با MT5، orphan detection |
+| failure_recovery.py | Retry queue + dead-letter |
+| semi_auto.py | تأیید دستی با timeout 5دقیقه |
+| order_journal.py | Audit trail تمام events |
+
+---
+
+## 5. تمام کلاس‌ها و توابع <a name="5"></a>
+
+### core/exceptions.py
+
 ```python
-class Settings(BaseSettings):
-    APP_NAME: str = "Galaxy Vast AI Trading Platform"
-    APP_VERSION: str = "2.0.0"
-    ENVIRONMENT: str            # "development" | "staging" | "production"
-    DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
-    SUPABASE_URL: str           # REQUIRED
-    SUPABASE_KEY: str           # REQUIRED - service_role key
-    SUPABASE_JWT_SECRET: str    # REQUIRED - min 32 chars
-    JWT_SECRET_KEY: str         # REQUIRED - min 32 chars
-    REDIS_URL: str = "redis://redis:6379/0"
-    MT5_LOGIN: Optional[int]
-    MT5_PASSWORD: Optional[str]
-    MT5_SERVER: Optional[str]
-    DEFAULT_RISK_PERCENT: float = 1.0
-    MAX_LOT_SIZE: float = 10.0
-    MIN_LOT_SIZE: float = 0.01
-    MAX_DAILY_TRADES: int = 20
-    MAX_DAILY_LOSS_PERCENT: float = 3.0
-    MAX_DRAWDOWN_PERCENT: float = 10.0
-    CIRCUIT_BREAKER_FAILURE_THRESHOLD: int = 5
-    CIRCUIT_BREAKER_TIMEOUT_S: int = 300
-    TELEGRAM_BOT_TOKEN: Optional[str]
-    TELEGRAM_ADMIN_IDS: str
-    ALLOWED_ORIGINS: List[str]
+class AppError(Exception)
+    error_code: str
+    http_status: int
+    context: Dict
+    to_dict() -> Dict
 
-def get_settings() -> Settings:
-    """Singleton via @lru_cache. Always use this."""
+class RetryableError(AppError)       # retry می‌شوند
+class NonRetryableError(AppError)    # retry نمی‌شوند
+class OrderSubmissionError(RetryableError)
+class BrokerConnectionError(RetryableError)
+class DatabaseError(RetryableError)
+class OrderDuplicateError(NonRetryableError)   # HTTP 409
+class RiskBlockedError(NonRetryableError)      # HTTP 422
+class CircuitOpenError(NonRetryableError)      # HTTP 503
 ```
 
-#### interfaces.py -- Protocol Definitions
+### core/retry.py
+
 ```python
-class IRiskGate(Protocol):
-    async def check(self, **kwargs) -> Any: ...
-    @property
-    def name(self) -> str: ...
+class RetryStrategy(Enum)
+    FIXED / EXPONENTIAL / LINEAR
 
-class IRiskOrchestrator(Protocol):
-    async def assess(self, inp: Any) -> Any: ...
-    async def check(self, **kwargs) -> Any: ...
-
-class IOrderBroker(Protocol):
-    async def send_order(self, request: Any) -> Any: ...
-    async def close_position(self, ticket: int, volume: float) -> bool: ...
-    async def get_positions(self) -> List[Any]: ...
-    async def health_check(self) -> bool: ...
-    async def initialize(self) -> bool: ...
-    async def shutdown(self) -> None: ...
-
-class IOrderStateMachine(Protocol):
-    async def create_order(self, **kwargs) -> Any: ...
-    async def transition(self, order_id: str, new_state: Any, **meta) -> bool: ...
-    def get_order(self, order_id: str) -> Optional[Any]: ...
-
-class IAgent(Protocol):
-    async def analyze(self, market_data: Dict) -> Any: ...
-    @property
-    def name(self) -> str: ...
-    @property
-    def weight(self) -> float: ...
-```
-
-#### exceptions.py
-```
-AppError
-+-- RetryableError
-|   +-- OrderSubmissionError
-|   +-- BrokerConnectionError
-|   +-- DatabaseError
-+-- NonRetryableError
-    +-- OrderDuplicateError  (409)
-    +-- RiskBlockedError     (422)
-    +-- CircuitOpenError     (503)
-    +-- AuthError            (401)
-    +-- ValidationError      (422)
-    +-- ConfigurationError   (500)
-```
-
-#### logger.py
-```python
-class ContextualLogger:
-    def bind(self, **context) -> "ContextualLogger": ...
-    def info(self, msg: str, **kwargs) -> None: ...
-    def error(self, msg: str, exc_info=False, **kwargs) -> None: ...
-    def warning(self, msg: str, **kwargs) -> None: ...
-
-def get_logger(name: str) -> ContextualLogger:
-    """
-    Usage:
-        logger = get_logger(__name__)
-        logger.info("Order submitted", order_id="uuid", lot=0.1)
-    Output JSON:
-        {"ts":"2026-06-25T13:00:00","level":"INFO",
-         "msg":"Order submitted","order_id":"uuid","lot":0.1}
-    """
-```
-
-#### retry.py
-```python
-class RetryStrategy(Enum):
-    FIXED = "fixed"
-    EXPONENTIAL = "exponential"
-    LINEAR = "linear"
-
-@dataclass
-class RetryConfig:
+class RetryConfig
     max_attempts: int = 3
     base_delay_s: float = 1.0
     max_delay_s: float = 60.0
-    jitter: bool = True
     strategy: RetryStrategy = EXPONENTIAL
     retry_on: tuple = (RetryableError,)
 
-# Pre-built configs
+@async_retry(config: RetryConfig)    # decorator
+await with_retry_async(fn, config)   # programmatic
+
+# Pre-built:
 MT5_RETRY  = RetryConfig(max_attempts=3, base_delay_s=0.5)
 DB_RETRY   = RetryConfig(max_attempts=5, base_delay_s=0.2)
-RISK_RETRY = RetryConfig(max_attempts=2, strategy=FIXED)
-
-@async_retry(MT5_RETRY)
-async def my_function(): ...
-
-await with_retry_async(coro_factory, config=MT5_RETRY, on_retry=cb)
+RISK_RETRY = RetryConfig(max_attempts=2, base_delay_s=0.1)
 ```
 
----
-
-### 4.2 -- backend/risk/
-
-#### risk_orchestrator.py
-```python
-@dataclass
-class RiskInput:
-    symbol: str               # EURUSD
-    direction: str            # "BUY" | "SELL"
-    balance: float            # account balance (USD)
-    stop_loss_pips: float     # SL distance in pips
-    entry_price: float = 0.0
-    stop_loss: float = 0.0
-    equity: float = 0.0
-    current_atr: float = 10.0
-    atr_history: List[float] = []
-    current_spread: float = 0.0
-    avg_spread: float = 0.0
-    open_positions: List[Any] = []
-    today_trades_count: int = 0
-    today_pnl_usd: float = 0.0
-    week_pnl_usd: float = 0.0
-    month_pnl_usd: float = 0.0
-    user_id: str = ""
-    signal_id: str = ""
-    override_risk_pct: Optional[float] = None
-    extra_ctx: Dict[str, Any] = {}  # win_rate, avg_rr ...
-
-@dataclass
-class RiskCheckResult:
-    approved: bool
-    decision: RiskDecision    # APPROVED | BLOCKED | REVIEW
-    block_reason: str
-    risk_percent: float
-    lot_size: float
-    lot_multiplier: float
-    gates_passed: List[str]
-    gates_failed: List[str]
-    metadata: Dict[str, Any]
-    def to_dict(self) -> Dict: ...
-
-class RiskOrchestrator:
-    async def assess(self, inp: RiskInput) -> RiskCheckResult: ...
-    async def check(self, symbol, direction, ...) -> RiskCheckResult: ...
-
-async def get_risk_orchestrator() -> RiskOrchestrator:
-    """Singleton -- double-checked locking. All 7 gates injected."""
-```
-
-#### lot_sizing.py
-```python
-class LotSizer:
-    async def calculate(
-        self,
-        balance: float,           # REQUIRED -- NOT account_balance
-        stop_loss_pips: float,
-        symbol: str,
-        volatility_ratio: float = 1.0,  # NOT lot_multiplier
-        win_rate: float = 0.55,
-        avg_rr: float = 1.5,
-        override_risk_pct: Optional[float] = None,
-    ) -> LotSizingResult: ...
-    # Formula: kelly = W - (1-W)/R; lot = kelly * balance / (sl * pip_value)
-```
-
-#### daily_limits.py
-```python
-@dataclass
-class TodayTrades:
-    trade_count: int
-    pnl_usd: float
-    risk_used_percent: float
-
-class DailyLimitsEngine:
-    def check_limits(
-        self,
-        account_balance: float,   # NOT balance_usd
-        today: TodayTrades,       # TodayTrades dataclass REQUIRED
-        week_pnl_usd: float,
-        month_pnl_usd: float,
-    ) -> DailyCheckResult: ...
-```
-
-#### equity_protection.py
-```python
-class EquityProtectionEngine:
-    # WARNING: check() takes ZERO arguments
-    # Call update_equity() first!
-    def update_equity(self, equity: float, balance: float) -> None: ...
-    def check(self) -> ProtectionCheckResult: ...
-    # drawdown = (high_water_mark - equity) / high_water_mark
-    # if drawdown > MAX_DRAWDOWN -> can_trade=False
-```
-
-#### volatility_filter.py
-```python
-class VolatilityFilter:
-    def check(
-        self,
-        current_atr: float,       # POSITIONAL -- first arg
-        atr_history=None,         # NOT price_distance or entry_price
-        current_spread: float = 0.0,
-        avg_spread: float = 0.0,
-        symbol: str = "",
-    ) -> VolatilityCheckResult: ...
-    def load_news_events(self, events: List[NewsEvent]) -> None:
-        # events must be from backend.risk.news_filter.NewsEvent
-```
-
-#### correlation_filter.py
-```python
-class CorrelationFilter:
-    async def check(
-        self,
-        new_symbol: str,           # NOT "symbol"
-        new_direction: str,        # NOT "direction"
-        open_positions: List[CorrPosition],
-        base_risk_percent: float,
-    ) -> CorrelationCheckResult: ...
-```
-
----
-
-### 4.3 -- backend/execution/
-
-#### execution_service.py
-```python
-class ExecutionService:
-    def __init__(
-        self,
-        broker: IOrderBroker,
-        risk: IRiskOrchestrator,
-        osm: IOrderStateMachine,
-        fr: IFailureRecovery,
-        pr: Any,  # PositionReconciliation
-    ): ...
-
-    async def start(self) -> None:
-        # Must be called before execute_signal()
-        # Wires: MT5.initialize() -> OSM.start() -> FR.start()
-        #   -> PR.set_mt5(self._mt5) -> PR.start()
-
-    async def execute_signal(self, signal: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        signal fields:
-          signal_id (REQUIRED), symbol (REQUIRED), direction (REQUIRED)
-          entry_price, stop_loss, take_profit, stop_loss_pips
-          balance, equity, current_atr, lot_size (override)
-          today_trades_count, today_pnl_usd, week_pnl_usd, month_pnl_usd
-          user_id, win_rate, avg_rr
-
-        Returns:
-          status: "FILLED" | "BLOCKED" | "ERROR"
-          order_id, ticket, lot_size, risk_percent, fill_latency_ms
-        """
-```
-
-#### order_state_machine.py
-```python
-class OrderState(Enum):
-    PENDING   = "PENDING"    # created
-    SUBMITTED = "SUBMITTED"  # sent to MT5
-    FILLED    = "FILLED"     # confirmed by broker
-    CLOSING   = "CLOSING"    # being closed
-    CLOSED    = "CLOSED"     # closed
-    CANCELLED = "CANCELLED"  # cancelled
-    ERROR     = "ERROR"      # error
-
-# Valid transitions:
-# PENDING -> SUBMITTED | CANCELLED | ERROR
-# SUBMITTED -> FILLED | ERROR
-# FILLED -> CLOSING | CLOSED
-# CLOSING -> CLOSED | ERROR
-```
-
----
-
-### 4.4 -- backend/agents/
+### core/logger.py
 
 ```python
-@dataclass
-class AgentVote:
-    agent_name: str
-    direction: str         # "BUY" | "SELL" | "HOLD"
-    confidence: float      # 0.0 - 1.0
-    reasoning: str
-    metadata: Dict[str, Any]
+class ContextualLogger
+    bind(**kwargs) -> ContextualLogger
+    debug/info/warning/error/critical(msg, **kwargs)
 
-class BaseAgent(ABC):
-    @property
-    @abstractmethod
-    def name(self) -> str: ...
-    @property
-    def weight(self) -> float: return 1.0  # override for different weights
-    @abstractmethod
-    async def analyze(self, market_data: Dict) -> AgentVote: ...
+class AuditLogger
+    record(action, actor, resource, result, **meta)
 
-@dataclass
-class VoteResult:
-    decision: str          # "BUY" | "SELL" | "HOLD" | "BLOCKED"
-    confidence: float      # 0.0 - 1.0
-    votes_buy: int
-    votes_sell: int
-    votes_hold: int
-    reasoning: str
-    agent_votes: List[Dict]
-    def to_dict(self) -> Dict: ...
+get_logger(name) -> ContextualLogger
+get_audit_logger() -> AuditLogger
 
-class VotingEngine:
-    async def vote(self, market_data: Dict) -> VoteResult:
-        """Runs all agents in parallel via asyncio.gather."""
+# Usage:
+log = get_logger(__name__)
+log.info("Order submitted", order_id="ORD-1", symbol="EURUSD", lot=0.05)
+# JSON: {"ts":"...","level":"INFO","msg":"Order submitted","order_id":"ORD-1",...}
 ```
 
----
-
-### 4.5 -- circuit_breaker.py
+### circuit_breaker.py
 
 ```python
-class CircuitState(Enum):
-    CLOSED = "CLOSED"      # normal
-    OPEN = "OPEN"          # halted
-    HALF_OPEN = "HALF_OPEN" # probing
+class BreakerState(Enum)
+    CLOSED / OPEN / HALF_OPEN
 
-# Algorithm:
-# 5 failures in 60s -> OPEN
-# After 300s -> HALF_OPEN
-# 2 successes -> CLOSED
-# Any failure in HALF_OPEN -> OPEN (reset timer)
+class BreakerConfig
+    failure_threshold: int = 5
+    window_seconds: float = 60.0
+    reset_timeout_s: float = 120.0
+    success_threshold: int = 2
 
-async def get_mt5_breaker() -> CircuitBreaker: ...  # singleton
-async def halt_trading(reason: str) -> None: ...    # manual halt
-async def resume_trading() -> None: ...             # manual resume
+class CircuitBreaker
+    can_execute() -> bool
+    record_success()
+    record_failure(reason)
+    force_open(reason) / force_close(reason)
+    snapshot() -> Dict
+    add_on_open(callback) / add_on_close(callback)
+
+halt_trading(reason: str)
+resume_trading(reason: str)
+is_trading_halted() -> bool
 ```
 
----
+### execution/execution_service.py
 
-### 4.6 -- api/health.py
+```python
+class ExecutionService
+    __init__(risk, broker, osm, fr, pr, semi_auto, metrics)
+    start() / stop()
+    execute_signal(signal: Dict) -> Dict
+    _pipeline(signal, signal_id, log)
+    _run_risk(signal, log) -> Dict
+    _create_order(signal, risk_result) -> ManagedOrder
+    _submit(order) -> Dict
+```
+
+### execution/order_state_machine.py
+
+```python
+class OrderState(Enum)
+    PENDING / SUBMITTED / FILLED / PARTIAL
+    CLOSING / CLOSED / REJECTED / CANCELLED / ERROR
+
+# Valid Transitions:
+# PENDING    -> SUBMITTED, CANCELLED, ERROR
+# SUBMITTED  -> FILLED, PARTIAL, REJECTED, ERROR
+# FILLED     -> CLOSING, CLOSED, ERROR
+# CLOSING    -> CLOSED, ERROR
+
+class ManagedOrder
+    order_id, signal_id, symbol, direction
+    lot_size, stop_loss, take_profit
+    state: OrderState
+    created_at: datetime
+
+class OrderStateMachine
+    transition(order_id, to_state) -> bool
+    get_order(order_id) -> Optional[ManagedOrder]
+    start() / stop()
+```
+
+### agents/voting_engine.py
+
+```python
+class VoteDecision(Enum)
+    BUY / SELL / HOLD / BLOCK
+
+class VoteResult
+    decision: VoteDecision
+    confidence: float
+    final_confidence() -> float
+    passed_threshold(min_conf) -> bool
+    blocking_agents() -> List[str]
+    to_dict() -> Dict
+
+class VotingEngine
+    vote(context: Dict) -> VoteResult
+    update_weights(weight_map: Dict)
+    enable_agent(name) / disable_agent(name)
+    get_weights() -> Dict
+```
+
+### intelligence/ml_engine.py
+
+```python
+class MLEngine
+    predict(features: Dict) -> MLPrediction
+    train(contexts: List) -> TrainingResult
+    async_train(contexts) / async_predict(features)
+    save_models() / load_models()
+    is_trained() -> bool
+
+class ConceptDriftDetector
+    update(value: float)
+    drift_score() -> float
+    reset()
+
+class UnifiedMLEngine      # v2 با drift detection
+    should_retrain() -> bool
+    get_drift_info() -> Dict
+```
+
+### api/health.py
 
 ```
-GET /health          -> {"status": "healthy"}   # liveness
-GET /health/ready    -> {"status": "ready"}      # readiness
-GET /health/deep     -> {
-    status: "healthy" | "degraded" | "unhealthy",
-    components: {
-        database:          {status: "up", latency_ms: 5},
-        redis:             {status: "up", latency_ms: 2},
-        mt5_connector:     {status: "up" | "down"},
-        risk_engine:       {status: "up"},
-        circuit_breaker:   {status: "CLOSED" | "OPEN"},
-        equity_protection: {status: "ACTIVE" | "HALTED"},
-    }
+GET /health        liveness  (Kubernetes probe)
+GET /health/ready  readiness (Kubernetes probe)
+GET /health/deep   full system check
+
+# Response:
+{
+  "status": "healthy",
+  "components": {
+    "database": {"status": "healthy", "latency_ms": 3.2},
+    "redis":    {"status": "healthy", "latency_ms": 0.8},
+    "mt5":      {"status": "healthy", "latency_ms": 12.1},
+    "risk":     {"status": "healthy", "latency_ms": 0.1}
+  },
+  "uptime_s": 3600.5
 }
 ```
 
 ---
 
-## 🔧 ۵. نحوه نصب
+## 6. نحوه نصب <a name="6"></a>
 
 ### پیش‌نیازها
 
 ```
-Python >= 3.11
-Docker >= 24.0
-Docker Compose >= 2.20
-Git >= 2.40
-Redis >= 7.0 (for local dev without Docker)
+Python     3.11+
+Docker     24.0+
+Docker Compose  2.20+
+MetaTrader 5    (فقط Windows)
+Supabase account (رایگان کافی است)
 ```
 
-### گام ۱ -- Clone
+### گام 1: دریافت کد
 
 ```bash
 git clone https://github.com/sani13790000/bot12.git
 cd bot12
 ```
 
-### گام ۲ -- تنظیم Environment
+### گام 2: تنظیم متغیرها
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-**فیلدهای اجباری:**
-```env
-SUPABASE_URL=https://your-project.supabase.co
+حداقل **الزامی**:
+
+```bash
+SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=min-32-chars-secret
-JWT_SECRET_KEY=min-32-chars-secret  # generate: python -c "import secrets; print(secrets.token_hex(32))"
-MT5_LOGIN=12345678
-MT5_PASSWORD=your-password
-MT5_SERVER=YourBroker-Real
+SUPABASE_JWT_SECRET=your-jwt-secret
+JWT_SECRET_KEY=...     # python3 -c "import secrets; print(secrets.token_hex(32))"
+TELEGRAM_BOT_TOKEN=123456789:ABC-...
+TELEGRAM_ADMIN_IDS=123456789
+MQL5_API_TOKEN=your-secure-token
 ```
 
-### گام ۳ -- نصب Dependencies
+### گام 3: نصب وابستگی‌ها
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+python3 -m venv venv
+source venv/bin/activate    # Linux/Mac
 pip install -r requirements.txt
-python -c "import fastapi, pydantic, supabase; print('OK')"
 ```
 
-### گام ۴ -- Database Migrations
+### گام 4: Migration دیتابیس
 
 ```bash
-npm install -g supabase
-supabase db push --project-ref YOUR_REF
+supabase db push
+# یا فایل‌های supabase/migrations/ را مرتب در SQL Editor اجرا کنید
 ```
 
-### گام ۵ -- تایید Setup
+### گام 5: تأیید نصب
 
 ```bash
-PYTHONPATH=. python startup_check.py
-# -> System ready to start.
+python3 -c "from backend.core.config import get_settings; print('OK:', get_settings().ENVIRONMENT)"
 ```
 
 ---
 
-## 🚀 ۶. نحوه اجرا
+## 7. نحوه اجرا <a name="7"></a>
 
 ### Docker Compose (توصیه‌شده)
 
 ```bash
-# Development
-docker compose up --build
-
-# Production
-docker compose -f docker-compose.prod.yml up -d
-
-# Logs
-docker compose logs -f api
-
-# Stop
-docker compose down
+docker-compose up --build -d
+docker-compose ps
+docker-compose logs -f api
+docker-compose down
 ```
 
-### اجرای مستقیم Python
+### Python مستقیم
 
 ```bash
-# API
-PYTHONPATH=. uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Telegram Bot
-PYTHONPATH=. python -m backend.telegram.bot
+uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
+python3 -m backend.telegram.bot
+streamlit run backend/dashboard/app.py --server.port 8501
 ```
 
-### تایید اجرا
+### تأیید
 
 ```bash
-curl http://localhost:8000/health
-# -> {"status":"healthy","version":"2.0.0"}
-
-curl -s http://localhost:8000/health/deep | python -m json.tool
+curl http://localhost:8000/health/deep | python3 -m json.tool
+# http://localhost:8000/docs   Swagger UI
+# http://localhost:8501        Dashboard
 ```
 
 ---
 
-## 🔐 ۷. متغیرهای ENV
+## 8. تنظیمات سیستم <a name="8"></a>
+
+### حساب‌های کوچک (< $1,000)
 
 ```env
-# APP
-ENVIRONMENT=production      # development | staging | production
-DEBUG=false
-LOG_LEVEL=INFO              # DEBUG | INFO | WARNING | ERROR
-
-# DATABASE -- REQUIRED
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=service_role_key  # NOT anon key!
-SUPABASE_JWT_SECRET=32+chars
-
-# JWT -- REQUIRED
-JWT_SECRET_KEY=32+chars
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=30
-
-# REDIS
-REDIS_URL=redis://redis:6379/0
-REDIS_PASSWORD=changeme
-REDIS_MAX_CONNECTIONS=20
-
-# MT5 TRADING
-MT5_LOGIN=12345678
-MT5_PASSWORD=pass
-MT5_SERVER=Broker-Real
-MT5_TIMEOUT_SECONDS=30
-
-# RISK
-DEFAULT_RISK_PERCENT=1.0
-MAX_LOT_SIZE=10.0
-MIN_LOT_SIZE=0.01
-MAX_DAILY_TRADES=20
-MAX_DAILY_LOSS_PERCENT=3.0
-MAX_DRAWDOWN_PERCENT=10.0
-MAX_EXPOSURE_PERCENT=20.0
-INITIAL_ACCOUNT_BALANCE=10000.0
-
-# CIRCUIT BREAKER
-CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
-CIRCUIT_BREAKER_TIMEOUT_S=300
-
-# TELEGRAM
-TELEGRAM_BOT_TOKEN=123:token
-TELEGRAM_ADMIN_IDS=123456,789012
-
-# CORS
-ALLOWED_ORIGINS=https://yourdomain.com
-
-# ML
-BACKTEST_MAX_WORKERS=4
-DRIFT_THRESHOLD=0.1
-SEMI_AUTO_PENDING_TTL_S=300
-```
-
----
-
-## ⚙️ ۸. تنظیمات سیستم
-
-### حساب کوچک (< $10,000)
-```env
-DEFAULT_RISK_PERCENT=0.5
-MAX_LOT_SIZE=1.0
 MAX_DAILY_TRADES=5
-MAX_DAILY_LOSS_PERCENT=1.5
-MAX_DRAWDOWN_PERCENT=5.0
+MAX_DAILY_LOSS_PCT=3.0
+RISK_PER_TRADE_PCT=0.5
+MAX_LOT_SIZE=0.1
+VOTING_THRESHOLD=0.75
 ```
 
-### حساب متوسط ($10k-$100k)
+### حساب‌های متوسط ($1,000-$10,000)
+
 ```env
-DEFAULT_RISK_PERCENT=1.0
-MAX_LOT_SIZE=5.0
-MAX_DAILY_TRADES=15
-MAX_DRAWDOWN_PERCENT=8.0
+MAX_DAILY_TRADES=10
+MAX_DAILY_LOSS_PCT=5.0
+RISK_PER_TRADE_PCT=1.0
+MAX_LOT_SIZE=1.0
+VOTING_THRESHOLD=0.65
 ```
 
-### حساب بزرگ (> $100,000)
+### حساب‌های بزرگ (> $10,000)
+
 ```env
-DEFAULT_RISK_PERCENT=0.5  # کمتر برای سرمایه بزرگ
-MAX_LOT_SIZE=50.0
-MAX_DAILY_TRADES=30
-MAX_DRAWDOWN_PERCENT=6.0
+MAX_DAILY_TRADES=20
+MAX_DAILY_LOSS_PCT=3.0
+RISK_PER_TRADE_PCT=0.5
+MAX_LOT_SIZE=10.0
+VOTING_THRESHOLD=0.70
 ```
 
 ---
 
-## 🐳 ۹. Docker
+## 9. متغیرهای محیطی ENV <a name="9"></a>
+
+### App
+| متغیر | پیش‌فرض | توضیح |
+|-------|---------|-------|
+| ENVIRONMENT | production | development/staging/production |
+| DEBUG | false | debug mode |
+| LOG_LEVEL | INFO | DEBUG/INFO/WARNING/ERROR |
+
+### Supabase (الزامی)
+| SUPABASE_URL | آدرس پروژه |
+| SUPABASE_KEY | service_role key |
+| SUPABASE_JWT_SECRET | JWT secret |
+
+### JWT (الزامی)
+| JWT_SECRET_KEY | حداقل 64 کاراکتر hex |
+| ACCESS_TOKEN_EXPIRE_MINUTES | 30 |
+| REFRESH_TOKEN_EXPIRE_DAYS | 30 |
+
+### Redis
+| REDIS_URL | redis://redis:6379/0 |
+| REDIS_PASSWORD | changeme_redis |
+| REDIS_MAX_CONNECTIONS | 20 |
+
+### Telegram (الزامی)
+| TELEGRAM_BOT_TOKEN | توکن @BotFather |
+| TELEGRAM_ADMIN_IDS | ID ادمین‌ها با کاما |
+
+### MT5
+| MQL5_API_TOKEN | توکن EA |
+| MT5_PATH | مسیر terminal64.exe |
+| MT5_TIMEOUT_SECONDS | 30 |
+
+### ریسک
+| RISK_PER_TRADE_PCT | 1.0 | درصد ریسک |
+| MAX_DAILY_TRADES | 10 | حد روزانه |
+| MAX_DAILY_LOSS_PCT | 5.0 | حد ضرر % |
+| MAX_WEEKLY_LOSS_PCT | 10.0 | حد ضرر هفتگی |
+| MAX_TOTAL_DRAWDOWN_PCT | 20.0 | حد drawdown کل |
+| VOTING_THRESHOLD | 0.65 | حداقل confidence |
+
+> **هشدار:** هرگز از * در ALLOWED_ORIGINS استفاده نکنید - سیستم startup را متوقف می‌کند.
+
+---
+
+## 10. Docker و Docker Compose <a name="10"></a>
+
+### سرویس‌ها
+
+| سرویس | پورت | RAM | توضیح |
+|-------|------|-----|-------|
+| api | 8000 | 2G | FastAPI backend |
+| redis | 6379 | 768M | Cache + Rate Limiting |
+| telegram_bot | - | 512M | ربات aiogram |
+| dashboard | 8501 | 1G | Streamlit |
+| frontend | 3000 | 256M | UI |
+
+### دستورات
 
 ```bash
-# Build
-docker compose build
-docker compose build --no-cache api
-
-# Run
-docker compose up -d
-docker compose logs -f api
-docker compose exec api bash
-docker compose restart api
-docker compose down -v
+# اجرا
+docker-compose up --build -d
+# وضعیت
+docker-compose ps
+# لاگ
+docker-compose logs -f api
+# restart
+docker-compose restart api
+# توقف
+docker-compose down
+docker-compose down -v    # + حذف volumes
+# resource usage
 docker stats
 ```
 
-### Dockerfile highlights
-
-```
-Multi-stage: builder (gcc + pip install) -> runtime (slim)
-Non-root user: galaxyvast
-Healthcheck: curl /health every 30s
-EXPOSE 8000
-CMD: uvicorn with 2 workers + graceful shutdown 30s
-```
-
 ---
 
-## 🔄 ۱۰. CI/CD
+## 11. CI/CD Pipeline <a name="11"></a>
 
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on:
+  push:
+    branches: [main, develop]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: pip install -r requirements.txt
+      - run: OTEL_SDK_DISABLED=true pytest backend/tests/ --cov=backend -q
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install bandit && bandit -r backend/ -ll -x backend/tests/
 ```
-Push to main/develop
-    |
-    v
-[backend] ruff + mypy + pytest + bandit + pip-audit
-    |
-    v
-[docker-build] build api + bot images
-    |
-    v (only main or tag)
-[deploy] staging (auto) | production (manual approval)
-```
+
+### بررسی لوکل
 
 ```bash
-# Local checks
-ruff check backend/ --select=E,W,F,I --ignore=E501
-mypy backend/ --ignore-missing-imports
 OTEL_SDK_DISABLED=true pytest backend/tests/ -q
-bandit -r backend/ -ll
-pip-audit --requirement requirements.txt
+python3 -m py_compile backend/core/config.py
+pip install bandit && bandit -r backend/ -ll -x backend/tests/
 ```
 
 ---
 
-## 👨‍💻 ۱۱. نحوه توسعه
+## 12. نحوه توسعه <a name="12"></a>
 
 ### اضافه کردن Agent جدید
 
 ```python
-# backend/agents/momentum_agent.py
-from backend.agents.base_agent import BaseAgent, AgentVote
+# backend/agents/my_agent.py
+from backend.agents.base_agent import BaseAgent, VoteResult, VoteSignal
 
-class MomentumAgent(BaseAgent):
+class MyAgent(BaseAgent):
     @property
-    def name(self) -> str: return "momentum_agent"
-    @property
-    def weight(self) -> float: return 1.2
+    def agent_id(self): return "my_agent"
 
-    async def analyze(self, market_data: Dict) -> AgentVote:
-        rsi = market_data.get("rsi", 50.0)
-        macd = market_data.get("macd", 0.0)
-        if rsi < 30 and macd > 0:
-            return AgentVote(self.name, "BUY", 0.75, f"RSI={rsi:.0f}+MACD+", {})
-        elif rsi > 70 and macd < 0:
-            return AgentVote(self.name, "SELL", 0.75, f"RSI={rsi:.0f}+MACD-", {})
-        return AgentVote(self.name, "HOLD", 0.5, "No momentum", {})
+    @property
+    def weight(self): return 0.10
+
+    async def _analyze(self, context: dict) -> VoteResult:
+        score = 0.6  # منطق تحلیل شما
+        signal = VoteSignal.BUY if score > 0.7 else \
+                 VoteSignal.SELL if score < 0.3 else VoteSignal.HOLD
+        return VoteResult(
+            agent_id=self.agent_id,
+            signal=signal,
+            confidence=min(abs(score-0.5)*2, 1.0),
+            reason=f"score={score:.2f}"
+        )
 ```
 
 ### اضافه کردن Route جدید
@@ -980,376 +753,315 @@ class MomentumAgent(BaseAgent):
 ```python
 # backend/api/routes/my_route.py
 from fastapi import APIRouter, Depends
-from backend.core.auth import require_auth
-
-router = APIRouter(prefix="/my-feature", tags=["My Feature"])
+from backend.core.deps import get_current_user
+router = APIRouter(prefix="/my-feature", tags=["my-feature"])
 
 @router.get("/status")
-async def get_status(user=Depends(require_auth)):
-    return {"status": "OK"}
+async def get_status(user=Depends(get_current_user)):
+    return {"status": "ok"}
 
-# Register in main.py:
-# from backend.api.routes import my_route
-# app.include_router(my_route.router, prefix="/api/v1")
+# در main.py:
+app.include_router(my_router, prefix="/api/v1")
 ```
 
 ### استانداردهای کد
 
 ```python
-# Always: from __future__ import annotations
-# Always: full type hints
-# Always: structured logging (not f-strings)
-# Always: AppError subclass (not Exception)
+# همیشه type hints
+from typing import Optional, Dict, Any, List
 
-logger.info("Order submitted", order_id=oid, symbol=sym, lot=lot)  # CORRECT
-logger.info(f"Order {oid} submitted")                              # WRONG
-
-raise RiskBlockedError("High ATR", context={"atr": 45, "thr": 30}) # CORRECT
-raise Exception("error")                                           # WRONG
+# از get_logger استفاده کنید
+from backend.core.logger import get_logger
+log = get_logger(__name__)
+log.info("event", key=value)    # structured
 ```
 
 ---
 
-## 🔍 ۱۲. نحوه دیباگ
+## 13. نحوه دیباگ <a name="13"></a>
+
+### لاگ‌ها
 
 ```bash
-# Logs
-docker compose logs -f api
-docker compose logs api | grep '"level":"ERROR"'
+docker-compose logs -f api
+docker-compose logs api | grep '"level":"ERROR"'
+docker-compose logs api | grep 'signal_id.*SIG-123'
+```
 
-# Debug mode
-# .env: ENVIRONMENT=development, DEBUG=true, LOG_LEVEL=DEBUG
-uvicorn backend.api.main:app --reload --log-level debug
+### Debug Mode
 
-# System status
-curl -s http://localhost:8000/health/deep | python -m json.tool
-curl -s http://localhost:8000/api/v1/risk/circuit-breaker/status
-curl -s http://localhost:8000/metrics | grep galaxy_vast
+```env
+ENVIRONMENT=development
+DEBUG=true
+LOG_LEVEL=DEBUG
+```
 
-# Common issues
-# Circuit breaker OPEN:
-curl -X POST http://localhost:8000/api/v1/risk/circuit-breaker/reset \
-  -H "Authorization: Bearer ADMIN_TOKEN"
+### بررسی وضعیت
 
-# Telegram conflict:
-docker compose restart telegram_bot
+```bash
+curl http://localhost:8000/health/deep
+curl http://localhost:8000/api/v1/risk/circuit-breaker/status
+curl http://localhost:8000/api/v1/observability/metrics/snapshot
+```
 
-# MT5 not connected:
-curl http://localhost:8000/health/deep | python -m json.tool | grep mt5
+### دیباگ Python
+
+```python
+import asyncio
+from backend.core.deps import get_execution_service
+
+async def debug():
+    svc = get_execution_service()
+    result = await svc.execute_signal({
+        "signal_id": "DEBUG-001",
+        "symbol": "EURUSD",
+        "direction": "BUY",
+        "entry_price": 1.0850,
+        "stop_loss": 1.0830,
+        "take_profit": 1.0890,
+    })
+    print(result)
+
+asyncio.run(debug())
 ```
 
 ---
 
-## 💾 ۱۳. نحوه بکاپ
+## 14. نحوه بکاپ <a name="14"></a>
 
 ```bash
-# Database
-pg_dump "postgresql://postgres:[PASS]@db.[PROJECT].supabase.co:5432/postgres" \
-  --no-owner --no-acl -F c -f backup_$(date +%Y%m%d).dump
+# مدل‌ها
+docker-compose exec api tar -czf /tmp/models.tar.gz /app/models/
+docker cp $(docker-compose ps -q api):/tmp/models.tar.gz ./backups/
 
 # Redis
-docker compose exec redis redis-cli -a "${REDIS_PASSWORD}" SAVE
-docker compose cp redis:/data/dump.rdb ./backups/redis_$(date +%Y%m%d).rdb
+docker-compose exec redis redis-cli -a changeme_redis BGSAVE
 
-# Models
-tar -czf models_$(date +%Y%m%d).tar.gz ./models/
-
-# Cron (daily 2am)
-0 2 * * * /path/to/scripts/backup.sh
+# اسکریپت خودکار - crontab
+0 3 * * * /path/to/scripts/backup.sh >> /var/log/backup.log 2>&1
 ```
 
 ---
 
-## 🔄 ۱۴. نحوه آپدیت
+## 15. نحوه آپدیت <a name="15"></a>
 
 ```bash
-# Standard update
+# 1. کد جدید
 git pull origin main
-pip install -r requirements.txt
-supabase db push --project-ref YOUR_REF
-docker compose build api && docker compose up -d api
+
+# 2. rebuild
+docker-compose build api
+
+# 3. راه‌اندازی
+docker-compose up -d
+
+# 4. تأیید
 curl http://localhost:8000/health/deep
 
 # Rollback
 git log --oneline -10
-git checkout [COMMIT_SHA]
-docker compose build api && docker compose up -d api
+git checkout [HASH]
+docker-compose build api && docker-compose up -d
 ```
 
 ---
 
-## 🤖 ۱۵. آموزش مدل‌های ML
+## 16. نحوه آموزش مدل‌های ML <a name="16"></a>
 
 ### Pipeline
 
 ```
-DB Trades -> TradeDatasetGenerator -> FeaturePipeline (50+ features)
--> TrainingPipeline (walk-forward, 12 folds)
--> ModelManager (versioning, LRU cache)
--> PredictionService (async, thread-safe)
+معاملات بسته‌شده
+       |
+Feature Extraction (8 feature: atr, spread, smc_score, win_rate_7d, ...)
+       |
+Walk-Forward Cross-Validation (5 fold)
+       |
+XGBoost + Logistic Regression
+       |
+CalibratedClassifierCV
+       |
+Concept Drift Detection (ADWIN)
+       |
+UnifiedMLEngine (production)
 ```
 
-### Features
+### شرایط آموزش خودکار (هر 60 دقیقه)
 
-| دسته | Features |
-|------|----------|
-| Price | OHLCV, Returns, Log returns |
-| Technical | RSI, MACD, BB, ATR, EMA(9,21,50,200) |
-| SMC | Order blocks, FVG, Liquidity, BOS, ChoCH |
-| Session | London/NY/Tokyo/Overlap |
-| Volatility | ATR ratio, Spread ratio |
-| Time | Hour, Day, Month |
+```
+1. حداقل 50 معامله جدید
+2. Drift score > آستانه
+3. دقت < 55% در 7 روز اخیر
+4. force_retrain() فراخوانی شده
+```
 
 ### آموزش دستی
 
 ```bash
-# Via API
-curl -X POST http://localhost:8000/api/v1/self-learning/train \
-  -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{"model_type":"xgboost","lookback_days":90,"min_trades":100}'
+# API
+curl -X POST http://localhost:8000/api/v1/learning/force-retrain \
+  -H "Authorization: Bearer ADMIN_TOKEN"
 
-# Via Python
-python -c "
-import asyncio
-from backend.self_learning.training_pipeline import TrainingPipeline
-from backend.self_learning.trade_dataset_generator import TradeDatasetGenerator
-
-async def main():
-    gen = TradeDatasetGenerator()
-    dataset = await gen.generate(lookback_days=90)
-    print(f'Dataset: {len(dataset)} samples')
-    result = await TrainingPipeline().train(dataset)
-    print(f'Accuracy: {result.accuracy:.2%}')
-asyncio.run(main())
-"
+# بررسی عملکرد
+curl http://localhost:8000/api/v1/learning/stats
 ```
 
 ---
 
-## 🔗 ۱۶. اتصال به صرافی‌ها و بروکرها
+## 17. نحوه اتصال بروکرها <a name="17"></a>
 
 ### MetaTrader 5
 
-```bash
-# .env
-MT5_LOGIN=12345678
-MT5_PASSWORD=your-password
-MT5_SERVER=YourBroker-Real
-
-# Test connection
-curl http://localhost:8000/health/deep | python -m json.tool | grep -A3 mt5
+```
+1. نصب MT5 از https://www.metatrader5.com
+2. تنظیم .env: MT5_PATH + MQL5_API_TOKEN
+3. کپی mql5/GalaxyVastEA.mq5 در پوشه MQL5\Experts
+4. در MetaEditor: F7 (Compile)
+5. دراگ EA به نمودار:
+   - API_URL: http://YOUR_SERVER:8000
+   - API_TOKEN: مقدار MQL5_API_TOKEN
+   - MAGIC_NUMBER: عدد منحصربه‌فرد
 ```
 
-### MQL5 EA -- ارسال سیگنال
-
-```mql5
-// In your EA:
-string body = StringFormat(
-    "{\"signal_id\":\"%s\",\"symbol\":\"%s\",\"direction\":\"%s\","
-    "\"entry_price\":%.5f,\"stop_loss\":%.5f,\"take_profit\":%.5f}",
-    signal_id, Symbol(), direction, entry, sl, tp
-);
-WebRequest("POST", api_url+"/api/v1/signals",
-           "Content-Type: application/json\r\nAuthorization: Bearer "+key,
-           0, body, response, error);
-```
-
-### اضافه بروکر غیر-MT5
+### بروکر سفارشی
 
 ```python
-class MyBrokerConnector:
-    # Implement IOrderBroker protocol:
-    async def initialize(self) -> bool: ...
-    async def shutdown(self) -> None: ...
+# IOrderBroker Protocol را پیاده‌سازی کنید:
+class MyBroker:
+    async def send_order(self, request) -> MT5OrderResult: ...
+    async def get_positions(self) -> list: ...
+    async def close_position(self, ticket, ...) -> MT5OrderResult: ...
     async def health_check(self) -> bool: ...
-    async def send_order(self, request) -> Any: ...
-    async def close_position(self, ticket, volume) -> bool: ...
-    async def get_positions(self) -> List: ...
-
-# Use:
-service = ExecutionService(broker=MyBrokerConnector(), ...)
 ```
 
 ---
 
-## 🛡️ ۱۷. مدیریت ریسک
+## 18. مدیریت ریسک <a name="18"></a>
 
-### ۷ لایه ریسک
+### 7 Gate ریسک
 
 ```
-Gate 1 - Daily Limits:
-  max_daily_trades (20) | max_daily_loss% (3%) | weekly/monthly limits
-
-Gate 2 - Equity Protection:
-  drawdown = (HWM - equity) / HWM
-  if drawdown > 10% -> HALT
-
-Gate 3 - Volatility Filter:
-  ATR check | spread check | news blocking (NFP/CPI/FOMC)
-
-Gate 4 - Correlation Filter:
-  new_symbol vs open_positions correlation < threshold
-  e.g. EURUSD+GBPUSD both BUY -> corr 0.85 -> BLOCKED
-
-Gate 5 - Exposure Control:
-  sum(risk of all open positions) < MAX_EXPOSURE% (20%)
-
-Gate 6 - Portfolio Risk:
-  VAR | concentration | direction bias
-
-Gate 7 - Lot Sizing (Kelly):
-  f* = W - (1-W)/R
-  blend = f* x 0.25 + fixed x 0.75 (conservative)
-  lot = blend * balance / (sl_pips * pip_value)
+سیگنال دریافت شد
+  |
+[Gate 1] EquityProtection   drawdown بیش از حد?
+[Gate 2] DailyLimits        تعداد معامله بیش از حد?
+[Gate 3] VolatilityFilter   ATR/spread بیش از حد?
+[Gate 4] NewsFilter         خبر High Impact در 30دق?
+[Gate 5] CorrelationFilter  همبستگی > 0.7?
+[Gate 6] ExposureControl    کل ریسک > حد?
+[Gate 7] LotSizer           محاسبه Kelly+ATR
+  |
+اجرا مجاز است
 ```
 
 ### Circuit Breaker
 
 ```
-CLOSED -> [5 fails/60s] -> OPEN -> [300s] -> HALF_OPEN -> [2 success] -> CLOSED
-                                              HALF_OPEN -> [fail] -> OPEN (reset)
+CLOSED  --[5 خطا/60s]--> OPEN (halt)
+  ^                              |
+  |        [120s انتظار]      |
+  |              v              |
+  +--[موفق]-- HALF_OPEN <------+
 ```
 
-### کنترل دستی
+### کنترل از API
 
 ```bash
-# Halt
-curl -X POST http://localhost:8000/api/v1/risk/circuit-breaker/halt \
-  -H "Authorization: Bearer ADMIN_TOKEN" -d '{"reason":"Manual halt"}'
+# توقف
+docker-compose exec api curl -X POST localhost:8000/api/v1/risk/circuit-breaker/halt \
+  -d '{"reason":"manual halt"}'
+# از سرگیری
+curl -X POST localhost:8000/api/v1/risk/circuit-breaker/reset
+```
 
-# Resume
-curl -X POST http://localhost:8000/api/v1/risk/circuit-breaker/reset \
-  -H "Authorization: Bearer ADMIN_TOKEN"
+### Semi-Auto Mode
 
-# Telegram
-/halt    <- stop trading
-/resume  <- continue
-/status  <- full status
-/set_risk 0.5
+```bash
+# سیگنال‌های در انتظار
+curl http://localhost:8000/api/v1/signals/pending
+# تأیید (تا 5 دقیقه فرصت)
+curl -X POST http://localhost:8000/api/v1/signals/SIG-123/approve
 ```
 
 ---
 
-## 🚨 ۱۸. راهنمای رفع خطا
+## 19. راهنمای رفع خطا <a name="19"></a>
+
+### خطاهای رایج
 
 | خطا | علت | راه‌حل |
 |-----|-----|--------|
-| `RuntimeError: no running event loop` | asyncio.Lock() در import time | lazy init pattern |
-| `ImportError: No module named backend.X` | PYTHONPATH تنظیم نیست | `export PYTHONPATH=.` |
-| `Circuit Breaker OPEN` | شکست‌های متوالی | بررسی logs + reset |
-| `Equity Protection HALTED` | drawdown بیش از حد | بستن موقعیت‌ها یا reset |
-| `Duplicate order` | signal_id قبلاً execute شده | این feature است -- signal_id جدید |
-| `Daily limit reached` | حد روزانه | فردا ادامه دهید |
-| `MT5 not connected` | MT5 Terminal خاموش | restart MT5 |
-| `Telegram conflict` | دو instance از bot | `docker compose restart telegram_bot` |
-| `Redis connection refused` | Redis down است | `docker compose restart redis` |
-| `JWT token expired` | توکن منقضی شده | دوباره login |
+| RuntimeError: no running event loop | asyncio.Lock در import time | lazy init بنویسید |
+| AttributeError: NoneType.check | singleton مقداردهی نشده | set_mt5() در startup |
+| TypeError: float() argument None | float(None) | _safe_float(val, 0.0) |
+| Redis connection refused | Redis اجرا نمی‌شود | docker-compose up redis -d |
+| Circuit breaker OPEN | خطاهای MT5 | MT5 بررسی + /reset |
+| Risk block: daily loss | ضرر به حد رسید | فردا ادامه دهید |
 
----
+### خطاهای MT5
 
-## 📡 ۱۹. API Reference
+| کد | معنا | راه‌حل |
+|----|------|--------|
+| 10004 | Connection lost | MT5 restart |
+| 10014 | Invalid volume | min/max lot |
+| 10016 | Invalid stops | فاصله SL/TP |
+| 10019 | Not enough money | موجودی |
 
-### Authentication
-
-```bash
-POST /api/v1/auth/login
-{"username": "admin@example.com", "password": "pass"}
-# -> {"access_token": "JWT...", "refresh_token": "JWT..."}
-
-# All other requests:
-Authorization: Bearer JWT_TOKEN
-```
-
-### سیگنال‌ها
+### ریست اضطراری
 
 ```bash
-# ارسال سیگنال
-POST /api/v1/signals
-{
-  "signal_id": "uuid",     # REQUIRED
-  "symbol": "EURUSD",      # REQUIRED
-  "direction": "BUY",      # REQUIRED
-  "entry_price": 1.0850,
-  "stop_loss": 1.0800,
-  "take_profit": 1.0950,
-  "stop_loss_pips": 50,
-  "win_rate": 0.60,
-  "avg_rr": 1.8
-}
-# -> {status: "FILLED", ticket: 12345678, lot_size: 0.1, ...}
-
-GET /api/v1/signals?limit=20&offset=0
+curl -X POST localhost:8000/api/v1/risk/circuit-breaker/halt -d '{"reason":"emergency"}'
+docker-compose restart api
+curl http://localhost:8000/health/deep
+curl -X POST localhost:8000/api/v1/risk/circuit-breaker/reset
 ```
 
-### ریسک
+### اجرای تست‌ها
 
 ```bash
-POST /api/v1/risk/assess           # evaluate without executing
-GET  /api/v1/risk/circuit-breaker/status
-POST /api/v1/risk/circuit-breaker/halt
-POST /api/v1/risk/circuit-breaker/reset
-GET  /api/v1/risk/daily-status
-```
+# همه (249 تست)
+OTEL_SDK_DISABLED=true pytest backend/tests/ -v
 
-### معاملات
-
-```bash
-GET    /api/v1/trades?status=OPEN&symbol=EURUSD
-DELETE /api/v1/trades/{trade_id}   # close
-GET    /api/v1/trades/statistics?period=today
-```
-
-### WebSocket
-
-```javascript
-const ws = new WebSocket("ws://localhost:8000/ws/signals?token=JWT");
-ws.onmessage = (e) => {
-  const d = JSON.parse(e.data);
-  // types: SIGNAL_NEW, SIGNAL_FILLED, SIGNAL_BLOCKED, RISK_ALERT, HEARTBEAT
-};
-```
-
-### Health
-
-```
-GET /health         -> liveness
-GET /health/ready   -> readiness
-GET /health/deep    -> full check
-GET /metrics        -> Prometheus
+# با coverage
+OTEL_SDK_DISABLED=true pytest backend/tests/ --cov=backend --cov-report=html
 ```
 
 ---
 
-## 📖 ۲۰. Glossary
+## 20. Glossary <a name="20"></a>
 
 | اصطلاح | توضیح |
-|--------|--------|
-| ATR | Average True Range -- معیار نوسان |
-| BOS | Break of Structure -- شکست ساختار (SMC) |
-| ChoCH | Change of Character -- تغییر جهت (SMC) |
-| Circuit Breaker | توقف خودکار در شکست‌های متوالی |
-| DI | Dependency Injection -- تزریق وابستگی |
-| Drawdown | کاهش از اوج به کف (%) |
-| EA | Expert Advisor -- ربات MT5 |
-| Equity | ارزش فعلی حساب |
-| FAIL_CLOSED | خطا -> block trade (ایمن‌تر) |
-| FVG | Fair Value Gap -- شکاف ارزش (SMC) |
-| Gate | یک لایه بررسی ریسک |
-| HWM | High Water Mark -- بالاترین equity تاریخی |
-| Idempotency | اجرای مکرر، نتیجه یکسان |
-| Kelly Criterion | فرمول بهینه‌سازی حجم |
-| Lot | واحد حجم (1 lot = 100,000 واحد) |
-| MT5 | MetaTrader 5 |
-| MQL5 | زبان MT5 |
-| Pip | کوچکترین واحد تغییر قیمت |
-| RBAC | Role-Based Access Control |
+|--------|-------|
 | SMC | Smart Money Concept |
-| Singleton | فقط یک instance |
+| FVG | Fair Value Gap |
+| Order Block | ناحیه سفارش بزرگ |
+| Liquidity | سطوح Stop Loss |
+| ATR | Average True Range |
+| Kelly Criterion | فرمول حجم بهینه |
+| Walk-Forward | آموزش بدون leak آینده |
+| Concept Drift | تغییر الگوی بازار |
+| Drawdown | کاهش سرمایه از peak |
+| Circuit Breaker | توقف خودکار |
+| Gate | لایه بررسی ریسک |
+| Semi-Auto | تأیید دستی سیگنال |
+| Idempotency | فقط یک‌بار اجرا شود |
+| Dead Letter Queue | صف سفارات بدون retry |
+| Orphan Position | پوزیشن در MT5 ولی در سیستم نیست |
+| Singleton | فقط یک نمونه در کل برنامه |
+| DI | Dependency Injection |
+| RBAC | Role-Based Access Control |
+| Spread | تفاوت bid/ask |
+| Pip | کوچکترین واحد تغییر قیمت |
+| Lot | 1 lot = 100,000 واحد |
 | SL | Stop Loss |
 | TP | Take Profit |
-| VAR | Value at Risk |
-| VotingEngine | جمع‌آوری آرای agent‌ها |
+| R:R | Risk:Reward ratio |
+| AUC | Area Under Curve - ML |
+| ADWIN | Adaptive Windowing - drift |
+| MQL5 | زبان Expert Advisor |
+| EA | Expert Advisor - MT5 |
+| NFP | Non-Farm Payrolls |
 
 ---
 
-*آخرین بروزرسانی: ۲۰۲۶-۰۶-۲۵ | نسخه ۲.۰.۰ | Python 3.11 | FastAPI 0.115*
+*نسخه 2.0.0 | Galaxy Vast AI Trading Platform | 2026-06-25*
