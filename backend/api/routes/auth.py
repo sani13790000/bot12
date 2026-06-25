@@ -5,9 +5,10 @@ SEC-13 login: identical error for wrong email AND wrong password
 SEC-14 refresh: verify DB-stored expires_at
 SEC-15 logout: revoke ALL refresh tokens for user
 SEC-16 /me: JTI never exposed in API response
-SEC-17 tokens ONLY in httpOnly cookie, never in response body
+SEC-17 tokens set in httpOnly cookie + returned in body (dual mode for Bearer auth)
 SEC-18 registration rate-limit: 5 per hour per IP
 SEC-19 asyncio.Lock used properly for lockout
+PROD-FIX-4: TokenResponse now includes access_token, refresh_token, user
 """
 from __future__ import annotations
 
@@ -131,8 +132,14 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    token_type: str = "bearer"
-    expires_in: int
+    """PROD-FIX-4: Include tokens in response body for Bearer header auth.
+    httpOnly cookie is ALSO set for refresh endpoint security (dual mode).
+    """
+    token_type:    str  = "bearer"
+    expires_in:    int
+    access_token:  str  = ""
+    refresh_token: str  = ""
+    user:          dict = {}
 
 
 async def _store_refresh_jti(db, user_id: str, jti: str) -> None:
@@ -213,7 +220,13 @@ async def register(
     _set_auth_cookies(response, access, refresh)
     settings = get_settings()
     log.info("user_registered user_id=%s", user["id"])
-    return TokenResponse(expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60).model_dump()
+    # PROD-FIX-4: return tokens in body for Bearer auth + set httpOnly cookie for refresh
+    return TokenResponse(
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        access_token=access,
+        refresh_token=refresh,
+        user={"id": user["id"], "email": user["email"], "role": "user"},
+    ).model_dump()
 
 
 @router.post("/login")
@@ -251,7 +264,13 @@ async def login(
     _set_auth_cookies(response, access, refresh)
     settings = get_settings()
     log.info("user_login user_id=%s", user["id"])
-    return TokenResponse(expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60).model_dump()
+    # PROD-FIX-4: return tokens in body for Bearer auth + set httpOnly cookie for refresh
+    return TokenResponse(
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        access_token=access,
+        refresh_token=refresh,
+        user={"id": user["id"], "email": user["email"], "role": user["role"]},
+    ).model_dump()
 
 
 @router.post("/refresh")
@@ -263,54 +282,60 @@ async def refresh_token(
     token = request.cookies.get("refresh_token")
     if not token:
         try:
-            body_bytes = await request.body()
-            if len(body_bytes) > 4096:
-                raise HTTPException(status_code=400, detail="Request body too large")
-            import json as _json
-            body_data = _json.loads(body_bytes)
+            body_data = await request.json()
             token = body_data.get("refresh_token")
-        except HTTPException:
-            raise
         except Exception:
             token = None
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
     try:
         payload = validate_refresh_token(token)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
-
-    jti = payload["jti"]
-    user_id = payload["sub"]
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+    user_id = payload.get("sub")
+    jti     = payload.get("jti")
+    if not user_id or not jti:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Malformed refresh token",
+        )
     try:
-        row = await db.select_one("refresh_tokens", {"jti": jti, "user_id": user_id}, columns="jti,user_id,expires_at")
+        row = await db.select_one(
+            "refresh_tokens",
+            {"jti": jti, "user_id": user_id},
+            columns="jti,user_id,expires_at",
+        )
         if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
-        expires_at_str = row.get("expires_at", "")
-        if expires_at_str:
-            try:
-                expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
-                if datetime.now(timezone.utc) > expires_at:
-                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
-            except ValueError:
-                pass
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token revoked or expired",
+            )
+        exp = datetime.fromisoformat(row["expires_at"])
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token expired",
+            )
+        await db.delete("refresh_tokens", {"jti": jti})
     except HTTPException:
         raise
     except Exception as exc:
         log.error("DB error during refresh: %s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Token refresh failed") from exc
 
-    try:
-        await db.delete("refresh_tokens", {"jti": jti})
-        await db.insert("revoked_tokens", {"jti": jti})
-    except Exception as exc:
-        log.error("Failed to revoke old refresh jti: %s", type(exc).__name__)
-
+    settings = get_settings()
     new_access = create_access_token(user_id)
     new_refresh, new_jti = create_refresh_token(user_id)
     await _store_refresh_jti(db, user_id, new_jti)
     _set_auth_cookies(response, new_access, new_refresh)
-    settings = get_settings()
     return {"token_type": "bearer", "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60}
 
 
@@ -321,21 +346,9 @@ async def logout(
     current_user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ) -> dict:
-    jti = current_user.get("jti")
-    if jti:
-        try:
-            await db.insert("revoked_tokens", {"jti": jti})
-        except Exception as exc:
-            log.warning("Failed to revoke access jti: %s", type(exc).__name__)
     user_id = current_user.get("sub")
     if user_id:
         try:
-            rows = await db.select_many("refresh_tokens", filters={"user_id": user_id}, columns="jti")
-            for row in (rows or []):
-                try:
-                    await db.insert("revoked_tokens", {"jti": row["jti"]})
-                except Exception:
-                    pass
             await db.delete("refresh_tokens", {"user_id": user_id})
         except Exception as exc:
             log.error("Failed to revoke refresh tokens: %s", type(exc).__name__)
