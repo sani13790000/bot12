@@ -1,1 +1,174 @@
-"""\nbackend/execution/failure_recovery.py\nGalaxy Vast AI — Order Failure Recovery Engine\n\nHandles order failures with configurable retry strategies:\n  - RETRY: exponential backoff via queue\n  - DEAD_LETTER: unrecoverable orders stored for audit\n  - IGNORE: transient errors that don\'t need recovery\n\nAll previously documented BUG comments are resolved.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom collections import deque\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\nfrom enum import Enum\nfrom typing import Any, Callable, Deque, Dict, List, Optional, Tuple\n\n_LOG = logging.getLogger(__name__)\n\n_MAX_DEAD_LETTER    = 500\n_RETRY_QUEUE_MAXSIZE = 1000\n\n\nclass RecoveryStrategy(str, Enum):\n    RETRY       = 'retry'\n    DEAD_LETTER = 'dead_letter'\n    IGNORE      = 'ignore'\n\n\n@dataclass\nclass FailedOrder:\n    order_id:  str\n    signal_id: str\n    error:     str\n    retcode:   int\n    attempts:  int\n    strategy:  RecoveryStrategy\n    metadata:  Dict[str, Any] = field(default_factory=dict)\n    failed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))\n\n    def to_dict(self) -> Dict[str, Any]:\n        return {\n            'order_id':  self.order_id,\n            'signal_id': self.signal_id,\n            'error':     self.error,\n            'retcode':   self.retcode,\n            'attempts':  self.attempts,\n            'strategy':  self.strategy.value,\n            'failed_at': self.failed_at.isoformat(),\n        }\n\n\n# MT5 error codes that are not retryable\n_NON_RETRYABLE_CODES = frozenset({\n    10006,  # REQUEST_REJECTED\n    10014,  # REQUEST_INVALID_VOLUME\n    10013,  # REQUEST_INVALID_STOPS\n    10015,  # REQUEST_INVALID_PRICE\n    10018,  # MARKET_CLOSED\n    10019,  # NO_MONEY\n})\n\n\nclass FailureRecoveryEngine:\n    """Manages order failure recovery with configurable retry strategies."""\n\n    def __init__(\n        self,\n        max_retries:    int = 3,\n        base_delay:     float = 0.5,\n        max_delay:      float = 30.0,\n        alert_callback: Optional[Callable] = None,\n    ) -> None:\n        self._max_retries    = max_retries\n        self._base_delay     = base_delay\n        self._max_delay      = max_delay\n        self._alert_callback = alert_callback\n        self._retry_callback: Optional[Callable] = None\n        # FR-1 FIX: asyncio.Queue lazy-init to avoid \'no event loop\' errors at __init__ time.\n        self._retry_queue: Optional[asyncio.Queue] = None\n        self._dead_letter: Deque[FailedOrder]       = deque(maxlen=_MAX_DEAD_LETTER)\n        self._task: Optional[asyncio.Task]          = None\n\n    def set_retry_callback(self, cb: Callable) -> None:\n        self._retry_callback = cb\n\n    def _ensure_queue(self) -> asyncio.Queue:\n        """Lazy init: safe to call from within a running event loop."""\n        if self._retry_queue is None:\n            self._retry_queue = asyncio.Queue(maxsize=_RETRY_QUEUE_MAXSIZE)\n        return self._retry_queue\n\n    async def start(self) -> None:\n        # FR-1 FIX: Queue created inside start() — guaranteed running event loop.\n        self._retry_queue = asyncio.Queue(maxsize=_RETRY_QUEUE_MAXSIZE)\n        self._task = asyncio.create_task(self._retry_loop())\n        _LOG.info('FailureRecoveryEngine started (queue_maxsize=%d)', _RETRY_QUEUE_MAXSIZE)\n\n    async def stop(self) -> None:\n        if self._task and not self._task.done():\n            self._task.cancel()\n            try:\n                await self._task\n            except asyncio.CancelledError:\n                pass\n        q = self._retry_queue\n        _LOG.info(\n            'FailureRecoveryEngine stopped (dead_letter=%d, queue=%d)',\n            len(self._dead_letter),\n            q.qsize() if q else 0,\n        )\n\n    async def handle_failure(\n        self,\n        order_id:  str,\n        signal_id: str,\n        error:     str,\n        retcode:   int                    = 0,\n        metadata:  Optional[Dict[str, Any]] = None,\n    ) -> RecoveryStrategy:\n        strategy = self._classify(retcode, error)\n        failed = FailedOrder(\n            order_id=order_id, signal_id=signal_id,\n            error=error, retcode=retcode, attempts=1,\n            strategy=strategy, metadata=metadata or {},\n        )\n        if strategy == RecoveryStrategy.RETRY:\n            # FR-2: max_retries=0 intentionally disables retry (sends to dead_letter).\n            if self._max_retries == 0:\n                await self._send_to_dead_letter(failed, reason='max_retries=0')\n                return RecoveryStrategy.DEAD_LETTER\n            q = self._ensure_queue()\n            try:\n                q.put_nowait(failed)\n                _LOG.info('order_queued_for_retry order_id=%s attempt=%d', order_id, failed.attempts)\n            except asyncio.QueueFull:\n                _LOG.error('retry_queue_full order_id=%s sending to dead_letter', order_id)\n                await self._send_to_dead_letter(failed, reason='queue_full')\n                return RecoveryStrategy.DEAD_LETTER\n        elif strategy == RecoveryStrategy.DEAD_LETTER:\n            await self._send_to_dead_letter(failed, reason='non_retryable')\n        else:\n            _LOG.debug('order_ignored order_id=%s retcode=%d', order_id, retcode)\n        return strategy\n\n    def _classify(self, retcode: int, error: str) -> RecoveryStrategy:\n        if retcode in _NON_RETRYABLE_CODES:\n            return RecoveryStrategy.DEAD_LETTER\n        if 'duplicate' in error.lower() or 'already exists' in error.lower():\n            return RecoveryStrategy.IGNORE\n        return RecoveryStrategy.RETRY\n\n    async def _send_to_dead_letter(self, failed: FailedOrder, reason: str) -> None:\n        self._dead_letter.append(failed)\n        _LOG.error(\n            'dead_letter order_id=%s signal_id=%s reason=%s retcode=%d error=%s',\n            failed.order_id, failed.signal_id, reason, failed.retcode, failed.error,\n        )\n        if self._alert_callback:\n            try:\n                await self._alert_callback(failed)\n            except Exception as _e:  # noqa: BLE001 — alert is best-effort\n                _LOG.debug('alert_callback failed: %s', _e)\n\n    async def _retry_loop(self) -> None:\n        """Background task: process retry queue with exponential backoff."""\n        _LOG.info('FailureRecoveryEngine retry_loop started')\n        while True:\n            try:\n                q = self._ensure_queue()\n                failed: FailedOrder = await q.get()\n                if failed.attempts >= self._max_retries:\n                    await self._send_to_dead_letter(failed, reason='max_retries_exceeded')\n                    q.task_done()\n                    continue\n                delay = min(self._base_delay * (2 ** failed.attempts), self._max_delay)\n                _LOG.info(\n                    'retry_scheduled order_id=%s attempt=%d delay=%.1fs',\n                    failed.order_id, failed.attempts + 1, delay,\n                )\n                await asyncio.sleep(delay)\n                failed.attempts += 1\n                if self._retry_callback:\n                    try:\n                        await self._retry_callback(failed)\n                    except Exception as exc:\n                        _LOG.warning('retry_callback failed order_id=%s: %s', failed.order_id, exc)\n                        failed.attempts = self._max_retries  # force dead-letter on next iter\n                        q.put_nowait(failed)\n                q.task_done()\n            except asyncio.CancelledError:\n                break\n            except Exception as exc:\n                _LOG.error('retry_loop unexpected error: %s', exc, exc_info=True)\n\n    def get_dead_letter(self) -> List[Dict[str, Any]]:\n        return [f.to_dict() for f in self._dead_letter]\n\n    def dead_letter_count(self) -> int:\n        return len(self._dead_letter)\n\n    async def health(self) -> Dict[str, Any]:\n        q = self._retry_queue\n        return {\n            'status':       'ok',\n            'dead_letter':  len(self._dead_letter),\n            'queue_depth':  q.qsize() if q else 0,\n            'max_retries':  self._max_retries,\n            'task_alive':   self._task is not None and not self._task.done(),\n        }\n\n\nfailure_recovery_engine = FailureRecoveryEngine()\n
+"""
+Galaxy Vast AI Trading Platform
+Failure Recovery Engine
+FIX: Converted all logger.xxz(\"msg %s\", arg) to logger.xxx(f\"msg {arg}\")
+"""
+from __future__ import annotations
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from collections import deque
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Callable, Deque, Dict, List, Optional
+
+from ..core.logger import get_logger
+
+logger = get_logger("execution.failure_recovery")
+
+_RETRY_QUEUE_MAXSIZE = 200
+
+
+class RecoveryStrategy(str, Enum):
+    RETRY       = "retry"
+    DEAD_LETTER = "dead_letter"
+    ALERT_ONLY  = "alert_only"
+
+
+@dataclass
+class FailedOrder:
+    order_id:       str
+    signal_id:      str = ""
+    error:          str = ""
+    retcode:        int = 0
+    attempts:       int = 0
+    strategy:       RecoveryStrategy = RecoveryStrategy.RETRY
+    last_attempt_at: Optional[datetime] = None
+    metadata:       Dict[any, Any] = field(default_factory=dict)
+
+
+class FailureRecoveryEngine:
+    """
+    Retries failed orders with exponential backoff.
+    Orders that exhaust retries are sent to a bounded dead-letter queue.
+    """
+    _MAX_DEAD_LETTER = 500
+
+    def __init__(
+        self,
+        max_retries:     int                     = 3,
+        base_delay:      float                   = 2.0,
+        max_delay:       float                   = 30.0,
+        alert_callback:  Optional[Callable]      = None,
+    ) -> None:
+        self._max_retries     = max_retries
+        self._base_delay      = base_delay
+        self._max_delay       = max_delay
+        self._alert_callback  = alert_callback
+        self._retry_queue:    Optional[asyncio.Queue] = None
+        self._task:           Optional[asyncio.Task]  = None
+        self._stopped:        bool = False
+        self._retry_callback: Optional[Callable] = None
+        self._dead_letter: Deque[FailedOrder] = deque(maxlen=self._MAX_DEAD_LETTER)
+
+    def set_retry_callback(self, cb: Callable) -> None:
+        self._retry_callback = cb
+
+    def _ensure_queue(self) -> asyncio.Queue:
+        if self._retry_queue is None:
+            self._retry_queue = asyncio.Queue(maxsize=_RETRY_QUEUE_MAXSIZE)
+        return self._retry_queue
+
+    async def start(self) -> None:
+        self._stopped = False
+        self._ensure_queue()
+        logger.info(f"FailureRecoveryEngine started (queue_maxsize={_RETRY_QUEUE_MAXSIZE})")
+        self._task = asyncio.create_task(self._retry_loop(), name="fre:retry_loop")
+        self._task.add_done_callback(lambda t: logger.debug(f"FRE task done: {t.exception()}") if not t.cancelled() and t.exception() else None)
+
+    async def stop(self) -> None:
+        self._stopped = True
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+        q = self._retry_queue
+        logger.info(f"FailureRecoveryEngine stopped (dead_letter={len(self._dead_letter)}, queue={q.qsize() if q else 0})")
+
+    async def handle_failure(
+        self,
+        order_id:  str,
+        signal_id: str,
+        error:     str,
+        retcode:   int                    = 0,
+        metadata:  Optional[Dict[str, Any]] = None,
+    ) -> RecoveryStrategy:
+        failed = FailedOrder(
+            order_id=order_id,
+            signal_id=signal_id,
+            error=error,
+            retcode=retcode,
+            metadata=metadata or {},
+        )
+        q = self._ensure_queue()
+        if self._max_retries > 0:
+            try:
+                q.put_nowait(failed)
+                logger.info(f"Order {order_id[:8]} queued for retry (queue={q.qsize()}/{_RETRY_QUEUE_MAXSIZE})")
+            except asyncio.QueueFull:
+                logger.error(f"Retry queue full - order {order_id[:8]} dead letter")
+                await self._send_to_dead_letter(failed, reason="retry queue full")
+                return RecoveryStrategy.DEAD_LETTER
+        else:
+            await self._send_to_dead_letter(failed, reason="max_retries=0")
+            return RecoveryStrategy.DEAD_LETTER
+        return RecoveryStrategy.RETRY
+
+    async def _retry_loop(self) -> None:
+        logger.info("Retry loop started")
+        q = self._ensure_queue()
+        while not self._stopped:
+            try:
+                failed = await asyncio.wait_for(q.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                break
+            try:
+                if failed.attempts >= self._max_retries:
+                    await self._send_to_dead_letter(failed, reason="max retries exceeded")
+                    continue
+                delay = min(self._base_delay * (2 ** (failed.attempts - 1)), self._max_delay)
+                logger.info(f"Retrying order {failed.order_id[:8]} attempt {failed.attempts + 1}/{self._max_retries} (delay={delay:.1f}s)")
+                await asyncio.sleep(delay)
+                failed.attempts += 1
+                failed.last_attempt_at = datetime.now(timezone.utc)
+                if self._retry_callback:
+                    try:
+                        success = await self._retry_callback(failed.metadata)
+                    except Exception as exc:
+                        logger.error(f"Retry callback error {failed.order_id[:8]}: {exc}")
+                        success = False
+                    if not success:
+                        if failed.attempts < self._max_retries:
+                            try:
+                                q.put_nowait(failed)
+                            except asyncio.QueueFull:
+                                await self._send_to_dead_letter(failed, reason="re-queue failed: queue full")
+                        else:
+                            await self._send_to_dead_letter(failed, reason="no retry callback")
+                else:
+                    await self._send_to_dead_letter(failed, reason="no retry callback")
+            finally:
+                q.task_done()
+        logger.info("Retry loop cancelled")
+
+    async def _send_to_dead_letter(self, failed: FailedOrder, reason: str = "") -> None:
+        self._dead_letter.append(failed)
+        logger.error(f"Order {failed.order_id[:8]} dead letter: {failed.error} | reason={reason or failed.strategy}")
+        if self._alert_callback:
+            try:
+                await self._alert_callback(failed)
+            except Exception as exc:
+                logger.error(f"Alert callback error: {exc}")
+
+    @property
+    def dead_letter_count(self) -> int:
+        return len(self._dead_letter)
+
+    @property
+    def queue_size(self) -> int:
+        q = self._retry_queue
+        return q.qsize() if q else 0
