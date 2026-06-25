@@ -1,6 +1,7 @@
 # ============================================================
 # Dockerfile - Galaxy Vast AI Trading Platform
 # Multi-stage build: smaller image, non-root user, healthcheck
+# PROD-FIX-3: Fixed duplicate PYTHONPATH ENV (second was overriding first)
 # ============================================================
 
 # ---- builder stage ----
@@ -31,10 +32,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Environment
+# PROD-FIX-3: PYTHONPATH was set twice — second assignment overrides first,
+# losing /install/lib/python3.11/site-packages. Combined into one ENV instruction.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
     PIP_NO_CACHE_DIR=1 \
     PATH=/install/bin:$PATH \
     PYTHONPATH=/install/lib/python3.11/site-packages:/app
