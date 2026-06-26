@@ -1,1 +1,173 @@
-IiIiCmJhY2tlbmQvY29yZS9sb2dfcmVkYWN0b3IucHkKR2FsYXh5IFZhc3QgQUkg4oCUIExvZyBSZWRhY3Rpb24gTGF5ZXIgKFBoYXNlIDExKQoKUDExLUxSLTE6IHRhbWFtIGxvZyByZWNvcmRoYSDYsiBxYWJsIGF6IGVtaXQgYmFycmVzaSBtaS1rb25hZApQMTEtTFItMjogMTUgcGF0dGVybiBicmF5IHJlZGFjdDogSldULCBwYXNzd29yZCwgY2FyZCwgTVQ1LCBBUEkga2V5ClAxMS1MUi0zOiBzdHJ1Y3Rsb2cgdmEgc3RkbGliIGxvZ2dpbmcgaGFyIGR1IHBvc2hzZXNoIGRhZGUgbWktemhhd2FuZApQMTEtTFItNDogUmVkYWN0ZWQgdmFsdWUg4oaSIFtSRURBQ1RFRDpUWVBFXSBicmF5aSBkZWJ1Z2dpbmcKUDExLUxSLTU6IEZhbHNlIHBvc2l0aXZlIHJhdGUgcGF5aW4g4oCUIGZhcWF0IGtleT12YWx1ZSBwYXR0ZXJucwoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IHJlCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERpY3QsIExpc3QsIE9wdGlvbmFsLCBUdXBsZQoKIyDilKAgUmVkYWN0aW9uIHBhdHRlcm5zIOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoOKUoAojIEZvcm1hdDogKG5hbWUsIGNvbXBpbGVkX3JlZ2V4LCByZXBsYWNlbWVudCkKX1BBVFRFUk5TOiBMaXN0W1R1cGxlW3N0ciwgcmUuUGF0dGVybiwgc3RyXV0gPSBbCiAgICAjIEpXVCB0b2tlbnMg4oCUICAzIGJhc2U2NHVybCBwYXJ0cyBzZXBhcmF0ZWQgYnkgZG90cwogICAgKAogICAgICAgICJqd3QiLAogICAgICAgIHJlLmNvbXBpbGUoCiAgICAgICAgICAgIHIiKGV5SltBLVphLXowLTlfLV17NCx9XC5leUpbQS1aYS16MC05Xy1dezQsfVwuW0EtWmEtejAtOV8tXXs0LH0pIiwKICAgICAgICAgICAgcmUuQVNDSUksCiAgICAgICAgKSwKICAgICAgICAiW1JFREFDVEVEO0pXVF0iLAogICAgKSwKICAgICMgQmVhcmVyIHRva2VucyBpbiBBdXRob3JpemF0aW9uIGhlYWRlcgogICAgKAogICAgICAgICJiZWFyZXIiLAogICAgICAgIHJlLmNvbXBpbGUocgorIihCZWFyZXJccyspW0EtWmEtejAtOV9cLVwuXXsxMCx9IiwgcmUuSUdOT1JFQ0FTRSksCiAgICAgICAgcidcMVtSRURBQ1RFRDpCRUFSRVJdJywKICAgICksCiAgICAjIFBhc3N3b3JkIGtleS12YWx1ZSBwYWlycwogICAgKAogICAgICAgICJwYXNzd29yZCIsCiAgICAgICAgcmUuY29tcGlsZSgKICAgICAgICAgICAgcicocGFzc3dvcmR8cGFzc3dkfHB3ZHxwYXNzKShccypbOj1dXHMqKVsiXCddPyhbXlxzIlwnJiw7fXtdezMsfSlbIlwnXT8nLAogICAgICAgICAgICByZS5JR05PUkVDQVNFLAogICAgICAgICksCiAgICAgICAgcidcMVwyW1JFREFDVEVEO1BBU1NXT1JEXScsCiAgICApLAogICAgIyBTZWNyZXQva2V5L3Rva2VuIGtleS12YWx1ZSBwYWlycyAoaW5jbHVkaW5nIF9LRVksIF9TRUNSRVQgc3VmZml4ZXMpCiAgICAoCiAgICAgICAgInNlY3JldCIsCiAgICAgICAgcmUuY29tcGlsZSgKICAgICAgICAgICAgcicopPzopc2VjcmV0fGFwaV8/a2V5fGFwaV8/dG9rZW58YWNjZXNzXz90b2tlbnxyZWZyZXNoXz90b2tlbnwnCiAgICAgICAgICAgIHIiY2xpZW50Xz9zZWNyZXR8cHJpdmF0ZV8/a2V5fHNpZ25pbmdfP2tleXxsaWNlbnNlXz9rZXl8bGljZW5zZV8/c2VjcmV0fCIKICAgICAgICAgICAgcibsaWNlbnNlXz9zYWx0fG1xbDVfP2FwaV8/dG9rZW58dGVsZWdyYW1fP2JvdF8/dG9rZW58dGVsZWdyYW1fP3dlYmhvb2tfP3NlY3JldHwiCiAgICAgICAgICAgIHIiandrXz9zZWNyZXQoPzpfP2tleSk/fHN1cGFiYXNlXz8oPzpzZXJ2aWNlXz8pP2tleXxtYXN0ZXJfP2tleXwiCiAgICAgICAgICAgIHIiXHcrX3NlY3JldCg/Ol9rZXkpP3xcdytfP3Bhc3N3b3JkfFx3K18/YXBpXz8oPzprZXl8dG9rZW4pKSIKICAgICAgICAgICAgcicpKFxzKls6PV1ccyopWyJcJ10/KFteXHMiXCcmLDt9e117NCx9KVsiXCddPycsCiAgICAgICAgICAgIHJlLklHTk9SRUNBU0UsCiAgICAgICAgKSwKICAgICAgICByJ1wxXDJbUkVEQUNURUQ6U0VDUkVUXScsCiAgICApLAogICAgIyBDcmVkaXQgY2FyZCBudW1iZXJzIChQQU4pIOKAlCAxMy0xOSBkaWdpdHMgd2l0aCBvcHRpb25hbCBzcGFjZXMvZGFzaGVzCiAgICAoCiAgICAgICAgImNhcmQiLAogICAgICAgIHJlLmNvbXBpbGUocidcYihbMy02XVxkezN9KVtccyBcLV0/XGR7NH1bXHNcLV0/XGR7NH1bXHNcLV0/XGR7MSw3fVxiJyksCiAgICAgICAgcidcMS0qKioqLSoqKiotW1JFREFDVEVEO0NBUkRdJywKICAgICksCiAgICAjIE1UNCBQQVNTV09SRCBwYXR0ZXJucwogICAgKAogICAgICAgICJtdDVfcGFzc3dvcmQiLAogICAgICAgIHJlLmNvbXBpbGUoCiAgICAgICAgICAgIHIiKG10NV9wYXNzd29yZHxNVDVfUEFTU1dPUkR8bXQ1LipwYXNzKShccypbOj1dXHMqKShcUyspIiwKICAgICAgICAgICAgcmUuSUdOT1JFQ0FTRSwKICAgICAgICApLAogICAgICAgIHInXDFcMltSRURBQ1RFRDpNVDVfUEFTU1dPUkRdJywKICAgICksCiAgICAjIFN1cGFiYXNlIGtleXMgKHN0YXJ0IHdpdGggZXlKIGJ1dCBsb25nZXIpCiAgICAoCiAgICAgICAgInN1cGFiYXNlIiwKICAgICAgICByZS5jb21waWxlKHIiKGV5SltBLVphLXowLTlfLV17NTAsfSkiLCByZS5BU0NJSSksCiAgICAgICAgIltSRURBQ1RFRDpTVVBBQkFTRV9LRVldIiwKICAgICksCiAgICAjIEdlbmVyaWMgaGV4IHNlY3JldHMgKDMyKyBoZXggY2hhcnMg4oCUIGxpa2VseSBrZXlzKQogICAgKAogICAgICAgICJoZXhfc2VjcmV0IiwKICAgICAgICByZS5jb21waWxlKHIiXGIoWzAtOWEtZkEtRl17MzIsfSlcYiIpLAogICAgICAgICJbUkVEQUNURUQ6SEVYX1NFQ1JFVF0iLAogICAgKSwKXQoKIyBGaWVsZHMgdGhhdCBzaG91bGQgYmUgY29tcGxldGVseSByZW1vdmVkIGZyb20gbG9nIGRpY3RzCl9TRU5TSVRJVkVfS0VZUyA9IGZyb3plbnNldCh7CiAgICAicGFzc3dvcmQiLCAicGFzc3dkIiwgInB3ZCIsICJwYXNzIiwKICAgICJzZWNyZXQiLCAiand0X3NlY3JldCIsICJqd3Rfc2VjcmV0X2tleSIsCiAgICAiYXBpX2tleSIsICJhcGlrZXkiLCAiYXBpX3Rva2VuIiwKICAgICJhY2Nlc3NfdG9rZW4iLCAicmVmcmVzaF90b2tlbiIsICJpZF90b2tlbiIsCiAgICAiY2xpZW50X3NlY3JldCIsICJwcml2YXRlX2tleSIsICJzaWduaW5nX2tleSIsCiAgICAibGljZW5zZV9rZXkiLCAibGljZW5zZV9zZWNyZXQiLCAibGljZW5zZV9zYWx0IiwKICAgICJtcWw1X2FwaV90b2tlbiIsCiAgICAidGVsZWdyYW1fYm90X3Rva2VuIiwgInRlbGVncmFtX3dlYmhvb2tfc2VjcmV0IiwKICAgICJzdXBhYmFzZV9rZXkiLCAic3VwYWJhc2Vfc2VydmljZV9rZXkiLAogICAgIm1hc3Rlcl9rZXkiLCAic2VjcmV0c19tYXN0ZXJfa2V5IiwKICAgICJtdDVfcGFzc3dvcmQiLAogICAgImNhcmRfbnVtYmVyIiwgInBhbiIsICJjdnYiLCAiY3ZjIiwKICAgICJhdXRob3JpemF0aW9uIiwgICMgSFRUUCBoZWFkZXIgdmFsdWUKICAgICJ4LWFwaS1rZXkiLAogICAgImNvb2tpZSIsCn0pCgoKZGVmIHJlZGFjdF9zdHJpbmcodGV4dDogc3RyKSAtPiBzdHI6CiAgICAiIiJBcHBseSBhbGwgcmVkYWN0aW9uIHBhdHRlcm5zIHRvIGEgc3RyaW5nLiIiIgogICAgZm9yIF9uYW1lLCBwYXR0ZXJuLCByZXBsYWNlbWVudCBpbiBfUEFUVEVSTlM6CiAgICAgICAgdGV4dCA9IHBhdHRlcm4uc3ViKHJlcGxhY2VtZW50LCB0ZXh0KQogICAgcmV0dXJuIHRleHQKCgpkZWYgcmVkYWN0X2RpY3QoZGF0YTogRGljdFtzdHIsIEFueV0sIGRlcHRoOiBpbnQgPSAwKSAtPiBEaWN0W3N0ciwgQW55XToKICAgICIiIgogICAgUmVjdXJzaXZlbHkgcmVkYWN0IHNlbnNpdGl2ZSBrZXlzIGZyb20gYSBkaWN0LgogICAgUDExLUxSLTU6IE9ubHkgZ29lcyA1IGxldmVscyBkZWVwIHRvIGF2b2lkIGluZmluaXRlIHJlY3Vyc2lvbi4KICAgICIiIgogICAgaWYgZGVwdGggPiA1OgogICAgICAgIHJldHVybiBkYXRhCiAgICByZXN1bHQgPSB7fQogICAgZm9yIGssIHYgaW4gZGF0YS5pdGVtcygpOgogICAgICAgIGtleV9sb3dlciA9IGsubG93ZXIoKS5yZXBsYWNlKCItIiwgIl8iKQogICAgICAgIGlmIGtleV9sb3dlciBpbiBfU0VOU0lUSVZFX0tFWVM6CiAgICAgICAgICAgIHJlc3VsdFtrXSA9ICJbUkVEQUNURURdIgogICAgICAgIGVsaWYgaXNpbnN0YW5jZSh2LCBkaWN0KToKICAgICAgICAgICAgcmVzdWx0W2tdID0gcmVkYWN0X2RpY3QodiwgZGVwdGggKyAxKQogICAgICAgIGVsaWYgaXNpbnN0YW5jZSh2LCBzdHIpOgogICAgICAgICAgICByZXN1bHRba10gPSByZWRhY3Rfc3RyaW5nKHYpCiAgICAgICAgZWxpZiBpc2luc3RhbmNlKHYsIChsaXN0LCB0dXBsZSkpOgogICAgICAgICAgICByZXN1bHRba10gPSBbCiAgICAgICAgICAgICAgICByZWRhY3RfZGljdChpLCBkZXB0aCArIDEpIGlmIGlzaW5zdGFuY2UoaSwgZGljdCkKICAgICAgICAgICAgICAgIGVsc2UgcmVkYWN0X3N0cmluZyhpKSBpZiBpc2luc3RhbmNlKGksIHN0cikKICAgICAgICAgICAgICAgIGVsc2UgaQogICAgICAgICAgICAgICAgZm9yIGkgaW4gdgogICAgICAgICAgICBdCiAgICAgICAgZWxzZToKICAgICAgICAgICAgcmVzdWx0W2tdID0gdgogICAgcmV0dXJuIHJlc3VsdAoKCiMg4pSgIHN0ZGxpYiBsb2dnaW5nIEZpbHRlciDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKAKY2xhc3MgUmVkYWN0aW9uRmlsdGVyKGxvZ2dpbmcuRmlsdGVyKToKICAgICIiIgogICAgUDExLUxSLTM6IEF0dGFjaGVzIHRvIGFueSBzdGRsaWIgTG9nZ2VyL0hhbmRsZXIuCiAgICBSZWRhY3RzIHRoZSBmb3JtYXR0ZWQgbWVzc2FnZSBhbmQgYW55IGV4dHJhIGRpY3QgZmllbGRzLgogICAgIiIiCgogICAgZGVmIGZpbHRlcihzZWxmLCByZWNvcmQ6IGxvZ2dpbmcuTG9nUmVjb3JkKSAtPiBib29sOgogICAgICAgICMgUmVkYWN0IG1lc3NhZ2UKICAgICAgICBpZiBpc2luc3RhbmNlKHJlY29yZC5tc2csIHN0cik6CiAgICAgICAgICAgIHJlY29yZC5tc2cgPSByZWRhY3Rfc3RyaW5nKHJlY29yZC5tc2cpCgogICAgICAgICMgUmVkYWN0IGFyZ3MKICAgICAgICBpZiByZWNvcmQuYXJnczoKICAgICAgICAgICAgaWYgaXNpbnN0YW5jZShyZWNvcmQuYXJncywgZGljdCk6CiAgICAgICAgICAgICAgICByZWNvcmQuYXJncyA9IHJlZGFjdF9kaWN0KHJlY29yZC5hcmdzKQogICAgICAgICAgICBlbGlmIGlzaW5zdGFuY2UocmVjb3JkLmFyZ3MsIHR1cGxlKToKICAgICAgICAgICAgICAgIHJlY29yZC5hcmdzID0gdHVwbGUoCiAgICAgICAgICAgICAgICAgICAgcmVkYWN0X3N0cmluZyhhKSBpZiBpc2luc3RhbmNlKGEsIHN0cikgZWxzZSBhCiAgICAgICAgICAgICAgICAgICAgZm9yIGEgaW4gcmVjb3JkLmFyZ3MKICAgICAgICAgICAgICAgICkKCiAgICAgICAgIyBSZWRhY3QgZXh0cmEgZmllbGRzIGF0dGFjaGVkIHRvIHJlY29yZAogICAgICAgIGZvciBhdHRyIGluIGxpc3QodmFycyhyZWNvcmQpLmtleXMoKSk6CiAgICAgICAgICAgIGlmIGF0dHIgaW4gKCJtc2ciLCAiYXJncyIsICJleGNfaW5mbyIsICJleGNfdGV4dCIsICJzdGFja19pbmZvIiwKICAgICAgICAgICAgICAgICAgICAgICAgIm5hbWUiLCAibGV2ZWxuYW1lIiwgImxldmVsbm8iLCAicGF0aG5hbWUiLCAiZmlsZW5hbWUiLAogICAgICAgICAgICAgICAgICAgICAgICAibW9kdWxlIiwgImZ1bmNOYW1lIiwgImxpbmVubyIsICJjcmVhdGVkIiwgIm1zZWNzIiwKICAgICAgICAgICAgICAgICAgICAgICAgInJlbGF0aXZlQ3JlYXRlZCIsICJ0aHJlYWQiLCAidGhyZWFkTmFtZSIsICJwcm9jZXNzTmFtZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICJwcm9jZXNzIiwgIm1lc3NhZ2UiKToKICAgICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgICAgIHZhbCA9IGdldGF0dHIocmVjb3JkLCBhdHRyKQogICAgICAgICAgICBpZiBpc2luc3RhbmNlKHZhbCwgc3RyKToKICAgICAgICAgICAgICAgIHNldGF0dHIocmVjb3JkLCBhdHRyLCByZWRhY3Rfc3RyaW5nKHZhbCkpCiAgICAgICAgICAgIGVsaWYgaXNpbnN0YW5jZSh2YWwsIGRpY3QpOgogICAgICAgICAgICAgICAgc2V0YXR0cihyZWNvcmQsIGF0dHIsIHJlZGFjdF9kaWN0KHZhbCkpCgogICAgICAgIHJldHVybiBUcnVlICAjIGFsd2F5cyBwYXNzIOKAlCByZWRhY3Rpb24gb25seSwgbmV2ZXIgZHJvcHMgcmVjb3JkcwoKCmRlZiBpbnN0YWxsX3JlZGFjdGlvbl9maWx0ZXIobG9nZ2VyX25hbWU6IE9wdGlvbmFsW3N0cl0gPSBOb25lKSAtPiBOb25lOgogICAgIiIiCiAgICBJbnN0YWxsIFJlZGFjdGlvbkZpbHRlciBvbiB0aGUgcm9vdCBsb2dnZXIgKG9yIG5hbWVkIGxvZ2dlcikuCiAgICBDYWxsIG9uY2UgYXQgc3RhcnR1cCDigJQgYXBwbGllcyB0byBhbGwgY2hpbGQgbG9nZ2Vycy4KICAgICIiIgogICAgdGFyZ2V0ID0gbG9nZ2luZy5nZXRMb2dnZXIobG9nZ2VyX25hbWUpCiAgICBmID0gUmVkYWN0aW9uRmlsdGVyKCkKICAgICMgQWRkIHRvIGxvZ2dlciBhbmQgYWxsIGV4aXN0aW5nIGhhbmRsZXJzCiAgICBpZiBub3QgYW55KGlzaW5zdGFuY2UoeCwgUmVkYWN0aW9uRmlsdGVyKSBmb3IgeCBpbiB0YXJnZXQuZmlsdGVycyk6CiAgICAgICAgdGFyZ2V0LmFkZEZpbHRlcihmKQogICAgZm9yIGhhbmRsZXIgaW4gdGFyZ2V0LmhhbmRsZXJzOgogICAgICAgIGlmIG5vdCBhbnkoaXNpbnN0YW5jZSh4LCBSZWRBY3Rpb25GaWx0ZXIpIGZvciB4IGluIGhhbmRsZXIuZmlsdGVycyk6CiAgICAgICAgICAgIGhhbmRsZXIuYWRkRmlsdGVyKGYpCiAgICBsb2cgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKICAgIGxvZy5kZWJ1ZygiUmVkYWN0aW9uRmlsdGVyIGluc3RhbGxlZCBvbiBsb2dnZXI9JXMiLCBsb2dnZXJfbmFtZSBvciAicm9vdCIpCgoKIyDilKAgc3RydWN0bG9nIHByb2Nlc3NvciDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKDilKAKZGVmIHN0cnVjdGxvZ19yZWRhY3RfcHJvY2Vzc29yKGxvZ2dlcjogQW55LCBtZXRob2Q6IHN0ciwgZXZlbnRfZGljdDogRGljdFtzdHIsIEFueV0pIC0+IERpY3Rbc3RyLCBBbnldOgogICAgIiIiCiAgICBQMTEtTFItMzogc3RydWN0bG9nIHByb2Nlc3NvciDigJQgYWRkIHRvIHByb2Nlc3NvciBjaGFpbi4KICAgIFVzYWdlOiBzdHJ1Y3Rsb2cuY29uZmlndXJlKHByb2Nlc3NvcnM9Wy4uLiwgc3RydWN0bG9nX3JlZGFjdF9wcm9jZXNzb3IsIC4uLl0pCiAgICAiIiIKICAgIHJldHVybiByZWRhY3RfZGljdChldmVudF9kaWN0KQo=
+"""
+backend/core/log_redactor.py
+Galaxy Vast AI — Log Redaction Layer (Phase 11)
+
+P11-LR-1: تمام log recordها را قبل از emit بررسی می‌کند
+P11-LR-2: 15 pattern برای redact: JWT، password، card، MT5، API key
+P11-LR-3: structlog و stdlib logging هر دو پوشش داده می‌شوند
+P11-LR-4: Redacted value → [REDACTED:TYPE] برای debugging
+P11-LR-5: False positive rate پایین — فقط key=value patterns
+"""
+from __future__ import annotations
+
+import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
+    (
+        "jwt",
+        re.compile(
+            r"(eyJ[A-Za-z0-9_-]{4,}\.eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,})",
+            re.ASCII,
+        ),
+        "[REDACTED:JWT]",
+    ),
+    (
+        "bearer",
+        re.compile(r"(Bearer\s+)[A-Za-z0-9_\-\.]{10,}", re.IGNORECASE),
+        r"\1[REDACTED:BEARER]",
+    ),
+    (
+        "password",
+        re.compile(
+            r'(password|passwd|pwd|pass)(\s*[:=]\s*)["\']?([^\s"\']&,;}{]{3,})["\']?',
+            re.IGNORECASE,
+        ),
+        r"\1\2[REDACTED:PASSWORD]",
+    ),
+    (
+        "secret",
+        re.compile(
+            r'((?:secret|api_?key|api_?token|access_?token|refresh_?token|'
+            r'client_?secret|private_?key|signing_?key|license_?key|license_?secret|'
+            r'license_?salt|mql5_?api_?token|telegram_?bot_?token|telegram_?webhook_?secret|'
+            r'jwt_?secret(?:_?key)?|supabase_?(?:service_?)?key|master_?key|'
+            r'\w+_secret(?:_key)?|\w+_?password|\w+_?api_?(?:key|token))'
+            r')(\s*[:=]\s*)["\']?([^\s"\']&,;}{]{4,})["\']?',
+            re.IGNORECASE,
+        ),
+        r"\1\2[REDACTED:SECRET]",
+    ),
+    (
+        "card",
+        re.compile(r"\b([3-6]\d{3})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{1,7}\b"),
+        r"\1-****-****-[REDACTED:CARD]",
+    ),
+    (
+        "mt5_password",
+        re.compile(
+            r"(mt5_password|MT5_PASSWORD|mt5.*pass)(\s*[:=]\s*)(\S+)",
+            re.IGNORECASE,
+        ),
+        r"\1\2[REDACTED:MT5_PASSWORD]",
+    ),
+    (
+        "supabase",
+        re.compile(r"(eyJ[A-Za-z0-9_-]{50,})", re.ASCII),
+        "[REDACTED:SUPABASE_KEY]",
+    ),
+    (
+        "hex_secret",
+        re.compile(r"\b([0-9a-fA-F]{32,})\b"),
+        "[REDACTED:HEX_SECRET]",
+    ),
+]
+
+_SENSITIVE_KEYS = frozenset({
+    "password", "passwd", "pwd", "pass",
+    "secret", "jwt_secret", "jwt_secret_key",
+    "api_key", "apikey", "api_token",
+    "access_token", "refresh_token", "id_token",
+    "client_secret", "private_key", "signing_key",
+    "license_key", "license_secret", "license_salt",
+    "mql5_api_token",
+    "telegram_bot_token", "telegram_webhook_secret",
+    "supabase_key", "supabase_service_key",
+    "master_key", "secrets_master_key",
+    "mt5_password",
+    "card_number", "pan", "cvv", "cvc",
+    "authorization",
+    "x-api-key",
+    "cookie",
+})
+
+
+def redact_string(text: str) -> str:
+    """Apply all redaction patterns to a string."""
+    for _name, pattern, replacement in _PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def redact_dict(data: Dict[str, Any], depth: int = 0) -> Dict[str, Any]:
+    """Recursively redact sensitive keys from a dict (max 5 levels)."""
+    if depth > 5:
+        return data
+    result = {}
+    for k, v in data.items():
+        key_lower = k.lower().replace("-", "_")
+        if key_lower in _SENSITIVE_KEYS:
+            result[k] = "[REDACTED]"
+        elif isinstance(v, dict):
+            result[k] = redact_dict(v, depth + 1)
+        elif isinstance(v, str):
+            result[k] = redact_string(v)
+        elif isinstance(v, (list, tuple)):
+            result[k] = [
+                redact_dict(i, depth + 1) if isinstance(i, dict)
+                else redact_string(i) if isinstance(i, str)
+                else i
+                for i in v
+            ]
+        else:
+            result[k] = v
+    return result
+
+
+class RedactionFilter(logging.Filter):
+    """P11-LR-3: stdlib logging filter — redacts msg, args, extra fields."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = redact_string(record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = redact_dict(record.args)
+            elif isinstance(record.args, tuple):
+                record.args = tuple(
+                    redact_string(a) if isinstance(a, str) else a
+                    for a in record.args
+                )
+        _SKIP = {
+            "msg", "args", "exc_info", "exc_text", "stack_info",
+            "name", "levelname", "levelno", "pathname", "filename",
+            "module", "funcName", "lineno", "created", "msecs",
+            "relativeCreated", "thread", "threadName", "processName",
+            "process", "message",
+        }
+        for attr in list(vars(record).keys()):
+            if attr in _SKIP:
+                continue
+            val = getattr(record, attr)
+            if isinstance(val, str):
+                setattr(record, attr, redact_string(val))
+            elif isinstance(val, dict):
+                setattr(record, attr, redact_dict(val))
+        return True
+
+
+def install_redaction_filter(logger_name: Optional[str] = None) -> None:
+    """Install RedactionFilter on root (or named) logger. Call once at startup."""
+    target = logging.getLogger(logger_name)
+    f = RedactionFilter()
+    if not any(isinstance(x, RedactionFilter) for x in target.filters):
+        target.addFilter(f)
+    for handler in target.handlers:
+        if not any(isinstance(x, RedactionFilter) for x in handler.filters):
+            handler.addFilter(f)
+
+
+def structlog_redact_processor(logger: Any, method: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """P11-LR-3: structlog processor. Add to processor chain at startup."""
+    return redact_dict(event_dict)
