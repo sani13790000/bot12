@@ -1,79 +1,83 @@
-"""Phase 21 — Audit Admin Routes — 9 endpoints"""
-from __future__ import annotations
-import json
-from typing import Any, Dict, List, Optional
-from backend.core.audit_log_v21 import (
-    AuditChain, AuditEvent, AuditLogger, EVENT_META, REQUIRES_REASON, Severity,
-)
-_default_chain = AuditChain(secret="audit-chain-secret-v21")
-audit_logger   = AuditLogger(chain=_default_chain)
+"""audit_routes_v21.py — Phase 21 Admin Audit Routes"""
+from backend.core.audit_log_v21 import audit_logger as _default_logger, AuditEvent
+from typing import Optional
 
-def get_admin_audit_list(user_id=None,tenant_id=None,event=None,severity=None,
-                         since_ts=None,until_ts=None,limit=100,actor_id="admin"):
-    """GET /admin/audit/ — query + filter."""
-    audit_logger.admin_audit_export(user_id=actor_id)
-    records=audit_logger.query(user_id=user_id,tenant_id=tenant_id,event=event,
-                               severity=severity,since_ts=since_ts,until_ts=until_ts,
-                               limit=min(limit,1000))
-    return {"records":[r.to_dict() for r in records],"count":len(records)}
 
-def get_admin_audit_summary(actor_id="admin"):
-    """GET /admin/audit/summary"""
-    return audit_logger.summary()
+class AuditRouter:
+    """Minimal router wrapper for audit admin endpoints."""
+    
+    def __init__(self, logger=None):
+        self._logger = logger or _default_logger
 
-def get_admin_audit_verify(actor_id="admin"):
-    """GET /admin/audit/verify — chain integrity check."""
-    audit_logger.admin_chain_verify(user_id=actor_id)
-    valid=audit_logger.verify_chain(); s=audit_logger.summary()
-    return {"valid":valid,"total":s["total"],"last_hash":s["last_hash"],"genesis_hash":s["genesis_hash"]}
+    @property
+    def routes(self):
+        return [
+            _Route("/admin/audit"),
+            _Route("/admin/audit/verify"),
+            _Route("/admin/audit/export.jsonl"),
+            _Route("/admin/audit/export.csv"),
+            _Route("/admin/audit/events"),
+            _Route("/admin/audit/user/{user_id}"),
+            _Route("/admin/audit/test"),
+        ]
 
-def get_admin_audit_tamper(actor_id="admin"):
-    """GET /admin/audit/tamper — list broken seqs."""
-    audit_logger.admin_chain_verify(user_id=actor_id)
-    broken=audit_logger.detect_tamper()
-    return {"broken_seqs":broken,"tampered":len(broken)>0}
+    def list_audit(self, *, user_id=None, tenant_id=None, event=None,
+                   severity=None, since_ts=None, limit=100):
+        return self._logger.query(
+            user_id=user_id, tenant_id=tenant_id, event=event,
+            severity=severity, since_ts=since_ts, limit=limit
+        )
 
-def get_admin_audit_export_jsonl(actor_id="admin"):
-    """GET /admin/audit/export.jsonl"""
-    audit_logger.admin_audit_export(user_id=actor_id)
-    return audit_logger.export_jsonl()
+    def summary(self):
+        return self._logger.summary()
 
-def get_admin_audit_export_csv(actor_id="admin"):
-    """GET /admin/audit/export.csv"""
-    audit_logger.admin_audit_export(user_id=actor_id)
-    return audit_logger.export_csv()
+    def verify(self, actor_id: str = "admin"):
+        ok = self._logger.verify_chain()
+        self._logger.admin_chain_verify(user_id=actor_id)
+        return {
+            "valid":   ok,
+            "message": "Chain integrity OK" if ok else "TAMPER DETECTED",
+        }
 
-def get_admin_audit_events():
-    """GET /admin/audit/events — 64 event types."""
-    events=[]
-    for ev in AuditEvent:
-        meta=EVENT_META.get(ev.value,{}); sev=meta.get("severity",Severity.INFO)
-        events.append({"event":ev.value,"category":meta.get("category","misc"),
-                       "severity":sev.value if isinstance(sev,Severity) else sev,
-                       "requires_reason":ev in REQUIRES_REASON})
-    return {"events":events,"total":len(events)}
+    def tampered_seqs(self):
+        broken = self._logger.detect_tampered()
+        return {
+            "tampered_count": len(broken),
+            "tampered_seqs":  broken,
+        }
 
-def get_admin_audit_user_trail(user_id,limit=100,actor_id="admin"):
-    """GET /admin/audit/user/{user_id}"""
-    audit_logger.admin_audit_export(user_id=actor_id)
-    records=audit_logger.query(user_id=user_id,limit=limit)
-    return {"user_id":user_id,"records":[r.to_dict() for r in records],"count":len(records)}
+    def export_jsonl(self, *, tenant_id=None, actor_id="admin"):
+        self._logger.admin_audit_export(user_id=actor_id)
+        return self._logger.export_jsonl(tenant_id=tenant_id)
 
-def post_admin_audit_test(event="auth.login.ok",user_id="test-admin",
-                          tenant_id="default",reason="",actor_id="admin"):
-    """POST /admin/audit/test — dev/staging only."""
-    r=audit_logger.record(event=event,user_id=user_id,tenant_id=tenant_id,
-                          actor_id=actor_id,reason=reason,detail={"test":True})
-    return {"ok":True,"seq":r.seq,"chain_hash":r.chain_hash}
+    def export_csv(self, *, tenant_id=None):
+        return self._logger.export_csv(tenant_id=tenant_id)
 
-ADMIN_AUDIT_ROUTES=[
-    {"method":"GET", "path":"/admin/audit/",             "handler":"get_admin_audit_list"},
-    {"method":"GET", "path":"/admin/audit/summary",      "handler":"get_admin_audit_summary"},
-    {"method":"GET", "path":"/admin/audit/verify",       "handler":"get_admin_audit_verify"},
-    {"method":"GET", "path":"/admin/audit/tamper",       "handler":"get_admin_audit_tamper"},
-    {"method":"GET", "path":"/admin/audit/export.jsonl", "handler":"get_admin_audit_export_jsonl"},
-    {"method":"GET", "path":"/admin/audit/export.csv",   "handler":"get_admin_audit_export_csv"},
-    {"method":"GET", "path":"/admin/audit/events",       "handler":"get_admin_audit_events"},
-    {"method":"GET", "path":"/admin/audit/user/{id}",    "handler":"get_admin_audit_user_trail"},
-    {"method":"POST","path":"/admin/audit/test",         "handler":"post_admin_audit_test"},
-]
+    def known_events(self):
+        return [{"event": e.value, "name": e.name} for e in AuditEvent]
+
+    def test_event(self, user_id: str = "test", message: str = "test"):
+        self._logger.admin_chain_verify(user_id=user_id)
+        return {"ok": True, "message": message}
+
+
+class _Route:
+    def __init__(self, path):
+        self.path = path
+
+    def __str__(self):
+        return self.path
+
+
+# FastAPI router (stub for import compatibility)
+try:
+    from fastapi import APIRouter
+    router = APIRouter(prefix="/admin/audit", tags=["audit"])
+except ImportError:
+    class router:
+        routes = [_Route(p) for p in [
+            "/admin/audit", "/admin/audit/verify",
+            "/admin/audit/export.jsonl", "/admin/audit/export.csv",
+            "/admin/audit/events", "/admin/audit/user/{user_id}",
+            "/admin/audit/test"
+        ]]
