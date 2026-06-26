@@ -1,0 +1,35 @@
+# infra/prometheus/alert_rules.yml — Phase 15
+groups:
+  - name: galaxyvast
+    rules:
+      - alert: APIDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is down"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name=~"galaxyvast.*"} > 1.8e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container memory > 1.8GB"
+
+      - alert: DrawdownCritical
+        expr: equity_drawdown_pct > 0.10
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Drawdown > 10% — kill switch may trigger"
