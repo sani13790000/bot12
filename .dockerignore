@@ -1,77 +1,75 @@
-# .dockerignore — Phase 15 hardened
-# Keeps Docker image lean + protects source code
-
-# Git
+# ── VCS ──────────────────────────────────────────────────────────────────────
 .git
 .gitignore
+.gitattributes
 
-# Node
-node_modules
-npm-debug.log
-frontend/node_modules
-frontend/.next
-frontend/dist
+# ── MQL5 source (P14-FIX-4 / P17-FIX-DI-1) — NEVER in Docker image ─────────
+mql5/
+*.mq5
+*.mqh
 
-# Python
-__pycache__
+# ── Release artifacts ─────────────────────────────────────────────────────────
+releases/
+scripts/
+
+# ── Python artifacts ──────────────────────────────────────────────────────────
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-*.egg-info
-dist
-build
-.eggs
-.mypy_cache
-.pytest_cache
-.coverage
-htmlcov
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
 
-# Models (large files)
-models/
-*.pkl
-*.joblib
-*.h5
-*.pt
-*.pth
+# ── Tests (not needed in runtime image) ──────────────────────────────────────
+backend/tests/
+**/test_*.py
+**/*_test.py
+conftest.py
 
-# Logs
-logs/
-*.log
-
-# Env files
+# ── Environment / secrets ─────────────────────────────────────────────────────
 .env
-.env.local
-.env.*.local
+.env.*
+*.env
+*.secret
+secrets/
 
-# IDE
-.vscode
-.idea
+# ── Frontend build artifacts (built separately) ───────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+node_modules/
+
+# ── Dev tools ─────────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+coverage.xml
+.coverage
+htmlcov/
+
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Docker
-docker-compose*.yml
-Dockerfile*
-
-# Docs
+# ── Docs / CI config ─────────────────────────────────────────────────────────
 docs/
 *.md
-!README.md
+.github/
+.pre-commit-config.yaml
 
-# P15-FIX-4: MQL5 source MUST NOT go into Docker image
-mql5/
-*.mq5
-*.mqh
-*.ex5
-
-# Release artifacts
-releases/
-source_archive/
-
-# Scripts
-scripts/
+# ── Infra (not in app image) ──────────────────────────────────────────────────
+infra/
+docker-compose*.yml
+Makefile
