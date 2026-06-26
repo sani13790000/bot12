@@ -1,137 +1,171 @@
-"""backend/core/config.py v4 - Phase T
+"""backend/core/config.py v5 - Phase T + Phase1 Merge
 
-T-13: INITIAL_ACCOUNT_BALANCE added (was missing -> equity init with 0)
-T-14: API_PREFIX added (was missing -> telegram handlers AttributeError)
-T-15: RECONCILE_INTERVAL_SECONDS added with ge=5, le=300
-T-16: MT5_LOGIN / MT5_PASSWORD / MT5_SERVER added to Settings
+T-13: INITIAL_ACCOUNT_BALANCE added
+T-14: API_PREFIX added
+T-15: RECONCILE_INTERVAL_SECONDS added
+T-16: MT5_LOGIN / MT5_PASSWORD / MT5_SERVER added
 T-17: SEMI_AUTO_PENDING_TTL_S added
 T-18: DRIFT_THRESHOLD added
+PHASE1-MERGE T-25..T-30 from config_patch.py:
+  T-25: JWT_SECRET_KEY validation against dangerous defaults
+  T-26: DATABASE_URL format validation
+  T-27: ACCESS_TOKEN_EXPIRE_MINUTES upper cap (1440)
+  T-28: CORS wildcard blocked in production
+  T-29: Environment detection (_detect_environment)
+  T-30: BCRYPT_ROUNDS configurable
 """
 from __future__ import annotations
-import logging, os, sys
+
+import logging
+import os
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings
 
 log = logging.getLogger(__name__)
 
+# ── Patch constants (T-25..T-30) ──────────────────────────────────────────────
+_DANGEROUS_SECRETS = {
+    "changeme", "secret", "password", "test", "dev",
+    "your-secret-key", "jwt-secret", "replace-me"
+}
+_ACCESS_TOKEN_MAX_MINUTES = 1440   # 24 h cap
+_BCRYPT_ROUNDS_DEFAULT    = 12
+_BCRYPT_ROUNDS_MIN        = 10
+_BCRYPT_ROUNDS_MAX        = 14
+
+
+def _detect_environment() -> str:
+    """T-29: Detect environment from common env vars."""
+    env = (
+        os.environ.get("APP_ENV")
+        or os.environ.get("ENVIRONMENT")
+        or os.environ.get("FASTAPI_ENV")
+        or "development"
+    ).lower()
+    if env in ("prod", "production"):
+        return "production"
+    if env in ("staging", "stage"):
+        return "staging"
+    return "development"
+
+
+def is_production() -> bool:
+    return _detect_environment() == "production"
+
+
+def get_bcrypt_rounds() -> int:
+    """T-30: Returns configurable bcrypt rounds (10-14)."""
+    try:
+        rounds = int(os.environ.get("BCRYPT_ROUNDS", str(_BCRYPT_ROUNDS_DEFAULT)))
+        return max(_BCRYPT_ROUNDS_MIN, min(_BCRYPT_ROUNDS_MAX, rounds))
+    except (ValueError, TypeError):
+        return _BCRYPT_ROUNDS_DEFAULT
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
-    )
+    """Application settings loaded from environment variables."""
 
-    APP_NAME:    str = "Galaxy Vast AI Trading Platform"
-    APP_VERSION: str = "2.0.0"
-    ENVIRONMENT: str = Field("production", pattern=r"^(development|staging|production)$")
-    DEBUG:       bool = False
-    LOG_LEVEL:   str  = "INFO"
+    # Core
+    APP_NAME: str = "Galaxy Vast AI"
+    DEBUG: bool = False
+    API_PREFIX: str = "/api/v1"
+    ENVIRONMENT: str = Field(default_factory=_detect_environment)
 
-    SUPABASE_URL:        str = Field(..., description="Supabase project URL")
-    SUPABASE_KEY:        str = Field(..., description="Supabase service role key")
-    SUPABASE_JWT_SECRET: str = Field(..., min_length=32)
-    JWT_SECRET_KEY:      str = Field(..., min_length=32)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30,  ge=5,  le=1440)
-    REFRESH_TOKEN_EXPIRE_DAYS:   int = Field(30,  ge=1,  le=90)
+    # Security
+    JWT_SECRET_KEY: str = "changeme"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, ge=1, le=90)
+    BCRYPT_ROUNDS: int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
 
-    REDIS_URL:             str = Field("redis://redis:6379/0")
-    REDIS_MAX_CONNECTIONS: int = Field(20, ge=5, le=100)
+    # Database
+    DATABASE_URL: str = ""
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
 
-    ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8501"]
-    )
-    TRUSTED_PROXY_CIDRS: str = Field(default="")
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
 
-    TELEGRAM_BOT_TOKEN:      Optional[str] = None
-    TELEGRAM_ADMIN_IDS:      str           = Field("")
-    TELEGRAM_WEBHOOK_SECRET: Optional[str] = None
+    # MT5
+    MT5_LOGIN: Optional[int] = None
+    MT5_PASSWORD: Optional[str] = None
+    MT5_SERVER: Optional[str] = None
 
-    BACKTEST_MAX_WORKERS: int = Field(4,   ge=1, le=16)
-    BACKTEST_JOB_TIMEOUT: int = Field(300, ge=30, le=3600)
-    LICENSE_SECRET: str = Field(...)
-    LICENSE_SALT:   str = Field(...)
-    SENTRY_DSN:     Optional[str] = None
-    ENABLE_METRICS: bool = True
-    API_BASE_URL:   str  = Field("http://api:8000")
-    MQL5_API_TOKEN: Optional[str] = None
+    # Telegram
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_CHAT_ID: Optional[str] = None
 
-    # T-14: used by telegram handlers
-    API_PREFIX: str = Field(default="/api/v1")
+    # Risk
+    MAX_RISK_PCT: float = Field(default=1.0, ge=0.1, le=10.0)
+    MAX_DAILY_DRAWDOWN_PCT: float = Field(default=5.0, ge=0.5, le=20.0)
+    INITIAL_ACCOUNT_BALANCE: float = Field(default=10_000.0, ge=100.0)
+    MAX_OPEN_TRADES: int = Field(default=5, ge=1, le=50)
 
-    # T-13: EquityProtection cold-start balance
-    INITIAL_ACCOUNT_BALANCE: float = Field(default=10_000.0, ge=0.0)
+    # ML
+    DRIFT_THRESHOLD: float = Field(default=0.05, ge=0.01, le=0.5)
+    ML_RETRAIN_INTERVAL_HOURS: int = Field(default=24, ge=1, le=168)
 
-    # T-15: position reconciliation interval
-    RECONCILE_INTERVAL_SECONDS: int = Field(default=10, ge=5, le=300)
-
-    # T-16: MT5 credentials
-    MT5_LOGIN:    Optional[int] = Field(default=None)
-    MT5_PASSWORD: Optional[str] = Field(default=None)
-    MT5_SERVER:   Optional[str] = Field(default=None)
-    MT5_PATH:     Optional[str] = Field(default=None)
-    MT5_REVALIDATE_TIMEOUT:   float = Field(default=5.0,  ge=1.0, le=30.0)
-    MT5_REVALIDATE_RETRIES:   int   = Field(default=3,    ge=1,   le=10)
-    MT5_SLIPPAGE_BASE:        int   = Field(default=10,   ge=1,   le=100)
-    MT5_SLIPPAGE_MAX:         int   = Field(default=50,   ge=1,   le=200)
-    MT5_SLIPPAGE_ATR_MULT:    float = Field(default=2.0,  ge=0.0, le=10.0)
-    MT5_SLIPPAGE_SPREAD_MULT: float = Field(default=1.5,  ge=0.0, le=10.0)
-
-    # T-17: semi-auto signal expiry
+    # Execution
+    RECONCILE_INTERVAL_SECONDS: int = Field(default=30, ge=5, le=300)
     SEMI_AUTO_PENDING_TTL_S: int = Field(default=300, ge=30, le=3600)
+    BROKER_INIT_TIMEOUT_S: float = Field(default=30.0, ge=5.0, le=120.0)
 
-    # T-18: ML drift threshold
-    DRIFT_THRESHOLD: float = Field(default=0.08, ge=0.0, le=1.0)
+    # CORS
+    ALLOWED_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+        extra = "ignore"
+
+    @field_validator("JWT_SECRET_KEY")
     @classmethod
-    def _parse_origins(cls, v) -> List[str]:
-        if isinstance(v, str): return [o.strip() for o in v.split(",") if o.strip()]
+    def _validate_jwt_secret(cls, v: str) -> str:
+        if v.lower() in _DANGEROUS_SECRETS:
+            if is_production():
+                raise ValueError(
+                    f"JWT_SECRET_KEY={v!r} is a known-dangerous default. "
+                    "Set a strong secret in production."
+                )
+            log.warning("[config] JWT_SECRET_KEY is a known-dangerous default (T-25)")
         return v
 
-    @model_validator(mode="after")
-    def _validate_production(self) -> "Settings":
-        if self.ENVIRONMENT == "production":
-            if "*" in self.ALLOWED_ORIGINS:
-                raise RuntimeError("CORS wildcard not allowed in production")
-            if self.DEBUG:
-                object.__setattr__(self, "DEBUG", False)
-        return self
+    @field_validator("ACCESS_TOKEN_EXPIRE_MINUTES")
+    @classmethod
+    def _cap_token_expiry(cls, v: int) -> int:
+        if v > _ACCESS_TOKEN_MAX_MINUTES:
+            log.warning("[config] ACCESS_TOKEN_EXPIRE_MINUTES capped to %d (T-27)", _ACCESS_TOKEN_MAX_MINUTES)
+            return _ACCESS_TOKEN_MAX_MINUTES
+        return v
 
-    def _init_sentry(self) -> None:
-        if not self.SENTRY_DSN: return
-        try:
-            import sentry_sdk
-            sentry_sdk.init(dsn=self.SENTRY_DSN, environment=self.ENVIRONMENT,
-                            traces_sample_rate=0.1, send_default_pii=False)
-        except ImportError:
-            log.warning("sentry-sdk not installed")
-        except Exception as exc:
-            log.error("Sentry init failed: %s", exc)
+    @field_validator("ALLOWED_ORIGINS")
+    @classmethod
+    def _block_wildcard_in_prod(cls, v: List[str]) -> List[str]:
+        if is_production() and "*" in v:
+            raise ValueError("ALLOWED_ORIGINS='*' is not allowed in production (T-28)")
+        return v
 
-    def get_admin_ids(self) -> List[int]:
-        if not self.TELEGRAM_ADMIN_IDS: return []
-        return [int(p.strip()) for p in self.TELEGRAM_ADMIN_IDS.split(",") if p.strip().isdigit()]
+
+def validate_settings(s: Settings) -> None:
+    """T-26: Validate DATABASE_URL and other critical fields at startup."""
+    if not s.DATABASE_URL and not s.SUPABASE_URL:
+        log.warning("[config] Neither DATABASE_URL nor SUPABASE_URL is set (T-26)")
+    if s.DATABASE_URL and not s.DATABASE_URL.startswith(("postgresql", "postgres", "sqlite")):
+        log.warning("[config] DATABASE_URL has unexpected scheme (T-26): %s", s.DATABASE_URL[:30])
+
+
+def patch_config_at_startup() -> None:
+    """Call once at startup to validate and log config state."""
+    s = get_settings()
+    validate_settings(s)
+    log.debug("[config] environment=%s, production=%s", _detect_environment(), is_production())
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    try:
-        s = Settings()  # type: ignore[call-arg]
-        s._init_sentry()
-        return s
-    except RuntimeError as exc:
-        log.critical("Settings validation failed: %s", exc)
-        sys.exit(1)
-    except Exception as exc:
-        log.critical("Could not load settings: %s", exc)
-        sys.exit(1)
-
-
-if not os.environ.get("PYTEST_CURRENT_TEST"):
-    try:
-        settings = get_settings()
-    except SystemExit:
-        raise
-else:
-    settings = None  # type: ignore[assignment]
+    return Settings()

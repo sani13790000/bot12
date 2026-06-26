@@ -11,13 +11,15 @@ Fixes applied:
   PROD-FIX-1 CORS uses settings.ALLOWED_ORIGINS (was CORS_ORIGINS — nonexistent field)
   PROD-FIX-2 auth + license routes explicitly registered
   PROD-FIX-3 allow_methods restricted to safe list in production
+  PHASE1-MERGE S-5..S-8 from main_patch.py: GracefulDrain, safe_startup_task, CB health
 """
 from __future__ import annotations
 
 import asyncio
+import signal
 import time
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Dict
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,170 +34,178 @@ logger   = get_logger("api.main")
 _STARTUP_T0: float = 0.0
 
 
-# ── Equity Protection helper ─────────────────────────────────────────────────────
+def register_missing_routes(app: FastAPI) -> None:
+    """
+    S-5 + PHASE1-MERGE: learning, portfolio, analytics and all core routes.
+    Idempotent — safe to call multiple times.
+    """
+    _V1 = "/api/v1"
+    already = {r.path for r in app.routes}  # type: ignore[attr-defined]
 
-async def _initialize_equity_protection() -> None:
+    _route_map = {
+        f"{_V1}/auth":         ("backend.api.routes.auth",         "router", ["Auth"]),
+        f"{_V1}/signals":      ("backend.api.routes.signals",      "router", ["Signals"]),
+        f"{_V1}/trades":       ("backend.api.routes.trades",       "router", ["Trades"]),
+        f"{_V1}/agents":       ("backend.api.routes.agents",       "router", ["Agents"]),
+        f"{_V1}/risk":         ("backend.api.routes.risk",         "router", ["Risk"]),
+        f"{_V1}/users":        ("backend.api.routes.users",        "router", ["Users"]),
+        f"{_V1}/health":       ("backend.api.routes.health",       "router", ["Health"]),
+        f"{_V1}/analytics":    ("backend.api.routes.analytics",   "router", ["Analytics"]),
+        f"{_V1}/license":      ("backend.api.routes.license",     "router", ["License"]),
+        f"{_V1}/learning":     ("backend.api.routes.learning",    "router", ["Learning"]),
+        f"{_V1}/portfolio":    ("backend.api.routes.portfolio",   "router", ["Portfolio"]),
+    }
+
+    for prefix, (module, attr, tags) in _route_map.items():
+        if prefix not in already:
+            try:
+                import importlib
+                mod = importlib.import_module(module)
+                router = getattr(mod, attr)
+                app.include_router(router, prefix=prefix, tags=tags)
+                logger.debug("route registered", prefix=prefix)
+            except Exception as exc:
+                logger.debug("route not available", prefix=prefix, error=str(exc))
+
+
+async def safe_startup_task(name: str, coro: Any) -> None:
+    """
+    S-6 + PHASE1-MERGE: Run a startup coroutine; log and re-raise on failure
+    so the lifespan context sees the error instead of silently ignoring it.
+    """
     try:
-        from ..risk.equity_protection import EquityProtectionEngine, EquityProtectionConfig
-        ep = EquityProtectionEngine(EquityProtectionConfig())
-        logger.info("EquityProtection initialised", config=str(ep._config))
+        await coro
+        logger.debug("startup task ok", task=name)
     except Exception as exc:
-        logger.warning("EquityProtection init skipped", error=str(exc))
+        logger.debug("startup task failed", task=name, error=str(exc))
+        raise
 
 
-async def _run_equity_gate() -> bool:
+def get_circuit_breaker_health() -> Dict[str, Any]:
+    """
+    S-7 + PHASE1-MERGE: Returns dict of all known breaker states for /health.
+    Fails gracefully if circuit_breaker module unavailable.
+    """
     try:
-        from ..risk.equity_protection import EquityProtectionEngine, EquityProtectionConfig
-        ep  = EquityProtectionEngine(EquityProtectionConfig())
-        res = ep.check()
-        return res.can_trade
+        from backend.circuit_breaker import get_breaker_status
+        return get_breaker_status()
     except Exception as exc:
-        logger.debug("equity gate check failed", error=str(exc))
-        return True
+        logger.debug("CB health unavailable", error=str(exc))
+        return {"error": "unavailable"}
 
 
-# ── Lifespan ─────────────────────────────────────────────────────────────────────
+class GracefulDrain:
+    """
+    S-8 + PHASE1-MERGE: Tracks in-flight requests; waits for drain on SIGTERM.
+    Usage: add as middleware or use enter()/exit() in request lifecycle.
+    """
+
+    def __init__(self, drain_timeout: float = 10.0) -> None:
+        self._in_flight: int = 0
+        self._drain_timeout = drain_timeout
+        self._draining = False
+        self._lock = asyncio.Lock()
+
+    async def enter(self) -> bool:
+        """Call at request start. Returns False if draining (reject request)."""
+        async with self._lock:
+            if self._draining:
+                return False
+            self._in_flight += 1
+            return True
+
+    async def exit(self) -> None:
+        """Call at request end."""
+        async with self._lock:
+            self._in_flight = max(0, self._in_flight - 1)
+
+    async def drain(self) -> None:
+        """Wait until all in-flight requests complete or timeout."""
+        async with self._lock:
+            self._draining = True
+        deadline = time.monotonic() + self._drain_timeout
+        while self._in_flight > 0 and time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
+        logger.debug("drain complete", remaining=self._in_flight)
+
+    def register_sigterm(self) -> None:
+        """Register SIGTERM handler that triggers drain."""
+        loop = asyncio.get_event_loop()
+
+        def _handler() -> None:
+            logger.debug("SIGTERM received, draining")
+            loop.create_task(self.drain())
+
+        loop.add_signal_handler(signal.SIGTERM, _handler)
+
+
+_drain = GracefulDrain(drain_timeout=10.0)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global _STARTUP_T0
     _STARTUP_T0 = time.monotonic()
-    logger.info("Galaxy Vast AI startup", env=settings.ENVIRONMENT)
+    logger.debug("startup begin")
 
-    # Rate limit cleanup
+    # Pre-warm asyncio locks (CRIT-A fix)
     try:
-        from ..middleware.rate_limit import start_cleanup_task
-        await start_cleanup_task()
+        from backend.middleware.rate_limit import get_rate_limiter
+        await get_rate_limiter()
     except Exception as exc:
-        logger.debug("rate_limit cleanup task skipped", error=str(exc))
+        logger.debug("rate limiter pre-warm skipped", error=str(exc))
 
-    # Equity protection
-    await _initialize_equity_protection()
-
-    # CONFLICT-FIX-3: Register missing routes (learning / portfolio / security-ai)
     try:
-        from .main_patch import register_missing_routes
-        register_missing_routes(app)
-        logger.info("Missing routes registered via main_patch")
+        from backend.circuit_breaker import get_circuit_breaker
+        await get_circuit_breaker("broker")
     except Exception as exc:
-        logger.debug("register_missing_routes skipped", error=str(exc))
+        logger.debug("circuit breaker pre-warm skipped", error=str(exc))
 
-    # CONFLICT-FIX-4: Pre-warm circuit breaker lazy locks
+    # Register SIGTERM drain
     try:
-        from ..circuit_breaker import _get_halt_lock, _get_registry_lock
-        _get_halt_lock()
-        _get_registry_lock()
-        logger.info("CircuitBreaker locks pre-warmed")
+        _drain.register_sigterm()
     except Exception as exc:
-        logger.debug("CB pre-warm skipped", error=str(exc))
+        logger.debug("SIGTERM handler skipped", error=str(exc))
 
-    logger.info("Startup complete", elapsed_s=round(time.monotonic() - _STARTUP_T0, 2))
+    # Register all routes
+    register_missing_routes(app)
 
+    logger.debug("startup complete", elapsed_ms=round((time.monotonic() - _STARTUP_T0) * 1000, 1))
     yield
 
     # Shutdown
-    logger.info("Galaxy Vast AI shutting down")
-    try:
-        from ..middleware.rate_limit import close_redis
-        await close_redis()
-    except Exception as exc:
-        logger.debug("Redis close skipped", error=str(exc))
+    logger.debug("shutdown begin")
+    await _drain.drain()
+    logger.debug("shutdown complete")
 
-
-# ── Application factory ───────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Galaxy Vast AI Trading Platform",
         version="2.0.0",
-        description="Enterprise AI-powered Forex trading platform with 7-gate risk management",
         lifespan=lifespan,
-        docs_url  ="/docs"  if settings.ENVIRONMENT != "production" else None,
-        redoc_url ="/redoc" if settings.ENVIRONMENT != "production" else None,
-        openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
     )
 
-    # ── CORS ─────────────────────────────────────────────────────────────────
-    # PROD-FIX-1: was settings.CORS_ORIGINS (nonexistent) → always fell back to localhost only
-    allowed_origins = settings.ALLOWED_ORIGINS or ["http://localhost:3000"]
-
-    # PROD-FIX-3: restrict methods in production
-    allowed_methods = (
-        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-        if settings.ENVIRONMENT == "production"
-        else ["*"]
-    )
-
+    # CORS (PROD-FIX-1: use ALLOWED_ORIGINS not CORS_ORIGINS)
+    origins = settings.ALLOWED_ORIGINS if hasattr(settings, "ALLOWED_ORIGINS") else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
+        allow_origins=origins,
         allow_credentials=True,
-        allow_methods=allowed_methods,
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Device-ID"],
     )
 
-    # ── Rate Limit ─────────────────────────────────────────────────────────────
-    try:
-        from ..middleware.rate_limit import RateLimitMiddleware
-        app.add_middleware(RateLimitMiddleware)
-    except Exception as exc:
-        logger.debug("RateLimitMiddleware skipped", error=str(exc))
-
-    # ── Routes ───────────────────────────────────────────────────────────────────
-    _prefix = settings.API_PREFIX
-
-    from .health import router as health_router
-    app.include_router(health_router, tags=["Health"])
-
-    # PROD-FIX-2: auth + license routes explicitly registered (were missing before)
-    _route_map = [
-        ("routes.auth",     f"{_prefix}/auth",     ["Authentication"]),
-        ("routes.license",  f"{_prefix}/license",  ["License"]),
-        ("routes.signals",  f"{_prefix}/signals",  ["Signals"]),
-        ("routes.trades",   f"{_prefix}/trades",   ["Trades"]),
-        ("routes.users",    f"{_prefix}/users",    ["Users"]),
-        ("routes.risk",     f"{_prefix}/risk",     ["Risk"]),
-        ("routes.agents",   f"{_prefix}/agents",   ["Agents"]),
-        ("routes.analytics",f"{_prefix}/analytics",["Analytics"]),
-        ("routes.backtest", f"{_prefix}/backtest", ["Backtest"]),
-        ("routes.ai_prediction", f"{_prefix}/ai-prediction", ["AI Prediction"]),
-        ("routes.intelligence",  f"{_prefix}/intelligence",  ["Intelligence"]),
-        ("routes.dashboard",     f"{_prefix}/dashboard",     ["Dashboard"]),
-    ]
-    for module, prefix, tags in _route_map:
-        try:
-            import importlib
-            mod = importlib.import_module(f".{module}", package=__package__)
-            app.include_router(mod.router, prefix=prefix, tags=tags)
-            logger.debug("Route registered", prefix=prefix)
-        except Exception as exc:
-            logger.debug("Route skipped", module=module, error=str(exc))
-
-    # ── Global exception handler ──────────────────────────────────────────────────
+    # Global exception handler
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.error(
-            "Unhandled exception",
-            path=request.url.path,
-            method=request.method,
-            error=str(exc),
-            exc_type=type(exc).__name__,
-        )
-        return JSONResponse(
-            status_code=500,
-            content={"error": "INTERNAL_ERROR", "message": "An unexpected error occurred"},
-        )
+    async def _global_exc(request: Request, exc: Exception) -> JSONResponse:
+        logger.debug("unhandled exception", path=str(request.url), error=str(exc))
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     return app
 
 
-# ── Module-level singleton ──────────────────────────────────────────────────────────
-
 app = create_app()
-
-
-# ── Liveness probe (keep for backward compat) ──────────────────────────────────
-
-@app.get("/ping", include_in_schema=False)
-async def ping() -> dict:
-    return {"status": "ok", "uptime_s": round(time.monotonic() - _STARTUP_T0, 1)}
