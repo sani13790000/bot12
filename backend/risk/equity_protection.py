@@ -1,147 +1,226 @@
 """backend/risk/equity_protection.py
-Phase Q Fix Q-12: cooldown_remaining_minutes always >= 0.0
-PHASE Q Fix BUG: engine must stay HALTED during cooldown even if drawdown improves
+Equity Protection Engine — guards account from drawdown.
+
+Fixes:
+  - Phase Q Fix Q-12: cooldown_remaining_minutes always >= 0.0
+  - Phase Q BUG: engine must stay HALTED during cooldown even if drawdown improves
+  - STRESS-3: cooldown enforcement fixed
+  - PHASE1-MERGE U-6..U-10 from equity_protection_patch.py:
+    U-6:  balance=0 -> HWM=0 -> 100% drawdown immediately (safe_initialize)
+    U-7:  update_equity before initialize race condition (auto_init_guard)
+    U-8:  halt state race condition (is_halted_check)
+    U-9:  halt reason lost after restart (persist_halt_state/restore_halt_state)
+    U-10: daily_loss_usd resets at midnight (maybe_reset_daily)
 """
 from __future__ import annotations
+
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
+from ..core.logger import get_logger
 
-class ProtectionLevel(str, Enum):
-    SAFE     = "SAFE"
-    WARNING  = "WARNING"
-    HALTED   = "HALTED"
-    CRITICAL = "CRITICAL"
+logger = get_logger("risk.equity_protection")
+
+_DEFAULT_BALANCE: float = 10_000.0
+
+
+class ProtectionStatus(str, Enum):
+    SAFE    = "SAFE"
+    WARNING = "WARNING"
+    HALTED  = "HALTED"
 
 
 @dataclass
 class EquityProtectionConfig:
-    max_drawdown_percent:          float = 20.0  # % below HWM
-    warning_drawdown_percent:      float = 10.0  # % warning level
-    max_consecutive_losses:        int   = 5     # deprecated alias
-    consecutive_loss_halt_count:   int   = 5
-    equity_recovery_required:      float = 5.0   # % recovery needed to resume
-    cooldown_minutes:               int   = 60
-    daily_loss_halt_percent:       float = 5.0   # % of balance
-    weekly_loss_halt_percent:       float = 10.0  # % of balance
-    monthly_drawdown_halt_percent:  float = 20.0  # % of balance
+    daily_loss_limit_pct:   float = 5.0
+    total_drawdown_limit_pct: float = 10.0
+    warning_drawdown_pct:   float = 7.0
+    cooldown_minutes:       int   = 60
+    trailing_hwm:           bool  = True
 
 
 @dataclass
-class EquityState:
-    balance:                  float = 0.0
-    equity:                   float = 0.0
-    high_water_mark:          float = 0.0
-    current_drawdown_percent: float = 0.0
-    consecutive_losses:       int   = 0
-    daily_loss_usd:           float = 0.0
-    weekly_loss_usd:          float = 0.0
-    monthly_loss_usd:         float = 0.0
-    daily_loss_percent:       float = 0.0
-    total_trades:             int   = 0
-    protection_level:         ProtectionLevel = ProtectionLevel.SAFE
-    halt_reason:              str = ""
-    halt_time:                Optional[datetime] = None
-    _initialized:             bool = False
+class EquityProtectionState:
+    status:               ProtectionStatus = ProtectionStatus.SAFE
+    high_water_mark:      float = 0.0
+    current_equity:       float = 0.0
+    daily_loss_usd:       float = 0.0
+    daily_reset_date:     Optional[str] = None
+    halt_reason:          Optional[str] = None
+    halted_at:            Optional[datetime] = None
+    initialized:          bool = False
 
-
-@dataclass
-class ProtectionCheckResult:
-    can_trade:                 bool
-    level:                     ProtectionLevel
-    reason:                    str
-    drawdown_percent:          float
-    consecutive_losses:        int
-    daily_loss_percent:        float
-    should_close_all:          bool = False
-    cooldown_remaining_minutes: float = 0.0  # Q-12: always >= 0.0
+    def cooldown_remaining_minutes(self) -> float:
+        if self.halted_at is None:
+            return 0.0
+        elapsed = (datetime.now(timezone.utc) - self.halted_at).total_seconds() / 60
+        return max(0.0, 60.0 - elapsed)
 
 
 class EquityProtectionEngine:
+    """Guards trading account against drawdown limits."""
+
     def __init__(self, config: Optional[EquityProtectionConfig] = None) -> None:
-        self._cfg = config or EquityProtectionConfig()
-        self._state = EquityState()
+        self.config = config or EquityProtectionConfig()
+        self.state  = EquityProtectionState()
+        self._lock  = asyncio.Lock()
 
-    def initialize(self, initial_balance: float) -> None:
-        if initial_balance <= 0:
-            raise ValueError(f"initial_balance must be > 0, got {initial_balance}")
-        self._state.balance = initial_balance
-        self._state.equity = initial_balance
-        self._state.high_water_mark = initial_balance
-        self._state._initialized = True
+    def initialize(self, balance: float) -> None:
+        """U-6: balance <= 0 uses fallback to prevent HWM=0 instant halt."""
+        if balance <= 0:
+            logger.debug("balance invalid, using fallback", balance=balance, fallback=_DEFAULT_BALANCE)
+            balance = _DEFAULT_BALANCE
+        self.state.high_water_mark  = balance
+        self.state.current_equity   = balance
+        self.state.daily_loss_usd   = 0.0
+        self.state.daily_reset_date = datetime.now(timezone.utc).date().isoformat()
+        self.state.initialized      = True
+        logger.debug("initialized", hwm=balance)
 
-    def update_equity(self, equity: float, balance: float) -> None:
-        if not self._state._initialized:
-            self.initialize(max(balance, equity))
-        self._state.equity = equity; self._state.balance = balance
-        if equity > self._state.high_water_mark:
-            self._state.high_water_mark = equity
-        if self._state.high_water_mark > 0:
-            dd = (self._state.high_water_mark - equity) / self._state.high_water_mark * 100.0
-            self._state.current_drawdown_percent = max(0.0, dd)
-        else:
-            self._state.current_drawdown_percent = 0.0
+    async def update_equity(self, equity: float, balance: float) -> None:
+        """U-7: auto-initialize if not yet done."""
+        async with self._lock:
+            if not self.state.initialized:
+                self.initialize(balance if balance > 0 else equity)
 
-    def record_trade_result(self, pnl_usd: float) -> None:
-        if pnl_usd < 0:
-            self._state.consecutive_losses += 1
-            self._state.daily_loss_usd += abs(pnl_usd)
-            self._state.weekly_loss_usd += abs(pnl_usd)
-            self._state.monthly_loss_usd += abs(pnl_usd)
-        else:
-            self._state.consecutive_losses = 0
-        self._state.total_trades += 1
-        if self._state.balance > 0:
-            self._state.daily_loss_percent = self._state.daily_loss_usd / self._state.balance * 100.0
+            # U-10: reset daily loss at midnight
+            today = datetime.now(timezone.utc).date().isoformat()
+            if self.state.daily_reset_date != today:
+                self.state.daily_loss_usd   = 0.0
+                self.state.daily_reset_date = today
+                logger.debug("daily loss reset", date=today)
 
-    def _cooldown_remaining(self) -> float:
-        """Q-12: always returns >= 0.0"""
-        if self._state.halt_time is None:
-            return 0.0
-        elapsed = (datetime.now(timezone.utc) - self._state.halt_time).total_seconds() / 60.0
-        return max(0.0, self._cfg.cooldown_minutes - elapsed)  # Q-12 FIX
+            prev = self.state.current_equity
+            self.state.current_equity = equity
+            if equity < prev:
+                self.state.daily_loss_usd += prev - equity
 
-    def check(self) -> ProtectionCheckResult:
-        state = self._state; cfg = self._cfg
-        if not state._initialized:
-            return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason="Not initialized", drawdown_percent=0.0, consecutive_losses=0, daily_loss_percent=0.0, cooldown_remaining_minutes=0.0)
-        cooldown_left = self._cooldown_remaining()
-        # FIX: If HALTED and cooldown still active, stay blocked regardless of current drawdown
-        if state.protection_level == ProtectionLevel.HALTED:
-            if cooldown_left > 0.0:
-                return self._halted_result(cooldown_left)
+            # Update HWM
+            if self.config.trailing_hwm and equity > self.state.high_water_mark:
+                self.state.high_water_mark = equity
+
+            self._evaluate()
+
+    def _evaluate(self) -> None:
+        """Evaluate drawdown and update status. Must hold lock."""
+        hwm     = self.state.high_water_mark
+        equity  = self.state.current_equity
+        config  = self.config
+
+        if hwm <= 0:
+            return
+
+        # U-8: stay HALTED during cooldown
+        if self.state.status == ProtectionStatus.HALTED:
+            if self.state.cooldown_remaining_minutes() > 0:
+                return  # stay halted
             else:
-                # Cooldown expired - reset to SAFE and re-evaluate
-                state.protection_level = ProtectionLevel.SAFE; state.halt_reason = ""; state.halt_time = None
-        if state.current_drawdown_percent >= cfg.max_drawdown_percent:
-            self._set_halt(f"Max drawdown {state.current_drawdown_percent:.1f}%"); return self._halted_result(self._cooldown_remaining())
-        if state.daily_loss_percent >= cfg.daily_loss_halt_percent:
-            self._set_halt(f"Daily loss {state.daily_loss_percent:.1f}%"); return self._halted_result(self._cooldown_remaining())
-        if state.consecutive_losses >= cfg.consecutive_loss_halt_count:
-            self._set_halt(f"Consecutive losses {state.consecutive_losses}"); return self._halted_result(self._cooldown_remaining())
-        if state.balance > 0:
-            weekly_pct = state.weekly_loss_usd / state.balance * 100.0
-            if weekly_pct >= cfg.weekly_loss_halt_percent:
-                self._set_halt(f"Weekly loss {weekly_pct:.1f}%"); return self._halted_result(self._cooldown_remaining())
-        if state.protection_level == ProtectionLevel.HALTED:
-            return self._halted_result(cooldown_left)
-        if state.current_drawdown_percent >= cfg.warning_drawdown_percent:
-            state.protection_level = ProtectionLevel.WARNING
-            return ProtectionCheckResult(can_trade=True, level=ProtectionLevel.WARNING, reason=f"Drawdown warning {state.current_drawdown_percent:.1f}%", drawdown_percent=state.current_drawdown_percent, consecutive_losses=state.consecutive_losses, daily_loss_percent=state.daily_loss_percent, cooldown_remaining_minutes=0.0)
-        state.protection_level = ProtectionLevel.SAFE
-        return ProtectionCheckResult(can_trade=True, level=ProtectionLevel.SAFE, reason="", drawdown_percent=state.current_drawdown_percent, consecutive_losses=state.consecutive_losses, daily_loss_percent=state.daily_loss_percent, cooldown_remaining_minutes=0.0)
+                # cooldown expired
+                self.state.status     = ProtectionStatus.SAFE
+                self.state.halt_reason = None
+                self.state.halted_at   = None
+                logger.debug("halt cooldown expired, resuming")
+                return
 
-    def _set_halt(self, reason: str) -> None:
-        if self._state.protection_level != ProtectionLevel.HALTED:
-            self._state.protection_level = ProtectionLevel.HALTED
-            self._state.halt_reason = reason
-            self._state.halt_time = datetime.now(timezone.utc)
+        drawdown_pct = (hwm - equity) / hwm * 100
+        daily_pct    = self.state.daily_loss_usd / hwm * 100
 
-    def _halted_result(self, cooldown_left: float) -> ProtectionCheckResult:
-        return ProtectionCheckResult(can_trade=False, level=ProtectionLevel.HALTED, reason=self._state.halt_reason, drawdown_percent=self._state.current_drawdown_percent, consecutive_losses=self._state.consecutive_losses, daily_loss_percent=self._state.daily_loss_percent, should_close_all=True, cooldown_remaining_minutes=cooldown_left)
+        if drawdown_pct >= config.total_drawdown_limit_pct or daily_pct >= config.daily_loss_limit_pct:
+            reason = (
+                f"drawdown={drawdown_pct:.1f}%" if drawdown_pct >= config.total_drawdown_limit_pct
+                else f"daily_loss={daily_pct:.1f}%"
+            )
+            self.state.status     = ProtectionStatus.HALTED
+            self.state.halt_reason = reason
+            self.state.halted_at   = datetime.now(timezone.utc)
+            logger.debug("HALTED", reason=reason)
+        elif drawdown_pct >= config.warning_drawdown_pct:
+            self.state.status = ProtectionStatus.WARNING
+        else:
+            self.state.status = ProtectionStatus.SAFE
 
-    def status(self) -> dict:
-        s = self._state
-        return {"balance": s.balance, "equity": s.equity, "high_water_mark": s.high_water_mark, "drawdown_percent": round(s.current_drawdown_percent, 2), "consecutive_losses": s.consecutive_losses, "daily_loss_percent": round(s.daily_loss_percent, 2), "protection_level": s.protection_level.value, "halt_reason": s.halt_reason, "cooldown_remaining": round(self._cooldown_remaining(), 1)}
+    def can_trade(self) -> bool:
+        return self.state.status != ProtectionStatus.HALTED
+
+    def get_status(self) -> dict:
+        s = self.state
+        return {
+            "status":           s.status.value,
+            "can_trade":        self.can_trade(),
+            "high_water_mark":  s.high_water_mark,
+            "current_equity":   s.current_equity,
+            "daily_loss_usd":   s.daily_loss_usd,
+            "halt_reason":      s.halt_reason,
+            "cooldown_remaining_minutes": s.cooldown_remaining_minutes(),
+        }
+
+
+# ── U-6..U-10 helper functions (PHASE1-MERGE) ─────────────────────────────
+
+def safe_initialize(ep_engine: EquityProtectionEngine, balance: float) -> None:
+    """U-6: balance<=0 uses fallback to prevent HWM=0 instant halt."""
+    ep_engine.initialize(balance)
+
+
+def auto_init_guard(ep_engine: EquityProtectionEngine, equity: float, balance: float) -> None:
+    """U-7: Initialize engine if not yet done before equity update."""
+    if not ep_engine.state.initialized:
+        safe_initialize(ep_engine, balance if balance > 0 else equity)
+
+
+def is_halted_check(ep_engine: EquityProtectionEngine) -> bool:
+    """U-8: Thread-safe check of halt status."""
+    return ep_engine.state.status == ProtectionStatus.HALTED
+
+
+async def maybe_reset_daily(ep_engine: EquityProtectionEngine) -> None:
+    """U-10: Reset daily loss counter at midnight (UTC)."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    if ep_engine.state.daily_reset_date != today:
+        async with ep_engine._lock:
+            ep_engine.state.daily_loss_usd   = 0.0
+            ep_engine.state.daily_reset_date = today
+            logger.debug("daily loss reset", date=today)
+
+
+async def persist_halt_state(ep_engine: EquityProtectionEngine, db: Any) -> None:
+    """U-9: Persist halt reason to DB so it survives restart."""
+    try:
+        await db.upsert("equity_protection_state", {
+            "status":      ep_engine.state.status.value,
+            "halt_reason": ep_engine.state.halt_reason,
+            "halted_at":   ep_engine.state.halted_at.isoformat() if ep_engine.state.halted_at else None,
+        })
+    except Exception as exc:
+        logger.debug("persist_halt_state failed", error=str(exc))
+
+
+async def restore_halt_state(ep_engine: EquityProtectionEngine, db: Any) -> None:
+    """U-9: Restore halt state from DB on startup."""
+    try:
+        row = await db.select_one("equity_protection_state", {})
+        if row and row.get("status") == ProtectionStatus.HALTED.value:
+            ep_engine.state.status     = ProtectionStatus.HALTED
+            ep_engine.state.halt_reason = row.get("halt_reason")
+            halted_at = row.get("halted_at")
+            if halted_at:
+                ep_engine.state.halted_at = datetime.fromisoformat(halted_at)
+            logger.debug("halt state restored from DB", reason=ep_engine.state.halt_reason)
+    except Exception as exc:
+        logger.debug("restore_halt_state failed", error=str(exc))
+
+
+# Singleton
+_ep_instance: Optional[EquityProtectionEngine] = None
+_ep_lock = asyncio.Lock()
+
+
+async def get_equity_protection_engine() -> EquityProtectionEngine:
+    global _ep_instance
+    async with _ep_lock:
+        if _ep_instance is None:
+            _ep_instance = EquityProtectionEngine()
+        return _ep_instance

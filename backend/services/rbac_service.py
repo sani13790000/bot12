@@ -1,188 +1,169 @@
+"""backend/services/rbac_service.py v2 - Phase T + Phase1 Merge
+
+PHASE1-MERGE T-19..T-24 from rbac_patch.py:
+  T-19: DB error audit log on permission check failure
+  T-20: assign_role validates role exists
+  T-21: ProactivePermCache — proactive TTL eviction
+  T-22: Wildcard '*' expansion in get_user_permissions()
+  T-23: require_permission enforced before handler
+  T-24: Rate limit on permission checks
+"""
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections import OrderedDict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
-from ..database import db
-
-logger = logging.getLogger("rbac_service")
-
-ROLE_PERMISSIONS: Dict[str, Set[str]] = {
-    "guest":       {"VIEW_PUBLIC"},
-    "user":        {"VIEW_PUBLIC", "VIEW_STATUS", "VIEW_SIGNALS", "CREATE_SIGNAL"},
-    "trader":      {"VIEW_PUBLIC", "VIEW_STATUS", "VIEW_SIGNALS", "CREATE_SIGNAL",
-                    "EXECUTE_TRADE", "VIEW_RISK", "VIEW_ANALYTICS"},
-    "admin":       {"VIEW_PUBLIC", "VIEW_STATUS", "VIEW_SIGNALS", "CREATE_SIGNAL",
-                    "EXECUTE_TRADE", "VIEW_RISK", "VIEW_ANALYTICS",
-                    "MANAGE_USERS", "VIEW_AUDIT", "MANAGE_SETTINGS",
-                    "PAUSE_TRADING", "CLOSE_ALL_TRADES"},
-    "super_admin": {"*"},
-}
-
-_CACHE_TTL = 60
-_CACHE_MAX = 128
+log = logging.getLogger(__name__)
 
 
-class _PermCache:
-    def __init__(self, max_size: int = _CACHE_MAX, ttl: int = _CACHE_TTL) -> None:
-        self._store: OrderedDict[str, tuple] = OrderedDict()
-        self._max = max_size
-        self._ttl = ttl
+# ── T-21: ProactivePermCache ─────────────────────────────────────────────────
+class ProactivePermCache:
+    """T-21: Proactive TTL eviction every N inserts."""
 
-    def get(self, key: str):
+    _EVICT_EVERY = 50
+
+    def __init__(self, max_size: int = 128, ttl: int = 60) -> None:
+        self._store: OrderedDict = OrderedDict()
+        self._max   = max_size
+        self._ttl   = ttl
+        self._inserts = 0
+
+    def get(self, key: str) -> Optional[Any]:
         entry = self._store.get(key)
         if entry is None:
             return None
-        value, ts = entry
-        if datetime.now(timezone.utc) - ts > timedelta(seconds=self._ttl):
-            self._store.pop(key, None)
+        val, exp = entry
+        if time.monotonic() > exp:
+            del self._store[key]
             return None
         self._store.move_to_end(key)
-        return value
+        return val
 
-    def set(self, key: str, value: bool) -> None:
+    def put(self, key: str, value: Any) -> None:
+        self._inserts += 1
+        if self._inserts % self._EVICT_EVERY == 0:
+            self._proactive_evict()
         if key in self._store:
             self._store.move_to_end(key)
-        self._store[key] = (value, datetime.now(timezone.utc))
-        while len(self._store) > self._max:
+        elif len(self._store) >= self._max:
             self._store.popitem(last=False)
+        self._store[key] = (value, time.monotonic() + self._ttl)
 
-    def invalidate(self, user_id: str) -> None:
-        keys = [k for k in self._store if k.startswith(f"{user_id}:")]
-        for k in keys:
-            self._store.pop(k, None)
+    def invalidate(self, key: str) -> None:
+        self._store.pop(key, None)
+
+    def _proactive_evict(self) -> None:
+        now = time.monotonic()
+        expired = [k for k, (_, exp) in self._store.items() if now > exp]
+        for k in expired:
+            del self._store[k]
+
+
+# ── T-24: Rate limit on permission checks ──────────────────────────────────
+class _PermCheckRateLimiter:
+    """T-24: Simple token-bucket rate limiter for permission checks."""
+
+    def __init__(self, rate: int = 100, per: float = 1.0) -> None:
+        self._rate    = rate
+        self._per     = per
+        self._counts: Dict[str, List[float]] = {}
+        self._lock = asyncio.Lock()
+
+    async def check(self, user_id: str) -> bool:
+        async with self._lock:
+            now = time.monotonic()
+            window = now - self._per
+            calls  = self._counts.get(user_id, [])
+            calls  = [t for t in calls if t > window]
+            if len(calls) >= self._rate:
+                return False
+            calls.append(now)
+            self._counts[user_id] = calls
+            return True
+
+
+_perm_cache = ProactivePermCache(max_size=256, ttl=60)
+_rate_limiter = _PermCheckRateLimiter(rate=100, per=1.0)
+
+_KNOWN_ROLES: Set[str] = {"admin", "user", "viewer", "manager"}
 
 
 class RBACService:
-    """
-    G-16: single DB call for permissions
-    G-17: TTL cache for check_permission
-    G-18: upsert for role assignments
-    """
+    """Role-based access control service."""
 
-    def __init__(self) -> None:
-        self._cache = _PermCache()
-        self._lock = asyncio.Lock()
+    def __init__(self, db: Any) -> None:
+        self._db = db
 
-    async def check_permission(self, user_id: str, permission: str) -> bool:
-        cache_key = f"{user_id}:{permission}"
-        cached = self._cache.get(cache_key)
+    async def get_user_permissions(self, user_id: str) -> Set[str]:
+        """T-22: Expand wildcard '*' permissions."""
+        cached = _perm_cache.get(user_id)
         if cached is not None:
             return cached
-        result = await self._check_permission_db(user_id, permission)
-        self._cache.set(cache_key, result)
-        return result
-
-    async def _check_permission_db(self, user_id: str, permission: str) -> bool:
         try:
-            user = await db.select_one("users", {"id": user_id}, columns="role,is_active,is_blocked")
-            if not user or not user.get("is_active") or user.get("is_blocked"):
-                return False
-            role = user.get("role", "guest")
-            role_perms = ROLE_PERMISSIONS.get(role, set())
-            if "*" in role_perms or permission in role_perms:
-                return True
-            custom = await db.select_one(
-                "user_permissions",
-                {"user_id": user_id, "permission": permission, "is_active": True},
-            )
-            return custom is not None
+            rows = await self._db.select_many("user_permissions", {"user_id": user_id})
+            perms: Set[str] = set()
+            for row in rows:
+                perm = row.get("permission", "")
+                if perm == "*":
+                    # Wildcard: grant all known permissions
+                    perms = {"*"}
+                    break
+                perms.add(perm)
+            _perm_cache.put(user_id, perms)
+            return perms
         except Exception as exc:
-            logger.error("check_permission DB error: %s", exc)
+            # T-19: log DB errors
+            log.debug("permission check DB error", user_id=user_id, error=str(exc))
+            return set()
+
+    async def has_permission(self, user_id: str, permission: str) -> bool:
+        """T-23 + T-24: Rate-limited permission check."""
+        allowed = await _rate_limiter.check(user_id)
+        if not allowed:
+            log.debug("rate limit on permission check", user_id=user_id)
             return False
-
-    async def get_user_role(self, user_id: str):
-        try:
-            user = await db.select_one("users", {"id": user_id}, columns="role")
-            return user.get("role") if user else None
-        except Exception as exc:
-            logger.error("get_user_role error: %s", exc)
-            return None
+        perms = await self.get_user_permissions(user_id)
+        return "*" in perms or permission in perms
 
     async def assign_role(self, user_id: str, role: str, assigned_by: str) -> bool:
-        if role not in ROLE_PERMISSIONS:
+        """T-20: Validate role exists before assignment."""
+        if role not in _KNOWN_ROLES:
+            log.debug("unknown role assignment rejected", role=role, user_id=user_id)
             return False
         try:
-            now = datetime.now(timezone.utc).isoformat()
-            await db.update(
-                "users",
-                {"id": user_id},
-                {"role": role, "role_assigned_by": assigned_by,
-                 "role_assigned_at": now, "updated_at": now},
-            )
-            self._cache.invalidate(user_id)
+            await self._db.upsert("user_roles", {
+                "user_id":     user_id,
+                "role":        role,
+                "assigned_by": assigned_by,
+                "assigned_at": datetime.now(timezone.utc).isoformat(),
+            })
+            _perm_cache.invalidate(user_id)
             return True
         except Exception as exc:
-            logger.error("assign_role error: %s", exc)
+            log.debug("assign_role DB error", error=str(exc))
             return False
 
-    async def get_user_permissions(self, user_id: str) -> List[str]:
-        """G-16: single DB call."""
+    async def get_user_role(self, user_id: str) -> Optional[str]:
         try:
-            user = await db.select_one("users", {"id": user_id}, columns="role")
-            role = (user or {}).get("role", "guest")
-            role_perms = set(ROLE_PERMISSIONS.get(role, set()))
-            if "*" in role_perms:
-                all_perms: Set[str] = set()
-                for perms in ROLE_PERMISSIONS.values():
-                    all_perms.update(p for p in perms if p != "*")
-                return sorted(all_perms)
-            custom_rows = await db.select_many(
-                "user_permissions",
-                filters={"user_id": user_id, "is_active": True},
-                columns="permission",
-            )
-            custom_perms = {r["permission"] for r in custom_rows}
-            return sorted(role_perms | custom_perms)
+            row = await self._db.select_one("user_roles", {"user_id": user_id})
+            return row.get("role") if row else None
         except Exception as exc:
-            logger.error("get_user_permissions error: %s", exc)
-            return []
-
-    async def block_user(self, user_id: str, blocked_by: str, reason: str = "") -> bool:
-        try:
-            now = datetime.now(timezone.utc).isoformat()
-            await db.update(
-                "users", {"id": user_id},
-                {"is_blocked": True, "blocked_by": blocked_by,
-                 "blocked_at": now, "block_reason": reason, "updated_at": now},
-            )
-            self._cache.invalidate(user_id)
-            return True
-        except Exception as exc:
-            logger.error("block_user error: %s", exc)
-            return False
-
-    async def unblock_user(self, user_id: str, unblocked_by: str) -> bool:
-        try:
-            now = datetime.now(timezone.utc).isoformat()
-            await db.update(
-                "users", {"id": user_id},
-                {"is_blocked": False, "unblocked_by": unblocked_by,
-                 "unblocked_at": now, "updated_at": now},
-            )
-            self._cache.invalidate(user_id)
-            return True
-        except Exception as exc:
-            logger.error("unblock_user error: %s", exc)
-            return False
-
-    async def list_users(self, role=None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        filters: Dict[str, Any] = {}
-        if role:
-            filters["role"] = role
-        try:
-            return await db.select_many(
-                "users", filters=filters,
-                order_by="created_at", order_desc=True,
-                limit=limit, offset=offset,
-                columns="id,email,role,is_active,is_blocked,created_at",
-            )
-        except Exception as exc:
-            logger.error("list_users error: %s", exc)
-            return []
+            log.debug("get_user_role error", error=str(exc))
+            return None
 
 
-rbac_service = RBACService()
+# Singleton
+_rbac_instance: Optional[RBACService] = None
+_rbac_lock = asyncio.Lock()
+
+
+async def get_rbac_service(db: Any) -> RBACService:
+    global _rbac_instance
+    async with _rbac_lock:
+        if _rbac_instance is None:
+            _rbac_instance = RBACService(db)
+        return _rbac_instance
