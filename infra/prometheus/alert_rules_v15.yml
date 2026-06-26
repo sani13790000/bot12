@@ -21,6 +21,8 @@ groups:
         annotations:
           summary: "License expiring in {{ $value }} days"
           description: "Customer license will expire soon."
+          runbook: "https://docs.mt5trading.io/runbooks/license-expiry"
+
   - name: saas_heartbeat_alerts
     interval: 60s
     rules:
@@ -32,16 +34,18 @@ groups:
           team: platform
         annotations:
           summary: "EA heartbeat loss detected"
-          description: "{{ $value }} heartbeat(s) missing. EA may have crashed."
+          description: "{{ $value }} heartbeat(s) missing."
           runbook: "https://docs.mt5trading.io/runbooks/heartbeat-loss"
       - alert: HeartbeatGapHigh
-        expr: histogram_quantile(0.95, heartbeat_gap_s) > 120
+        expr: heartbeat_gap_s{quantile="0.95"} > 120
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Heartbeat gap p95 > 120s"
           description: "EA heartbeat gaps are growing."
+          runbook: "https://docs.mt5trading.io/runbooks/heartbeat-slow"
+
   - name: saas_kill_switch_alerts
     interval: 10s
     rules:
@@ -54,7 +58,7 @@ groups:
           pagerduty: "true"
         annotations:
           summary: "KILL SWITCH IS ACTIVE - ALL TRADING HALTED"
-          description: "Kill switch activated. All EA trading stopped immediately."
+          description: "Kill switch was activated."
           runbook: "https://docs.mt5trading.io/runbooks/kill-switch"
       - alert: KillSwitchActivationSpike
         expr: increase(kill_switch_activations_total_total[1h]) > 3
@@ -64,6 +68,8 @@ groups:
         annotations:
           summary: "Kill switch activated {{ $value }}x in last hour"
           description: "Repeated kill switch activations indicate systemic issue."
+          runbook: "https://docs.mt5trading.io/runbooks/kill-switch-spike"
+
   - name: saas_drawdown_alerts
     interval: 30s
     rules:
@@ -76,7 +82,7 @@ groups:
           pagerduty: "true"
         annotations:
           summary: "CRITICAL: Equity drawdown {{ $value }}%"
-          description: "Drawdown exceeds 10%. Review immediately."
+          description: "Account equity drawdown exceeds 10%."
           runbook: "https://docs.mt5trading.io/runbooks/drawdown-critical"
       - alert: DrawdownWarning
         expr: equity_drawdown_pct >= 5 and equity_drawdown_pct < 10
@@ -86,7 +92,8 @@ groups:
           team: risk
         annotations:
           summary: "WARNING: Equity drawdown {{ $value }}%"
-          description: "Drawdown approaching critical threshold."
+          description: "Account equity drawdown approaching critical threshold."
+          runbook: "https://docs.mt5trading.io/runbooks/drawdown-warning"
       - alert: DrawdownAlertSpike
         expr: increase(drawdown_alerts_total_total[1h]) > 10
         for: 0m
@@ -94,7 +101,9 @@ groups:
           severity: warning
         annotations:
           summary: "{{ $value }} drawdown alerts in last hour"
-          description: "Repeated drawdown alerts - volatile market conditions."
+          description: "Repeated drawdown alerts."
+          runbook: "https://docs.mt5trading.io/runbooks/drawdown-spike"
+
   - name: saas_reconciliation_alerts
     interval: 60s
     rules:
@@ -107,7 +116,7 @@ groups:
           pagerduty: "true"
         annotations:
           summary: "Position reconciliation mismatch detected"
-          description: "Broker and local positions diverged. Manual review required."
+          description: "Broker and local positions diverged."
           runbook: "https://docs.mt5trading.io/runbooks/reconciliation-mismatch"
       - alert: ReconciliationNotRunning
         expr: time() - reconciliation_last_run_ts > 3600
@@ -118,14 +127,17 @@ groups:
         annotations:
           summary: "Reconciliation has not run in > 1 hour"
           description: "Position reconciliation check is overdue."
+          runbook: "https://docs.mt5trading.io/runbooks/reconciliation-slow"
       - alert: ReconciliationSlow
-        expr: histogram_quantile(0.95, reconciliation_duration_s) > 30
+        expr: reconciliation_duration_s{quantile="0.95"} > 30
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Reconciliation p95 > 30s"
           description: "Position reconciliation is taking too long."
+          runbook: "https://docs.mt5trading.io/runbooks/reconciliation-timeout"
+
   - name: saas_api_alerts
     interval: 30s
     rules:
@@ -138,7 +150,8 @@ groups:
           pagerduty: "true"
         annotations:
           summary: "MT5Trading API is down"
-          description: "FastAPI backend not responding to health checks."
+          description: "The FastAPI backend is not responding."
+          runbook: "https://docs.mt5trading.io/runbooks/api-down"
       - alert: APIHighErrorRate
         expr: rate(http_5xx_total[5m]) > 0.1
         for: 2m
@@ -147,9 +160,10 @@ groups:
           team: platform
         annotations:
           summary: "API 5xx error rate > 10%"
-          description: "High error rate. Check logs immediately."
+          description: "High error rate on API endpoints."
+          runbook: "https://docs.mt5trading.io/runbooks/api-errors"
       - alert: APIHighLatency
-        expr: histogram_quantile(0.95, http_request_duration_seconds) > 2.0
+        expr: http_request_duration_seconds{quantile="0.95"} > 2.0
         for: 5m
         labels:
           severity: warning
@@ -157,24 +171,4 @@ groups:
         annotations:
           summary: "API p95 latency > 2s"
           description: "API response times are degraded."
-  - name: saas_trading_alerts
-    interval: 30s
-    rules:
-      - alert: HighTradeRejectionRate
-        expr: rate(trades_rejected_total_total[5m]) / rate(trades_submitted_total_total[5m]) > 0.2
-        for: 5m
-        labels:
-          severity: warning
-          team: trading
-        annotations:
-          summary: "Trade rejection rate > 20%"
-          description: "High proportion of rejections. Check risk gate or broker."
-      - alert: DeadLetterQueueGrowing
-        expr: increase(dead_letter_total_total[10m]) > 5
-        for: 0m
-        labels:
-          severity: warning
-          team: trading
-        annotations:
-          summary: "Dead letter orders: {{ $value }} in last 10m"
-          description: "Orders dead-lettered. Check broker and retry logic."
+          runbook: "https://docs.mt5trading.io/runbooks/api-latency"
