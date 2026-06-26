@@ -1,72 +1,189 @@
-# Galaxy Vast AI Trading Platform — Deployment Guide
+# 🚀 DEPLOYMENT.md — Galaxy Vast AI Trading Platform
 
-## Pre-flight Checklist
+> **نسخه:** 3.0 | **آخرین به‌روزرسانی:** 2026-06-26
+> مسیر کامل نصب: **Dev → Staging → Production**
 
-### 1. Environment Variables (required)
+---
+
+> ⚠️ **هشدار ریسک معامله‌گری**
+> این نرم‌افزار ابزار اتوماسیون است — نه مشاوره مالی.
+> معامله در بازارهای مالی ریسک بالا دارد و ممکن است تمام سرمایه از دست برود.
+> فقط با سرمایه‌ای که توانایی از دست دادنش را دارید استفاده کنید.
+
+---
+
+## پیش‌نیازها
+
+| محیط | CPU | RAM | Disk |
+|------|-----|-----|------|
+| Dev | 2 core | 4 GB | 20 GB |
+| Staging | 2 core | 4 GB | 40 GB |
+| Production | 4 core | 8 GB | 80 GB SSD |
+
 ```bash
+docker --version        # Docker 24+
+docker compose version  # Compose v2+
+python3 --version       # Python 3.11+
+```
+
+---
+
+## محیط Development
+
+```bash
+git clone https://github.com/sani13790000/bot12 galaxy-vast
+cd galaxy-vast
 cp .env.example .env
-# Fill in all values:
-# SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-# JWT_SECRET_KEY (min 32 chars)
-# TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-# LICENSE_KEY, LICENSE_SALT
-# ENVIRONMENT=production
-# ALLOWED_ORIGINS=https://yourdomain.com
-```
 
-### 2. Database Migrations
-Run migrations in order in Supabase SQL editor:
-```
-supabase/migrations/20260612155742_001_initial_schema.sql
-supabase/migrations/20260618_002_partitioning.sql
-... (003 through 013)
-supabase/migrations/014_users_table.sql
-```
+# Generate secrets
+python3 -c "import secrets; print('SECRETS_MASTER_KEY=' + secrets.token_hex(32))"
+python3 -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_hex(32))"
+python3 -c "import secrets; print('FIELD_ENCRYPTION_KEY=' + secrets.token_hex(32))"
+python3 -c "import secrets; print('LICENSE_SALT=' + secrets.token_hex(16))"
 
-### 3. MQL5 EA Setup
-1. Open `mql5/Config.mqh`
-2. Set `API_BASE_URL` to your server URL (e.g. `https://api.yourdomain.com`)
-3. Set `API_TOKEN` to a valid JWT token from `/api/v1/auth/login`
-4. Compile and attach EA to chart
+# ویرایش .env
+nano .env
 
-### 4. Docker Deploy
-```bash
+# Database migrations
+# در Supabase SQL Editor به ترتیب اجرا کنید:
+ls supabase/migrations/ | sort
+
+# اجرا
 python3 startup_check.py
 docker compose up -d --build
-docker compose ps  # all services should be healthy
+
+# Verify
+curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
 ```
 
-### 5. Verify
+---
+
+## محیط Staging
+
 ```bash
-curl https://api.yourdomain.com/health
-# Expected: {"status": "healthy", "database": {"connected": true}}
+# nginx
+sudo cp infra/nginx/nginx.conf /etc/nginx/sites-available/galaxy-vast
+sudo ln -s /etc/nginx/sites-available/galaxy-vast /etc/nginx/sites-enabled/
+sudo certbot --nginx -d staging.yourdomain.com
+sudo nginx -t && sudo systemctl reload nginx
 
-curl https://api.yourdomain.com/docs
-# Expected: Swagger UI with 22+ endpoints
+# Deploy
+git pull origin develop
+docker compose pull
+docker compose up -d --no-deps api
+sleep 20
+curl -sf https://staging.yourdomain.com/health/live \
+    || (docker compose restart api; exit 1)
 ```
 
-### 6. Resource Limits (per service)
-| Service | Memory Limit | CPU Limit |
-|---|---|---|
-| redis | 600MB | 0.5 core |
-| api | 3GB | 2.0 core |
-| telegram_bot | 512MB | 0.5 core |
-| dashboard | 1GB | 1.0 core |
-| frontend | 256MB | 0.5 core |
+---
 
-### 7. Rollback
-If migration needs rollback:
+## محیط Production — Blue/Green Deploy
+
 ```bash
-# Run down migration in Supabase SQL editor:
-supabase/migrations/down/014_users_table_down.sql
+# Backup اول
+bash scripts/backup.sh production
+
+# مرحله ۱: فقط api
+docker compose -f docker-compose.prod.yml pull api
+docker compose -f docker-compose.prod.yml up -d --no-deps api
+
+# مرحله ۲: Health check
+sleep 30
+curl -sf https://api.yourdomain.com/health/live \
+    || (docker compose -f docker-compose.prod.yml restart api && exit 1)
+
+# مرحله ۳: بقیه
+docker compose -f docker-compose.prod.yml up -d
+docker image prune -f
 ```
 
-## Security Checklist
-- [ ] `ENVIRONMENT=production` in .env
-- [ ] `ALLOWED_ORIGINS` set to exact domain (no wildcard)
-- [ ] `JWT_SECRET_KEY` at least 32 random chars
-- [ ] `LICENSE_SALT` set to random value
-- [ ] `API_TOKEN` set in MQL5 Config.mqh
-- [ ] HTTPS enabled on server
-- [ ] Redis not exposed to public internet
-- [ ] Supabase RLS enabled on all tables
+---
+
+## Database Migrations — ترتیب اجرا
+
+```
+001_initial_schema.sql
+002_partitioning.sql
+003_trading_core.sql → 004 → 005 → 006 → ... → 025
+026_phase10_billing.sql
+027_phase13_saas_schema.sql   ← آخرین (hardening + RLS)
+```
+
+---
+
+## Environment Variables اجباری
+
+```bash
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SECRETS_MASTER_KEY=<64-char hex>
+JWT_SECRET_KEY=<64-char hex>
+FIELD_ENCRYPTION_KEY=<64-char hex>
+LICENSE_SALT=<32-char hex>
+WEBHOOK_SECRET=<64-char hex>
+ENVIRONMENT=production
+ALLOWED_ORIGINS=https://yourdomain.com
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_CHAT_ID=-1001234567890
+REDIS_URL=redis://:PASSWORD@redis:6379/0
+```
+
+---
+
+## Health Checks
+
+| Endpoint | نوع | توضیح |
+|----------|-----|---------|
+| `GET /health/live` | Liveness | process زنده |
+| `GET /health/ready` | Readiness | DB + Redis متصل |
+| `GET /health/deep` | Admin | همه components |
+
+```json
+{"status": "healthy", "checks": {"db": "ok", "redis": "ok"}}
+{"status": "degraded", "checks": {"db": "ok", "redis": "slow"}}  // 200
+{"status": "unhealthy", "checks": {"db": "error"}}  // 503
+```
+
+---
+
+## Rollback
+
+```bash
+# سریع (30 ثانیه)
+docker compose -f docker-compose.prod.yml restart api
+
+# به نسخه قبلی
+git checkout v3.19
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+---
+
+## Backup
+
+```bash
+bash scripts/backup.sh production
+# Cron: 0 2 * * * bash /opt/galaxy-vast/scripts/backup.sh production
+```
+
+---
+
+## Troubleshooting
+
+```bash
+# API 503
+docker compose logs api --tail=100
+docker compose restart api
+
+# Kill Switch فعال شد
+# Telegram: /resume
+curl -X POST https://api.yourdomain.com/api/v1/risk/resume \
+     -H "Authorization: Bearer ADMIN_JWT"
+
+# EA نمی‌تواند connect کند
+curl -I https://api.yourdomain.com/health/live
+tail -f /var/log/nginx/access.log | grep "429"
+```
