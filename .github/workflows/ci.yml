@@ -1,1 +1,99 @@
-# P17
+name: CI
+# Galaxy Vast AI Trading Platform — PR / push lint + test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  backend:
+    name: Backend Lint + Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt ruff pytest pytest-cov
+      - name: Ruff lint
+        run: ruff check backend/ --statistics
+      - name: Ruff format check
+        run: ruff format --check backend/
+      - name: Tests + Coverage
+        env:
+          JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY }}
+        run: |
+          pytest backend/tests/ \
+            --cov=backend \
+            --cov-report=xml \
+            --cov-fail-under=70 \
+            -x -q
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: coverage.xml
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+      - name: TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:8000
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install scanners
+        run: pip install bandit
+      - name: Bandit SAST
+        run: bandit -r backend/ -ll -x backend/tests/ || true
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 0
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+        continue-on-error: true
