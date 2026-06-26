@@ -1,31 +1,49 @@
-# infra/prometheus/prometheus.yml — Phase 15
-# P15-FIX-17: all exporters + alerting
 global:
   scrape_interval:     15s
   evaluation_interval: 15s
+  external_labels:
+    env: production
+    app: galaxyvast
 
 rule_files:
-  - "alert_rules.yml"
+  - /etc/prometheus/alert_rules.yml
 
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets: ['alertmanager:9093']
 
 scrape_configs:
-  - job_name: api
+  # Galaxy Vast API
+  - job_name: 'api'
     static_configs:
-      - targets: ["api:8000"]
-    metrics_path: /metrics
+      - targets: ['api:8000']
+    metrics_path: '/admin/metrics/prometheus'
+    bearer_token_file: /etc/prometheus/api_token
+    scrape_interval: 15s
+    scrape_timeout:  10s
 
-  - job_name: redis-exporter
+  # PostgreSQL
+  - job_name: 'postgres'
     static_configs:
-      - targets: ["redis-exporter:9121"]
+      - targets: ['postgres-exporter:9187']
 
-  - job_name: node-exporter
+  # Node / system metrics
+  - job_name: 'node'
     static_configs:
-      - targets: ["node-exporter:9100"]
+      - targets: ['node-exporter:9100']
 
-  - job_name: cadvisor
+  # Redis
+  - job_name: 'redis'
     static_configs:
-      - targets: ["cadvisor:8080"]
+      - targets: ['redis-exporter:9121']
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+
+  # cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
