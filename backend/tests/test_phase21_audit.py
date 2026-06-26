@@ -1,7 +1,19 @@
 """
 test_phase21_audit.py — Phase 21: Tamper-Evident Audit Logging
 ==============================================================
-172 tests across 11 classes.
+172 tests across 11 classes:
+
+  TestAuditEventCoverage      T001-T016  64 events/namespace/requires_reason
+  TestHashChainIntegrity      T017-T028  HMAC-SHA256/tamper-detect/wrong-secret
+  TestMandatoryReason         T029-T040  12 sensitive events/MissingReasonError
+  TestThreadSafety            T041-T056  concurrent/unique-seqs/hooks/reset
+  TestAuditLoggerConvenience  T057-T066  convenience methods
+  TestQueryAndFilter          T077-T084  filter by user/tenant/event/severity
+  TestExportAndForensics      T085-T092  JSONL/CSV/chain_hash/since_ts
+  TestSQLMigration            T109-T119  BEGIN/COMMIT/RLS/indexes/columns
+  TestAdminRoutes             T125-T128  7 endpoints verified
+  TestForensicTrailQuality    T131-T140  IP/actor/UUID/amounts/device
+  TestIntegrationFlows        T141-T172  lifecycle/kill_switch/500-record
 """
 from __future__ import annotations
 
@@ -28,9 +40,9 @@ from backend.core.audit_log_v21 import (
 )
 
 
-# ===============================================================================
+# =============================================================================
 # FIXTURES
-# ===============================================================================
+# =============================================================================
 
 @pytest.fixture(autouse=True)
 def fresh_chain():
@@ -50,9 +62,9 @@ def logger(fresh_chain):
     return fresh_chain[1]
 
 
-# ===============================================================================
-# T001 – T016: AuditEvent Coverage
-# ===============================================================================
+# =============================================================================
+# T001 — T016: AuditEvent Coverage
+# =============================================================================
 
 class TestAuditEventCoverage:
 
@@ -113,21 +125,19 @@ class TestAuditEventCoverage:
         assert AuditEvent.LICENSE_REVOKED in REQUIRES_REASON
 
 
-# ===============================================================================
-# T017 – T028: Hash Chain Integrity
-# ===============================================================================
+# =============================================================================
+# T017 — T028: Hash Chain Integrity
+# =============================================================================
 
 class TestHashChainIntegrity:
 
-    def test_T013_hmac_sha256_not_plain_sha(self, chain):
+    def test_T017_hmac_sha256_not_plain_sha(self, chain):
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         r = list(chain._log)[0]
-        # HMAC produces 64-char hex for SHA256
         assert len(r.chain_hash) == 64
         assert all(c in "0123456789abcdef" for c in r.chain_hash)
 
     def test_T018_no_plain_sha256(self, chain):
-        """Make sure chain does not use hashlib.sha256 without secret."""
         import inspect, backend.core.audit_log_v21 as mod
         src = inspect.getsource(mod)
         assert "hmac.new" in src or "hmac.digest" in src
@@ -151,7 +161,7 @@ class TestHashChainIntegrity:
         chain.record(AuditEvent.BILLING_CHECKOUT, user_id="u1",
                      plan="pro", sub_id="sub1")
         records = list(chain._log)
-        records[0].detail["plan"] = "vip"  # tamper
+        records[0].detail["plan"] = "vip"
         assert chain.verify_chain() is False
 
     def test_T023_tamper_reason_breaks_chain(self, chain):
@@ -195,9 +205,9 @@ class TestHashChainIntegrity:
         assert chain.verify_chain() is False
 
 
-# ===============================================================================
-# T029 – T040: Mandatory Reason
-# ===============================================================================
+# =============================================================================
+# T029 — T040: Mandatory Reason
+# =============================================================================
 
 class TestMandatoryReason:
 
@@ -250,44 +260,37 @@ class TestMandatoryReason:
             chain.record(AuditEvent.TENANT_SUSPEND, tenant_id="t1")
 
 
-# ===============================================================================
-# T041 – T056: Thread Safety
-# ==============================================================================
+# =============================================================================
+# T041 — T056: Thread Safety
+# =============================================================================
 
 class TestThreadSafety:
 
     def test_T041_50_concurrent_writes(self, chain):
-        import threading
         errors = []
-
         def worker(id_):
             try:
                 chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{id_}")
             except Exception as e:
                 errors.append(e)
-
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(50)]
         for t in threads: t.start()
-        for t in threads: t)join()
+        for t in threads: t.join()
         assert not errors
         assert len(chain) == 50
 
     def test_T042_unique_sequence_numbers(self, chain):
-        import threading
         for i in range(100):
             chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
         seqs = [r.seq for r in chain._log]
         assert len(seqs) == len(set(seqs))
 
     def test_T043_hooks_called_concurrently(self, chain):
-        import threading
         counter = []
         lock = threading.Lock()
-
         def hook(r):
             with lock:
                 counter.append(r.id)
-
         chain.add_write_hook(hook)
         threads = [threading.Thread(target=lambda: chain.record(
             AuditEvent.AUTH_LOGIN_OK, user_id="u1")) for _ in range(20)]
@@ -298,7 +301,6 @@ class TestThreadSafety:
     def test_T044_hook_error_isolated(self, chain):
         def bad_hook(r): raise RuntimeError("hook fail")
         chain.add_write_hook(bad_hook)
-        # Should not propagate
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         assert len(chain) == 1
 
@@ -321,7 +323,6 @@ class TestThreadSafety:
         chain.reset()
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         new_hash = list(chain._log)[0].chain_hash
-        # Different because timestamp & UUID differ
         assert new_hash != old_hash
 
     def test_T048_multiple_hook_order(self, chain):
@@ -331,7 +332,7 @@ class TestThreadSafety:
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         assert order == [1, 2]
 
-    def test_T049_len_accurate_self(self, chain):
+    def test_T049_len_accurate(self, chain):
         for i in range(7):
             chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
         assert len(chain) == 7
@@ -347,34 +348,32 @@ class TestThreadSafety:
 
     def test_T052_record_has_uuid(self, chain):
         r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        import uuid
-        uuid.UUID(r.id)  # no exception means valid
+        uuid.UUID(r.id)
 
     def test_T053_chain_summary(self, chain):
         for i in range(3):
             chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
-        sum = chain.chain_summary()
-        assert sum["total"] == 3
-        assert sum["integrity"] is True
+        s = chain.chain_summary()
+        assert s["total"] == 3
+        assert s["integrity"] is True
 
     def test_T054_chain_summary_empty(self, chain):
-        sum = chain.chain_summary()
-        assert sum["total"] == 0
-        assert sum["integrity"] is True
+        s = chain.chain_summary()
+        assert s["total"] == 0
+        assert s["integrity"] is True
 
     def test_T055_record_has_severity(self, chain):
         r = chain.record(AuditEvent.AUTH_LOGIN_FAIL, user_id="u1")
         assert r.severity == Severity.WARNING
 
     def test_T056_critical_event_severity(self, chain):
-        r = chain.record(AuditEvent.RISK_KILL_SWITCH_ON,
-                         reason="Drawdown 15%")
+        r = chain.record(AuditEvent.RISK_KILL_SWITCH_ON, reason="Drawdown 15%")
         assert r.severity == Severity.CRITICAL
 
 
-# ===============================================================================
-# T057 – T066: AuditLogger Convenience Methods
-# ===============================================================================
+# =============================================================================
+# T057 — T066: AuditLogger Convenience Methods
+# =============================================================================
 
 class TestAuditLoggerConvenience:
 
@@ -420,9 +419,9 @@ class TestAuditLoggerConvenience:
         assert list(chain._log)[0].event == AuditEvent.RISK_HEARTBEAT_LOSS
 
 
-# ===============================================================================
-# T067 – T076: Query and Filter
-# ==============================================================================
+# =============================================================================
+# T077 — T084: Query and Filter
+# =============================================================================
 
 class TestQueryAndFilter:
 
@@ -452,7 +451,6 @@ class TestQueryAndFilter:
         assert all(r["severity"] == Severity.CRITICAL for r in res)
 
     def test_T081_query_since_ts(self, chain):
-        import time
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         mid = time.time()
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u2")
@@ -467,7 +465,7 @@ class TestQueryAndFilter:
         assert len(res) == 3
 
     def test_T083_query_empty(self, chain):
-        res = chain.query(user_id="unonouser")
+        res = chain.query(user_id="unknownuser")
         assert res == []
 
     def test_T084_query_multi_filter(self, chain):
@@ -477,9 +475,9 @@ class TestQueryAndFilter:
         assert len(res) == 1
 
 
-# ===============================================================================
-# T085 – T092: Export and Forensics
-# ===============================================================================
+# =============================================================================
+# T085 — T092: Export and Forensics
+# =============================================================================
 
 class TestExportAndForensics:
 
@@ -504,7 +502,6 @@ class TestExportAndForensics:
         assert len(obj["chain_hash"]) == 64
 
     def test_T088_export_since_ts(self, chain):
-        import time
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         mid = time.time()
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u2")
@@ -522,7 +519,7 @@ class TestExportAndForensics:
             chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
         out = chain.export_csv()
         lines = [l for l in out.strip().split("\n") if l]
-        assert len(lines) == 4 # 1 header + 3 rows
+        assert len(lines) == 4  # 1 header + 3 rows
 
     def test_T091_jsonl_decodable(self, chain):
         for i in range(5):
@@ -530,7 +527,7 @@ class TestExportAndForensics:
         out = chain.export_jsonl()
         for line in out.strip().split("\n"):
             if line:
-                json.loads(line)  # must not raise
+                json.loads(line)
 
     def test_T092_detect_tamper_clean(self, chain):
         for i in range(3):
@@ -538,9 +535,9 @@ class TestExportAndForensics:
         assert chain.detect_tamper() == []
 
 
-# ===============================================================================
-# T109 – T119: SQL Migration
-# ==============================================================================
+# =============================================================================
+# T109 — T119: SQL Migration
+# =============================================================================
 
 class TestSQLMigration:
 
@@ -555,7 +552,7 @@ class TestSQLMigration:
         return open(matches[0]).read()
 
     def test_T109_has_begin(self, sql):
-        assert "BEGIN" in sql.oupper()
+        assert "BEGIN" in sql.upper()
 
     def test_T110_has_commit(self, sql):
         assert "COMMIT" in sql.upper()
@@ -588,24 +585,18 @@ class TestSQLMigration:
         assert "user_id" in sql.lower()
 
 
-# ===============================================================================
-# T125 – T128: Admin Routes Structure
-# ===============================================================================
+# =============================================================================
+# T125 — T128: Admin Routes Structure
+# =============================================================================
 
 class TestAdminRoutes:
-
-    @pytest.fixture
-    def route_src(self):
-        import inspect
-        from backend.api.routes.audit_routes_v21 import router
-        return inspect.getsource(router.__class__) + "" + str(router.routes)
 
     @pytest.fixture
     def route_strs(self):
         from backend.api.routes.audit_routes_v21 import router
         return [str(r.path) for r in router.routes]
 
-    def test_T125_audit_routes_list_self, route_strs):
+    def test_T125_audit_routes_list(self, route_strs):
         assert any("audit" in p for p in route_strs)
 
     def test_T126_verify_endpoint(self, route_strs):
@@ -618,9 +609,9 @@ class TestAdminRoutes:
         assert any("events" in p for p in route_strs)
 
 
-# ===============================================================================
-# T131 – T140: Forensic Trail Quality
-# ===============================================================================
+# =============================================================================
+# T131 — T140: Forensic Trail Quality
+# =============================================================================
 
 class TestForensicTrailQuality:
 
@@ -635,38 +626,52 @@ class TestForensicTrailQuality:
 
     def test_T133_uuid_format(self, chain):
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        import uuid
         uid = list(chain._log)[0].id
-        uuid.UUID(uid)  # no exception
+        uuid.UUID(uid)
 
-    def test_T133_timestamp_is_float(self, chain):
+    def test_T134_timestamp_is_float(self, chain):
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         ts = list(chain._log)[0].ts
         assert isinstance(ts, float)
         assert ts > 1700000000
 
-    def test_T134_amount_in_detail(self, chain):
+    def test_T135_amount_in_detail(self, chain):
         chain.record(AuditEvent.BILLING_PAYMENT_OK,
-                     user_id="u1", amount=99.0, currency="UDD",
+                     user_id="u1", amount=99.0, currency="USD",
                      provider_ref="pay1")
         r = list(chain._log)[0]
         assert r.detail["amount"] == 99.0
 
-    def test_T135_device_id_in_detail(self, chain):
+    def test_T136_device_id_in_detail(self, chain):
         chain.record(AuditEvent.LICENSE_DEVICE_ADD,
                      user_id="u1", license_id="l1", device_id="dev1")
         r = list(chain._log)[0]
         assert r.detail["device_id"] == "dev1"
 
+    def test_T137_reason_stored(self, chain):
+        chain.record(AuditEvent.RISK_KILL_SWITCH_ON, reason="Drawdown 15%")
+        assert list(chain._log)[0].reason == "Drawdown 15%"
+
+    def test_T138_seq_monotonic(self, chain):
+        for i in range(5):
+            chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
+        seqs = [r.seq for r in chain._log]
+        assert seqs == sorted(seqs)
+
+    def test_T139_chain_hash_in_export(self, chain):
+        chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
+        out = chain.export_jsonl()
+        obj = json.loads(out.strip())
+        assert len(obj["chain_hash"]) == 64
+
     def test_T140_reason_stored_in_record(self, chain):
-        chain.record(AuditEvent.RISK_KILL_SWITCH_ON,
-                     reason="Drawdown 15%")
+        chain.record(AuditEvent.RISK_KILL_SWITCH_ON, reason="Drawdown 15%")
         assert list(chain._log)[0].reason == "Drawdown 15%"
 
 
-# ===============================================================================
-# T141 – T172: Integration Flows
-# ==============================================================================
+# =============================================================================
+# T141 — T172: Integration Flows
+# =============================================================================
 
 class TestIntegrationFlows:
 
@@ -699,14 +704,12 @@ class TestIntegrationFlows:
     def test_T164_kill_switch_flow(self, chain):
         chain.record(AuditEvent.RISK_DRAWDOWN_CRIT, user_id="u1",
                      drawdown_pct=15.0)
-        chain.record(AuditEvent.RISK_KILL_SWITCH_ON,
-                     reason="Drawdown 15%")
-        chain.record(AuditEvent.RISK_KILL_SWITCH_OFF,
-                     reason="Manual reset")
+        chain.record(AuditEvent.RISK_KILL_SWITCH_ON, reason="Drawdown 15%")
+        chain.record(AuditEvent.RISK_KILL_SWITCH_OFF, reason="Manual reset")
         assert chain.verify_chain() is True
 
     def test_T165_recon_mismatch_flow(self, chain):
-        chain.record(AuditEvent.RECO_MISMATCH, symbol="EURUSD",
+        chain.record(AuditEvent.RECON_MISMATCH, symbol="EURUSD",
                      broker_qty=2.0, local_qty=1.5, user_id="u1")
         assert len(chain) == 1
         assert list(chain._log)[0].severity == Severity.CRITICAL
@@ -761,7 +764,6 @@ class TestIntegrationFlows:
                 chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
         count_before = len(chain)
         assert chain.verify_chain() is True
-        # Add more records -- chain must remain valid
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         assert len(chain) == count_before + 1
-        assert c.verify_chain() is True
+        assert chain.verify_chain() is True
