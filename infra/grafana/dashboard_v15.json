@@ -1,84 +1,81 @@
 {
-  "title": "MT5Trading SaaS Admin Observability",
-  "uid": "mt5trading-phase15",
-  "tags": ["mt5trading", "saas", "admin"],
+  "title": "Galaxy Vast â€” Operations",
+  "uid": "galaxyvast-ops",
+  "schemaVersion": 38,
+  "version": 3,
   "refresh": "30s",
-  "time": {"from": "now-3h", "to": "now"},
   "panels": [
     {
-      "id": 1, "type": "stat", "title": "Kill Switch Active",
-      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "kill_switch_active", "legendFormat": "Active"}],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [
-        {"value": 0, "color": "green"}, {"value": 1, "color": "red"}
-      ]}, "mappings": [{"type": "value", "options": {"0": {"text": "OFF"}, "1": {"text": "ON"}}}]}}
+      "id": 1,
+      "title": "Kill Switch Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "galaxyvast_kill_switch_active", "legendFormat": "Kill Switch"}]
     },
     {
-      "id": 2, "type": "stat", "title": "License Failures (5m)",
-      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "increase(license_failures_total_total[5m])"}],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [
-        {"value": 0, "color": "green"}, {"value": 3, "color": "yellow"}, {"value": 10, "color": "red"}
-      ]}}}
+      "id": 2,
+      "title": "License Failures (5m)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "increase(galaxyvast_license_failures_total[5m])", "legendFormat": "Failures"}]
     },
     {
-      "id": 3, "type": "stat", "title": "Heartbeat Losses (5m)",
-      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "increase(heartbeat_losses_total_total[5m])"}],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [
-        {"value": 0, "color": "green"}, {"value": 1, "color": "orange"}, {"value": 5, "color": "red"}
-      ]}}}
+      "id": 3,
+      "title": "Heartbeat Losses (10m)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "increase(galaxyvast_heartbeat_losses_total[10m])", "legendFormat": "Losses"}]
     },
     {
-      "id": 4, "type": "gauge", "title": "Equity Drawdown %",
-      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "equity_drawdown_pct"}],
-      "fieldConfig": {"defaults": {
-        "min": 0, "max": 20, "unit": "percent",
-        "thresholds": {"steps": [
-          {"value": 0, "color": "green"}, {"value": 5, "color": "yellow"}, {"value": 10, "color": "red"}
-        ]}
-      }}
+      "id": 4,
+      "title": "Equity Drawdown %",
+      "type": "gauge",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "targets": [{"expr": "galaxyvast_equity_drawdown_pct", "legendFormat": "Drawdown"}]
     },
     {
-      "id": 5, "type": "stat", "title": "Reconciliation Mismatches",
-      "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "reconciliation_mismatches_total_total"}],
-      "fieldConfig": {"defaults": {"thresholds": {"steps": [
-        {"value": 0, "color": "green"}, {"value": 1, "color": "red"}
-      ]}}}
+      "id": 5,
+      "title": "Reconciliation Mismatches (15m)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "targets": [{"expr": "increase(galaxyvast_reconciliation_mismatches_total[15m])", "legendFormat": "Mismatches"}]
     },
     {
-      "id": 6, "type": "stat", "title": "API Status",
-      "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "up{job='mt5trading-api'}"}],
-      "fieldConfig": {"defaults": {"mappings": [
-        {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}
-      ]}}
+      "id": 6,
+      "title": "APB’equest Rate",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 4},
+      "targets": [{"expr": "rate(http_requests_total[5m])", "legendFormat": "{{method}} {{path}}"}]
     },
     {
-      "id": 10, "type": "timeseries", "title": "License Failures Over Time",
-      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
-      "targets": [
-        {"expr": "increase(license_failures_total_total[5m])", "legendFormat": "Failures/5m"},
-        {"expr": "increase(license_validations_total_total[5m])", "legendFormat": "Success/5m"}
-      ]
+      "id": 7,
+      "title": "API Error Rate",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 4},
+      "targets": [{"expr": "rate(http_requests_total{status=~"5.."}[5m])", "legendFormat": "5xx"}]
     },
     {
-      "id": 11, "type": "timeseries", "title": "Heartbeat Status",
-      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
-      "targets": [
-        {"expr": "increase(heartbeat_received_total_total[5m])", "legendFormat": "Received/5m"},
-        {"expr": "increase(heartbeat_losses_total_total[5m])", "legendFormat": "Lost/5m"}
-      ]
+      "id": 8,
+      "title": "Active Subscriptions",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 10},
+      "targets": [{"expr": "galaxyvast_subscriptions_active", "legendFormat": "Active"}]
     },
     {
-      "id": 20, "type": "timeseries", "title": "Trade Activity",
-      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
-      "targets": [
-        {"expr": "rate(trades_submitted_total_total[5m])", "legendFormat": "Submitted/s"},
-        {"expr": "rate(trades_rejected_total_total[5m])", "legendFormat": "Rejected/s"}
-      ]
+      "id": 9,
+      "title": "Trade Latency (p95)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 6, "y": 10},
+      "targets": [{"expr": "histogram_quantile(0.95, galaxyvast_trade_latency_seconds_bucket)", "legendFormat": "p95"}]
+    },
+    {
+      "id": 10,
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 16},
+      "targets": [{"expr": "container_memory_usage_bytes{name=~'galaxyvast.*'}", "legendFormat": "{{name}}"}]
     }
-  ]
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "browser"
 }
