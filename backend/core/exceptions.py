@@ -1,79 +1,88 @@
-"""
-backend/core/exceptions.py
-Galaxy Vast AI Trading Platform — Enterprise Exception Hierarchy
-
-All application exceptions carry:
-  - error_code: str  (machine-readable, for API responses)
-  - http_status: int (HTTP status code mapping)
-  - context: dict    (structured diagnostic data)
-  - to_dict()        (serializable for API responses)
-
-Retryable vs NonRetryable mix-ins integrate with core/retry.py.
-FIX: Resolved MRO error in PredictionError and ModelNotFoundError
-"""
-from __future__ import annotations
-from typing import Any, Dict, Optional
-
-
-class AppError(Exception):
-    error_code: str = 'APP_ERROR'
-    http_status: int = 500
-    def __init__(self, message: str, *, error_code: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(message)
-        self.message = message
-        self.context: Dict[str, Any] = context or {}
-        if error_code: self.error_code = error_code
-    def to_dict(self) -> Dict[str, Any]:
-        return {'error': self.error_code, 'message': self.message, 'context': self.context, 'http_status': self.http_status}
-
-class RetryableError(AppError): pass
-class NonRetryableError(AppError): pass
-
-class AuthError(NonRetryableError):
-    error_code = 'AUTH_ERROR'; http_status = 401
-class TokenExpiredError(AuthError): error_code = 'TOKEN_EXPIRED'
-class TokenInvalidError(AuthError): error_code = 'TOKEN_INVALID'
-class InsufficientPermissionsError(NonRetryableError):
-    error_code = 'INSUFFICIENT_PERMISSIONS'; http_status = 403
-class LicenseError(NonRetryableError):
-    error_code = 'LICENSE_ERROR'; http_status = 403
-
-class ValidationError(NonRetryableError):
-    error_code = 'VALIDATION_ERROR'; http_status = 422
-class ConfigurationError(NonRetryableError):
-    error_code = 'CONFIGURATION_ERROR'; http_status = 500
-
-class RiskError(AppError):
-    error_code = 'RISK_ERROR'; http_status = 500
-class RiskGateError(RetryableError, RiskError): error_code = 'RISK_GATE_ERROR'
-class RiskBlockedError(NonRetryableError, RiskError):
-    error_code = 'RISK_BLOCKED'; http_status = 422
-class CircuitOpenError(NonRetryableError, RiskError):
-    error_code = 'CIRCUIT_OPEN'; http_status = 503
-
-class ExecutionError(AppError):
-    error_code = 'EXECUTION_ERROR'; http_status = 500
-class OrderSubmissionError(RetryableError, ExecutionError): error_code = 'ORDER_SUBMISSION_ERROR'
-class OrderDuplicateError(NonRetryableError, ExecutionError):
-    error_code = 'ORDER_DUPLICATE'; http_status = 409
-class BrokerConnectionError(RetryableError, ExecutionError): error_code = 'BROKER_CONNECTION_ERROR'
-class OrderStateError(NonRetryableError, ExecutionError): error_code = 'ORDER_STATE_ERROR'
-class ReconciliationError(RetryableError, ExecutionError): error_code = 'RECONCILIATION_ERROR'
-
-class DatabaseError(RetryableError):
-    error_code = 'DATABASE_ERROR'; http_status = 503
-class DatabaseConnectionError(DatabaseError): error_code = 'DATABASE_CONNECTION_ERROR'
-class QueryError(DatabaseError): error_code = 'QUERY_ERROR'
-
-class MLError(RetryableError): error_code = 'ML_ERROR'
-# FIX: Removed duplicate RetryableError base to fix MRO error
-class ModelNotFoundError(MLError):
-    error_code = 'MODEL_NOT_FOUND'; http_status = 404
-class PredictionError(MLError): error_code = 'PREDICTION_ERROR'
-
-class ServiceUnavailableError(RetryableError):
-    error_code = 'SERVICE_UNAVAILABLE'; http_status = 503
-class RateLimitError(NonRetryableError):
-    error_code = 'RATE_LIMIT_EXCEEDED'; http_status = 429
-class NotFoundError(NonRetryableError):
-    error_code = 'NOT_FOUND'; http_status = 404
+IiIiCmJhY2tlbmQvY29yZS9leGNlcHRpb25zLnB5CkdhbGF4eSBWYXN0IEFJ
+IFRyYWRpbmcgUGxhdGZvcm0g4oCUIEVudGVycHJpc2UgRXhjZXB0aW9uIEhp
+ZXJhcmNoeQoKQWxsIGFwcGxpY2F0aW9uIGV4Y2VwdGlvbnMgY2Fycnk6CiAg
+LSBlcnJvcl9jb2RlOiBzdHIgIChtYWNoaW5lLXJlYWRhYmxlLCBmb3IgQVBJ
+IHJlc3BvbnNlcykKICAtIGh0dHBfc3RhdHVzOiBpbnQgKEhUVFAgc3RhdHVz
+IGNvZGUgbWFwcGluZykKICAtIGNvbnRleHQ6IGRpY3QgICAgKHN0cnVjdHVy
+ZWQgZGlhZ25vc3RpYyBkYXRhKQogIC0gdG9fZGljdCgpICAgICAgICAoc2Vy
+aWFsaXphYmxlIGZvciBBUEkgcmVzcG9uc2VzKQoKUmV0cnlhYmxlIHZzIE5v
+blJldHJ5YWJsZSBtaXgtaW5zIGludGVncmF0ZSB3aXRoIGNvcmUvcmV0cnku
+cHkuCkZJWDogUmVzb2x2ZWQgTVJPIGVycm9yIGluIFByZWRpY3Rpb25FcnJv
+ciBhbmQgTW9kZWxOb3RGb3VuZEVycm9yCiIiIgpmcm9tIF9fZnV0dXJlX18g
+aW1wb3J0IGFubm90YXRpb25zCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERp
+Y3QsIE9wdGlvbmFsCgoKY2xhc3MgQXBwRXJyb3IoRXhjZXB0aW9uKToKICAg
+IGVycm9yX2NvZGU6IHN0ciA9ICdBUFBfRVJST1InCiAgICBodHRwX3N0YXR1
+czogaW50ID0gNTAwCiAgICBkZWYgX19pbml0X18oc2VsZiwgbWVzc2FnZTog
+c3RyLCAqLCBlcnJvcl9jb2RlOiBPcHRpb25hbFtzdHJdID0gTm9uZSwgY29u
+dGV4dDogT3B0aW9uYWxbRGljdFtzdHIsIEFueV1dID0gTm9uZSkgLT4gTm9u
+ZToKICAgICAgICBzdXBlcigpLl9faW5pdF9fKG1lc3NhZ2UpCiAgICAgICAg
+c2VsZi5tZXNzYWdlID0gbWVzc2FnZQogICAgICAgIHNlbGYuY29udGV4dDog
+RGljdFtzdHIsIEFueV0gPSBjb250ZXh0IG9yIHt9CiAgICAgICAgaWYgZXJy
+b3JfY29kZTogc2VsZi5lcnJvcl9jb2RlID0gZXJyb3JfY29kZQogICAgZGVm
+IHRvX2RpY3Qoc2VsZikgLT4gRGljdFtzdHIsIEFueV06CiAgICAgICAgcmV0
+dXJuIHsnZXJyb3InOiBzZWxmLmVycm9yX2NvZGUsICdtZXNzYWdlJzogc2Vs
+Zi5tZXNzYWdlLCAnY29udGV4dCc6IHNlbGYuY29udGV4dCwgJ2h0dHBfc3Rh
+dHVzJzogc2VsZi5odHRwX3N0YXR1c30KCmNsYXNzIFJldHJ5YWJsZUVycm9y
+KEFwcEVycm9yKTogcGFzcwpjbGFzcyBOb25SZXRyeWFibGVFcnJvcihBcHBF
+cnJvcik6IHBhc3MKCmNsYXNzIEF1dGhFcnJvcihOb25SZXRyeWFibGVFcnJv
+cik6CiAgICBlcnJvcl9jb2RlID0gJ0FVVEhfRVJST1InOyBodHRwX3N0YXR1
+cyA9IDQwMQpjbGFzcyBUb2tlbkV4cGlyZWRFcnJvcihBdXRoRXJyb3IpOiBl
+cnJvcl9jb2RlID0gJ1RPS0VOX0VYUElSRUQnCmNsYXNzIFRva2VuSW52YWxp
+ZEVycm9yKEF1dGhFcnJvcik6IGVycm9yX2NvZGUgPSAnVE9LRU5fSU5WQUxJ
+RCcKY2xhc3MgSW5zdWZmaWNpZW50UGVybWlzc2lvbnNFcnJvcihOb25SZXRy
+eWFibGVFcnJvcik6CiAgICBlcnJvcl9jb2RlID0gJ0lOU1VGRklDSUVOVF9Q
+RVJNSVNTSU9OUyc7IGh0dHBfc3RhdHVzID0gNDAzCmNsYXNzIExpY2Vuc2VF
+cnJvcihOb25SZXRyeWFibGVFcnJvcik6CiAgICBlcnJvcl9jb2RlID0gJ0xJ
+Q0VOU0VfRVJST1InOyBodHRwX3N0YXR1cyA9IDQwMwoKY2xhc3MgVmFsaWRh
+dGlvbkVycm9yKE5vblJldHJ5YWJsZUVycm9yKToKICAgIGVycm9yX2NvZGUg
+PSAnVkFMSURBVElPTl9FUlJPUic7IGh0dHBfc3RhdHVzID0gNDIyCmNsYXNz
+IENvbmZpZ3VyYXRpb25FcnJvcihOb25SZXRyeWFibGVFcnJvcik6CiAgICBl
+cnJvcl9jb2RlID0gJ0NPTkZJR1VSQVRJT05fRVJST1InOyBodHRwX3N0YXR1
+cyA9IDUwMAoKY2xhc3MgUmlza0Vycm9yKEFwcEVycm9yKToKICAgIGVycm9y
+X2NvZGUgPSAnUklTS19FUlJPUic7IGh0dHBfc3RhdHVzID0gNTAwCmNsYXNz
+IFJpc2tHYXRlRXJyb3IoUmV0cnlhYmxlRXJyb3IsIFJpc2tFcnJvcik6IGVy
+cm9yX2NvZGUgPSAnUklTS19HQVRFX0VSUk9SJwpjbGFzcyBSaXNrQmxvY2tl
+ZEVycm9yKE5vblJldHJ5YWJsZUVycm9yLCBSaXNrRXJyb3IpOgogICAgZXJy
+b3JfY29kZSA9ICdSSVNLX0JMT0NLRUQnOyBodHRwX3N0YXR1cyA9IDQyMgpj
+bGFzcyBDaXJjdWl0T3BlbkVycm9yKE5vblJldHJ5YWJsZUVycm9yLCBSaXNr
+RXJyb3IpOgogICAgZXJyb3JfY29kZSA9ICdDSVJDVUlUX09QRU4nOyBodHRw
+X3N0YXR1cyA9IDUwMwoKY2xhc3MgRXhlY3V0aW9uRXJyb3IoQXBwRXJyb3Ip
+OgogICAgZXJyb3JfY29kZSA9ICdFWEVDVVRJT05fRVJST1InOyBodHRwX3N0
+YXR1cyA9IDUwMAoKY2xhc3MgT3JkZXJTdWJtaXNzaW9uRXJyb3IoUmV0cnlh
+YmxlRXJyb3IsIEV4ZWN1dGlvbkVycm9yKToKICAgIGVycm9yX2NvZGUgPSAn
+T1JERVJfU1VCTUlTU0lPTl9FUlJPUicKICAgIGRlZiBfX2luaXRfXyhzZWxm
+LCBzeW1ib2w6IHN0ciA9ICIiLCBvcmRlcl9pZDogc3RyID0gIiIsICosCiAg
+ICAgICAgICAgICAgICAgcmV0Y29kZTogaW50ID0gMCwgcmVhc29uOiBzdHIg
+PSAiIiwgKiprd2FyZ3MpOgogICAgICAgIG1zZyA9IChmIk9yZGVyIHN1Ym1p
+c3Npb24gZmFpbGVkOiBzeW1ib2w9e3N5bWJvbH0gb3JkZXJfaWQ9e29yZGVy
+X2lkfSAiCiAgICAgICAgICAgICAgICBmInJldGNvZGU9e3JldGNvZGV9IHJl
+YXNvbj17cmVhc29ufSIpCiAgICAgICAgc3VwZXIoKS5fX2luaXRfXyhtc2cs
+IGNvbnRleHQ9eyJzeW1ib2wiOiBzeW1ib2wsICJvcmRlcl9pZCI6IG9yZGVy
+X2lkLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInJldGNvZGUi
+OiByZXRjb2RlLCAicmVhc29uIjogcmVhc29ufSkKCmNsYXNzIE9yZGVyRHVw
+bGljYXRlRXJyb3IoTm9uUmV0cnlhYmxlRXJyb3IsIEV4ZWN1dGlvbkVycm9y
+KToKICAgIGVycm9yX2NvZGUgPSAnT1JERVJfRFVQTElDQVRFJzsgaHR0cF9z
+dGF0dXMgPSA0MDkKY2xhc3MgQnJva2VyQ29ubmVjdGlvbkVycm9yKFJldHJ5
+YWJsZUVycm9yLCBFeGVjdXRpb25FcnJvcik6IGVycm9yX2NvZGUgPSAnQlJP
+S0VSX0NPTk5FQ1RJT05fRVJST1InCmNsYXNzIE9yZGVyU3RhdGVFcnJvcihO
+b25SZXRyeWFibGVFcnJvciwgRXhlY3V0aW9uRXJyb3IpOiBlcnJvcl9jb2Rl
+ID0gJ09SREVSX1NUQVRFX0VSUk9SJwpjbGFzcyBSZWNvbmNpbGlhdGlvbkVy
+cm9yKFJldHJ5YWJsZUVycm9yLCBFeGVjdXRpb25FcnJvcik6IGVycm9yX2Nv
+ZGUgPSAnUkVDT05DSUxJQVRJT05fRVJST1InCgpjbGFzcyBEYXRhYmFzZUVy
+cm9yKFJldHJ5YWJsZUVycm9yKToKICAgIGVycm9yX2NvZGUgPSAnREFUQUJB
+U0VfRVJST1InOyBodHRwX3N0YXR1cyA9IDUwMwpjbGFzcyBEYXRhYmFzZUNv
+bm5lY3Rpb25FcnJvcihEYXRhYmFzZUVycm9yKTogZXJyb3JfY29kZSA9ICJE
+QVRBQkFTRV9DT05ORUNUSU9OX0VSUk9SJwpjbGFzcyBRdWVyeUVycm9yKERh
+dGFiYXNlRXJyb3IpOiBlcnJvcl9jb2RlID0gJ1FVRVJZX0VSUk9SJwoKY2xh
+c3MgTUxFcnJvcihSZXRyeWFibGVFcnJvcik6IGVycm9yX2NvZGUgPSAnTUxf
+RVJST1InCmNsYXNzIE1vZGVsTm90Rm91bmRFcnJvcihNTEVycm9yKToKICAg
+IGVycm9yX2NvZGUgPSAnTU9ERUxfTk9UX0ZPVU5EJzsgaHR0cF9zdGF0dXMg
+PSA0MDQKY2xhc3MgUHJlZGljdGlvbkVycm9yKE1MRXJyb3IpOiBlcnJvcl9j
+b2RlID0gJ1BSRURJQ1RJT05fRVJST1InCgpjbGFzcyBTZXJ2aWNlVW5hdmFp
+bGFibGVFcnJvcihSZXRyeWFibGVFcnJvcik6CiAgICBlcnJvcl9jb2RlID0g
+J1NFUlZJQ0VfVU5BVkFJTEFCTEUnOyBodHRwX3N0YXR1cyA9IDUwMwpjbGFz
+cyBSYXRlTGltaXRFcnJvcihOb25SZXRyeWFibGVFcnJvcik6CiAgICBlcnJv
+cl9jb2RlID0gJ1JBVEVfTElNSVRfRVhDRUVERUQnOyBodHRwX3N0YXR1cyA9
+IDQyOQpjbGFzcyBOb3RGb3VuZEVycm9yKE5vblJldHJ5YWJsZUVycm9yKToK
+ICAgIGVycm9yX2NvZGUgPSAnTk9UX0ZPVU5EJzsgaHR0cF9zdGF0dXMgPSA0
+MDQK
