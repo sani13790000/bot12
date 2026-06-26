@@ -1,1 +1,191 @@
-"""backend/risk/daily_limits.py\n\nP4-FIX-HIGH-2: Persistence interface added.\n  - DailyLimitsEngine.to_snapshot() / from_snapshot() for DB persistence\n  - Without persistence today counters reset on restart (bypass risk).\nP4-FIX-4: TodayTrades default fields (was TypeError on TodayTrades())\nPhase Q Fix Q-13: next_reset populated for ALL limit statuses.\n"""\nfrom __future__ import annotations\nfrom dataclasses import dataclass\nfrom datetime import datetime, timedelta, timezone\nfrom enum import Enum\nfrom typing import Any, Dict, Optional\n\n\nclass LimitStatus(str, Enum):\n    OK = "OK"\n    WARNING = "WARNING"\n    DAILY_TRADES_HIT = "DAILY_TRADES_HIT"\n    DAILY_LOSS_HIT = "DAILY_LOSS_HIT"\n    WEEKLY_LOSS_HIT = "WEEKLY_LOSS_HIT"\n    MONTHLY_DRAWDOWN_HIT = "MONTHLY_DRAWDOWN_HIT"\n\n\n@dataclass\nclass TodayTrades:\n    trade_count:        int   = 0\n    pnl_usd:            float = 0.0\n    risk_used_percent:  float = 0.0\n\n\n@dataclass\nclass LimitsCheckResult:\n    can_trade:                 bool\n    status:                    LimitStatus\n    reason:                    str\n    daily_trades_count:        int\n    daily_trades_limit:        int\n    daily_pnl:                 float\n    daily_loss_limit_pct:      float\n    weekly_pnl:                float\n    weekly_loss_limit_pct:     float\n    monthly_pnl:               float\n    monthly_drawdown_limit_pct: float\n    next_reset:                Optional[datetime] = None\n\n\ndef _next_midnight_utc() -> datetime:\n    now = datetime.now(timezone.utc)\n    return (now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))\n\n\ndef _next_monday_utc() -> datetime:\n    now = datetime.now(timezone.utc)\n    days_to = (7 - now.weekday()) % 7 or 7\n    return (now + timedelta(days=days_to)).replace(hour=0, minute=0, second=0, microsecond=0)\n\n\ndef _next_month_utc() -> datetime:\n    now = datetime.now(timezone.utc)\n    if now.month == 12:\n        return datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)\n    return datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)\n\n\nclass DailyLimitsEngine:\n    """\n    Checks daily/weekly/monthly trading limits.\n\n    PERSISTENCE NOTE (P4-FIX-HIGH-2):\n    This engine is in-memory by default. On every restart the counters reset,\n    which means a bad actor could bypass daily limits by restarting the process.\n    Use to_snapshot()/from_snapshot() with DB persistence on every trade close.\n    """\n\n    def __init__(self, max_daily_trades: int = 10, max_daily_loss_pct: float = 3.0,\n                 max_weekly_loss_pct: float = 7.0, max_monthly_dd_pct: float = 15.0):\n        self._max_daily_trades    = max_daily_trades\n        self._max_daily_loss_pct  = max_daily_loss_pct\n        self._max_weekly_loss_pct = max_weekly_loss_pct\n        self._max_monthly_dd_pct  = max_monthly_dd_pct\n        self._warning_threshold   = 0.80\n\n    def check_limits(self, account_balance: float, today: TodayTrades,\n                     week_pnl_usd: float = 0.0, month_pnl_usd: float = 0.0) -> LimitsCheckResult:\n        if account_balance <= 0:\n            return self._blocked(LimitStatus.DAILY_LOSS_HIT, "Balance zero or negative",\n                                  today, week_pnl_usd, month_pnl_usd, _next_midnight_utc())\n        daily_loss_pct = (abs(min(today.pnl_usd, 0.0)) / account_balance) * 100\n        week_loss_pct  = (abs(min(week_pnl_usd,  0.0)) / account_balance) * 100\n        month_dd_pct   = (abs(min(month_pnl_usd, 0.0)) / account_balance) * 100\n        base = dict(daily_trades_count=today.trade_count, daily_trades_limit=self._max_daily_trades,\n                    daily_pnl=today.pnl_usd, daily_loss_limit_pct=self._max_daily_loss_pct,\n                    weekly_pnl=week_pnl_usd, weekly_loss_limit_pct=self._max_weekly_loss_pct,\n                    monthly_pnl=month_pnl_usd, monthly_drawdown_limit_pct=self._max_monthly_dd_pct)\n        if month_dd_pct >= self._max_monthly_dd_pct:\n            return LimitsCheckResult(can_trade=False, status=LimitStatus.MONTHLY_DRAWDOWN_HIT,\n                                     reason=f"Monthly drawdown {month_dd_pct:.2f}% >= {self._max_monthly_dd_pct}%",\n                                     next_reset=_next_month_utc(), **base)\n        if week_loss_pct >= self._max_weekly_loss_pct:\n            return LimitsCheckResult(can_trade=False, status=LimitStatus.WEEKLY_LOSS_HIT,\n                                     reason=f"Weekly loss {week_loss_pct:.2f}% >= {self._max_weekly_loss_pct}%",\n                                     next_reset=_next_monday_utc(), **base)\n        if daily_loss_pct >= self._max_daily_loss_pct:\n            return LimitsCheckResult(can_trade=False, status=LimitStatus.DAILY_LOSS_HIT,\n                                     reason=f"Daily loss {daily_loss_pct:.2f}% >= {self._max_daily_loss_pct}%",\n                                     next_reset=_next_midnight_utc(), **base)\n        if today.trade_count >= self._max_daily_trades:\n            return LimitsCheckResult(can_trade=False, status=LimitStatus.DAILY_TRADES_HIT,\n                                     reason=f"Daily trades {today.trade_count} >= {self._max_daily_trades}",\n                                     next_reset=_next_midnight_utc(), **base)\n        warn_reason = ""\n        if daily_loss_pct >= self._max_daily_loss_pct * self._warning_threshold:\n            warn_reason = f"Daily loss warning {daily_loss_pct:.2f}%"\n        elif today.trade_count >= int(self._max_daily_trades * self._warning_threshold):\n            warn_reason = f"Trade count warning {today.trade_count}/{self._max_daily_trades}"\n        return LimitsCheckResult(can_trade=True,\n                                 status=LimitStatus.WARNING if warn_reason else LimitStatus.OK,\n                                 reason=warn_reason, next_reset=None, **base)\n\n    def _blocked(self, status, reason, today, week_pnl_usd, month_pnl_usd, next_reset):\n        return LimitsCheckResult(can_trade=False, status=status, reason=reason,\n                                 daily_trades_count=today.trade_count, daily_trades_limit=self._max_daily_trades,\n                                 daily_pnl=today.pnl_usd, daily_loss_limit_pct=self._max_daily_loss_pct,\n                                 weekly_pnl=week_pnl_usd, weekly_loss_limit_pct=self._max_weekly_loss_pct,\n                                 monthly_pnl=month_pnl_usd, monthly_drawdown_limit_pct=self._max_monthly_dd_pct,\n                                 next_reset=next_reset)\n\n    def to_snapshot(self) -> Dict[str, Any]:\n        return {"max_daily_trades": self._max_daily_trades,\n                "max_daily_loss_pct": self._max_daily_loss_pct,\n                "max_weekly_loss_pct": self._max_weekly_loss_pct,\n                "max_monthly_dd_pct": self._max_monthly_dd_pct,\n                "snapshot_utc": datetime.now(timezone.utc).isoformat()}\n\n    @classmethod\n    def from_snapshot(cls, snap: Dict[str, Any]) -> "DailyLimitsEngine":\n        return cls(max_daily_trades=snap.get("max_daily_trades", 10),\n                   max_daily_loss_pct=snap.get("max_daily_loss_pct", 3.0),\n                   max_weekly_loss_pct=snap.get("max_weekly_loss_pct", 7.0),\n                   max_monthly_dd_pct=snap.get("max_monthly_dd_pct", 15.0))\n
+"""backend/risk/daily_limits.py
+
+P4-FIX-HIGH-2: Persistence interface added.
+  - DailyLimitsEngine.to_snapshot() / from_snapshot() for DB persistence
+  - Without persistence today counters reset on restart (bypass risk).
+P4-FIX-4: TodayTrades default fields (was TypeError on TodayTrades())
+Phase Q Fix Q-13: next_reset populated for ALL limit statuses.
+"""
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, Dict, Optional
+
+
+class LimitStatus(str, Enum):
+    OK                       = "OK"
+    WARNING                  = "WARNING"
+    DAILY_TRADER_HIT         = "DAILY_TRADER_HIT"
+    DAILY_TRADES_HIT         = "DAILY_TRADES_HIT"
+    DAILY_LOSS_HIT           = "DAILY_LOSS_HIT"
+    WEEKLY_LOSS_HIT          = "WEEKLY_LOSS_HIT"
+    MONTHLY_DRAWDOWN_HIT     = "MONTHLY_DRAWDOWN_HIT"
+
+
+@dataclass
+class TodayTrades:
+    trade_count:        int   = 0
+    pnl_usd:            float = 0.0
+    risk_used_percent:  float = 0.0
+
+
+@dataclass
+class LimitsCheckResult:
+    can_trade:                  bool
+    status:                     LimitStatus
+    reason:                     str
+    daily_trades_count:         int
+    daily_trades_limit:         int
+    daily_pnl:                  float
+    daily_loss_limit_pct:       float
+    weekly_pnl:                 float
+    weekly_loss_limit_pct:      float
+    monthly_pnl:                float
+    monthly_drawdown_limit_pct: float
+    next_reset:                 Optional[datetime] = None
+
+
+def _next_midnight_utc() -> datetime:
+    now = datetime.now(timezone.utc)
+    return (now.replace(hour=0, minute=0, second=0, microsecond=0)
+            + timedelta(days=1))
+
+
+def _next_monday_utc() -> datetime:
+    now = datetime.now(timezone.utc)
+    days_to = (7 - now.weekday()) % 7 or 7
+    return (now + timedelta(days=days_to)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+
+def _next_month_utc() -> datetime:
+    now = datetime.now(timezone.utc)
+    if now.month == 12:
+        return datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+    return datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+
+
+class DailyLimitsEngine:
+    """
+    Checks daily/weekly/monthly trading limits.
+
+    PERSISTENCE NOTE (P4-FIX-HIGH-2):
+    This engine is in-memory by default. On every restart the counters reset,
+    which means a bad actor could bypass daily limits by restarting the process.
+    Use to_snapshot()/from_snapshot() with DB persistence on every trade close.
+    """
+
+    def __init__(
+        self,
+        max_daily_trades:     int   = 10,
+        max_daily_loss_pct:   float = 3.0,
+        max_weekly_loss_pct:  float = 7.0,
+        max_monthly_dd_pct:   float = 15.0,
+    ):
+        self._max_daily_trades    = max_daily_trades
+        self._max_daily_loss_pct  = max_daily_loss_pct
+        self._max_weekly_loss_pct = max_weekly_loss_pct
+        self._max_monthly_dd_pct  = max_monthly_dd_pct
+        self._warning_threshold   = 0.80
+
+    def check_limits(
+        self,
+        account_balance: float,
+        today:           TodayTrades,
+        week_pnl_usd:    float = 0.0,
+        month_pnl_usd:   float = 0.0,
+    ) -> LimitsCheckResult:
+        if account_balance <= 0:
+            return self._blocked(
+                LimitStatus.DAILY_LOSS_HIT,
+                "Balance zero or negative",
+                today, week_pnl_usd, month_pnl_usd,
+                _next_midnight_utc(),
+            )
+        daily_loss_pct = (abs(min(today.pnl_usd, 0.0)) / account_balance) * 100
+        week_loss_pct  = (abs(min(week_pnl_usd,  0.0)) / account_balance) * 100
+        month_dd_pct   = (abs(min(month_pnl_usd, 0.0)) / account_balance) * 100
+
+        base = dict(
+            daily_trades_count=today.trade_count,
+            daily_trades_limit=self._max_daily_trades,
+            daily_pnl=today.pnl_usd,
+            daily_loss_limit_pct=self._max_daily_loss_pct,
+            weekly_pnl=week_pnl_usd,
+            weekly_loss_limit_pct=self._max_weekly_loss_pct,
+            monthly_pnl=month_pnl_usd,
+            monthly_drawdown_limit_pct=self._max_monthly_dd_pct,
+        )
+
+        if month_dd_pct >= self._max_monthly_dd_pct:
+            return LimitsCheckResult(
+                can_trade=False, status=LimitStatus.MONTHLY_DRAWDOWN_HIT,
+                reason=f"Monthly drawdown {month_dd_pct:.2f}% >= {self._max_monthly_dd_pct}%",
+                next_reset=_next_month_utc(), **base,
+            )
+        if week_loss_pct >= self._max_weekly_loss_pct:
+            return LimitsCheckResult(
+                can_trade=False, status=LimitStatus.WEEKLY_LOSS_HIT,
+                reason=f"Weekly loss {week_loss_pct:.2f}% >= {self._max_weekly_loss_pct}%",
+                next_reset=_next_monday_utc(), **base,
+            )
+        if daily_loss_pct >= self._max_daily_loss_pct:
+            return LimitsCheckResult(
+                can_trade=False, status=LimitStatus.DAILY_LOSS_HIT,
+                reason=f"Daily loss {daily_loss_pct:.2f}% >= {self._max_daily_loss_pct}%",
+                next_reset=_next_midnight_utc(), **base,
+            )
+        if today.trade_count >= self._max_daily_trades:
+            return LimitsCheckResult(
+                can_trade=False, status=LimitStatus.DAILY_TRADES_HIT,
+                reason=f"Daily trades {today.trade_count} >= {self._max_daily_trades}",
+                next_reset=_next_midnight_utc(), **base,
+            )
+
+        warn_reason = ""
+        if daily_loss_pct >= self._max_daily_loss_pct * self._warning_threshold:
+            warn_reason = f"Daily loss warning {daily_loss_pct:.2f}%"
+        elif today.trade_count >= int(self._max_daily_trades * self._warning_threshold):
+            warn_reason = f"Trade count warning {today.trade_count}/{self._max_daily_trades}"
+
+        return LimitsCheckResult(
+            can_trade=True,
+            status=LimitStatus.WARNING if warn_reason else LimitStatus.OK,
+            reason=warn_reason,
+            next_reset=None,
+            **base,
+        )
+
+    def _blocked(self, status, reason, today, week_pnl_usd, month_pnl_usd, next_reset):
+        return LimitsCheckResult(
+            can_trade=False, status=status, reason=reason,
+            daily_trades_count=today.trade_count,
+            daily_trades_limit=self._max_daily_trades,
+            daily_pnl=today.pnl_usd,
+            daily_loss_limit_pct=self._max_daily_loss_pct,
+            weekly_pnl=week_pnl_usd,
+            weekly_loss_limit_pct=self._max_weekly_loss_pct,
+            monthly_pnl=month_pnl_usd,
+            monthly_drawdown_limit_pct=self._max_monthly_dd_pct,
+            next_reset=next_reset,
+        )
+
+    def to_snapshot(self) -> Dict[str, Any]:
+        return {
+            "max_daily_trades":    self._max_daily_trades,
+            "max_daily_loss_pct":  self._max_daily_loss_pct,
+            "max_weekly_loss_pct": self._max_weekly_loss_pct,
+            "max_monthly_dd_pct":  self._max_monthly_dd_pct,
+            "snapshot_utc":        datetime.now(timezone.utc).isoformat(),
+        }
+
+    @classmethod
+    def from_snapshot(cls, snap: Dict[str, Any]) -> "DailyLimitsEngine":
+        return cls(
+            max_daily_trades=snap.get("max_daily_trades", 10),
+            max_daily_loss_pct=snap.get("max_daily_loss_pct", 3.0),
+            max_weekly_loss_pct=snap.get("max_weekly_loss_pct", 7.0),
+            max_monthly_dd_pct=snap.get("max_monthly_dd_pct", 15.0),
+        )
