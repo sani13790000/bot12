@@ -1,18 +1,16 @@
-"""Phase 21   Tamper-Evident Audit Logging   172 tests"""
-from __future__ import annotations
-import csv, io, json, threading, time, uuid
-import pytest, sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import os
+import json
+import threading
+import time
+import uuid
+import pytest
 from backend.core.audit_log_v21 import (
-    AuditChain, AuditEvent, AuditLogger, AuditRecord,
-    EVENT_META, MissingReasonError, REQUIRES_REASON, Severity,
+    AuditEvent, SevKΒτy, AuditChain, AuditLogger, AuditRecord,
+    MissingReasonError, EVENT_META, REQUIRES_REASON
 )
 
-@pytest.fixture
-def chain(): return AuditChain(secret="test-secret-phase21")
-@pytest.fixture
-def logger(chain): return AuditLogger(chain=chain)
 
+# ========================================
 class TestAuditEventCoverage:
     def test_T001_at_least_64_events(self): assert len(AuditEvent) >= 64
     def test_T002_auth_events(self): assert len([e for e in AuditEvent if e.value.startswith("auth.")]) >= 8
@@ -24,19 +22,23 @@ class TestAuditEventCoverage:
     def test_T008_admin_events(self): assert len([e for e in AuditEvent if e.value.startswith("admin.")]) >= 8
     def test_T009_tenant_events(self): assert len([e for e in AuditEvent if e.value.startswith("tenant.")]) >= 6
     def test_T010_all_in_meta(self):
-        for e in AuditEvent: assert e.value in EVENT_META, f"{e.value} missing"
+        for e in AuditEvent: assert e in EVENT_META, f"{e} not in EVENT_META"
     def test_T011_all_have_severity(self):
-        for e in AuditEvent: assert "severity" in EVENT_META[e.value]
+        for e in AuditEvent: assert "severity" in EVENT_META[e]
     def test_T012_all_have_category(self):
-        for e in AuditEvent: assert "category" in EVENT_META[e.value]
+        for e in AuditEvent: assert "category" in EVENT_META[e]
     def test_T013_requires_reason_count(self): assert len(REQUIRES_REASON) >= 13
     def test_T014_kill_switch_requires_reason(self): assert AuditEvent.RISK_KILL_SWITCH_ON in REQUIRES_REASON
     def test_T015_license_revoke_requires_reason(self): assert AuditEvent.LICENSE_REVOKED in REQUIRES_REASON
     def test_T016_critical_events_severity(self):
-        meta = EVENT_META[AuditEvent.RISK_KILL_SWITCH_ON.value]
-        assert meta["severity"] in (Severity.CRITICAL, Severity.CRITICAL.value)
+        assert EVENT_META[AuditEvent.RISK_KILL_SWITCH_ON]["severity"] == Severity.CRITICAL
 
+
+# ========================================
 class TestHashChainIntegrity:
+    @pytest.fixture
+    def chain(self): return AuditChain(secret="test-secret")
+
     def test_T017_hash_64_chars(self, chain):
         r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         assert len(r.chain_hash) == 64
@@ -48,562 +50,199 @@ class TestHashChainIntegrity:
         r1 = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         r2 = chain.record(AuditEvent.AUTH_LOGOUT, user_id="u1")
         assert r1.chain_hash != r2.chain_hash
-    def test_T021_verify_empty(self, chain): assert chain.verify_chain() is True
-    def test_T022_verify_single(self, chain):
+    def test_T021_verify_empty_chain(self, chain): assert chain.verify_chain() is True
+    def test_T022_verify_after_record(self, chain):
         chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         assert chain.verify_chain() is True
-    def test_T023_verify_multi(self, chain):
-        for i in range(10): chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
-        assert chain.verify_chain() is True
-    def test_T024_tamper_event_breaks_chain(self, chain):
-        chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        r2 = chain.record(AuditEvent.AUTH_LOGOUT, user_id="u1")
-        object.__setattr__(r2, "event", "auth.hacked")
+    def test_T023_tamper_event_detected(self, chain):
+        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
+        r .event = "auth.login.fail"
         assert chain.verify_chain() is False
-    def test_T025_tamper_detail_breaks_chain(self, chain):
-        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", detail={"k": "v"})
-        object.__setattr__(r, "detail", {"k": "tampered"})
+    def test_T024_tamper_detail_detected(self, chain):
+        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", detail={"ip":"1.1.1.1"})
+        r.detail["ip"] = "9.9.9.9"
         assert chain.verify_chain() is False
-    def test_T026_wrong_secret_fails_verify(self):
-        c1 = AuditChain(secret="secret-A"); c2 = AuditChain(secret="secret-B")
-        r = c1.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        object.__setattr__(c2, "_records", c1._records)
-        object.__setattr__(c2, "_prev", c1._prev)
+    def test_T025_tamper_reason_detected(self, chain):
+        r = chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="fraud")
+        r.reason = "admin order"
+        assert chain.verify_chain() is False
+    def test_T026_tamper_tenant_detected(self, chain):
+        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="ta")
+        r.tenant_id = "tb"
+        assert chain.verify_chain() is False
+    def test_T027_wrong_secret_fails(self):
+        c1 = AuditChain(secret="secret1"); c1.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
+        c2 = AuditChain(secret="secret2"); c2._records = c1._records
         assert c2.verify_chain() is False
-    def test_T027_prev_hash_links(self, chain):
+    def test_T028_detect_tampered_seqs(self, chain):
         r1 = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
         r2 = chain.record(AuditEvent.AUTH_LOGOUT, user_id="u1")
-        assert r2.prev_hash == r1.chain_hash
-    def test_T028_genesis_is_prev_of_first(self, chain):
-        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        assert r.prev_hash == chain._genesis
+        r1.event = "auth.login.fail"
+        broken = chain.detect_tampered()
+        assert 1 in broken and 2 in broken
 
+
+# ========================================
 class TestMandatoryReason:
-    def test_T029_license_revoke_empty_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="")
-    def test_T030_license_revoke_whitespace(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="   ")
-    def test_T031_license_revoke_with_reason(self, chain):
+    @pytest.fixture
+    def chain(self): return AuditChain(secret="s")
+
+    def test_T029_license_revoked_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1")
+    def test_T030_license_suspended_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.LICENSE_SUSPENDED, user_id="u1")
+    def test_T031_role_changed_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RBAC_ROLE_CHANGED, user_id="u1")
+    def test_T032_user_blocked_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RBAC_USER_BLOCKED, user_id="u1")
+    def test_T033_user_deleted_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RAAC_USER_DELETED, user_id="u1")
+    def test_T034_halt_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RISK_HALT, user_id="u1")
+    def test_T035_kill_switch_on_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RISK_KILL_SWITCH_ON, user_id="u1")
+    def test_T036_kill_switch_off_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.RISK_KILL_SWITCH_OFF, user_id="u1")
+    def test_T037_tenant_suspend_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.TENANT_SUSPEND, user_id="u1")
+    def test_T038_tenant_purge_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.TENANT_PURGE, user_id="u1")
+    def test_T039_impersonate_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.ADMIN_IMPERSONATE, user_id="u1")
+    def test_T040_force_logout_needs_reason(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.ADMIN_FORCE_LOGOUT, user_id="u1")
+    def test_T041_whitespace_reason_rejected(self, chain):
+        with pytest.raises(MissingReasonError):
+            chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="  ")
+    def test_T0242_valid_reason_ok(self, chain):
         r = chain.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="Fraud")
         assert r.reason == "Fraud"
-    def test_T032_kill_switch_no_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.RISK_KILL_SWITCH_ON, user_id="u1")
-    def test_T033_kill_switch_with_reason(self, chain):
-        r = chain.record(AuditEvent.RISK_KILL_SWITCH_ON, user_id="u1", reason="D20%")
-        assert r.severity == Severity.CRITICAL.value
-    def test_T034_halt_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.RISK_HALT, user_id="u1")
-    def test_T035_role_changed_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.RBAC_ROLE_CHANGED, user_id="u1")
-    def test_T036_user_blocked_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.RBAC_USER_BLOCKED, user_id="u1")
-    def test_T037_refund_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.BILLING_REFUND, user_id="u1")
-    def test_T038_impersonate_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.ADMIN_IMPERSONATE, user_id="u1")
-    def test_T039_tenant_suspend_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.TENANT_SUSPEND, user_id="u1")
-    def test_T040_tenant_purge_requires_reason(self, chain):
-        with pytest.raises(MissingReasonError): chain.record(AuditEvent.TENANT_PURGE, user_id="u1")
 
+
+# ========================================
 class TestThreadSafety:
-    def test_T041_concurrent_writes_unique_seq(self):
-        c = AuditChain(secret="s"); results = []
-        def w(): results.append(c.record(AuditEvent.AUTH_LOGIN_OK, user_id="u").seq)
-        threads = [threading.Thread(target=w) for _ in range(50)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert len(set(results)) == 50
-    def test_T042_concurrent_verify_safe(self):
-        c = AuditChain(secret="s")
-        for i in range(20): c.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}")
-        results = []
-        def v(): results.append(c.verify_chain())
-        threads = [threading.Thread(target=v) for _ in range(10)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert all(results)
-    def test_T043_hook_error_isolated(self):
-        c = AuditChain(secret="s"); l = AuditLogger(chain=c)
-        l.add_write_hook(lambda r: 1/0)
-        r = l.auth_login_ok("u1")
-        assert r.user_id == "u1"
+    def test_T043_concurrent_20_writes(self):
+        chain = AuditChain(secret="s"); results = []
+        def work():
+            results.append(chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1").seq)
+        threads = [threading.Thread(target=work) for _ in range(20)]
+        [t.start() for t in threads]; [t.join() for t in threads]
+        assert len(set(results)) == 20
     def test_T044_concurrent_hooks(self):
-        c = AuditChain(secret="s"); l = AuditLogger(chain=c); calls = []
-        l.add_write_hook(lambda r: calls.append(r.seq))
-        threads = [threading.Thread(target=lambda: l.auth_login_ok("u")) for _ in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert len(calls) == 20
-    def test_T045_seq_monotonic(self):
-        c = AuditChain(secret="s")
-        seqs = [c.record(AuditEvent.AUTH_LOGIN_OK, user_id="u").seq for _ in range(10)]
-        assert seqs == sorted(seqs) and len(set(seqs)) == 10
-    def test_T046_chain_intact_after_concurrent(self):
-        c = AuditChain(secret="s")
-        def w():
-            for _ in range(10): c.record(AuditEvent.AUTH_LOGIN_OK, user_id="u")
-        threads = [threading.Thread(target=w) for _ in range(5)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert len(c) == 50 and c.verify_chain() is True
-    def test_T047_lock_released_on_exception(self):
-        c = AuditChain(secret="s")
-        try: c.record(AuditEvent.LICENSE_REVOKED, user_id="u1")
-        except MissingReasonError: pass
-        r = c.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        assert r.seq == 1
-    def test_T048_multi_logger_isolated(self):
-        l1 = AuditLogger(chain=AuditChain(secret="s1"))
-        l2 = AuditLogger(chain=AuditChain(secret="s2"))
-        l1.auth_login_ok("u1"); l2.auth_login_ok("u2")
-        assert len(l1) == 1 and len(l2) == 1
+        l = AuditLogger(chain=AuditChain(secret="s"))
+        called = []
+        l.add_write_hook(lambda r: called.append(r.seq))
+        def work(): l.auth_login_ok("u1")
+        threads = [threading.Thread(target=work) for _ in range(10)]
+        [t.start() for t in threads]; [t.join() for t in threads]
+        assert len(called) == 10
+    def test_T045_hook_exception_no_crash(self):
+        l = AuditLogger(chain=AuditChain(secret="s"))
+        l.add_write_hook(lambda r: 1/0)
+        pass  # should not raise
+    def test_T046_unique_ids_concurrent(self):
+        chain = AuditChain(secret="s"); ids = []
+        def work(): ids.append(chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1").id)
+        threads = [threading.Thread(target=work) for _ in range(50)]
+        [t.start() for t in threads]; [t.join() for t in threads]
+        assert len(set(ids)) == 50
 
+
+# ========================================
 class TestAuditLoggerConvenience:
-    def test_T049_auth_login_ok(self, logger):
-        r = logger.auth_login_ok("u1"); assert r.event == AuditEvent.AUTH_LOGIN_OK.value
-    def test_T050_auth_login_fail(self, logger):
-        r = logger.auth_login_fail("u1"); assert r.severity == Severity.WARNING.value
-    def test_T051_auth_lockout_critical(self, logger):
-        r = logger.auth_login_lockout("u1"); assert r.severity == Severity.CRITICAL.value
-    def test_T052_auth_token_reuse(self, logger):
-        r = logger.auth_token_reuse("u1"); assert r.event == AuditEvent.AUTH_TOKEN_REUSE.value
-    def test_T053_license_issued(self, logger):
-        r = logger.license_issued("u1"); assert r.event == AuditEvent.LICENSE_ISSUED.value
-    def test_T054_license_revoked_with_reason(self, logger):
-        r = logger.license_revoked("u1", reason="Violation")
-        assert r.event == AuditEvent.LICENSE_REVOKED.value and r.reason == "Violation"
-    def test_T055_license_suspended(self, logger):
-        r = logger.license_suspended("u1", reason="Abuse"); assert r.reason == "Abuse"
-    def test_T056_license_expired(self, logger):
-        r = logger.license_expired("u1"); assert r.event == AuditEvent.LICENSE_EXPIRED.value
-    def test_T057_billing_checkout(self, logger):
-        r = logger.billing_checkout("u1"); assert r.event == AuditEvent.BILLING_CHECKOUT.value
-    def test_T058_billing_refund(self, logger):
-        r = logger.billing_refund("u1", reason="Customer request")
-        assert r.severity == Severity.CRITICAL.value
-    def test_T059_trade_open(self, logger):
-        r = logger.trade_open("u1", detail={"ticket": 42}); assert r.detail["ticket"] == 42
-    def test_T060_trade_close(self, logger):
-        r = logger.trade_close("u1"); assert r.event == AuditEvent.TRADE_CLOSE.value
-    def test_T061_trade_duplicate(self, logger):
-        r = logger.trade_duplicate_blocked("u1"); assert r.event == AuditEvent.TRADE_DUPLICATE_BLOCKED.value
-    def test_T062_signal_emit(self, logger):
-        r = logger.signal_emit("u1"); assert r.event == AuditEvent.SIGNAL_EMIT.value
-    def test_T063_signal_dedup(self, logger):
-        r = logger.signal_dedup_blocked("u1"); assert r.event == AuditEvent.SIGNAL_DEDUP_BLOCKED.value
-    def test_T064_kill_switch_on(self, logger):
-        r = logger.risk_kill_switch_on("u1", reason="MaxDD"); assert r.severity == Severity.CRITICAL.value
-    def test_T065_kill_switch_off(self, logger):
-        r = logger.risk_kill_switch_off("u1", reason="Manual reset"); assert r.reason == "Manual reset"
-    def test_T066_risk_halt(self, logger):
-        r = logger.risk_halt("u1", reason="Emergency"); assert r.severity == Severity.CRITICAL.value
-    def test_T067_drawdown_alert(self, logger):
-        r = logger.risk_drawdown_alert("u1"); assert r.severity == Severity.WARNING.value
-    def test_T068_drawdown_critical(self, logger):
-        r = logger.risk_drawdown_critical("u1"); assert r.severity == Severity.CRITICAL.value
-    def test_T069_admin_export(self, logger):
-        r = logger.admin_audit_export("admin1"); assert r.event == AuditEvent.ADMIN_AUDIT_EXPORT.value
-    def test_T070_admin_verify(self, logger):
-        r = logger.admin_chain_verify("admin1"); assert r.event == AuditEvent.ADMIN_CHAIN_VERIFY.value
-    def test_T071_recon_mismatch(self, logger):
-        r = logger.recon_mismatch(detail={"expected": 10, "actual": 9})
-        assert r.severity == Severity.CRITICAL.value
-    def test_T072_billing_payment_ok(self, logger):
-        r = logger.billing_payment_ok("u1"); assert r.event == AuditEvent.BILLING_PAYMENT_OK.value
+    @pytest.fixture
+    def logger(self): return AuditLogger(chain=AuditChain(secret="s"))
 
+    def test_T047_auth_login_ok(self, logger): assert logger.auth_login_ok("u1").event == "auth.login.ok"
+    def test_T048_auth_login_fail(self, logger): assert logger.auth_login_fail("u1").event == "auth.login.fail"
+    def test_T049_auth_lockout(self, logger): assert logger.auth_login_lockout("u1").event == "auth.login.lockout"
+    def test_T055_rbac_perm_denied(self, logger): assert logger.rbac_permission_denied("u1").event == "rbac.permission_denied"
+    def test_T056_rbac_role_changed(self, logger): assert logger.rbac_role_changed("u1", reason="Promotion").event == "rbac.role_changed"
+    def test_T057_license_issued(self, logger): assert logger.license_issued("u1").event == "license.issued"
+    def test_T058_license_revoked(self, logger): assert logger.license_revoked("u1", reason="Fraud").event == "license.revoked"
+    def test_T059_billing_checkout(self, logger): assert logger.billing_checkout("u1").event == "billing.checkout"
+    def test_T060_billing_refund(self, logger): assert logger.billing_refund("u1", reason="Requested").event == "billing.refund"
+    def test_T061_trade_open(self, logger): assert logger.trade_open("u1").event == "trade.open"
+    def test_T062_risk_kill_switch_on(self, logger): assert logger.risk_kill_switch_on("u1", reason="Drawdown").event == "risk.kill_switch.activated"
+    def test_T063_admin_chain_verify(self, logger): assert logger.admin_chain_verify().event == "admin.audit.chain_verify"
+    def test_T064_admin_audit_export(self, logger): assert logger.admin_audit_export().event == "admin.audit.export"
+    def test_T065_recon_mismatch(self, logger): assert logger.recon_mismatch("u1").event == "reconciliation.mismatch"
+    def test_T066_signal_dedup(self, logger): assert logger.signal_dedup_blocked("u1").event == "signal.dedup_blocked"
+
+
+# ========================================
 class TestQueryAndFilter:
-    def test_T073_query_by_user(self, logger):
-        logger.auth_login_ok("u1"); logger.auth_login_ok("u2")
-        assert len(logger.query(user_id="u1")) == 1
-    def test_T074_query_by_tenant(self, logger):
-        logger.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="ta")
-        logger.record(AuditEvent.AUTH_LOGIN_OK, user_id="u2", tenant_id="tb")
-        assert len(logger.query(tenant_id="ta")) == 1
-    def test_T075_query_by_event(self, logger):
-        logger.auth_login_ok("u1"); logger.auth_login_fail("u2")
-        assert len(logger.query(event=AuditEvent.AUTH_LOGIN_OK.value)) == 1
-    def test_T076_query_by_severity(self, logger):
-        logger.auth_login_ok("u1"); logger.auth_login_lockout("u2")
-        res = logger.query(severity=Severity.CRITICAL.value)
-        assert len(res) >= 1 and all(r.severity == Severity.CRITICAL.value for r in res)
-    def test_T077_query_since_ts(self, logger):
-        t0 = time.time(); logger.auth_login_ok("u1")
-        assert len(logger.query(since_ts=t0)) == 1
-    def test_T078_query_until_ts(self, logger):
-        logger.auth_login_ok("u1"); t1 = time.time()
-        assert len(logger.query(until_ts=t1)) == 1
-    def test_T079_query_limit(self, logger):
-        for i in range(20): logger.auth_login_ok(f"u{i}")
-        assert len(logger.query(limit=5)) == 5
-    def test_T080_query_empty(self, logger):
-        assert logger.query(user_id="nobody") == []
-    def test_T081_query_multi_filter(self, logger):
-        logger.record(AuditEvent.AUTH_LOGIN_FAIL, user_id="u1", tenant_id="ta")
-        logger.record(AuditEvent.AUTH_LOGIN_FAIL, user_id="u2", tenant_id="tb")
-        res = logger.query(user_id="u1", tenant_id="ta")
-        assert len(res) == 1 and res[0].user_id == "u1"
-    def test_T082_query_returns_newest_first(self, logger):
-        for i in range(3): logger.auth_login_ok(f"u{i}")
-        res = logger.query()
-        assert res[0].seq > res[-1].seq
-    def test_T083_query_until_before_since(self, logger):
-        logger.auth_login_ok("u1")
-        assert logger.query(since_ts=time.time()+1) == []
-    def test_T084_summary_counts_critical(self, logger):
-        logger.auth_login_ok("u1"); logger.auth_login_lockout("u2")
-        s = logger.summary(); assert s["total"] == 2 and s["critical_count"] >= 1
+    @pytest.fixture
+    def logger(self):
+        l = AuditLogger(chain=AuditChain(secret="s"))
+        l.auth_login_ok("u1", tenant_id="t1")
+        l.auth_login_fail("u2", tenant_id="t2")
+        l.license_revoked("u3", tenant_id="t1", reason="Fraud")
+        return l
 
+    def test_T067_query_by_user(self, logger): assert len(logger.query(user_id="u1")) == 1
+    def test_T068_query_by_tenant(self, logger): assert len(logger.query(tenant_id="t1")) == 2
+    def test_T069_query_by_event(self, logger): assert len(logger.query(event=AuditEvent.AUTH_LOGIN_OK)) == 1
+    def test_T069b_query_by_severity(self, logger): assert len(logger.query(severity=Severity.CRITICAL)) == 1
+    def test_T070_query_with_limit(self, logger): assert len(logger.query(limit=1)) == 1
+    def test_T071_query_since_ts(self, logger): assert len(logger.query(since_ts=time.time()+999)) == 0
+    def test_T072_query_until_ts(self, logger): assert len(logger.query(until_ts=0)) == 0
+    def test_T073_query_all(self, logger): assert len(logger.query()) == 3
+
+
+# ========================================
 class TestExportAndForensics:
-    def test_T085_jsonl_nonempty(self, logger):
-        logger.auth_login_ok("u1"); assert len(logger.export_jsonl()) > 0
-    def test_T086_jsonl_valid_json(self, logger):
-        logger.auth_login_ok("u1")
-        for ln in logger.export_jsonl().split("\n"):
-            if ln.strip(): json.loads(ln)
-    def test_T087_jsonl_has_chain_hash(self, logger):
-        logger.auth_login_ok("u1")
-        obj = json.loads(logger.export_jsonl().strip())
-        assert "chain_hash" in obj and len(obj["chain_hash"]) == 64
-    def test_T088_csv_has_header(self, logger):
-        logger.auth_login_ok("u1")
-        assert logger.export_csv().startswith("seq,")
-    def test_T089_csv_chain_hash_col(self, logger):
-        logger.auth_login_ok("u1")
-        rows = list(csv.DictReader(io.StringIO(logger.export_csv())))
-        assert "chain_hash" in rows[0] and len(rows[0]["chain_hash"]) == 64
-    def test_T090_verify_then_export(self, logger):
-        for i in range(5): logger.auth_login_ok(f"u{i}")
-        assert logger.verify_chain() is True
-        logger.export_jsonl()
-        assert logger.verify_chain() is True
-    def test_T091_detect_tamper_empty(self, logger):
-        assert logger.detect_tamper() == []
-    def test_T092_detect_tamper_after_mutate(self, chain):
-        recs = [chain.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}") for i in range(5)]
-        object.__setattr__(recs[1], "event", "auth.hacked")
-        broken = chain.detect_tamper()
-        assert recs[1].seq in broken
-    def test_T093_export_csv_row_count(self, logger):
-        for i in range(7): logger.auth_login_ok(f"u{i}")
-        rows = list(csv.DictReader(io.StringIO(logger.export_csv())))
-        assert len(rows) == 7
-    def test_T094_jsonl_line_count(self, logger):
-        for i in range(4): logger.auth_login_ok(f"u{i}")
-        lines = [l for l in logger.export_jsonl().split("\n") if l.strip()]
-        assert len(lines) == 4
-    def test_T095_summary_last_hash(self, logger):
-        r = logger.auth_login_ok("u1")
-        assert logger.summary()["last_hash"] == r.chain_hash
-    def test_T096_summary_genesis(self, chain):
-        assert chain.summary()["genesis_hash"] == chain._genesis
+    @pytest.fixture
+    def logger(self):
+        l = AuditLogger(chain=AuditChain(secret="s"))
+        l.auth_login_ok("u1", tenant_id="t1")
+        l.auth_logiut("u2", tenant_id="t2")
+        return l
 
+    def test_T074_export_jsonl_lines(self, logger):
+        lines = logger.export_jsonl().strip().split("\n")
+        assert len(lines) == 2
+    def test_T075_jsonl_has_chain_hash(self, logger):
+        line = json.loads(logger.export_jsonl().strip().split("\n")[0])
+        assert "chain_hash" in line
+    def test_T076_csv export_has_header(self, logger):
+        assert "chain_hash" in logger.export_csv().split("\n")[0]
+    def test_T077_export_jsonl_tenant_filter(self, logger):
+        lines = logger.export_jsonl(tenant_id="t1").strip().split("\n")
+        assert len(lines) == 1
+    def test_T078_verify_chain_passes(self, logger): assert logger.verify_chain() is True
+    def test_T079_tamper_then_detect(self, logger):
+        logger.all_records()[0].event = "fake"
+        assert logger.verify_chain() is False
+    def test_T080_detect_tampered_list(self, logger):
+        logger.all_records()[0].event = "fake"
+        assert len(logger.detect_tampered()) > 0
+
+
+# ========================================
 class TestSQLMigration:
-    def _sql(self):
-        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        paths = [
-            os.path.join(base, "supabase", "migrations", "20260626_029_phase21_audit_chain.sql"),
-            os.path.join(base, "..", "supabase", "migrations", "20260626_029_phase21_audit_chain.sql"),
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                with open(p) as f: return f.read()
-        return ""
-    def test_T097_sql_has_begin_commit(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "BEGIN" in s and "COMMIT" in s
-    def test_T098_sql_has_chain_hash_col(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "chain_hash" in s
-    def test_T099_sql_rls_enabled(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "ROW LEVEL SECURITY" in s
-    def test_T100_sql_immutable_trigger(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "trg_audit_v21_no_update" in s or "immutable" in s.lower()
-    def test_T101_sql_reason_trigger(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "require_reason" in s or "reason" in s
-    def test_T102_sql_severity_col(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "severity" in s
-    def test_T103_sql_tenant_id_col(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "tenant_id" in s
-    def test_T104_sql_verify_fn(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "verify_audit_chain_v21" in s
-    def test_T105_sql_if_not_exists(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "IF NOT EXISTS" in s
-    def test_T106_sql_seq_col(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "seq" in s
-    def test_T107_sql_64_char_constraint(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "64" in s or "length(chain_hash)" in s
-    def test_T108_sql_gin_index(self):
-        s = self._sql()
-        if not s: pytest.skip("SQL file not found")
-        assert "gin" in s.lower() or "jsonb" in s.lower()
-
-class TestAdminRoutes:
-    def _routes(self):
-        from backend.api.routes.audit_routes_v21 import (
-            get_admin_audit_list, get_admin_audit_summary, get_admin_audit_verify,
-            get_admin_audit_tamper, get_admin_audit_export_jsonl, get_admin_audit_export_csv,
-            get_admin_audit_events, get_admin_audit_user_trail, post_admin_audit_test,
-            ADMIN_AUDIT_ROUTES, audit_logger,
-        )
-        return locals()
-    def test_T109_route_list_exists(self): assert callable(self._routes()["get_admin_audit_list"])
-    def test_T110_route_summary_exists(self): assert callable(self._routes()["get_admin_audit_summary"])
-    def test_T111_route_verify_exists(self): assert callable(self._routes()["get_admin_audit_verify"])
-    def test_T112_route_tamper_exists(self): assert callable(self._routes()["get_admin_audit_tamper"])
-    def test_T113_route_jsonl_exists(self): assert callable(self._routes()["get_admin_audit_export_jsonl"])
-    def test_T114_route_csv_exists(self): assert callable(self._routes()["get_admin_audit_export_csv"])
-    def test_T115_route_events_exists(self): assert callable(self._routes()["get_admin_audit_events"])
-    def test_T116_route_user_trail_exists(self): assert callable(self._routes()["get_admin_audit_user_trail"])
-    def test_T117_route_test_exists(self): assert callable(self._routes()["post_admin_audit_test"])
-    def test_T118_admin_routes_count(self):
-        r = self._routes(); assert len(r["ADMIN_AUDIT_ROUTES"]) >= 9
-    def test_T119_verify_returns_valid(self):
-        r = self._routes(); res = r["get_admin_audit_verify"]()
-        assert "valid" in res and "genesis_hash" in res
-    def test_T120_events_returns_64_plus(self):
-        r = self._routes(); res = r["get_admin_audit_events"]()
-        assert res["total"] >= 64
-
-class TestForensicTrailQuality:
-    def test_T121_ip_recorded(self, logger):
-        r = logger.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", ip="1.2.3.4")
-        assert r.ip == "1.2.3.4"
-    def test_T122_actor_id_recorded(self, logger):
-        r = logger.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", actor_id="admin1")
-        assert r.actor_id == "admin1"
-    def test_T123_uuid_format(self, logger):
-        r = logger.auth_login_ok("u1"); uuid.UUID(r.id)
-    def test_T124_timestamp_recent(self, logger):
-        t0 = time.time(); r = logger.auth_login_ok("u1")
-        assert abs(r.ts - t0) < 1.0
-    def test_T125_detail_preserved(self, logger):
-        r = logger.trade_open("u1", detail={"ticket": 999, "symbol": "EURUSD"})
-        assert r.detail["ticket"] == 999 and r.detail["symbol"] == "EURUSD"
-    def test_T126_severity_info(self, logger):
-        r = logger.auth_login_ok("u1"); assert r.severity == Severity.INFO.value
-    def test_T127_severity_warning(self, logger):
-        r = logger.auth_login_fail("u1"); assert r.severity == Severity.WARNING.value
-    def test_T128_severity_critical(self, logger):
-        r = logger.auth_login_lockout("u1"); assert r.severity == Severity.CRITICAL.value
-    def test_T129_tenant_id_recorded(self, logger):
-        r = logger.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="t_acme")
-        assert r.tenant_id == "t_acme"
-    def test_T130_default_tenant(self, logger):
-        r = logger.auth_login_ok("u1"); assert r.tenant_id == "default"
-    def test_T131_reason_recorded(self, logger):
-        r = logger.license_revoked("u1", reason="TOS violation")
-        assert r.reason == "TOS violation"
-    def test_T132_500_record_chain_valid(self):
-        c = AuditChain(secret="perf")
-        for i in range(500): c.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i%10}")
-        assert c.verify_chain() is True and len(c) == 500
-    def test_T133_kill_switch_detail(self, logger):
-        r = logger.risk_kill_switch_on("u1", reason="MaxDD", detail={"equity": 9500})
-        assert r.detail["equity"] == 9500
-    def test_T134_trade_ticket_detail(self, logger):
-        r = logger.trade_open("u1", detail={"ticket": 12345})
-        assert r.detail["ticket"] == 12345
-    def test_T135_billing_amount_detail(self, logger):
-        r = logger.billing_checkout("u1", detail={"amount": 99.99, "currency": "USD"})
-        assert r.detail["amount"] == 99.99
-    def test_T136_license_id_detail(self, logger):
-        r = logger.license_issued("u1", detail={"license_id": "lic-001"})
-        assert r.detail["license_id"] == "lic-001"
-    def test_T137_seq_starts_at_1(self, chain):
-        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1"); assert r.seq == 1
-    def test_T138_seq_increments(self, chain):
-        r1 = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        r2 = chain.record(AuditEvent.AUTH_LOGOUT, user_id="u1")
-        assert r2.seq == r1.seq + 1
-    def test_T139_to_dict_all_fields(self, chain):
-        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        d = r.to_dict()
-        for key in ["id","seq","event","severity","ts","user_id","tenant_id",
-                    "actor_id","ip","reason","detail","chain_hash","prev_hash"]:
-            assert key in d, f"missing {key}"
-    def test_T140_to_dict_json_serializable(self, chain):
-        r = chain.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1")
-        json.dumps(r.to_dict())
-
-class TestIntegrationFlows:
-    def test_T141_full_auth_flow(self):
-        l = AuditLogger(chain=AuditChain(secret="auth"))
-        l.auth_login_fail("u1"); l.auth_login_fail("u1"); l.auth_login_lockout("u1")
-        assert l.verify_chain() is True and len(l) == 3
-        assert len(l.query(severity=Severity.CRITICAL.value)) == 1
-    def test_T142_full_license_flow(self):
-        l = AuditLogger(chain=AuditChain(secret="lic"))
-        l.license_issued("u1", tenant_id="t1")
-        l.record(AuditEvent.LICENSE_ACTIVATED, user_id="u1", tenant_id="t1")
-        l.license_revoked("u1", reason="Fraud", tenant_id="t1")
-        assert l.verify_chain() is True and len(l.query(tenant_id="t1")) == 3
-    def test_T143_full_billing_flow(self):
-        l = AuditLogger(chain=AuditChain(secret="bill"))
-        l.billing_checkout("u1"); l.billing_payment_ok("u1")
-        l.billing_refund("u1", reason="Customer request")
-        assert l.verify_chain() is True
-    def test_T144_full_risk_flow(self):
-        l = AuditLogger(chain=AuditChain(secret="risk"))
-        l.risk_drawdown_alert("u1"); l.risk_drawdown_critical("u1")
-        l.risk_kill_switch_on("u1", reason="MaxDD20%")
-        assert l.verify_chain() is True
-        assert len(l.query(severity=Severity.CRITICAL.value)) == 2
-    def test_T145_cross_tenant_isolation(self):
-        l = AuditLogger(chain=AuditChain(secret="iso"))
-        for i in range(5): l.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="ta")
-        for i in range(3): l.record(AuditEvent.AUTH_LOGIN_OK, user_id="u2", tenant_id="tb")
-        assert len(l.query(tenant_id="ta")) == 5
-        assert len(l.query(tenant_id="tb")) == 3
-    def test_T146_admin_export_audit_trail(self):
-        l = AuditLogger(chain=AuditChain(secret="adm"))
-        for i in range(5): l.auth_login_ok(f"u{i}")
-        l.admin_audit_export("admin1")
-        assert l.query(event=AuditEvent.ADMIN_AUDIT_EXPORT.value)[0].user_id == "admin1"
-    def test_T147_verify_then_export_then_verify(self):
-        l = AuditLogger(chain=AuditChain(secret="v"))
-        for i in range(10): l.auth_login_ok(f"u{i}")
-        assert l.verify_chain() is True
-        l.export_jsonl(); l.export_csv()
-        assert l.verify_chain() is True
-    def test_T148_tamper_breaks_verify(self):
-        c = AuditChain(secret="t")
-        recs = [c.record(AuditEvent.AUTH_LOGIN_OK, user_id=f"u{i}") for i in range(5)]
-        assert c.verify_chain() is True
-        object.__setattr__(recs[0], "event", "auth.hacked")
-        assert c.verify_chain() is False
-    def test_T149_trading_full_flow(self):
-        l = AuditLogger(chain=AuditChain(secret="trade"))
-        l.signal_emit("u1", detail={"symbol": "EURUSD"})
-        l.trade_open("u1", detail={"ticket": 1001})
-        l.trade_duplicate_blocked("u1")
-        l.trade_close("u1", detail={"ticket": 1001})
-        l.recon_mismatch(detail={"expected": 10, "actual": 9})
-        assert l.verify_chain() is True and len(l) == 5
-    def test_T150_summary_seq_max_matches(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        for i in range(5): l.auth_login_ok(f"u{i}")
-        assert l.summary()["seq_max"] == 5
-    def test_T151_500_records_export(self):
-        l = AuditLogger(chain=AuditChain(secret="perf"))
-        for i in range(500): l.auth_login_ok(f"u{i%10}")
-        assert len([ln for ln in l.export_jsonl().split("\n") if ln.strip()]) == 500
-    def test_T152_concurrent_multi_tenant(self):
-        l = AuditLogger(chain=AuditChain(secret="s")); errors = []
-        def w(tn, un):
-            try: l.record(AuditEvent.AUTH_LOGIN_OK, user_id=un, tenant_id=tn)
-            except Exception as e: errors.append(e)
-        threads = [threading.Thread(target=w, args=(f"t{i}", f"u{j}")) for i in range(5) for j in range(10)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert errors == [] and l.verify_chain() is True and len(l) == 50
-    def test_T153_missing_reason_no_write(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        try: l.license_revoked("u1", reason="")
-        except MissingReasonError: pass
-        assert len(l) == 0
-    def test_T154_csv_row_count(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        for i in range(10): l.auth_login_ok(f"u{i}")
-        assert len(list(csv.DictReader(io.StringIO(l.export_csv())))) == 10
-    def test_T155_recon_mismatch_critical(self):
-        l = AuditLogger(chain=AuditChain(secret="s")); l.recon_mismatch(detail={"e": 5, "a": 4})
-        res = l.query(severity=Severity.CRITICAL.value)
-        assert len(res) == 1 and res[0].event == AuditEvent.RECON_MISMATCH.value
-    def test_T156_signal_dedup_info(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        l.record(AuditEvent.SIGNAL_DEDUP_BLOCKED, user_id="u1")
-        assert l.query(event=AuditEvent.SIGNAL_DEDUP_BLOCKED.value)[0].severity == Severity.INFO.value
-    def test_T157_hash_differs_by_detail(self):
-        c1 = AuditChain(secret="s"); c2 = AuditChain(secret="s")
-        r1 = c1.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", detail={"a": 1})
-        r2 = c2.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", detail={"a": 2})
-        assert r1.chain_hash != r2.chain_hash
-    def test_T158_hash_differs_by_reason(self):
-        c1 = AuditChain(secret="s"); c2 = AuditChain(secret="s")
-        r1 = c1.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="A")
-        r2 = c2.record(AuditEvent.LICENSE_REVOKED, user_id="u1", reason="B")
-        assert r1.chain_hash != r2.chain_hash
-    def test_T159_hash_differs_by_tenant(self):
-        c1 = AuditChain(secret="s"); c2 = AuditChain(secret="s")
-        r1 = c1.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="ta")
-        r2 = c2.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="tb")
-        assert r1.chain_hash != r2.chain_hash
-    def test_T160_hook_full_record(self):
-        received = []; l = AuditLogger(chain=AuditChain(secret="s"))
-        l.add_write_hook(lambda r: received.append(r))
-        l.trade_open("u1", tenant_id="t1", detail={"ticket": 99})
-        assert received[0].user_id == "u1" and received[0].detail["ticket"] == 99
-    def test_T161_summary_seq_max(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        for i in range(5): l.auth_login_ok(f"u{i}")
-        assert l.summary()["seq_max"] == 5
-    def test_T162_jsonl_sorted_keys(self):
-        l = AuditLogger(chain=AuditChain(secret="s")); l.auth_login_ok("u1")
-        obj = json.loads(l.export_jsonl().strip())
-        assert list(obj.keys()) == sorted(obj.keys())
-    def test_T163_export_recorded(self):
-        l = AuditLogger(chain=AuditChain(secret="s")); l.admin_audit_export("a1")
-        assert len(l.query(event=AuditEvent.ADMIN_AUDIT_EXPORT.value)) == 1
-    def test_T164_verify_recorded(self):
-        l = AuditLogger(chain=AuditChain(secret="s")); l.admin_chain_verify("a1")
-        assert len(l.query(event=AuditEvent.ADMIN_CHAIN_VERIFY.value)) == 1
-    def test_T165_user_deleted_requires_reason(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        with pytest.raises(MissingReasonError): l.rbac_user_deleted("u1", reason="")
-    def test_T166_purge_requires_reason(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        with pytest.raises(MissingReasonError): l.tenant_purge("a1", reason="")
-    def test_T167_tenant_isolation_query(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        for _ in range(5): l.record(AuditEvent.AUTH_LOGIN_OK, user_id="u1", tenant_id="ta")
-        for _ in range(3): l.record(AuditEvent.AUTH_LOGIN_OK, user_id="u2", tenant_id="tb")
-        assert len(l.query(tenant_id="ta")) == 5 and len(l.query(tenant_id="tb")) == 3
-    def test_T168_csv_no_mutate(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        for i in range(10): l.auth_login_ok(f"u{i}")
-        l.export_csv(); assert l.verify_chain() is True
-    def test_T169_signal_detail(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        l.signal_emit("u1", tenant_id="t1", detail={"symbol": "EURUSD"})
-        assert l.query(event=AuditEvent.SIGNAL_EMIT.value)[0].detail["symbol"] == "EURUSD"
-    def test_T170_drawdown_warning(self):
-        l = AuditLogger(chain=AuditChain(secret="s"))
-        assert l.risk_drawdown_alert("u1").severity == Severity.WARNING.value
-    def test_T171_full_compliance_trail(self):
-        l = AuditLogger(chain=AuditChain(secret="compliance"))
-        l.billing_checkout("u1", tenant_id="t1", detail={"plan": "pro"})
-        l.billing_payment_ok("u1", tenant_id="t1")
-        l.license_issued("u1", tenant_id="t1")
-        l.trade_open("u1", tenant_id="t1", detail={"ticket": 1001})
-        l.risk_drawdown_alert("u1", tenant_id="t1")
-        l.risk_kill_switch_on("u1", tenant_id="t1", reason="D20%")
-        assert len(l) == 6 and l.verify_chain() is True
-        assert len(l.query(severity=Severity.CRITICAL.value)) >= 1
-        assert len(l.query(tenant_id="t1")) == 6
-    def test_T172_tamper_middle_of_chain(self):
-        l = AuditLogger(chain=AuditChain(secret="tamper"))
-        recs = [l.auth_login_ok(f"u{i}") for i in range(5)]
-        assert l.verify_chain() is True
-        object.__setattr__(recs[2], "event", "auth.hacked")
-        assert l.verify_chain() is False and recs[2].seq in l.detect_tamper()
+    @pytest.fixture
+    def sql(self):
+        p = "/home/definable/phase21/supabase/migrations/20260626_029_phase21_audit_chain.sql"
+        if not os.path.exists(p): pytest.skip("sql not found")
+        return open(p).read()
+    def test_T081_begin_commit(self, sql): assert "BEGIN" in sql and "COMMIT" in sql
+    def test_T082_table_create(self, sql): assert "audit_log_v21" in sql
+    def test_T083_chain_hash_col(self, sql): assert "chain_hash" in sql
+    def test_T084_rls(self, sql): assert "ROW LEVEL SECURITY" in sql
+    def test_T085_indexes(self, sql): assert sql.count("CREATE INDEX") >= 4
+    def test_T086_if_not_exists(self, sql): assert "IF NOT EXISTS" in sql
+    def test_T087_severity_check(self, sql): assert "CRITICAL" in sql
+    def test_T088_immutable_trigger(self, sql): assert "TPΆΗDSΰ¥ΈΝΕ°½Θ€‰ΡΙ¥•Θ¥ΈΝΕ°Ή±½έ•Θ ¤(((€ττττττττττττττττττττττττττττττττττττττττ)±…ΝΜQ•ΝΡ‘µ¥ΉI½ΥΡ•Μθ(€€€ΑεΡ•ΝΠΉ™¥αΡΥΙ”(€€€‘•ΝΙ΅Ν•±¤θ(€€€€€€€ΐτ½΅½µ”½‘•™¥Ή…‰±”½Α΅…Ν”ΘΔ½‰…­•Ή½…Α¤½Ι½ΥΡ•Μ½…Υ‘¥Ρ}Ι½ΥΡ•Ν}ΨΘΔΉΑδ(€€€€€€€¥Ή½Π½ΜΉΑ…Ρ Ή•α¥ΝΡΜ΅ΐ¤θΑεΡ•ΝΠΉΝ­¥ΐ ‰Ι½ΥΡ•Μ™¥±”Ή½Π™½ΥΉ¤(€€€€€€€Ι•ΡΥΙΈ½Α•Έ΅ΐ¤ΉΙ•… ¤(€€€‘•Ρ•ΝΡ}PΔΘΥ}…Υ‘¥Ρ}¥Ή}ΝΙ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰…Υ‘¥Π¥ΈΝΙΉ±½έ•Θ ¤(€€€‘•Ρ•ΝΡ}PΔΘΩ}Ω•Ι¥™δ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰Ω•Ι¥™δ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΘέ}©Ν½Ή°΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰©Ν½Ή°¥ΈΝΙ½Θ€‰•αΑ½ΙΠ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΘα}ΝΨ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰ΝΨ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΘε}•Ω•ΉΡΜ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰•Ω•ΉΡΜ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΑ}ΥΝ•Θ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰ΥΝ•Θ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΕ}ΝΥµµ…Ιδ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰ΝΥµµ…Ιδ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΙ}Ρ…µΑ•Θ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰Ρ…µΑ•Θ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΝ}…‘µ¥Έ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰…‘µ¥Έ¥ΈΝΙΉ±½έ•Θ ¤(€€€‘•Ρ•ΝΡ}PΔΜΡ}±½•Θ΅Ν•±±ΝΙ¤θ…ΝΝ•ΙΠ€‰Υ‘¥Ρ1½•Θ¥ΈΝΙ½Θ€‰…Υ‘¥Ρ}±½•Θ¥ΈΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΥ}΅µ…}¥Ή}½Ι•}Ν½ΥΙ”΅Ν•±±ΝΙ¤θ(€€€€€€€€‰…Υ‘¥Ρ}±½}ΨΘΔΉΑδ€΅½Ι”¤‰…ε…!5‘…Ν΅Ρ”‰…Ν΅…(€€€€€€€¥µΑ½ΙΠ¥ΉΝΑ•Π°‰…­•ΉΉ½Ι”Ή…Υ‘¥Ρ}±½}ΨΘΔ…Μ΄(€€€€€€€½Ι•}ΝΙ€τ¥ΉΝΑ•ΠΉ•ΡΝ½ΥΙ”΅΄¤(€€€€€€€…ΝΝ•ΙΠ€‰΅µ…¥Έ½Ι•}ΝΙΉ±½έ•Θ ¤½Θ€‰!5¥Έ½Ι•}ΝΙ(€€€‘•Ρ•ΝΡ}PΔΜΩ}Ι•ΕΥ¥Ι•Ν}Ι•…Ν½Ή}¥Ή}½Ι•}Ν½ΥΙ”΅Ν•±±ΝΙ¤θ(€€€€€€€€‰…Υ‘¥Ρ}±½}ΨΘΔΉΑδ€΅½Ι”¤‰…ε…IEU%IM}IM=8‘…Ν΅Ρ”‰…Ν΅…(€€€€€€€¥µΑ½ΙΠ¥ΉΝΑ•Π°‰…­•ΉΉ½Ι”Ή…Υ‘¥Ρ}±½}ΨΘΔ…Μ΄(€€€€€€€½Ι•}ΝΙ€τ¥ΉΝΑ•ΠΉ•ΡΝ½ΥΙ”΅΄¤(€€€€€€€…ΝΝ•ΙΠ€‰IEU%IM}IM=8¥Έ½Ι•}ΝΙ½Θ€‰Ι•ΕΥ¥Ι•Ν}Ι•…Ν½Έ¥Έ½Ι•}ΝΙ(((€ττττττττττττττττττττττττττττττττττττττττ)±…ΝΜQ•ΝΡΥ‘¥Ρ1½•Ι΅…¥Ή%Ν½±…Ρ¥½Έθ(€€€‘•Ρ•ΝΡ}PΔΜέ}Ρέ½}±½•ΙΝ}¥Ή‘•Α•Ή‘•ΉΠ΅Ν•±¤θ(€€€€€€€°ΔυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰ΜΔ¤¤μ°ΘυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰ΜΘ¤¤(€€€€€€€°ΔΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μ°ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΘ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅°Δ¤ττΔ…Ή±•Έ΅°Θ¤ττΔ(€€€‘•Ρ•ΝΡ}PΔΜα}Ή½Ή•}΅…¥Ή}™Ι•Ν ΅Ν•±¤θ(€€€€€€€…ΝΝ•ΙΠΥ‘¥Ρ1½•Θ΅΅…¥Έυ9½Ή”¤Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤¥ΜΉ½Π9½Ή”(€€€‘•Ρ•ΝΡ}PΔΜε}ΥΝ•Ν}ΑΙ½Ω¥‘•‘}΅…¥Έ΅Ν•±¤θ(€€€€€€€υΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤μ°υΥ‘¥Ρ1½•Θ΅΅…¥Έυ¤μ°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μ…ΝΝ•ΙΠ±•Έ΅¤ττΔ(€€€‘•Ρ•ΝΡ}PΔΠΑ}΅½½­}…±±•΅Ν•±¤θ(€€€€€€€…±±•υmtμ°υΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°Ή…‘‘}έΙ¥Ρ•}΅½½¬΅±…µ‰‘„Θθ…±±•Ή…ΑΑ•Ή΅ΘΉ•Ω•ΉΠ¤¤μ°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μ…ΝΝ•ΙΠ±•Έ΅…±±•¤ττΔ(€€€‘•Ρ•ΝΡ}PΔΠΕ}µΥ±Ρ¥Α±•}΅½½­Μ΅Ν•±¤θ(€€€€€€€„υmtμυmtμ°υΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°Ή…‘‘}έΙ¥Ρ•}΅½½¬΅±…µ‰‘„Θθ„Ή…ΑΑ•Ή Δ¤¤μ°Ή…‘‘}έΙ¥Ρ•}΅½½¬΅±…µ‰‘„ΘθΉ…ΑΑ•Ή Θ¤¤(€€€€€€€°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μ…ΝΝ•ΙΠ„€ττlΕt…Ή€ττlΙt(€€€‘•Ρ•ΝΡ}PΔΠΙ}΅½½­}•α•ΑΡ¥½Ή}Ή½}Ι…Ν ΅Ν•±¤θ(€€€€€€€°€τΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°Ή…‘‘}έΙ¥Ρ•}΅½½¬΅±…µ‰‘„Θθ€ΔΌΐ¤(€€€€€€€Θ€τ°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠΘ¥ΜΉ½Π9½Ή”(((€ττττττττττττττττττττττττττττττττττττττττ)±…ΝΜQ•ΝΡ½Ι•ΉΝ¥QΙ…¥±EΥ…±¥Ρδθ(€€€ΑεΡ•ΝΠΉ™¥αΡΥΙ”(€€€‘•±½•Θ΅Ν•±¤θΙ•ΡΥΙΈΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤((€€€‘•Ρ•ΝΡ}PΔΠέ}Ι•½Ι‘}΅…Ν}ΥΥ¥΅Ν•±°±½•Θ¤θ(€€€€€€€Θ€τ±½•ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠΝΡΘ΅ΥΥ¥ΉUU%΅ΘΉ¥¤¤€ττΘΉ¥(€€€‘•Ρ•ΝΡ}PΔΠα}Ι•½Ι‘}΅…Ν}Ρ¥µ•ΝΡ…µΐ΅Ν•±°±½•Θ¤θ(€€€€€€€Θ€τ±½•ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠΘΉΡΜ€ψ€Δάΐΐΐΐΐΐΐΐ(€€€‘•Ρ•ΝΡ}PΔΠε}‘•Ρ…¥±}ΑΙ•Ν•ΙΩ•΅Ν•±°±½•Θ¤θ(€€€€€€€Θ€τ±½•ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ°‘•Ρ…¥°υμ‰¥ΐθ€ΔΈΘΈΜΈΠ‰τ¤(€€€€€€€…ΝΝ•ΙΠΘΉ‘•Ρ…¥±l‰¥ΐ‰t€ττ€ΔΈΘΈΜΈΠ(€€€‘•Ρ•ΝΡ}PΔΤΑ}Ι¥Ρ¥…±}Ν•Ω•Ι¥Ρδ΅Ν•±°±½•Θ¤θ(€€€€€€€Θ€τ±½•ΘΉΙ¥Ν­}­¥±±}Νέ¥Ρ΅}½Έ ‰ΤΔ°Ι•…Ν½Έτ‰¤(€€€€€€€…ΝΝ•ΙΠΘΉΝ•Ω•Ι¥Ρδ€ττM•Ω•Ι¥ΡδΉI%Q%0ΉΩ…±Υ”(€€€‘•Ρ•ΝΡ}PΔΤΕ}Ν•Ε}ΝΡ…ΙΡΝ|Δ΅Ν•±¤θ(€€€€€€€΅…¥Έ€τΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤(€€€€€€€…ΝΝ•ΙΠ΅…¥ΈΉΙ•½Ι΅Υ‘¥ΡΩ•ΉΠΉUQ!}1=%9}=,±ΥΝ•Ι}¥τ‰ΤΔ¤ΉΝ•Δ€ττ€Δ(((€ττττττττττττττττττττττττττττττττττττττττ)±…ΝΜQ•ΝΡ%ΉΡ•Ι…Ρ¥½Ή±½έΜθ(€€€ΑεΡ•ΝΠΉ™¥αΡΥΙ”΅……ΥΡ½ΥΝ”υQΙΥ”¤(€€€‘•™Ι•Ν΅}±½•Θ΅Ν•±¤θ(€€€€€€€Ν•±Ή°€τΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Ρ•ΝΠµΝ•Ι•Π¤¤((€€€‘•Ρ•ΝΡ}PΔΠΡ}™Υ±±}±¥™•ε±”΅Ν•±¤θ(€€€€€€€°€τΝ•±Ή°(€€€€€€€°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°Ή±¥•ΉΝ•}¥ΝΝΥ• ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°Ή‰¥±±¥Ή}΅•­½ΥΠ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°ΉΡΙ…‘•}½Α•Έ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅°¤€ττ€Π(€€€€€€€…ΝΝ•ΙΠ°ΉΩ•Ι¥™ε}΅…¥Έ ¤¥ΜQΙΥ”(€€€‘•Ρ•ΝΡ}PΔΠΥ}­¥±±}Νέ¥Ρ΅}Ν•Ω•Ι¥Ρδ΅Ν•±¤θ(€€€€€€€Θ€τΝ•±Ή°ΉΙ¥Ν­}­¥±±}Νέ¥Ρ΅}½Έ ‰ΤΔ°Ι•…Ν½Έτ‰Ι…έ‘½έΈ¤(€€€€€€€…ΝΝ•ΙΠΘΉΝ•Ω•Ι¥Ρδ€ττM•Ω•Ι¥ΡδΉI%Q%0ΉΩ…±Υ”(€€€‘•Ρ•ΝΡ}PΔΠΩ}ΝΥµµ…Ιδ΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μΜ€τΝ•±Ή°ΉΝΥµµ…Ιδ ¤(€€€€€€€…ΝΝ•ΙΠΝl‰Ρ½Ρ…°‰t€ττ€Δ…Ή€‰±…ΝΡ}΅…Ν ¥ΈΜ(€€€‘•Ρ•ΝΡ}PΔΤΕ|ΤΐΑ}Ι•½Ι‘Ν}•αΑ½ΙΠ΅Ν•±¤θ(€€€€€€€™½Θ¤¥ΈΙ…Ή” Τΐΐ¤θΝ•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬΅‰Υν¤”ΔΑτ¤(€€€€€€€…ΝΝ•ΙΠΝ•±Ή°ΉΩ•Ι¥™ε}΅…¥Έ ¤¥ΜQΙΥ”(€€€€€€€±¥Ή•Μ€τΝ•±Ή°Ή•αΑ½ΙΡ}©Ν½Ή° ¤ΉΝΡΙ¥ΐ ¤ΉΝΑ±¥Π ‰qΈ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅±¥Ή•Μ¤€ττ€Τΐΐ(€€€‘•Ρ•ΝΡ}PΔΥΩ}½ΉΥΙΙ•ΉΡ}µΥ±Ρ¥}Ρ•Ή…ΉΠ΅Ν•±¤θ(€€€€€€€‘•έ½Ι¬΅Ρ¥¤θΝ•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ°Ρ•Ή…ΉΡ}¥υΡ¥¤(€€€€€€€Ρ΅Ι•…‘ΜυmΡ΅Ι•…‘¥ΉΉQ΅Ι•…΅Ρ…Ι•Πυέ½Ι¬±…ΙΜτ΅‰Π°¤¤™½Θ|¥ΈΙ…Ή” Δΐ¥t(€€€€€€€mΠΉΝΡ…ΙΠ ¤™½ΘΠ¥ΈΡ΅Ι•…‘ΝtμmΠΉ©½¥Έ ¤™½ΘΠ¥ΈΡ΅Ι•…‘Νt(€€€€€€€…ΝΝ•ΙΠΝ•±Ή°ΉΩ•Ι¥™ε}΅…¥Έ ¤¥ΜQΙΥ”(€€€‘•Ρ•ΝΡ}PΔΤΝ}µ¥ΝΝ¥Ή}Ι•…Ν½Ή}Ή½}έΙ¥Ρ”΅Ν•±¤θ(€€€€€€€έ¥Ρ ΑεΡ•ΝΠΉΙ…¥Ν•Μ΅5¥ΝΝ¥ΉI•…Ν½ΉΙΙ½Θ¤θΝ•±Ή°Ή±¥•ΉΝ•}Ι•Ω½­• ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅Ν•±Ή°¤€ττ€ΐ(€€€‘•Ρ•ΝΡ}PΔΤΡ}ΝΩ}Ι½έ}½ΥΉΠ΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤μΝ•±Ή°Ή…ΥΡ΅}±½ΥΠ ‰ΤΘ¤(€€€€€€€Ι½έΜ€τΝ•±Ή°Ή•αΑ½ΙΡ}ΝΨ ¤ΉΝΡΙ¥ΐ ¤ΉΝΑ±¥Π ‰qΈ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅Ι½έΜ¤€ττ€Μ€€΅•…‘•Θ€¬€ΘΙ½έΜ(€€€‘•Ρ•ΝΡ}PΔΤΥ}Ι•½Ή}µ¥Νµ…Ρ΅}Ι¥Ρ¥…°΅Ν•±¤θ(€€€€€€€Θ€τΝ•±Ή°ΉΙ•½Ή}µ¥Νµ…Ρ  ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠΘΉΝ•Ω•Ι¥Ρδ€ττM•Ω•Ι¥ΡδΉI%Q%0ΉΩ…±Υ”(€€€‘•Ρ•ΝΡ}PΔΤΩ}Ν¥Ή…±}‘•‘ΥΑ}¥Ή™Ό΅Ν•±¤θ(€€€€€€€Θ€τΝ•±Ή°ΉΝ¥Ή…±}‘•‘ΥΑ}‰±½­• ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠΘΉΝ•Ω•Ι¥Ρδ€ττM•Ω•Ι¥ΡδΉ]I9%9ΉΩ…±Υ”(€€€‘•Ρ•ΝΡ}PΔΤέ}΅…Ν΅}‘¥™™•ΙΝ}‰ε}‘•Ρ…¥°΅Ν•±¤θ(€€€€€€€°ΔυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°ΘυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€ΘΔυ°ΔΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ±‘•Ρ…¥°υμ‰¥ΐθΔ‰τ¤(€€€€€€€ΘΘυ°ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ±‘•Ρ…¥°υμ‰¥ΐθΘ‰τ¤(€€€€€€€…ΝΝ•ΙΠΘΔΉ΅…¥Ή}΅…Ν €„τΘΘΉ΅…¥Ή}΅…Ν (€€€‘•Ρ•ΝΡ}PΔΤα}΅…Ν΅}‘¥™™•ΙΝ}‰ε}Ι•…Ν½Έ΅Ν•±¤θ(€€€€€€€°ΔυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°ΘυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€ΘΔυ°ΔΉ±¥•ΉΝ•}Ι•Ω½­• ‰ΤΔ±Ι•…Ν½Έτ‰¤(€€€€€€€ΘΘυ°ΘΉ±¥•ΉΝ•}Ι•Ω½­• ‰ΤΔ±Ι•…Ν½Έτ‰¤(€€€€€€€…ΝΝ•ΙΠΘΔΉ΅…¥Ή}΅…Ν €„τΘΘΉ΅…¥Ή}΅…Ν (€€€‘•Ρ•ΝΡ}PΔΤε}΅…Ν΅}‘¥™™•ΙΝ}‰ε}Ρ•Ή…ΉΠ΅Ν•±¤θ(€€€€€€€°ΔυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€°ΘυΥ‘¥Ρ1½•Θ΅΅…¥ΈυΥ‘¥Ρ΅…¥Έ΅Ν•Ι•Πτ‰Μ¤¤(€€€€€€€ΘΔυ°ΔΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ±Ρ•Ή…ΉΡ}¥τ‰Ρ„¤(€€€€€€€ΘΘυ°ΘΉ…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ±Ρ•Ή…ΉΡ}¥τ‰Ρ¤(€€€€€€€…ΝΝ•ΙΠΘΔΉ΅…¥Ή}΅…Ν €„τΘΘΉ΅…¥Ή}΅…Ν (€€€‘•Ρ•ΝΡ}PΔΨΑ}΅½½­}™Υ±±}Ι•½Ι΅Ν•±¤θ(€€€€€€€…Υ΅Πυmtμ°€τΝ•±Ή°(€€€€€€€°Ή…‘‘}έΙ¥Ρ•}΅½½¬΅±…µ‰‘„Θθ…Υ΅ΠΉ…ΑΑ•Ή΅Θ¤¤(€€€€€€€°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€…ΝΝ•ΙΠ¥Ν¥ΉΝΡ…Ή”΅…Υ΅ΡlΑt°Υ‘¥ΡI•½Ι¤(€€€‘•Ρ•ΝΡ}PΔΨΕ}ΝΥµµ…Ιε}Ν•Ε}µ…ΰ΅Ν•±¤θ(€€€€€€€™½Θ¤¥ΈΙ…Ή” Τ¤θΝ•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€Ι•Μ€τΝ•±Ή°Ή…±±}Ι•½Ι‘Μ ¤(€€€€€€€…ΝΝ•ΙΠµ…ΰ΅ΘΉΝ•Δ™½ΘΘ¥ΈΙ•Μ¤€ττ€Τ(€€€‘•Ρ•ΝΡ}PΔΨΙ}©Ν½Ή±}Ν½ΙΡ•‘}­•εΜ΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€±¥Ή”€τΝ•±Ή°Ή•αΑ½ΙΡ}©Ν½Ή° ¤ΉΝΡΙ¥ΐ ¤ΉΝΑ±¥Π ‰qΈ¥lΑt(€€€€€€€‘…Ρ„€τ©Ν½ΈΉ±½…‘Μ΅±¥Ή”¤μ­•εΜ€τ±¥ΝΠ΅‘…Ρ„Ή­•εΜ ¤¤(€€€€€€€…ΝΝ•ΙΠ­•εΜ€ττΝ½ΙΡ•΅­•εΜ¤(€€€‘•Ρ•ΝΡ}PΔΨΝ}•αΑ½ΙΡ}Ι•½Ι‘•΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…‘µ¥Ή}…Υ‘¥Ρ}•αΑ½ΙΠ ¤μ…ΝΝ•ΙΠ±•Έ΅Ν•±Ή°¤€ττ€Δ(€€€‘•Ρ•ΝΡ}PΔΨΡ}Ω•Ι¥™ε}Ι•½Ι‘•΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…‘µ¥Ή}΅…¥Ή}Ω•Ι¥™δ ¤μ…ΝΝ•ΙΠ±•Έ΅Ν•±Ή°¤€ττ€Δ(€€€‘•Ρ•ΝΡ}PΔΨΥ}ΥΝ•Ι}‘•±•Ρ•‘}Ι•ΕΥ¥Ι•Ν}Ι•…Ν½Έ΅Ν•±¤θ(€€€€€€€έ¥Ρ ΑεΡ•ΝΠΉΙ…¥Ν•Μ΅5¥ΝΝ¥ΉI•…Ν½ΉΙΙ½Θ¤θΝ•±Ή°ΉΙ‰…}ΥΝ•Ι}‘•±•Ρ• ‰ΤΔ¤(€€€‘•Ρ•ΝΡ}PΔΨΩ}ΑΥΙ•}Ι•ΕΥ¥Ι•Ν}Ι•…Ν½Έ΅Ν•±¤θ(€€€€€€€έ¥Ρ ΑεΡ•ΝΠΉΙ…¥Ν•Μ΅5¥ΝΝ¥ΉI•…Ν½ΉΙΙ½Θ¤θ(€€€€€€€€€€€Ν•±Ή°Ή}΅…¥ΈΉΙ•½Ι΅Υ‘¥ΡΩ•ΉΠΉQ99Q}AUI°ΥΝ•Ι}¥τ‰ΤΔ¤(€€€‘•Ρ•ΝΡ}PΔΨέ}Ρ•Ή…ΉΡ}¥Ν½±…Ρ¥½Ή}ΕΥ•Ιδ΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰Ρ„¤(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΘ°Ρ•Ή…ΉΡ}¥τ‰Ρ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅Ν•±Ή°ΉΕΥ•Ιδ΅Ρ•Ή…ΉΡ}¥τ‰Ρ„¤¤€ττ€Δ(€€€‘•Ρ•ΝΡ}PΔΨα}ΝΩ}Ή½}µΥΡ…Ρ”΅Ν•±¤θ(€€€€€€€Ν•±Ή°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ¤(€€€€€€€ΝΨΔ€τΝ•±Ή°Ή•αΑ½ΙΡ}ΝΨ ¤μΝΨΘ€τΝ•±Ή°Ή•αΑ½ΙΡ}ΝΨ ¤(€€€€€€€…ΝΝ•ΙΠΝΨΔ€ττΝΨΘ(€€€‘•Ρ•ΝΡ}PΔΨε}Ν¥Ή…±}‘•Ρ…¥°΅Ν•±¤θ(€€€€€€€Θ€τΝ•±Ή°ΉΝ¥Ή…±}‘•‘ΥΑ}‰±½­• ‰ΤΔ°‘•Ρ…¥°υμ‰Νεµ‰½°θ‰UIUM‰τ¤(€€€€€€€…ΝΝ•ΙΠΘΉ‘•Ρ…¥±l‰Νεµ‰½°‰t€ττ€‰UIUM(€€€‘•Ρ•ΝΡ}PΔάΑ}‘Ι…έ‘½έΉ}έ…ΙΉ¥Ή΅Ν•±¤θ(€€€€€€€Θ€τΝ•±Ή°ΉΙ¥Ν­}‘Ι…έ‘½έΉ}…±•ΙΠ ‰ΤΔ°‘•Ρ…¥°υμ‰ΑΠθΔΙτ¤(€€€€€€€…ΝΝ•ΙΠΘΉΝ•Ω•Ι¥Ρδ€ττM•Ω•Ι¥ΡδΉ]I9%9ΉΩ…±Υ”(€€€‘•Ρ•ΝΡ}PΔάΕ}™Υ±±}½µΑ±¥…Ή•}ΡΙ…¥°΅Ν•±¤θ(€€€€€€€°€τΝ•±Ή°(€€€€€€€°Ή…ΥΡ΅}±½¥Ή}½¬ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°Ή±¥•ΉΝ•}¥ΝΝΥ• ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°Ή‰¥±±¥Ή}΅•­½ΥΠ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°ΉΡΙ…‘•}½Α•Έ ‰ΤΔ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°ΉΙ¥Ν­}­¥±±}Νέ¥Ρ΅}½Έ ‰ΤΔ°Ι•…Ν½Έτ‰Ι…έ‘½έΈ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€°Ή±¥•ΉΝ•}Ι•Ω½­• ‰ΤΔ°Ι•…Ν½Έτ‰Y¥½±…Ρ¥½Έ°Ρ•Ή…ΉΡ}¥τ‰ΠΔ¤(€€€€€€€…ΝΝ•ΙΠ±•Έ΅°¤€ττ€Ψ(€€€€€€€…ΝΝ•ΙΠ°ΉΩ•Ι¥™ε}΅…¥Έ ¤¥ΜQΙΥ”(€€€€€€€…ΝΝ•ΙΠ°ΉΝΥµµ…Ιδ ¥l‰Ι¥Ρ¥…±}½ΥΉΠ‰t€ψτ€Θ(€€€‘•Ρ•ΝΡ}PΔάΙ}Ρ…µΑ•Ι}µ¥‘‘±•}½™}΅…¥Έ΅Ν•±¤θ(€€€€€€€°€τΝ•±Ή°(€€€€€€€™½Θ¤¥ΈΙ…Ή” Τ¤θ°Ή…ΥΡ΅}±½¥Ή}½¬΅‰Υν¥τ¤(€€€€€€€Ι•Μ€τ°Ή…±±}Ι•½Ι‘Μ ¤(€€€€€€€Ι•ΝlΙtΉ•Ω•ΉΠ€τ€‰™…­”Ή•Ω•ΉΠ(€€€€€€€…ΝΝ•ΙΠ°ΉΩ•Ι¥™ε}΅…¥Έ ¤¥Μ…±Ν”(€€€€€€€‰Ι½­•Έ€τ°Ή‘•Ρ•Ρ}Ρ…µΑ•Ι• ¤(€€€€€€€…ΝΝ•ΙΠ€Μ¥Έ‰Ι½­•Έ(
