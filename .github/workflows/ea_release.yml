@@ -1,0 +1,192 @@
+name: EA Release
+
+# Triggered only on version tags: v3.20, v4.0, etc.
+on:
+  push:
+    tags: ["v*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 3.20)"
+        required: true
+      environment:
+        description: "Target environment"
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+concurrency:
+  group: ea-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ── Job 1: Source Protection Check ────────────────────────────────
+  source-protection:
+    name: Source Protection Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check no MQL source in Docker context
+        run: |
+          echo "=== Checking Docker build context for source leaks ==="
+          if grep -r "\.mq5\|\.mqh" Dockerfile Dockerfile.bot 2>/dev/null | grep -v "^#"; then
+            echo "FAIL: Source file reference found in Dockerfile"
+            exit 1
+          fi
+          echo "No source file references in Dockerfile"
+
+      - name: Verify .gitignore has source protection
+        run: |
+          python3 - << 'EOF'
+          import sys
+          try:
+              gitignore = open('.gitignore').read()
+          except FileNotFoundError:
+              print('WARNING: .gitignore not found')
+              sys.exit(0)
+          recommended = ['releases/', '*.ex5']
+          missing = [r for r in recommended if r not in gitignore]
+          if missing:
+              print(f'WARNING: .gitignore missing patterns: {missing}')
+          else:
+              print('.gitignore source protection OK')
+          EOF
+
+      - name: Verify .dockerignore excludes mql5
+        run: |
+          if ! grep -q "mql5/" .dockerignore 2>/dev/null; then
+            echo "WARNING: mql5/ not in .dockerignore"
+          else
+            echo ".dockerignore excludes mql5/"
+          fi
+
+  # ── Job 2: Build EA Artifact ───────────────────────────────────────
+  build-ea:
+    name: Build EA Artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [source-protection]
+    env:
+      BUILD_SECRET: ${{ secrets.BUILD_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "env=${{ inputs.environment || 'production' }}" >> $GITHUB_OUTPUT
+
+      - name: Build release artifact
+        run: |
+          python scripts/build_release.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --env "${{ steps.version.outputs.env }}" \
+            --dry-run
+
+      # P14-FIX-5: Verify ZIP has no source files
+      - name: Verify release ZIP (no source leak)
+        run: |
+          ZIP=$(ls releases/*.zip | head -1)
+          echo "Verifying: $ZIP"
+          python scripts/verify_release.py "$ZIP"
+          echo "Release ZIP is clean"
+
+      - name: Upload EA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ea-release-${{ steps.version.outputs.version }}
+          path: releases/*.zip
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload build manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: ea-manifest-${{ steps.version.outputs.version }}
+          path: releases/staging_*/manifest.json
+          retention-days: 90
+
+  # ── Job 3: GitHub Release ──────────────────────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-ea]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download EA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ea-release-${{ github.ref_name }}
+          path: release-assets/
+
+      # Final source protection check before publishing
+      - name: Final source protection check
+        run: |
+          python3 - << 'EOF'
+          import zipfile, pathlib, sys
+          SOURCE_EXTS = {'.mq5','.mqh','.py','.ts','.tsx','.sql','.sh','.env','.key'}
+          violations = []
+          for zp in pathlib.Path('release-assets').glob('*.zip'):
+              with zipfile.ZipFile(zp) as zf:
+                  for name in zf.namelist():
+                      if pathlib.Path(name).suffix.lower() in SOURCE_EXTS:
+                          violations.append(f"{zp.name}: {name}")
+          if violations:
+              print("SOURCE LEAK DETECTED IN RELEASE:")
+              for v in violations: print(f"   {v}")
+              sys.exit(1)
+          print("No source files in release artifact")
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.zip
+          generate_release_notes: true
+          body: |
+            ## MT5 Trading EA ${{ github.ref_name }}
+
+            ### What's included
+            - `MT5TradingEA_Complete.ex5` compiled EA
+            - `README_INSTALL.txt` installation guide
+            - `manifest.json` build manifest with SHA-256
+            - `CHECKSUMS.txt` file integrity checksums
+
+            ### What's NOT included
+            - Source code (.mq5/.mqh)
+            - Backend code (.py)
+            - Frontend code (.ts/.tsx)
+
+  # ── Job 4: Notify ──────────────────────────────────────────────────
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [github-release]
+    if: always()
+    steps:
+      - name: Telegram notification
+        run: |
+          STATUS="${{ needs.github-release.result }}"
+          EMOJI="\u2705"; [[ "$STATUS" != "success" ]] && EMOJI="\u274c"
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}&text=${EMOJI} EA Release ${{ github.ref_name }}: ${STATUS}" || true
