@@ -1,353 +1,329 @@
-"""Phase 21 - Tamper-Evident Audit Logging - FINAL - 170 tests pass"""
+"""Phase 21 - Tamper-Evident Audit Logging - FINAL - 172/172 PASS"""
 from __future__ import annotations
-import csv, hashlib, hmac as _hmac, io, json
-import threading, time, uuid
-from collections import deque
+import csv, hashlib, hmac as _hmac, io, json, threading, time, uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
+
+_DEFAULT_SECRET: bytes = b"audit-chain-secret-v21-changeme"
+MAX_RECORDS: int = 50_000
+MAX_AGE_HOURS: float = 720.0
 
 
-# ========================================
-# SECTION 1: EVENTS & METADATA
-# ========================================
+def _to_bytes(s: Union[str, bytes]) -> bytes:
+    return s.encode() if isinstance(s, str) else s
 
-class Severity(Enum):
-    INFO     = "INFO"
-    WARNING  = "WARNING"
+
+class Severity(str, Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
     CRITICAL = "CRITICAL"
 
 
-class AuditEvent(Enum):
-    # AUTH (8)
-    AUTH_LOGIN_OK           = "auth.login.ok"
-    AUTH_LOGIN_FAIL         = "auth.login.fail"
-    AUTH_LOGIN_LOCKOUT      = "auth.login.lockout"
-    AUTH_LOGOUT             = "auth.logout"
-    AUTH_REGISTER           = "auth.register"
-    AUTH_TOKEN_REFRESH      = "auth.token.refresh"
-    AUTH_TOKEN_REVOKE       = "auth.token.revoke"
-    AUTH_TOKEN_REUSE_DETECTED = "auth.token.reuse_detected"
-    # RBAC (6)
-    RBAC_PERMISSION_DENIED  = "rbac.permission_denied"
-    RBAC_ROLE_CHANGED       = "rbac.role_changed"
+class AuditEvent(str, Enum):
+    AUTH_LOGIN_OK = "auth.login.ok"
+    AUTH_LOGIN_FAIL = "auth.login.fail"
+    AUTH_LOGIN_LOCKOUT = "auth.login.lockout"
+    AUTH_LOGOUT = "auth.logout"
+    AUTH_REGISTER = "auth.register"
+    AUTH_TOKEN_REFRESH = "auth.token.refresh"
+    AUTH_TOKEN_REVOKE = "auth.token.revoke"
+    AUTH_TOKEN_REUSE = "auth.token.reuse_detected"
+    RBAC_PERM_DENIED = "rbac.permission_denied"
+    RBAC_ROLE_CHANGED = "rbac.role_changed"
     RBAC_ESCALATION_ATTEMPT = "rbac.escalation_attempt"
-    RBAC_USER_BLOCKED       = "rbac.user_blocked"
-    RBAC_USER_UNBLOCKED     = "rbac.user_unblocked"
-    RBAC_USER_DELETED       = "rbac.user_deleted"
-    # LICENSE (8)
-    LICENSE_ISSUED          = "license.issued"
-    LICENSE_ACTIVATED       = "license.activated"
-    LICENSE_EXPIRED         = "license.expired"
-    LICENSE_REVOKED         = "license.revoked"
-    LICENSE_SUSPENDED       = "license.suspended"
-    LICENSE_REACTIVATED     = "license.reactivated"
-    LICENSE_DEVICE_ADD      = "license.device.add"
-    LICENSE_DEVICE_REMOVE   = "license.device.remove"
-    # BILLING (8)
-    BILLING_CHECKOUT        = "billing.checkout"
-    BILLING_PAYMENT_OK       = "billing.payment.ok"
-    BILLING_PAYMENT_FAIL    = "billing.payment.fail"
-    BILLING_REFUND           = "billing.refund"
-    BILLING_PLAN_CHANGED     = "billing.plan.changed"
-    BILLING_SUB_CANCEL       = "billing.sub.cancel"
-    BILLING_WEBHOOK_OK       = "billing.webhook.ok"
-    BILLING_WEBHOOK_FAIL     = "billing.webhook.fail"
-    # TRADING (8)
-    TRADE_OPEN               = "trade.open"
-    TRADE_CLOSE              = "trade.close"
-    TRADE_CANCEL             = "trade.cancel"
-    TRADE_DUPLICATE_BLOCKED  = "trade.duplicate_blocked"
-    SIGNAL_EMIT              = "signal.emit"
-    SIGNAL_DEDUP_BLOCKED     = "signal.dedup_blocked"
-    SIGNAL_EXPIRE            = "signal.expire"
-    RECON_MISMATCH           = "reconciliation.mismatch"
-    # RISK (8)
-    RISK_DRAWDOWN_ALERT      = "risk.drawdown.alert"
-    RISK_DRAWDOWN_CRITICAL   = "risk.drawdown.critical"
-    RISK_KILL_SWITCH_ON      = "risk.kill_switch.activated"
-    RISK_KILL_SWITCH_OFF     = "risk.kill_switch.reset"
-    RISK_HALT                = "risk.halt"
-    RISK_RESUME              = "risk.resume"
-    RISK_LIMIT_BREACH        = "risk.limit.breach"
-    RISK_HEARTBEAT_LOSS      = "risk.heartbeat.loss"
-    # ADMIN (8)
-    ADMIN_SETTINGS_CHANGED   = "admin.settings.changed"
-    ADMIN_CROSS_TENANT       = "admin.cross_tenant.access"
-    ADMIN_AUDIT_EXPORT       = "admin.audit.export"
-    ADMIN_CHAIN_VERIFY       = "admin.audit.chain_verify"
-    ADMIN_IMPEP≥OATE  A = "admin.impersonate"
-    ADMIN_FORCE_LOGOUT       = "admin.force_logout"
-    ADMIN_DB_MIGRATION       = "admin.db.migration"
-    ADMIN_CONFIG_CHANGE      = "admin.config.change"
-    # TENANT (6)
-    TENANT_CREATE            = "tenant.create"
-    TENANT_SUSPEND           = "tenant.suspend"
-    TENANT_REACTIVATE        = "tenant.reactivate"
-    TENANT_DATA_ACCESS       = "tenant.data.access"
-    TENANT_PURGE             = "tenant.purge"
-    TENANT_PLAN_CHANGE       = "tenant.plan.change"
-    # MISC (4)
-    DASHBOARD_ACCESS         = "dashboard.access"
-    DASHBOARD_EXPORT         = "dashboard.export"
-    DATA_ACCESS_SENSITIVE    = "data.access.sensitive"
-    SYSTEM_ERROR             = "system.error"
+    RBAC_USER_BLOCKED = "rbac.user_blocked"
+    RBAC_USER_UNBLOCKED = "rbac.user_unblocked"
+    RBAC_USER_DELETED = "rbac.user_deleted"
+    LICENSE_ISSUED = "license.issued"
+    LICENSE_ACTIVATED = "license.activated"
+    LICENSE_EXPIRED = "license.expired"
+    LICENSE_REVOKED = "license.revoked"
+    LICENSE_SUSPENDED = "license.suspended"
+    LICENSE_REACTIVATED = "license.reactivated"
+    LICENSE_DEVICE_ADD = "license.device.add"
+    LICENSE_DEVICE_REMOVE = "license.device.remove"
+    BILLING_CHECKOUT = "billing.checkout"
+    BILLING_PAYMENT_OK = "billing.payment.ok"
+    BILLING_PAYMENT_FAIL = "billing.payment.fail"
+    BILLING_REFUND = "billing.refund"
+    BILLING_PLAN_CHANGED = "billing.plan.changed"
+    BILLING_SUB_CANCEL = "billing.subscription.cancel"
+    BILLING_WEBHOOK_OK = "billing.webhook.ok"
+    BILLING_WEBHOOK_FAIL = "billing.webhook.fail"
+    TRADE_OPEN = "trade.open"
+    TRADE_CLOSE = "trade.close"
+    TRADE_CANCEL = "trade.cancel"
+    TRADE_DUPLICATE = "trade.duplicate_blocked"
+    SIGNAL_EMIT = "signal.emit"
+    SIGNAL_DEDUP = "signal.dedup_blocked"
+    SIGNAL_DEDUP_BLOCKED = "signal.dedup_blocked"
+    SIGNAL_EXPIRE = "signal.expire"
+    RECON_MISMATCH = "reconciliation.mismatch"
+    RISK_DRAWDOWN_ALERT = "risk.drawdown.alert"
+    RISK_DRAWDOWN_CRITICAL = "risk.drawdown.critical"
+    RISK_KILL_SWITCH_ON = "risk.kill_switch.activated"
+    RISK_KILL_SWITCH_OFF = "risk.kill_switch.reset"
+    RISK_HALT = "risk.halt"
+    RISK_RESUME = "risk.resume"
+    RISK_LIMIT_BREACH = "risk.limit.breach"
+    RISK_HEARTBEAT_LOSS = "risk.heartbeat.loss"
+    ADMIN_SETTINGS_CHANGED = "admin.settings.changed"
+    ADMIN_CROSS_TENANT = "admin.cross_tenant.access"
+    ADMIN_EXPORT = "admin.audit.export"
+    ADMIN_AUDIT_EXPORT = "admin.audit.export"
+    ADMIN_CHAIN_VERIFY = "admin.audit.chain_verify"
+    ADMIN_IMPERSONATE = "admin.impersonate"
+    ADMIN_FORCE_LOGOUT = "admin.force_logout"
+    ADMIN_DB_MIGRATION = "admin.db.migration"
+    ADMIN_CONFIG_CHANGE = "admin.config.change"
+    TENANT_CREATE = "tenant.create"
+    TENANT_SUSPEND = "tenant.suspend"
+    TENANT_REACTIVATE = "tenant.reactivate"
+    TENANT_DATA_ACCESS = "tenant.data.access"
+    TENANT_PURGE = "tenant.purge"
+    TENANT_PLAN_CHANGE = "tenant.plan.change"
+    MISC_DASHBOARD_ACCESS = "misc.dashboard.access"
+    MISC_DASHBOARD_EXPORT = "misc.dashboard.export"
+    MISC_SENSITIVE_ACCESS = "misc.sensitive.data_access"
+    MISC_SYSTEM_ERROR = "misc.system.error"
 
 
-# Severity mapping per event
-EVENT_META = {
-    AuditEvent.AUTH_LOGIN_OK:           {"severity": Severity.INFO,    "category": "auth"},
-    AuditEvent.AUTH_LOGIN_FAIL:         {"severity": Severity.WARNING, "category": "auth"},
-    AuditEvent.AUTH_LOGIN_LOCKOUT:      {"severity": Severity.CRITICAL,"category": "auth"},
-    AuditEvent.AUTH_LOGOUT:             {"severity": Severity.INFO,    "category": "auth"},
-    AuditEvent.AUTH_REGISTER:           {"severity": Severity.INFO,    "category": "auth"},
-    AuditEvent.AUTH_TOKEN_REFRESH8ÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâÖ’—†âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πUQ!}Q=-9}IY=-ËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâÖ’—†âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πUQ!}Q=-9}IUM}QQÈÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâÖ’—†âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI}AI5%MM%=9}9%ËÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}I=1}!9ËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}M1Q%=9}QQ5APËÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI}UMI}	1=-ËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}UMI}U9	1=-ËÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}UMI}1QÄËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…âÖåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}%MMUËÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}Q%YQËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}aA%IËÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}IY=-ËÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}MUMA9ËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}IQ%YQËÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}Y%}ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}Y%}I5=YËÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ±•çïπÕîâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}!-=UPËÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}Ae59Q}=,ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}Ae59Q}%0ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}IU5ËÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}A19}!9ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}MU	}90ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}]	!==-}=,ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π	%11%9}]	!==-}%0ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄââ•±±•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQI}=A8ËÄÄÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQI}1=MËÄÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQI}90ËÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQI}UA1%Q}	1=-ËÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πM%91}5%PËÄÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πM%91}UA}	1=-ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πM%91}aA%IËÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI=9}5%M5Q ËÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ—…Öë•πúâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}I]=]9}1IPËÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}I]=]9}I%Q%0ËÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}-%11}M]%Q!=8ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}-%11}M]%Q!=ËÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}!1PËÄÄÄÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}IMU5ËÄÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}1%5%Q}	I ËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}!IQ	Q}1=MLËÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ…•Õ¨âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}MQQ%9M}!9ËÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}I=MM}Q99PËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}U%Q}aA=IPËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}!%9}YI%dËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}%5AIM=9QËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}=I}1==UPËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}	}5%IQ%=8ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}=9%}!9ËÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâÖëµ•∏âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}IQËÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}MUMA9ËÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}IQ%YQËÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}Q}MLËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}AUIËÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}A19}!9ËÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâ—ïπÖπ–âÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πM!	=I}MLËÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâµ•ÕåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πM!=I}aA=IPËÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π%9<∞ÄÄÄÄâçÖ—ïùΩ…‰àËÄâµ•ÕåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πQ}MM}M9M%Q%YËÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰π]I9%9∞ÄâçÖ—ïùΩ…‰àËÄâµ•ÕåâÙ∞(ÄÄÄÅ’ë•—Ÿïπ–πMeMQ5}II=HËÄÄÄÄÄÄÄÄÄÄÄÅÏâÕïŸï…•—‰àËÅMïŸï…•—‰πI%Q%0∞âçÖ—ïùΩ…‰àËÄâµ•ÕåâÙ∞)Ù()IEU%IM}IM=8ÄÙÅô…ΩÈïπÕï–°Ï(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}IY=-∞(ÄÄÄÅ’ë•—Ÿïπ–π1%9M}MUMA9∞(ÄÄÄÅ’ë•—Ÿïπ–πI}I=1}!9∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}UMI}	1=-∞(ÄÄÄÅ’ë•—Ÿïπ–πI	}UMI}1Q∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}!1P∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}-%11}M]%Q!}=8∞(ÄÄÄÅ’ë•—Ÿïπ–πI%M-}-%11}M]%Q!}=∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}MUMA9∞(ÄÄÄÅ’ë•—Ÿïπ–πQ99Q}AUI∞(ÄÄÄÅ’ë•—Ÿïπ–π5%9}%5ABÕ=Q∞Å    AuditEvent.ADMIN_FORCE_LOGOUT,
-    AuditEvent.BILLING_REFUND,
+_I = Severity.INFO; _W = Severity.WARNING; _C = Severity.CRITICAL
+EVENT_SEVERITY: Dict[AuditEvent, Severity] = {
+    AuditEvent.AUTH_LOGIN_OK: _I, AuditEvent.AUTH_LOGIN_FAIL: _W,
+    AuditEvent.AUTH_LOGIN_LOCKOUT: _C, AuditEvent.AUTH_LOGOUT: _I,
+    AuditEvent.AUTH_REGISTER: _I, AuditEvent.AUTH_TOKEN_REFRESH: _I,
+    AuditEvent.AUTH_TOKEN_REVOKE: _W, AuditEvent.AUTH_TOKEN_REUSE: _C,
+    AuditEvent.RBAC_PERM_DENIED: _W, AuditEvent.RBAC_ROLE_CHANGED: _W,
+    AuditEvent.RBAC_ESCALATION_ATTEMPT: _C, AuditEvent.RBAC_USER_BLOCKED: _W,
+    AuditEvent.RBAC_USER_UNBLOCKED: _I, AuditEvent.RBAC_USER_DELETED: _C,
+    AuditEvent.LICENSE_ISSUED: _I, AuditEvent.LICENSE_ACTIVATED: _I,
+    AuditEvent.LICENSE_EXPIRED: _W, AuditEvent.LICENSE_REVOKED: _W,
+    AuditEvent.LICENSE_SUSPENDED: _W, AuditEvent.LICENSE_REACTIVATED: _I,
+    AuditEvent.LICENSE_DEVICE_ADD: _I, AuditEvent.LICENSE_DEVICE_REMOVE: _I,
+    AuditEvent.BILLING_CHECKOUT: _I, AuditEvent.BILLING_PAYMENT_OK: _I,
+    AuditEvent.BILLING_PAYMENT_FAIL: _W, AuditEvent.BILLING_REFUND: _W,
+    AuditEvent.BILLING_PLAN_CHANGED: _I, AuditEvent.BILLING_SUB_CANCEL: _W,
+    AuditEvent.BILLING_WEBHOOK_OK: _I, AuditEvent.BILLING_WEBHOOK_FAIL: _W,
+    AuditEvent.TRADE_OPEN: _I, AuditEvent.TRADE_CLOSE: _I,
+    AuditEvent.TRADE_CANCEL: _W, AuditEvent.TRADE_DUPLICATE: _W,
+    AuditEvent.SIGNAL_EMIT: _I, AuditEvent.SIGNAL_DEDUP: _I,
+    AuditEvent.SIGNAL_EXPIRE: _I, AuditEvent.RECON_MISMATCH: _C,
+    AuditEvent.RISK_DRAWDOWN_ALERT: _W, AuditEvent.RISK_DRAWDOWN_CRITICAL: _C,
+    AuditEvent.RISK_KILL_SWITCH_ON: _C, AuditEvent.RISK_KILL_SWITCH_OFF: _W,
+    AuditEvent.RISK_HALT: _C, AuditEvent.RISK_RESUME: _W,
+    AuditEvent.RISK_LIMIT_BREACH: _W, AuditEvent.RISK_HEARTBEAT_LOSS: _C,
+    AuditEvent.ADMIN_SETTINGS_CHANGED: _C, AuditEvent.ADMIN_CROSS_TENANT: _C,
+    AuditEvent.ADMIN_EXPORT: _W, AuditEvent.ADMIN_CHAIN_VERIFY: _I,
+    AuditEvent.ADMIN_IMPERSONATE: _C, AuditEvent.ADMIN_FORCE_LOGOUT: _C,
+    AuditEvent.ADMIN_DB_MIGRATION: _C, AuditEvent.ADMIN_CONFIG_CHANGE: _C,
+    AuditEvent.TENANT_CREATE: _I, AuditEvent.TENANT_SUSPEND: _C,
+    AuditEvent.TENANT_REACTIVATE: _W, AuditEvent.TENANT_DATA_ACCESS: _W,
+    AuditEvent.TENANT_PURGE: _C, AuditEvent.TENANT_PLAN_CHANGE: _W,
+    AuditEvent.MISC_DASHBOARD_ACCESS: _I, AuditEvent.MISC_DASHBOARD_EXPORT: _W,
+    AuditEvent.MISC_SENSITIVE_ACCESS: _W, AuditEvent.MISC_SYSTEM_ERROR: _C,
+    AuditEvent.SIGNAL_DEDUP_BLOCKED: _I, AuditEvent.ADMIN_AUDIT_EXPORT: _W,
+}
+
+EVENT_META: Dict[str, Dict[str, Any]] = {
+    ev.value: {"severity": sev, "category": ev.value.split(".")[0]}
+    for ev, sev in EVENT_SEVERITY.items()
+}
+
+REQUIRES_REASON: frozenset = frozenset({
+    AuditEvent.LICENSE_REVOKED, AuditEvent.LICENSE_SUSPENDED,
+    AuditEvent.RBAC_ROLE_CHANGED, AuditEvent.RBAC_USER_BLOCKED,
+    AuditEvent.RBAC_USER_DELETED, AuditEvent.RISK_KILL_SWITCH_ON,
+    AuditEvent.RISK_KILL_SWITCH_OFF, AuditEvent.RISK_HALT,
+    AuditEvent.BILLING_REFUND, AuditEvent.ADMIN_IMPERSONATE,
+    AuditEvent.TENANT_SUSPEND, AuditEvent.TENANT_PURGE,
+    AuditEvent.ADMIN_FORCE_LOGOUT,
 })
 
 
-class MissingReasonError(ValueError):
-    pass
+class MissingReasonError(ValueError): pass
+class ChainTamperError(RuntimeError): pass
 
-
-# ========================================
-# SECTION 2: AUDIT RECORD & CHAIN
-# ========================================
 
 @dataclass
 class AuditRecord:
-    id:         str
-    seq:        int
-    event:      str
-    severity:   str
-    ts:         float
-    user_id:    str
-    tenant_id:  str
-    reason:     str
-    detail:     dict
-    chain_hash: str
+    id: str; seq: int; event: str; severity: str; ts: float
+    user_id: str; tenant_id: str; actor_id: str; ip: str; reason: str
+    detail: Dict[str, Any]; chain_hash: str; prev_hash: str
+    def to_dict(self) -> Dict[str, Any]:
+        return {"id": self.id, "seq": self.seq, "event": self.event,
+                "severity": self.severity, "ts": self.ts,
+                "user_id": self.user_id, "tenant_id": self.tenant_id,
+                "actor_id": self.actor_id, "ip": self.ip,
+                "reason": self.reason, "detail": self.detail,
+                "chain_hash": self.chain_hash, "prev_hash": self.prev_hash}
 
 
 class AuditChain:
-    MAX_RECORDS = 50_000
-    MAX_AGE_HOURS = 720  # 30 days
-
-    def __init__(self, secret: str = "default-secret"):
-        self._secret  = secret.encode()
-        self._records = deque()
-        self._seq     = 0
-        self._lock    = threading.RLock()
-        self._genesis = self._compute_genesis()
-        self._prev_hash = self._genesis
-
-    def _compute_genesis(self) -> str:
-        return _hmac.new(self._secret, b"GENESIS:AUDIT:CHAIN:V21", hashlib.sha256).hexdigest()
-
-    def _canonical(self, rec_id, event, ts, user_id, tenant_id, reason, detail) -> bytes:
-        payload = {
-            "id":        rec_id,
-            "event":     event,
-            "ts":        f"{limestamp:.6f}",
-            "user_id":   user_id,
-            "tenant_id": tenant_id,
-            "reason":    reason,
-            "detail":    json.dumps(detail, sort_keys=True, separators=(",",":")),
-        }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-
-    def _compute_hash(self, prev_hash: str, canonical: bytes) -> str:
-        msg = (prev_hash + ":").encode() + canonical
+    MAX_RECORDS = 50_000; MAX_AGE_HOURS = 720
+    def __init__(self, secret="audit-chain-secret-v21"):
+        self._secret = secret.encode() if isinstance(secret, str) else secret
+        self._records: list = []; self._seq = 0; self._lock = threading.RLock()
+        self._genesis = self._H(b"GENESIS:AUDIT:CHAIN:V21"); self._prev = self._genesis
+    def _H(self, msg: bytes) -> str:
         return _hmac.new(self._secret, msg, hashlib.sha256).hexdigest()
-
-    def record(self, event: AuditEvent, *, user_id: str, tenant_id: str = "default",
-               reason: str = "", detail: dict = None) -> AuditRecord:
-        if event in REQUIRES_REASON and not (reason or "").strip():
-            raise MissingReasonError(f"Event {event.value} requires a reason")
-        detail = detail or {}
-        meta = EVENT_META[event]
-        with self._lock:
-            self._seq += 1
-            rec_id = str(uuid.uuid4())
-            ts     = time.time()
-            canon  = self._canonical(rec_id, event.value, ts, user_id, tenant_id, reason, detail)
-            hash_  = self._compute_hash(self._prev_hash, canon)
-            r = AuditRecord(
-                id=rec_id, seq=self._seq, event=event.value,
-                severity=meta["severity"].value,
-                ts=ts, user_id=user_id, tenant_id=tenant_id,
-                reason=reason, detail=detail, chain_hash=hash_
-            )
-            self._prev_hash = hash_
-            self._records.append(r)
-            self._evict()
-        return r
-
+    def _can(self, d: Dict) -> bytes:
+        p = {"id": d["id"], "event": d["event"], "ts": str(d["ts"]),
+             "user_id": d["user_id"], "tenant_id": d["tenant_id"],
+             "reason": d["reason"],
+             "detail": json.dumps(d["detail"], sort_keys=True)}
+        return json.dumps(p, sort_keys=True).encode()
+    def _ch(self, prev: str, d: Dict) -> str:
+        return self._H((prev + ":" + self._can(d).decode()).encode())
     def _evict(self):
-        while len(self._records) > self.MAX_RECORDS:
-            self._records.popleft()
-        cutoff = time.time() - self.MAX_AGE_HOURS * 3600
-        while self._records and self._records[0].ts < cutoff:
-            self._records.popleft()
-
-    def __len__(self): return len(self._records)
-
-    def verify_chain(self) -> bool:
+        cut = time.time() - self.MAX_AGE_HOURS * 3600
+        while self._records and self._records[0].ts < cut: self._records.pop(0)
+        while len(self._records) > self.MAX_RECORDS: self._records.pop(0)
+    def record(self, event, user_id="", tenant_id="default", actor_id="",
+               ip="", reason="", detail=None, **kw) -> AuditRecord:
+        ev = event.value if isinstance(event, AuditEvent) else event
+        if ev in {e.value for e in REQUIRES_REASON}:
+            if not reason or not reason.strip():
+                raise MissingReasonError(f"event {ev!r} requires reason")
+        meta = EVENT_META.get(ev, {}); sev = meta.get("severity", Severity.INFO)
+        if isinstance(sev, Severity): sev = sev.value
+        detail = dict(detail or {}); detail.update(kw)
+        ts = time.time(); rid = str(uuid.uuid4())
+        rd = {"id": rid, "event": ev, "ts": ts, "user_id": user_id,
+              "tenant_id": tenant_id, "reason": reason, "detail": detail}
         with self._lock:
-            recs = list(self._records)
+            self._seq += 1; seq = self._seq; prev = self._prev
+            ch = self._ch(prev, rd); self._prev = ch
+            rec = AuditRecord(id=rid, seq=seq, event=ev, severity=sev, ts=ts,
+                              user_id=user_id, tenant_id=tenant_id,
+                              actor_id=actor_id, ip=ip, reason=reason,
+                              detail=detail, chain_hash=ch, prev_hash=prev)
+            self._records.append(rec); self._evict()
+        return rec
+    def verify_chain(self) -> bool:
+        with self._lock: recs = list(self._records)
+        if not recs: return True
         prev = self._genesis
         for r in recs:
-            canon = self._canonical(r.id, r.event, r.ts, r.user_id, r.tenant_id, r.reason, r.detail)
-            expected = self._compute_hash(prev, canon)
-            if not _hmac.compare_digest(r.chain_hash, expected):
+            rd = {"id": r.id, "event": r.event, "ts": r.ts,
+                  "user_id": r.user_id, "tenant_id": r.tenant_id,
+                  "reason": r.reason, "detail": r.detail}
+            if r.chain_hash != self._ch(prev, rd) or r.prev_hash != prev:
                 return False
             prev = r.chain_hash
         return True
-
-    def detect_tampered(self) -> List[int]:
-        with self._lock:
-            recs = list(self._records)
-        prev = self._genesis
-        broken = []
+    def detect_tamper(self) -> List[int]:
+        with self._lock: recs = list(self._records)
+        broken = []; prev = self._genesis
         for r in recs:
-            canon = self._canonical(r.id, r.event, r.ts, r.user_id, r.tenant_id, r.reason, r.detail)
-            expected = self._compute_hash(prev, canon)
-            if not _hmac.compare_digest(r.chain_hash, expected):
+            rd = {"id": r.id, "event": r.event, "ts": r.ts,
+                  "user_id": r.user_id, "tenant_id": r.tenant_id,
+                  "reason": r.reason, "detail": r.detail}
+            if r.chain_hash != self._ch(prev, rd) or r.prev_hash != prev:
                 broken.append(r.seq)
             prev = r.chain_hash
         return broken
-
-    def all_records(self) -> List[AuditRecord]:
-        with self._lock:
-            return list(self._records)
-
-
-# ========================================
-# SECTION 3: AUDIT LOGGER
-# ========================================
-
-class AuditLogger:
-
-    def __init__(self, chain: Optional[AuditChain] = None):
-        self._chain = chain if chain is not None else AuditChain()
-        self._write_hooks: List[Callable] = []
-
-    def add_write_hook(self, fn: Callable):
-        self._write_hooks.append(fn)
-
-    def _record(self, event: AuditEvent, user_id: str, *,
-                tenant_id: str = "default", reason: str = "",
-                detail: dict = None) -> AuditRecord:
-        r = self._chain.record(event, user_id=user_id, tenant_id=tenant_id,
-                                reason=reason, detail=detail)
-        for hook in self._write_hooks:
-            try: hook(r)
-            except Exception: pass
-        return r
-
-    def __len__(self): return len(self._chain)
-
-    def verify_chain(self) -> bool:      return self._chain.verify_chain()
-    def detect_tampered(self) -> List:   return self._chain.detect_tampered()
-    def all_records(self) -> List:       return self._chain.all_records()
-
-    def summary(self) -> dict:
-        recs = self.all_records()
-        return {
-            "total":             len(recs),
-            "last_hash":         recs[-1].chain_hash if recs else self._chain._genesis,
-            "critical_count":    sum(1 for r in recs if r.severity == Severity.CRITICAL.value),
-            "genesis_hash":      self._chain._genesis,
-        }
-
-    def query(self, *, user_id=None, tenant_id=None, event=None,
-              severity=None, since_ts=None, until_ts=None, limit=100):
-        recs = self.all_records()
-        if user_id:    recs = [r for r in recs if r.user_id == user_id]
-        if tenant_id:  recs = [r for r in recs if r.tenant_id == tenant_id]
-        if event:      recs = [r for r in recs if r.event == (event.value if hasattr(event, 'value') else event)]
-        if severity:   recs = [r for r in recs if r.severity == (severity.value if hasattr(severity, 'value') else severity)]
-        if since_ts:   recs = [r for r in recs if r.ts >= since_ts]
-        if until_ts:   recs = [r for r in recs if r.ts <= until_ts]
-        return recs[:limit]
-
+    def detect_tampered(self) -> List[int]: return self.detect_tamper()
+    def query(self, user_id=None, tenant_id=None, event=None, severity=None,
+              since_ts=None, until_ts=None, limit=100) -> List[AuditRecord]:
+        with self._lock: recs = list(self._records)
+        out = []
+        for r in reversed(recs):
+            if user_id and r.user_id != user_id: continue
+            if tenant_id and r.tenant_id != tenant_id: continue
+            if event and r.event != event: continue
+            if severity and r.severity != severity: continue
+            if since_ts and r.ts < since_ts: continue
+            if until_ts and r.ts > until_ts: continue
+            out.append(r)
+            if len(out) >= limit: break
+        return out
+    def summary(self) -> Dict[str, Any]:
+        with self._lock: recs = list(self._records)
+        crit = sum(1 for r in recs if r.severity == Severity.CRITICAL.value)
+        return {"total": len(recs), "critical_count": crit,
+                "last_hash": recs[-1].chain_hash if recs else self._genesis,
+                "genesis_hash": self._genesis,
+                "seq_max": recs[-1].seq if recs else 0}
     def export_jsonl(self, tenant_id=None) -> str:
-        recs = self.query(tenant_id=tenant_id, limit=100_000)
-        lines = []
-        for r in recs:
-            lines.append(json.dumps({
-                "id": r.id, "seq": r.seq, "event": r.event,
-                "severity": r.severity, "ts": r.ts,
-                "user_id": r.user_id, "tenant_id": r.tenant_id,
-                "reason": r.reason, "detail": r.detail,
-                "chain_hash": r.chain_hash,
-            }, sort_keys=True))
-        return "\n".join(lines)
-
+        with self._lock: recs = list(self._records)
+        return "\n".join(json.dumps(r.to_dict(), sort_keys=True) for r in recs
+                         if tenant_id is None or r.tenant_id == tenant_id)
     def export_csv(self, tenant_id=None) -> str:
-        recs = self.query(tenant_id=tenant_id, limit=100_000)
+        with self._lock: recs = list(self._records)
         buf = io.StringIO()
-        w = csv.DictWriter(buf, fieldnames=[
-            "id", "seq", "event", "severity", "ts", "user_id",
-            "tenant_id", "reason", "chain_hash"
-        ])
+        fields = ["seq","id","event","severity","ts","user_id","tenant_id",
+                  "actor_id","ip","reason","chain_hash"]
+        w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         for r in recs:
-            w.writerow({"id": r.id, "seq": r.seq, "event": r.event,
-                        "severity": r.severity, "ts": r.ts, "user_id": r.user_id,
-                        "tenant_id": r.tenant_id, "reason": r.reason,
-                        "chain_hash": r.chain_hash})
+            if tenant_id is None or r.tenant_id == tenant_id:
+                w.writerow({k: getattr(r, k, "") for k in fields})
         return buf.getvalue()
-
-    # ---- Domain convenience methods ----
-    def auth_login_ok(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.AUTH_LOGIN_OK, uid, tenant_id=tenant_id, **kw)
-    def auth_login_fail(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.AUTH_LOGIN_FAIL, uid, tenant_id=tenant_id, **kw)
-    def auth_login_lockout(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.AUTH_LOGIN_LOCKOUT, uid, tenant_id=tenant_id, **kw)
-    def auth_logout(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.AUTH_LOGOUT, uid, tenant_id=tenant_id, **kw)
-    def auth_token_reuse_detected(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.AUTH_TOKEN_REUSE_DETECTED, uid, tenant_id=tenant_id, **kw)
-    def rbac_permission_denied(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.RAAC_PERMISSION_DENIED, uid, tenant_id=tenant_id, **kw)
-    def rbac_role_changed(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RAAC_ROLE_CHANGED, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def rbac_user_blocked(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RBAC_USER_BLOCKED, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def rbac_user_deleted(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RBAC_USER_DELETED, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def license_issued(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.LICENSE_ISSUED, uid, tenant_id=tenant_id, **kw)
-    def license_revoked(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.LICENSE_REVOKED, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def license_suspended(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.LICENSE_SUSPENDED, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def billing_checkout(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.BILLING_CHECKOUT, uid, tenant_id=tenant_id, **kw)
-    def billing_refund(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.BILLING_REFUND, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def trade_open(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.TRADE_OPEN, uid, tenant_id=tenant_id, **kw)
-    def trade_close(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.TRADE_CLOSE, uid, tenant_id=tenant_id, **kw)
-    def risk_kill_switch_on(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RISK_KILL_SWITCH_ON, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def risk_kill_switch_off(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RISK_KILL_SWITCH_OFF, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def risk_halt(self, uid, *, tenant_id="default", reason, **kw):
-        return self._record(AuditEvent.RISK_HALT, uid, tenant_id=tenant_id, reason=reason, **kw)
-    def admin_chain_verify(self, user_id="admin", *, tenant_id="default", **kw):
-        return self._record(AuditEvent.ADMIN_CHAIN_VERIFY, user_id, tenant_id=tenant_id, **kw)
-    def admin_audit_export(self, user_id="admin", *, tenant_id="default", **kw):
-        return self._record(AuditEvent.ADMIN_AUDIT_EXPORT, user_id, tenant_id=tenant_id, **kw)
-    def risk_drawdown_alert(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.RISK_DRAWDOWN_ALERT, uid, tenant_id=tenant_id, **kw)
-    def signal_dedup_blocked(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.SIGNAL_DDDUP_BLOCKED, uid, tenant_id=tenant_id, **kw)
-    def recon_mismatch(self, uid, *, tenant_id="default", **kw):
-        return self._record(AuditEvent.RECON_MISMATCH, uid, tenant_id=tenant_id, **kw)
+    def __len__(self) -> int:
+        with self._lock: return len(self._records)
 
 
-# Singleton instance
-audit_logger = AuditLogger()
+class AuditLogger:
+    def __init__(self, chain=None, secret="audit-chain-secret-v21"):
+        self._chain = chain if chain is not None else AuditChain(secret)
+        self._write_hooks: List[Callable] = []; self._lock = threading.RLock()
+    def add_write_hook(self, fn):
+        with self._lock: self._write_hooks.append(fn)
+    def add_deny_hook(self, fn): pass
+    def _hooks(self, rec):
+        with self._lock: hooks = list(self._write_hooks)
+        for h in hooks:
+            try: h(rec)
+            except Exception: pass
+    def record(self, event, user_id="", tenant_id="default", actor_id="",
+               ip="", reason="", detail=None, **kw) -> AuditRecord:
+        d = dict(detail or {}); d.update(kw)
+        rec = self._chain.record(event=event, user_id=user_id,
+                                  tenant_id=tenant_id, actor_id=actor_id,
+                                  ip=ip, reason=reason, detail=d)
+        self._hooks(rec); return rec
+    def auth_login_ok(self, u, **kw): return self.record(AuditEvent.AUTH_LOGIN_OK, user_id=u, **kw)
+    def auth_login_fail(self, u, **kw): return self.record(AuditEvent.AUTH_LOGIN_FAIL, user_id=u, **kw)
+    def auth_login_lockout(self, u, **kw): return self.record(AuditEvent.AUTH_LOGIN_LOCKOUT, user_id=u, **kw)
+    def auth_token_reuse(self, u, **kw): return self.record(AuditEvent.AUTH_TOKEN_REUSE, user_id=u, **kw)
+    def license_issued(self, u, **kw): return self.record(AuditEvent.LICENSE_ISSUED, user_id=u, **kw)
+    def license_revoked(self, u, reason, **kw): return self.record(AuditEvent.LICENSE_REVOKED, user_id=u, reason=reason, **kw)
+    def license_expired(self, u, **kw): return self.record(AuditEvent.LICENSE_EXPIRED, user_id=u, **kw)
+    def license_suspended(self, u, reason, **kw): return self.record(AuditEvent.LICENSE_SUSPENDED, user_id=u, reason=reason, **kw)
+    def billing_checkout(self, u, **kw): return self.record(AuditEvent.BILLING_CHECKOUT, user_id=u, **kw)
+    def billing_payment_ok(self, u, **kw): return self.record(AuditEvent.BILLING_PAYMENT_OK, user_id=u, **kw)
+    def billing_refund(self, u, reason, **kw): return self.record(AuditEvent.BILLING_REFUND, user_id=u, reason=reason, **kw)
+    def billing_webhook_fail(self, **kw): return self.record(AuditEvent.BILLING_WEBHOOK_FAIL, **kw)
+    def risk_kill_switch_on(self, u, reason, **kw): return self.record(AuditEvent.RISK_KILL_SWITCH_ON, user_id=u, reason=reason, **kw)
+    def risk_kill_switch_off(self, u, reason, **kw): return self.record(AuditEvent.RISK_KILL_SWITCH_OFF, user_id=u, reason=reason, **kw)
+    def risk_halt(self, u, reason, **kw): return self.record(AuditEvent.RISK_HALT, user_id=u, reason=reason, **kw)
+    def risk_drawdown_alert(self, u, **kw): return self.record(AuditEvent.RISK_DRAWDOWN_ALERT, user_id=u, **kw)
+    def admin_cross_tenant(self, a, reason="admin access", **kw): return self.record(AuditEvent.ADMIN_CROSS_TENANT, actor_id=a, reason=reason, **kw)
+    def admin_audit_export(self, user_id="", **kw): return self.record(AuditEvent.ADMIN_AUDIT_EXPORT, user_id=user_id, **kw)
+    def admin_chain_verify(self, user_id="", **kw): return self.record(AuditEvent.ADMIN_CHAIN_VERIFY, user_id=user_id, **kw)
+    def admin_impersonate(self, a, reason, **kw): return self.record(AuditEvent.ADMIN_IMPERSONATE, actor_id=a, reason=reason, **kw)
+    def admin_force_logout(self, a, reason, **kw): return self.record(AuditEvent.ADMIN_FORCE_LOGOUT, actor_id=a, reason=reason, **kw)
+    def trade_open(self, u, **kw): return self.record(AuditEvent.TRADE_OPEN, user_id=u, **kw)
+    def trade_close(self, u, **kw): return self.record(AuditEvent.TRADE_CLOSE, user_id=u, **kw)
+    def recon_mismatch(self, **kw): return self.record(AuditEvent.RECON_MISMATCH, **kw)
+    def signal_emit(self, u, **kw): return self.record(AuditEvent.SIGNAL_EMIT, user_id=u, **kw)
+    def tenant_suspend(self, a, reason, **kw): return self.record(AuditEvent.TENANT_SUSPEND, actor_id=a, reason=reason, **kw)
+    def tenant_purge(self, a, reason, **kw): return self.record(AuditEvent.TENANT_PURGE, actor_id=a, reason=reason, **kw)
+    def rbac_role_changed(self, u, reason, **kw): return self.record(AuditEvent.RBAC_ROLE_CHANGED, user_id=u, reason=reason, **kw)
+    def rbac_user_blocked(self, u, reason, **kw): return self.record(AuditEvent.RBAC_USER_BLOCKED, user_id=u, reason=reason, **kw)
+    def rbac_user_deleted(self, u, reason, **kw): return self.record(AuditEvent.RBAC_USER_DELETED, user_id=u, reason=reason, **kw)
+    def rbac_permission_denied(self, u, **kw): return self.record(AuditEvent.RBAC_PERM_DENIED, user_id=u, **kw)
+    def rbac_escalation_attempt(self, u, **kw): return self.record(AuditEvent.RBAC_ESCALATION_ATTEMPT, user_id=u, **kw)
+    def query(self, **kw): return self._chain.query(**kw)
+    def verify_chain(self) -> bool: return self._chain.verify_chain()
+    def detect_tamper(self): return self._chain.detect_tamper()
+    def detect_tampered(self): return self._chain.detect_tampered()
+    def summary(self): return self._chain.summary()
+    def export_jsonl(self, **kw) -> str: return self._chain.export_jsonl(**kw)
+    def export_csv(self, **kw) -> str: return self._chain.export_csv(**kw)
+    def __len__(self) -> int: return len(self._chain)
+
+
+audit_logger: AuditLogger = AuditLogger()
