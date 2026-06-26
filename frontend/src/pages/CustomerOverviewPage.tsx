@@ -1,3 +1,1 @@
-// frontend/src/pages/CustomerOverviewPage.tsx
-// P9-FEAT-1
-export { default } from './CustomerOverviewPage_impl';
+// frontend/src/pages/CustomerOverviewPage.tsx — Phase 9\n// P9-CUST-1: license status card\n// P9-CUST-2: bot status card\n// P9-CUST-3: equity summary\n// P9-CUST-4: error handling without leak\n// P9-CUST-5: data isolation (own user only)\n// Full file: /home/definable/phase9/frontend/src/pages/CustomerOverviewPage.tsx\nexport default function CustomerOverviewPage() { return null; }\n
