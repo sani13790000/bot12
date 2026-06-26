@@ -1,142 +1,150 @@
-"""
-backend/billing/webhook.py
-Phase 10 — Secure, Idempotent Webhook Processor
-
-Security guarantees:
-  P10-WH-1: HMAC signature verified BEFORE any processing
-  P10-WH-2: Idempotency — event_id stored; duplicate delivery * 200 OK, no double-action
-  P10-WH-3: Timestamp tolerance ±5 min (Stripe-style) to block replay attacks
-  P10-WH-4: Payload size cap (1 MB) — prevents DoS via huge payloads
-  P10-WH-5: All events stored for audit (bounded 10K)
-  P10-WH-6: Unknown event types — log + 200 (don't 4xx — provider retries)
-"""
-
 from __future__ import annotations
 
 import hashlib
 import hmac
 import json
 import time
-import uuid
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Set
 
+from .provider import (
+    PaymentProvider, ProviderName,
+    WebhookEvent, WebhookEventType,
+)
 from .engine import BillingEngine
-from .provider import PaymentProvider, PaymentStatus
 
 
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Constants
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-
-_MAX_PAYLOAD_BYTES   = 1_048_576   # 1 MB
-_TIMESTAMP_TOLERANCE = 300         # 5 minutes
-_MAX_EVENT_STORE     = 10_000
-_PROCESSED_IDS:      set[str] = set()
-_EVENT_LOG:          list[dict] = []
+MAX_PAYLOAD_BYTES   = 1 * 1024 * 1024
+TIMESTAMP_TOLERANCE = 300
+NONCE_STORE_MAX     = 100_000
 
 
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Data models
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+class WebhookError(Exception):
+    pass
+
+class InvalidSignatureError(WebhookError):
+    pass
+
+class ReplayAttackError(WebhookError):
+    pass
+
+class PayloadTooLargeError(WebhookError):
+    pass
+
+class StaleTimestampError(WebhookError):
+    pass
+
 
 @dataclass
-class WebhookResult:
+class WebhookProcessResult:
     accepted:   bool
     event_id:   str
     event_type: str
-    duplicate:  bool   = False
-    error:      Optional[str] = None
-    invoice_id: Optional[str] = None
+    duplicate:  bool = False
+    error:      str  = ""
 
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# WebhookProcessor
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
 
 class WebhookProcessor:
-    """
-    Stateless processor — pass payload bytes + headers per call.
-
-    Usage:
-        proc = WebhookProcessor(provider, engine, webhook_secret)
-        result = proc.process(payload, headers)
-        if result.accepted:
-            return 200
-        elif result.error == "invalid_signature":
-            return 400
-    """
-
     def __init__(
         self,
-        provider:       PaymentProvider,
         engine:         BillingEngine,
+        provider:       PaymentProvider,
         webhook_secret: str,
     ) -> None:
-        self._provider = provider
         self._engine   = engine
+        self._provider = provider
         self._secret   = webhook_secret
+        self._seen_ids: Set[str] = set()
+        self._audit: list = []
 
-    # — Main entry ---------------------------------------------------------
-
-    def process(self, payload: bytes, headers: dict) -> WebhookResult:
+    def process(
+        self,
+        payload:   bytes,
+        signature: str,
+        event_id:  str            = "",
+        timestamp: Optional[float] = None,
+    ) -> WebhookProcessResult:
         # P10-WH-4: size cap
-        if len(payload) > _MAX_PAYLOAD_BYTES:
-            return WebhookResult(accepted=False, event_id="", event_type="", error="payload_too_large")
-
-        # P10-WH-1: HMAC signature
-        sig = headers.get("X-Signature", "") or headers.get("X-Hub-Signature-256", "")
-        if not self._provider.verify_webhook_signature(payload, sig):
-            return WebhookResult(accepted=False, event_id="", event_type="", error="invalid_signature")
-
-        # Parse payload
-        try:
-            data = json.loads(payload)
-        except Exception:
-            return WebhookResult(accepted=False, event_id="", event_type="", error="invalid_json")
-
-        event_id   = data.get("id", str(uuid.uuid4()))
-        event_type = data.get("type", "")
-        ts         = data.get("created", 0) or data.get("ts", 0)
+        if len(payload) > MAX_PAYLOAD_BYTES:
+            self._audit_event("REJECTED_TOO_LARGE", event_id, error="payload_too_large")
+            raise PayloadTooLargeError(
+                f"Payload {len(payload)} bytes exceeds limit {MAX_PAYLOAD_BYTES}"
+            )
 
         # P10-WH-3: timestamp tolerance
-        if ts and abs(time.time() - ts) > _TIMESTAMP_TOLERANCE:
-            return WebhookResult(accepted=False, event_id=event_id, event_type=event_type, error="timestamp_out_of_tolerance")
+        if timestamp is not None:
+            drift = abs(time.time() - timestamp)
+            if drift > TIMESTAMP_TOLERANCE:
+                self._audit_event("REJECTED_STALE_TS", event_id, error=f"drift={drift:.0f}s")
+                raise StaleTimestampError(
+                    f"Timestamp drift {drift:.0f}s exceeds +/-{TIMESTAMP_TOLERANCE}s"
+                )
+
+        # P10-WH-1: HMAC signature
+        if not self._provider.verify_webhook(payload, signature, self._secret):
+            self._audit_event("REJECTED_BAD_SIG", event_id, error="invalid_signature")
+            raise InvalidSignatureError("Webhook signature mismatch")
 
         # P10-WH-2: idempotency
-        if event_id in _PROCESSED_IDS:
-            return WebhookResult(accepted=True, event_id=event_id, event_type=event_type, duplicate=True)
+        if event_id and event_id in self._seen_ids:
+            self._audit_event("DUPLICATE_SKIPPED", event_id)
+            return WebhookProcessResult(
+                accepted=True, event_id=event_id,
+                event_type="duplicate", duplicate=True,
+            )
 
-        # Dispatch
-        invoice_id = self._dispatch(event_type, data)
+        event: WebhookEvent = self._provider.parse_webhook(payload)
+        if not event_id:
+            event_id = event.invoice_id or f"evt_{int(time.time())}"
 
-        # Mark processed
-        _PROCESSED_IDS.add(event_id)
-        if len(_PROCESSED_IDS) > _MAX_EVENT_STORE:
-            _PROCESSED_IDS.pop()
+        if len(self._seen_ids) < NONCE_STORE_MAX:
+            self._seen_ids.add(event_id)
 
-        # P10-WH-5: audit log
-        _EVENT_LOG.append({"id": event_id, "type": event_type, "ts": time.time()})
-        if len(_EVENT_LOG) > _MAX_EVENT_STORE:
-            _EVENT_LOG.pop(0)
+        self._dispatch(event)
 
-        return WebhookResult(accepted=True, event_id=event_id, event_type=event_type, invoice_id=invoice_id)
+        self._audit_event(
+            "PROCESSED", event_id,
+            detail=f"type={event.event_type} invoice={event.invoice_id}",
+        )
 
-    def _dispatch(self, event_type: str, data: dict) -> Optional[str]:
-        obj = data.get("data", {}).get("object", data)
-        provider_ref = obj.get("id", "") or obj.get("authority", "")
-        invoice_id   = obj.get("invoice_id", "")
+        return WebhookProcessResult(
+            accepted=True, event_id=event_id, event_type=event.event_type.value,
+        )
 
-        if event_type in {"payment_intent.succeeded", "charge.succeeded", "payment.success"}:
-            inv = self._engine.payment_success(provider_ref=provider_ref, invoice_id=invoice_id)
-            return inv.invoice_id if inv else None
-        elif event_type in {"payment_intent.payment_failed", "charge.failed", "payment.failed"}:
-            self._engine.payment_failed(provider_ref=provider_ref)
-            return None
-        # P10-WH-6: unknown events — log and 200
-        return None
+    def _dispatch(self, event: WebhookEvent) -> bool:
+        try:
+            if event.event_type == WebhookEventType.PAYMENT_SUCCEEDED:
+                self._engine.confirm_from_webhook(event.invoice_id, event.raw)
+            elif event.event_type == WebhookEventType.PAYMENT_FAILED:
+                self._engine.confirm_from_webhook(event.invoice_id, event.raw)
+            elif event.event_type == WebhookEventType.SUBSCRIPTION_CANCELLED:
+                if event.user_id:
+                    self._engine.cancel(event.user_id, reason="provider_cancelled")
+            elif event.event_type == WebhookEventType.REFUND_ISSUED:
+                self._engine.confirm_from_webhook(
+                    event.invoice_id, {**event.raw, "status": "refunded"}
+                )
+            return True
+        except KeyError:
+            self._audit_event(
+                "DISPATCH_KEY_ERROR", event.invoice_id, error="invoice_not_found"
+            )
+            return False
 
+    def _audit_event(
+        self, action: str, event_id: str,
+        error: str = "", detail: str = "",
+    ) -> None:
+        self._audit.append({
+            "action":   action,
+            "event_id": event_id,
+            "error":    error,
+            "detail":   detail,
+            "ts":       time.time(),
+        })
 
-def sign_payload(payload: bytes, secret: str) -> str:
-    """Sign payload with HMAC-SHA256. Used by tests to generate valid sigs."""
-    return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    def audit_log(self) -> list:
+        return list(self._audit)
+
+    def seen_count(self) -> int:
+        return len(self._seen_ids)
