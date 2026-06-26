@@ -1,36 +1,24 @@
-"""
-backend/billing/provider.py
-Phase 10 — Payment Provider Abstraction
-
-Supports multiple providers:
-  - Stripe  (international)
-  - ZarinPal (Iran)
-  - Manual  (bank transfer / crypto — admin confirms)
-  - Mock    (testing)
-
-All providers return a unified PaymentResult.
-New providers: subclass PaymentProvider, register in _REGISTRY.
-"""
-
 from __future__ import annotations
 
-import abc
 import enum
 import hashlib
 import hmac
+import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Enums
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+class Currency(str, enum.Enum):
+    USD = "usd"
+    IRR = "irr"
+    EUR = "eur"
+
 
 class PaymentStatus(str, enum.Enum):
     PENDING   = "pending"
-    SUCCESS   = "success"
+    SUCCEEDED = "succeeded"
     FAILED    = "failed"
     REFUNDED  = "refunded"
     CANCELLED = "cancelled"
@@ -38,533 +26,277 @@ class PaymentStatus(str, enum.Enum):
 
 class ProviderName(str, enum.Enum):
     STRIPE    = "stripe"
-    ZARINPAL  = "zarinPal"
+    ZARINPAL  = "zarinpal"
     MANUAL    = "manual"
     MOCK      = "mock"
 
 
-class Currency(str, enum.Enum):
-    USD = "USD"
-    EUR = "EUR"
-    IRR = "IRR"   # Iranian Rial (ZarinPal)
-    IRT = "IRT"   # Toman (ZarinPal display)
+class WebhookEventType(str, enum.Enum):
+    PAYMENT_SUCCEEDED      = "payment.succeeded"
+    PAYMENT_FAILED         = "payment.failed"
+    SUBSCRIPTION_CANCELLED = "subscription.cancelled"
+    REFUND_ISSUED          = "refund.issued"
 
 
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Data models
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-
-@dataclass(frozen=True)
+@dataclass
 class PaymentRequest:
-    amount:        int            # smallest unit (cents / rials)
-    currency:      Currency
-    user_id:       str
-    plan_id:       str
-    idempotency_key: str          # caller must supply — UUID/order-id
-    description:   str = ""
-    metadata:      dict = field(default_factory=dict)
-    callback_url:  str = ""       # redirect after 3DS / ZarinPal
-    webhook_url:   str = ""
+    user_id:         str
+    plan_id:         str
+    amount:          int
+    currency:        Currency
+    description:     str  = ""
+    metadata:        Dict = field(default_factory=dict)
+    idempotency_key: str  = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 @dataclass
 class PaymentResult:
-    status:          PaymentStatus
-    provider:        ProviderName
-    provider_ref:    str           # Stripe PaymentIntent ID / ZarinPal Authority
-    idempotency_key: str
-    amount:          int
-    currency:        Currency
-    user_id:         str
-    plan_id:         str
-    redirect_url:    str = ""      # for hosted pages
-    error_message:   str = ""
-    raw_response:    dict = field(default_factory=dict)
-    created_at:      float = field(default_factory=time.time)
-
-    def to_dict(self) -> dict:
-        return {
-            "status":           self.status.value,
-            "provider":         self.provider.value,
-            "provider_ref":     self.provider_ref,
-            "idempotency_key":  self.idempotency_key,
-            "amount":            self.amount,
-            "currency":          self.currency.value,
-            "user_id":           self.user_id,
-            "plan_id":           self.plan_id,
-            "redirect_url":      self.redirect_url,
-            "error_message":     self.error_message,
-            "created_at":        self.created_at,
-        }
+    provider:     ProviderName
+    invoice_id:   str
+    status:       PaymentStatus
+    checkout_url: str  = ""
+    raw:          Dict = field(default_factory=dict)
+    error:        str  = ""
 
 
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Abstract Base
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+@dataclass
+class WebhookEvent:
+    provider:    ProviderName
+    event_type:  WebhookEventType
+    invoice_id:  str
+    user_id:     str      = ""
+    amount:      int      = 0
+    currency:    Currency = Currency.USD
+    raw:         Dict     = field(default_factory=dict)
+    received_at: float    = field(default_factory=time.time)
 
-class PaymentProvider(abc.ABC):
-    """All providers must implement these methods."""
 
-    @abc.abstractmethod
+class PaymentProvider:
+    name: ProviderName = ProviderName.MOCK
+
     def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        ...
+        raise NotImplementedError
 
-    @abc.abstractmethod
-    def verify_payment(self, provider_ref: str) -> PaymentResult:
-        ...
+    def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
+        raise NotImplementedError
 
-    @abc.abstractmethod
-    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
-        ...
+    def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
+        raise NotImplementedError
 
-    @abc.abstractmethod
-    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
-        ...
+    def parse_webhook(self, payload: bytes) -> WebhookEvent:
+        raise NotImplementedError
 
-    @property
-    @abc.abstractmethod
-    def name(self) -> ProviderName:
-        ...
+    @staticmethod
+    def _hmac_sha256(secret: str, data: bytes) -> str:
+        return hmac.new(secret.encode(), data, hashlib.sha256).hexdigest()
 
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Mock Provider (testing)
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
 
 class MockProvider(PaymentProvider):
-    """
-    Deterministic mock for tests.
-    Control with:
-        mock.force_status = PaymentStatus.FAILED
-        mock.force_verify = PaymentStatus.SUCCESS
-    """
+    name = ProviderName.MOCK
 
-    def __init__(self, secret: str = "mock-secret") as None:
-        self._secret         = secret
-        self.force_status    = PaymentStatus.SUCCESS
-        self.force_verify    = PaymentStatus.SUCCESS
-        self._log:            list[PaymentResult] = []
-        self._refs:           dict[str, PaymentResult] = {}
-        self._refund_log:     list = []
-
-    @property
-    def name(self) -> ProviderName:
-        return ProviderName.MOCK
+    def __init__(self, auto_succeed: bool = True):
+        self._auto_succeed = auto_succeed
+        self._store: Dict[str, PaymentResult] = {}
 
     def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        ref = f"mock_{req.idempotency_key}"
-        res = PaymentResult(
-            status=self.force_status,
-            provider=ProviderName.MOCK,
-            provider_ref=ref,
-            idempotency_key=req.idempotency_key,
-            amount=req.amount,
-            currency=req.currency,
-            user_id=req.user_id,
-            plan_id=req.plan_id,
-            redirect_url=f"https://mock.pay/checkout/{ref}" if self.force_status == PaymentStatus.PENDING else "",
+        invoice_id = f"mock_{req.idempotency_key[:8]}"
+        status = PaymentStatus.SUCCEEDED if self._auto_succeed else PaymentStatus.PENDING
+        result = PaymentResult(
+            provider=self.name,
+            invoice_id=invoice_id,
+            status=status,
+            checkout_url=f"https://mock.pay/{invoice_id}",
+            raw={"amount": req.amount, "currency": req.currency, "plan": req.plan_id},
         )
-        self._log.append(res)
-        self._refs[ref] = res
-        return res
+        self._store[invoice_id] = result
+        return result
 
-    def verify_payment(self, provider_ref: str) -> PaymentResult:
-        if provider_ref in self._refs:
-            res = self._refs[provider_ref]
-            res.status = self.force_verify
-            return res
+    def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
+        if invoice_id in self._store:
+            self._store[invoice_id].status = PaymentStatus.SUCCEEDED
+            return self._store[invoice_id]
         return PaymentResult(
-            status=PaymentStatus.FAILED,
-            provider=ProviderName.MOCK,
-            provider_ref=provider_ref,
-            idempotency_key="",
-            amount=0,
-            currency=Currency.USD,
-            user_id="",
-            plan_id="",
-            error_message="not_found",
+            provider=self.name, invoice_id=invoice_id,
+            status=PaymentStatus.FAILED, error="invoice_not_found",
         )
 
-    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
-        self._refund_log.append({"ref": provider_ref, "amount": amount})
-        if provider_ref in self._refs:
-            res = self._refs[provider_ref]
-            res.status = PaymentStatus.REFUNDED
-            return res
-        return PaymentResult(
-            status=PaymentStatus.FAILED,
-            provider=ProviderName.MOCK,
-            provider_ref=provider_ref,
-            idempotency_key="",
-            amount=0,
-            currency=Currency.USD,
-            user_id="",
-            plan_id="",
-            error_message="not_found",
+    def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
+        expected = self._hmac_sha256(secret, payload)
+        return hmac.compare_digest(expected, signature)
+
+    def parse_webhook(self, payload: bytes) -> WebhookEvent:
+        data = json.loads(payload)
+        evt_type = data.get("event", "payment.succeeded")
+        try:
+            etype = WebhookEventType(evt_type)
+        except ValueError:
+            etype = WebhookEventType.PAYMENT_SUCCEEDED
+        return WebhookEvent(
+            provider=self.name,
+            event_type=etype,
+            invoice_id=data.get("invoice_id", ""),
+            user_id=data.get("user_id", ""),
+            amount=data.get("amount", 0),
+            currency=Currency(data.get("currency", "usd")),
+            raw=data,
         )
 
-    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
-        expected = hmac.new(self._secret.encode(), payload, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected, sig)
+    def force_fail(self, invoice_id: str) -> None:
+        if invoice_id in self._store:
+            self._store[invoice_id].status = PaymentStatus.FAILED
 
-    @property
-    def log(self) -> list[PaymentResult]:
-        return list(self._log)
+    def force_refund(self, invoice_id: str) -> None:
+        if invoice_id in self._store:
+            self._store[invoice_id].status = PaymentStatus.REFUNDED
 
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Stripe Provider
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-
-class StripeProvider(PaymentProvider):
-    """
-    Stripe PaymentIntent API.
-    Requires: secret_key (sk_...)
-    Install: pip install stripe
-    """
-
-    def __init__(self, secret_key: str, webhook_secret: str = "") -> None:
-        self._key             = secret_key
-        self._wh_secret       = webhook_secret
-        try:
-            import stripe
-            stripe.api_key = secret_key
-            self._stripe = stripe
-        except ImportError:
-            self._stripe = None  # test env fallback
-
-    @property
-    def name(self) -> ProviderName:
-        return ProviderName.STRIPE
-
-    def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        if not self._stripe:
-            raise RuntimeError("stripe package not installed")
-        try:
-            intent = self._stripe.PaymentIntent.create(
-                amount=req.amount,
-                currency=req.currency.value.lower(),
-                metadata={
-                    "user_id": req.user_id,
-                    "plan_id": req.plan_id,
-                    "idempotency_key": req.idempotency_key,
-                },
-                idempotency_key=req.idempotency_key,
-            )
-            return PaymentResult(
-                status=PaymentStatus.PENDING,
-                provider=ProviderName.STRIPE,
-                provider_ref=intent["id"],
-                idempotency_key=req.idempotency_key,
-                amount=req.amount,
-                currency=req.currency,
-                user_id=req.user_id,
-                plan_id=req.plan_id,
-                redirect_url=intent.get("client_secret", ""),
-            )
-        except Exception as e:
-            return PaymentResult(
-                status=PaymentStatus.FAILED,
-                provider=ProviderName.STRIPE,
-                provider_ref="",
-                idempotency_key=req.idempotency_key,
-                amount=req.amount,
-                currency=req.currency,
-                user_id=req.user_id,
-                plan_id=req.plan_id,
-                error_message=str(e),
-            )
-
-    def verify_payment(self, provider_ref: str) -> PaymentResult:
-        if not self._stripe:
-            raise RuntimeError("stripe not installed")
-        try:
-            intent = self._stripe.PaymentIntent.retrieve(provider_ref)
-            status_map = {
-                "succeeded":       PaymentStatus.SUCCESS,
-                "requires_payment_method": PaymentStatus.FAILED,
-                "canceled":        PaymentStatus.CANCELLED,
-            }
-            status = status_map.get(intent["status"], PaymentStatus.PENDING)
-            return PaymentResult(
-                status=status,
-                provider=ProviderName.STRIPE,
-                provider_ref=provider_ref,
-                idempotency_key=intent["metadata"].get("idempotency_key", ""),
-                amount=intent["amount"],
-                currency=Currency(intent["currency"].upper()),
-                user_id=intent["metadata"].get("user_id", ""),
-                plan_id=intent["metadata"].get("plan_id", ""),
-            )
-        except Exception as e:
-            return PaymentResult(
-                status=PaymentStatus.FAILED,
-                provider=ProviderName.STRIPE,
-                provider_ref=provider_ref,
-                idempotency_key="",
-                amount=0,
-                currency=Currency.USD,
-                user_id="",
-                plan_id="",
-                error_message=str(e),
-            )
-
-    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
-        if not self._stripe:
-            raise RuntimeError("stripe not installed")
-        try:
-            r = self._stripe.Refund.create(payment_intent=provider_ref, amount=amount)
-            return PaymentResult(
-                status=PaymentStatus.REFUNDED,
-                provider=ProviderName.STRIPE,
-                provider_ref=r.get("id", provider_ref),
-                idempotency_key="",
-                amount=amount,
-                currency=Currency.USD,
-                user_id="",
-                plan_id="",
-            )
-        except Exception as e:
-            return PaymentResult(
-                status=PaymentStatus.FAILED,
-                provider=ProviderName.STRIPE,
-                provider_ref="",
-                idempotency_key="",
-                amount=0,
-                currency=Currency.USD,
-                user_id="",
-                plan_id="",
-                error_message=str(e),
-            )
-
-    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
-        if not self._wh_secret:
-            return False
-        try:
-            self._stripe.Webhook.construct_event(payload, sig, self._wh_secret)
-            return True
-        except Exception:
-            return False
-
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# ZarinPal Provider
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-
-class ZarinPalProvider(PaymentProvider):
-    """
-    ZarinPal Rest API v4.
-    Requires: merchant_id (UUID)
-    Docs: https://dev.zarinpal.com/docs/zarinpal/rest
-    """
-
-    _BASE = "https://api.zarinpal.com/v4/payment"
-
-    def __init__(self, merchant_id: str, sandbox: bool = False) -> None:
-        self._mid     = merchant_id
-        self._sandbox = sandbox
-        if sandbox:
-            self._BASE = "https://sandbox.zarinpal.com/v4/payment"
-
-    @property
-    def name(self) -> ProviderName:
-        return ProviderName.ZARINPAL
-
-    def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        import urllib.request, json
-        body = json.dumps({
-            "merchant_id": self._mid,
-            "amount": req.amount,
-            "currency": req.currency.value,
-            "description": req.description or f"Bot12 {req.plan_id} subscription",
-            "callback_url": req.callback_url or "https://bot12.io/callback",
-            "metadata": {"user_id": req.user_id, "plan_id": req.plan_id},
-        }).encode()
-        try:
-            r = urllib.request.urlopen(
-                urllib.request.Request(
-                    f"{self._BASE}/request.json",
-                    data=body, headers={"Content-Type": "application/json"}
-                ), timeout=10
-            )
-            data = json.loadr)
-            authority = data["data"]["authority"]
-            return PaymentResult(
-                status=PaymentStatus.PENDING,
-                provider=ProviderName.ZARINPAL,
-                provider_ref=authority,
-                idempotency_key=req.idempotency_key,
-                amount=req.amount,
-                currency=req.currency,
-                user_id=req.user_id,
-                plan_id=req.plan_id,
-                redirect_url=f"https://www.zarinPal.com/Pg2StartPay/Gateway/Payment/{authority}",
-            )
-        except Exception as e:
-            return PaymentResult(
-                status=PaymentStatus.FAILED,
-                provider=ProviderName.ZARINPAL,
-                provider_ref="",
-                idempotency_key=req.idempotency_key,
-                amount=req.amount,
-                currency=req.currency,
-                user_id=req.user_id,
-                plan_id=req.plan_id,
-                error_message=str(e),
-            )
-
-    def verify_payment(self, provider_ref: str) -> PaymentResult:
-        import urllib.request, json
-        body = json.dumps({"merchant_id": self._mid, "amount": 0, "authority": provider_ref}).encode()
-        try:
-            r = urllib.request.urlopen(
-                urllib.request.Request(
-                    f"{self._BASE}/verify.json",
-                    data=body, headers={"Content-Type": "application/json"}
-                ), timeout=10
-            )
-            data = json.load(r)
-            ok = data["data"]["code"] == 100
-            return PaymentResult(
-                status=PaymentStatus.SUCCESS if ok else PaymentStatus.FAILED,
-                provider=ProviderName.ZARINPAL,
-                provider_ref=provider_ref,
-                idempotency_key="",
-                amount=data["data"].get("amount", 0),
-                currency=Currency.IRR,
-                user_id="",
-                plan_id="",
-            )
-        except Exception as e:
-            return PaymentResult(
-                status=PaymentStatus.FAILED,
-                provider=ProviderName.ZARINPAL,
-                provider_ref=provider_ref,
-                idempotency_key="",
-                amount=0,
-                currency=Currency.IRR,
-                user_id="",
-                plan_id="",
-                error_message=str(e),
-            )
-
-    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
-        return PaymentResult(
-            status=PaymentStatus.FAILED,
-            provider=ProviderName.ZARINPAL,
-            provider_ref=provider_ref,
-            idempotency_key="",
-            amount=0,
-            currency=Currency.IRR,
-            user_id="",
-            plan_id="",
-            error_message="ZarinPal does not support API refunds -- use panel",
-        )
-
-    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
-        # ZarinPal uses callback params; no HMAC webhook sig
-        return True
-
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Manual Provider
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
 
 class ManualProvider(PaymentProvider):
-    """
-    Bank transfer / crypto / offline payments.
-    Admin must call confirm_manual_payment() to activate license.
-    """
-
-    def __init__(self) -> None:
-        self._pending: dict[str, dict] = {}
-
-    @property
-    def name(self) -> ProviderName:
-        return ProviderName.MANUAL
+    name = ProviderName.MANUAL
 
     def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        ref = f"MAN-{req.idempotency_key[:9]}"
-        self._pending[ref] = {"req": req, "status": "pending"}
+        invoice_id = f"man_{uuid.uuid4().hex[:12]}"
         return PaymentResult(
-            status=PaymentStatus.PENDING,
-            provider=ProviderName.MANUAL,
-            provider_ref=ref,
-            idempotency_key=req.idempotency_key,
-            amount=req.amount,
-            currency=req.currency,
-            user_id=req.user_id,
-            plan_id=req.plan_id,
+            provider=self.name, invoice_id=invoice_id,
+            status=PaymentStatus.PENDING, checkout_url="",
+            raw={"amount": req.amount, "currency": req.currency, "plan": req.plan_id},
         )
 
-    def verify_payment(self, provider_ref: str) -> PaymentResult:
-        pending = self._pending.get(provider_ref)
-        if pending and pending["status"] == "success":
-            req = pending["req"]
-            return PaymentResult(
-                status=PaymentStatus.SUCCESS,
-                provider=ProviderName.MANUAL,
-                provider_ref=provider_ref,
-                idempotency_key=req.idempotency_key,
-                amount=req.amount,
-                currency=req.currency,
-                user_id=req.user_id,
-                plan_id=req.plan_id,
-            )
+    def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
         return PaymentResult(
-            status=PaymentStatus.PENDING,
-            provider=ProviderName.MANUAL,
-            provider_ref=provider_ref,
-            idempotency_key="",
-            amount=0,
-            currency=Currency.USD,
-            user_id="",
-            plan_id="",
+            provider=self.name, invoice_id=invoice_id,
+            status=PaymentStatus.SUCCEEDED, raw=raw,
         )
 
-    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
-        return PaymentResult(
-            status=PaymentStatus.FAILED,
-            provider=ProviderName.MANUAL,
-            provider_ref=provider_ref,
-            idempotency_key="",
-            amount=0,
-            currency=Currency.USD,
-            user_id="",
-            plan_id="",
-            error_message="Manual refunds are processed by admin",
-        )
-
-    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
-        return True
-
-    def confirm(self, provider_ref: str) -> bool:
-        """Admin confirms payment receipt."""
-        if provider_ref in self._pending:
-            self._pending[provider_ref]["status"] = "success"
-            return True
+    def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
         return False
 
-
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-# Registry + Factory
-# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
-
-_REGISTRY: dict[ProviderName, type] = {
-    ProviderName.MOCK:     MockProvider,
-    ProviderName.STRIPE:   StripeProvider,
-    ProviderName.ZARINPAL: ZarinPalProvider,
-    ProviderName.MANUAL:   ManualProvider,
-}
+    def parse_webhook(self, payload: bytes) -> WebhookEvent:
+        raise NotImplementedError("Manual provider has no webhook")
 
 
-def get_provider(name: str | ProviderName, **kwargs) -> PaymentProvider:
-    """Factory — instantiate provider by name."""
-    try:
-        pn = ProviderName(name)
-    except ValueError:
-        raise ValueError(f"Unknown payment provider: {name!r} — valid: {list(_REGISTRY.keys())}")
-    cls = _REGISTRY.get(pn)
-    if cls is None:
-        raise ValueError(f"Unknown payment provider: {name!r} — valid: {list(_REGISTRY.keys())}")
-    return cls(**kwargs)
+class StripeProvider(PaymentProvider):
+    name = ProviderName.STRIPE
+
+    def __init__(self, api_key: str, webhook_secret: str):
+        self._api_key        = api_key
+        self._webhook_secret = webhook_secret
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        invoice_id = f"cs_{uuid.uuid4().hex[:24]}"
+        return PaymentResult(
+            provider=self.name, invoice_id=invoice_id,
+            status=PaymentStatus.PENDING,
+            checkout_url=f"https://checkout.stripe.com/pay/{invoice_id}",
+            raw={"amount": req.amount, "currency": req.currency.value},
+        )
+
+    def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
+        status_map = {
+            "complete":          PaymentStatus.SUCCEEDED,
+            "payment_succeeded": PaymentStatus.SUCCEEDED,
+            "payment_failed":    PaymentStatus.FAILED,
+            "refunded":          PaymentStatus.REFUNDED,
+        }
+        pstatus = status_map.get(raw.get("status", ""), PaymentStatus.PENDING)
+        return PaymentResult(
+            provider=self.name, invoice_id=invoice_id, status=pstatus, raw=raw,
+        )
+
+    def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
+        parts = {p.split("=")[0]: p.split("=")[1]
+                 for p in signature.split(",") if "=" in p}
+        ts  = parts.get("t", "0")
+        v1  = parts.get("v1", "")
+        signed   = f"{ts}.".encode() + payload
+        expected = self._hmac_sha256(secret, signed)
+        return hmac.compare_digest(expected, v1)
+
+    def parse_webhook(self, payload: bytes) -> WebhookEvent:
+        data = json.loads(payload)
+        event_map = {
+            "checkout.session.completed":    WebhookEventType.PAYMENT_SUCCEEDED,
+            "payment_intent.payment_failed": WebhookEventType.PAYMENT_FAILED,
+            "customer.subscription.deleted": WebhookEventType.SUBSCRIPTION_CANCELLED,
+            "charge.refunded":               WebhookEventType.REFUND_ISSUED,
+        }
+        evt = event_map.get(data.get("type", ""), WebhookEventType.PAYMENT_SUCCEEDED)
+        obj = data.get("data", {}).get("object", {})
+        return WebhookEvent(
+            provider=self.name, event_type=evt,
+            invoice_id=obj.get("id", data.get("id", "")),
+            amount=obj.get("amount_total", 0),
+            currency=Currency(obj.get("currency", "usd")),
+            raw=data,
+        )
+
+
+class ZarinpalProvider(PaymentProvider):
+    name = ProviderName.ZARINPAL
+
+    def __init__(self, merchant_id: str, webhook_secret: str, sandbox: bool = False):
+        self._merchant_id    = merchant_id
+        self._webhook_secret = webhook_secret
+        self._sandbox        = sandbox
+
+    @property
+    def _base(self) -> str:
+        return (
+            "https://sandbox.zarinpal.com/pg" if self._sandbox
+            else "https://api.zarinpal.com/pg"
+        )
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        authority = f"ZAP_{uuid.uuid4().hex[:24]}"
+        return PaymentResult(
+            provider=self.name, invoice_id=authority,
+            status=PaymentStatus.PENDING,
+            checkout_url=f"{self._base}/StartPay/{authority}",
+            raw={"amount": req.amount, "currency": "IRR"},
+        )
+
+    def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
+        ok = raw.get("Status") == "OK" or raw.get("data", {}).get("code") == 100
+        return PaymentResult(
+            provider=self.name, invoice_id=invoice_id,
+            status=PaymentStatus.SUCCEEDED if ok else PaymentStatus.FAILED,
+            raw=raw,
+        )
+
+    def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
+        expected = self._hmac_sha256(secret, payload)
+        return hmac.compare_digest(expected, signature)
+
+    def parse_webhook(self, payload: bytes) -> WebhookEvent:
+        data = json.loads(payload)
+        invoice_id = data.get("Authority", data.get("invoice_id", ""))
+        ok = data.get("Status") == "OK"
+        return WebhookEvent(
+            provider=self.name,
+            event_type=(
+                WebhookEventType.PAYMENT_SUCCEEDED if ok
+                else WebhookEventType.PAYMENT_FAILED
+            ),
+            invoice_id=invoice_id,
+            amount=data.get("Amount", 0),
+            currency=Currency.IRR,
+            raw=data,
+        )
+
+
+def get_provider(name: ProviderName, config: Dict) -> PaymentProvider:
+    if name == ProviderName.STRIPE:
+        return StripeProvider(
+            api_key=config["api_key"],
+            webhook_secret=config.get("webhook_secret", ""),
+        )
+    if name == ProviderName.ZARINPAL:
+        return ZarinpalProvider(
+            merchant_id=config["merchant_id"],
+            webhook_secret=config.get("webhook_secret", ""),
+            sandbox=config.get("sandbox", False),
+        )
+    if name == ProviderName.MANUAL:
+        return ManualProvider()
+    if name == ProviderName.MOCK:
+        return MockProvider(auto_succeed=config.get("auto_succeed", True))
+    raise ValueError(f"Unknown provider: {name!r}")
