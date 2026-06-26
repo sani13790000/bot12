@@ -1,1 +1,570 @@
-IiIiCmJhY2tlbmQvYmlsbGluZy9wcm92aWRlci5weQpQaGFzZSAxMCDigJQgUGF5bWVudCBQcm92aWRlciBBYnN0cmFjdGlvbgoKU3VwcG9ydHMgbXVsdGlwbGUgcHJvdmlkZXJzOgogIC0gU3RyaXBlICAoaW50ZXJuYXRpb25hbCkKICAtIFphcmluUGFsIChJcmFuKQogIC0gTWFudWFsICAoYmFuayB0cmFuc2ZlciAvIGNyeXB0byAtLSBhZG1pbiBjb25maXJtcykKICAtIE1vY2sgICAgKHRlc3RpbmcpCgpBbGwgcHJvdmlkZXJzIHJldHVybiBhIHVuaWZpZWQgUGF5bWVudFJlc3VsdC4KTmV3IHByb3ZpZGVyczogc3ViY2xhc3MgUGF5bWVudFByb3ZpZGVyLCByZWdpc3RlciBpbiBfUkVHSVNUUlkuCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmltcG9ydCBhYmMsIGVudW0sIGhhc2hsaWIsIGhtYWMsIHRpbWUsIHV1aWQKZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzLCBmaWVsZApmcm9tIHR5cGluZyBpbXBvcnQgT3B0aW9uYWwKCmNsYXNzIFBheW1lbnRTdGF0dXMoc3RyLCBlbnVtLkVudW0pOgogICAgUEVORElORyAgID0gInBlbmRpbmciCiAgICBTVUNDRVNTICAgPSAic3VjY2VzcyIKICAgIEZBSUxFRCAgICA9ICJmYWlsZWQiCiAgICBSRUZVTkRFRCAgPSAicmVmdW5kZWQiCiAgICBDQU5DRUxMRUQgPSAiY2FuY2VsbGVkIgoKY2xhc3MgUHJvdmlkZXJOYW1lKHN0ciwgZW51bS5FbnVtKToKICAgIFNUUklQRSAgICA9ICJzdHJpcGUiCiAgICBaQVJJTlBBTCAgPSAiemFyaW5wYWwiCiAgICBNQU5VQUwgICAgPSAibWFudWFsIgogICAgTU9DSyAgICAgID0gIm1vY2siCgpjbGFzcyBDdXJyZW5jeShzdHIsIGVudW0uRW51bSk6CiAgICBVU0QgPSAiVVNEIgogICAgRVVSID0gIkVVUiIKICAgIElSUiA9ICJJUlIiCiAgICBJUlQgPSAiSVJUIgoKQGRhdGFjbGFzcyhmcm96ZW49VHJ1ZSkKY2xhc3MgUGF5bWVudFJlcXVlc3Q6CiAgICBhbW91bnQ6IGludAogICAgY3VycmVuY3k6IEN1cnJlbmN5CiAgICB1c2VyX2lkOiBzdHIKICAgIHBsYW5faWQ6IHN0cgogICAgaWRlbXBvdGVuY3lfa2V5OiBzdHIKICAgIGRlc2NyaXB0aW9uOiBzdHIgPSAiIgogICAgbWV0YWRhdGE6IGRpY3QgPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9ZGljdCkKICAgIGNhbGxiYWNrX3VybDogc3RyID0gIiIKICAgIHdlYmhvb2tfdXJsOiBzdHIgPSAiIgoKQGRhdGFjbGFzcwpjbGFzcyBQYXltZW50UmVzdWx0OgogICAgc3RhdHVzOiBQYXltZW50U3RhdHVzCiAgICBwcm92aWRlcjogUHJvdmlkZXJOYW1lCiAgICBwcm92aWRlcl9yZWY6IHN0cgogICAgaWRlbXBvdGVuY3lfa2V5OiBzdHIKICAgIGFtb3VudDogaW50CiAgICBjdXJyZW5jeTogQ3VycmVuY3kKICAgIHVzZXJfaWQ6IHN0cgogICAgcGxhbl9pZDogc3RyCiAgICByZWRpcmVjdF91cmw6IHN0ciA9ICIiCiAgICByYXc6IGRpY3QgPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9ZGljdCkKICAgIGVycm9yOiBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgY3JlYXRlZF9hdDogZmxvYXQgPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9dGltZS50aW1lKQoKICAgIEBwcm9wZXJ0eQogICAgZGVmIG9rKHNlbGYpIC0+IGJvb2w6CiAgICAgICAgcmV0dXJuIHNlbGYuc3RhdHVzID09IFBheW1lbnRTdGF0dXMuU1VDQ0VTUwoKY2xhc3MgUGF5bWVudFByb3ZpZGVyKGFiYy5BQkMpOgogICAgbmFtZTogUHJvdmlkZXJOYW1lCiAgICBAYWJjLmFic3RyYWN0bWV0aG9kCiAgICBkZWYgY3JlYXRlX3BheW1lbnQoc2VsZiwgcmVxOiBQYXltZW50UmVxdWVzdCkgLT4gUGF5bWVudFJlc3VsdDogLi4uCiAgICBAYWJjLmFic3RyYWN0bWV0aG9kCiAgICBkZWYgdmVyaWZ5X3BheW1lbnQoc2VsZiwgcHJvdmlkZXJfcmVmOiBzdHIsIGFtb3VudDogaW50KSAtPiBQYXltZW50UmVzdWx0OiAuLi4KICAgIEBhYmMuYWJzdHJhY3RtZXRob2QKICAgIGRlZiByZWZ1bmQoc2VsZiwgcHJvdmlkZXJfcmVmOiBzdHIsIGFtb3VudDogT3B0aW9uYWxbaW50XSA9IE5vbmUpIC0+IFBheW1lbnRSZXN1bHQ6IC4uLgogICAgQGFiYy5hYnN0cmFjdG1ldGhvZAogICAgZGVmIHZlcmlmeV93ZWJob29rKHNlbGYsIHBheWxvYWQ6IGJ5dGVzLCBzaWduYXR1cmU6IHN0ciwgc2VjcmV0OiBzdHIpIC0+IGJvb2w6IC4uLgogICAgQGFiYy5hYnN0cmFjdG1ldGhvZAogICAgZGVmIHBhcnNlX3dlYmhvb2tfZXZlbnQoc2VsZiwgcGF5bG9hZDogYnl0ZXMpIC0+IGRpY3Q6IC4uLgoKY2xhc3MgTW9ja1Byb3ZpZGVyKFBheW1lbnRQcm92aWRlcik6CiAgICAiIiJEZXRlcm1pbmlzdGljIG1vY2sgZm9yIHVuaXQgdGVzdHMuIFByZWZpeCBhbW91bnQgd2l0aCA5OTk5IHRvIGZvcmNlIGZhaWx1cmUuIiIiCiAgICBuYW1lID0gUHJvdmlkZXJOYW1lLk1PQ0sKICAgIGRlZiBjcmVhdGVfcGF5bWVudChzZWxmLCByZXE6IFBheW1lbnRSZXF1ZXN0KSAtPiBQYXltZW50UmVzdWx0OgogICAgICAgIGZhaWwgPSBzdHIocmVxLmFtb3VudCkuc3RhcnRzd2l0aCgiOTk5OSIpCiAgICAgICAgcmV0dXJuIFBheW1lbnRSZXN1bHQoCiAgICAgICAgICAgIHN0YXR1cz1QYXltZW50U3RhdHVzLkZBSUxFRCBpZiBmYWlsIGVsc2UgUGF5bWVudFN0YXR1cy5TVUNDRVNTLAogICAgICAgICAgICBwcm92aWRlcj1zZWxmLm5hbWUsIHByb3ZpZGVyX3JlZj1mIm1vY2tfe3JlcS5pZGVtcG90ZW5jeV9rZXl9IiwKICAgICAgICAgICAgaWRlbXBvdGVuY3lfa2V5PXJlcS5pZGVtcG90ZW5jeV9rZXksIGFtb3VudD1yZXEuYW1vdW50LAogICAgICAgICAgICBjdXJyZW5jeT1yZXEuY3VycmVuY3ksIHVzZXJfaWQ9cmVxLnVzZXJfaWQsIHBsYW5faWQ9cmVxLnBsYW5faWQsCiAgICAgICAgICAgIGVycm9yPSJtb2NrX2ZhaWx1cmUiIGlmIGZhaWwgZWxzZSBOb25lLAogICAgICAgICkKICAgIGRlZiB2ZXJpZnlfcGF5bWVudChzZWxmLCBwcm92aWRlcl9yZWY6IHN0ciwgYW1vdW50OiBpbnQpIC0+IFBheW1lbnRSZXN1bHQ6CiAgICAgICAgb2sgPSBub3Qgc3RyKGFtb3VudCkuc3RhcnRzd2l0aCgiOTk5OSIpCiAgICAgICAgcmV0dXJuIFBheW1lbnRSZXN1bHQoCiAgICAgICAgICAgIHN0YXR1cz1QYXltZW50U3RhdHVzLlNVQ0NFU1MgaWYgb2sgZWxzZSBQYXltZW50U3RhdHVzLkZBSUxFRCwKICAgICAgICAgICAgcHJvdmlkZXI9c2VsZi5uYW1lLCBwcm92aWRlcl9yZWY9cHJvdmlkZXJfcmVmLAogICAgICAgICAgICBpZGVtcG90ZW5jeV9rZXk9IiIsIGFtb3VudD1hbW91bnQsIGN1cnJlbmN5PUN1cnJlbmN5LlVTRCwKICAgICAgICAgICAgdXNlcl9pZD0iIiwgcGxhbl9pZD0iIiwKICAgICAgICApCiAgICBkZWYgcmVmdW5kKHNlbGYsIHByb3ZpZGVyX3JlZjogc3RyLCBhbW91bnQ6IE9wdGlvbmFsW2ludF0gPSBOb25lKSAtPiBQYXltZW50UmVzdWx0OgogICAgICAgIHJldHVybiBQYXltZW50UmVzdWx0KAogICAgICAgICAgICBzdGF0dXM9UGF5bWVudFN0YXR1cy5SRUZVTERFRCWKICB    cHJvdmlkZXI9c2VsZi5uYW1lLCBwcm92aWRlcl9yZWY9cHJvdmlkZXJfcmVmLAogICAgICAgICAgICBpZGVtcG90ZW5jeV9rZXk9IiIsIGFtb3VudD1hbW91bnQgb3IgMCwgY3VycmVuY3k9Q3VycmVuY3kuVVNELAogICAgICAgICAgICB1c2VyX2lkPSIiLCBwbGFuX2lkPSIiLAogICAgICAgICkKICAgIGRlZiB2ZXJpZnlfd2ViaG9vayhzZWxmLCBwYXlsb2FkOiBieXRlcywgc2lnbmF0dXJlOiBzdHIsIHNlY3JldDogc3RyKSAtPiBib29sOgogICAgICAgIHJldHVybiBzaWduYXR1cmUgPT0gaG1hYy5uZXcoc2VjcmV0LmVuY29kZSgpLCBwYXlsb2FkLCBoYXNobGliLnNoYTI1NikuaGV4ZGlnZXN0KCkKICAgIGRlZiBwYXJzZV93ZWJob29rX2V2ZW50KHNlbGYsIHBheWxvYWQ6IGJ5dGVzKSAtPiBkaWN0OgogICAgICAgIGltcG9ydCBqc29uCiAgICAgICAgZXZ0ID0ganNvbi5sb2Fkcyhwb        Xlsb2FkKQogICAgICAgIHJldHVybiB7CiAgICAgICAgICAgICJldmVudF90eXBlIjogZXZ0LmdldCgiZXZlbnRfdHlwZSIsICJwYXltZW50LnN1Y2Nlc3MiKSwKICAgICAgICAgICAgInByb3ZpZGVyX3JlZiI6IGV2dC5nZXQoInByb3ZpZGVyX3JlZiIsICIiKSwKICAgICAgICAgICAgInN0YXR1cyI6IFBheW1lbnRTdGF0dXMoZXZ0LmdldCgic3RhdHVzIiwgInN1Y2Nlc3MiKSksCiAgICAgICAgICAgICJhbW91bnQiOiBldnQuZ2V0KCJhbW91bnQiLCAwKSwKICAgICAgICAgICAgImN1cnJlbmN5IjogZXZ0LmdldCgiY3VycmVuY3kiLCAiVVNEIiksCiAgICAgICAgICAgICJyYXciOiBldnQsCiAgICAgICAgfQoKY2xhc3MgTWFudWFsUHJvdmlkZXIoUGF5bWVudFByb3ZpZGVyKToKICAgICIiIkFkbWluIGNvbmZpcm1zIHBheW1lbnQgbWFudWFsbHkgdmlhIGFkbWluIHBhbmVsLiIiIgogICAgbmFtZSA9IFByb3ZpZGVyTmFtZS5NQU5VQUwKICAgIGRlZiBjcmVhdGVfcGF5bWVudChzZWxmLCByZXE6IFBheW1lbnRSZXF1ZXN0KSAtPiBQYXltZW50UmVzdWx0OgogICAgICAgIHJldHVybiBQYXltZW50UmVzdWx0KAogICAgICAgICAgICBzdGF0dXM9UGF5bWVudFN0YXR1cy5QRU5ESU5HLCBwcm92aWRlcj1zZWxmLm5hbWUsCiAgICAgICAgICAgIHByb3ZpZGVyX3JlZj1mIk1BTlVBTC17dXVpZC51dWlkNCgpLmhleFs6MTJdLnVwcGVyKCl9IiwKICAgICAgICAgICAgaWRlbXBvdGVuY3lfa2V5PXJlcS5pZGVtcG90ZW5jeV9rZXksIGFtb3VudD1yZXEuYW1vdW50LAogICAgICAgICAgICBjdXJyZW5jeT1yZXEuY3VycmVuY3ksIHVzZXJfaWQ9cmVxLnVzZXJfaWQsIHBsYW5faWQ9cmVxLnBsYW5faWQsCiAgICAgICAgKQogICAgZGVmIHZlcmlmeV9wYXltZW50KHNlbGYsIHByb3ZpZGVyX3JlZjogc3RyLCBhbW91bnQ6IGludCkgLT4gUGF5bWVudFJlc3VsdDoKICAgICAgICByZXR1cm4gUGF5bWVudFJlc3VsdCgKICAgICAgICAgICAgc3RhdHVzPVBheW1lbnRTdGF0dXMuUEVORElORywgcHJvdmlkZXI9c2VsZi5uYW1lLAogICAgICAgICAgICBwcm92aWRlcl9yZWY9cHJvdmlkZXJfcmVmLCBpZGVtcG90ZW5jeV9rZXk9IiIsCiAgICAgICAgICAgIGFtb3VudD1hbW91bnQsIGN1cnJlbmN5PUN1cnJlbmN5LlVTRCwgdXNlcl9pZD0iIiwgcGxhbl9pZD0iIiwKICAgICAgICApCiAgICBkZWYgcmVmdW5kKHNlbGYsIHByb3ZpZGVyX3JlZjogc3RyLCBhbW91bnQ6IE9wdGlvbmFsW2ludF0gPSBOb25lKSAtPiBQYXltZW50UmVzdWx0OgogICAgICAgIHJldHVybiBQYXltZW50UmVzdWx0KAogICAgICAgICAgICBzdGF0dXM9UGF5bWVudFN0YXR1cy5SRUZVTERFRCWKCB        cHJvdmlkZXI9c2VsZi5uYW1lLCBwcm92aWRlcl9yZWY9cHJvdmlkZXJfcmVmLAogICAgICAgICAgICBpZGVtcG90ZW5jeV9rZXk9IiIsIGFtb3VudD1hbW91bnQgb3IgMCwgY3VycmVuY3k9Q3VycmVuY3kuVVNELAogICAgICAgICAgICB1c2VyX2lkPSIiLCBwbGFuX2lkPSIiLAogICAgICAgICkKICAgIGRlZiB2ZXJpZnlfd2ViaG9vayhzZWxmLCBwYXlsb2FkOiBieXRlcywgc2lnbmF0dXJlOiBzdHIsIHNlY3JldDogc3RyKSAtPiBib29sOgogICAgICAgIHJldHVybiBUcnVlCiAgICBkZWYgcGFyc2Vfd2ViaG9va19ldmVudChzZWxmLCBwYXlsb2FkOiBieXRlcykgLT4gZGljdDoKICAgICAgICBpbXBvcnQganNvbjsgcmV0dXJuIGpzb24ubG9hZHMocGF5bG9hZCkKCl9SRUdJU1RSWTogZGljdFtQcm92aWRlck5hbWUsIHR5cGVbUGF5bWVudFByb3ZpZGVyXV0gPSB7CiAgICBQcm92aWRlck5hbWUuTUFOVUFMOiBNYW51YWxQcm92aWRlciwKICAgIFByb3ZpZGVyTmFtZS5NT0NLOiAgIE1vY2tQcm92aWRlciwKfQoKZGVmIGdldF9wcm92aWRlcihuYW1lLCAqKmt3YXJncykgLT4gUGF5bWVudFByb3ZpZGVyOgogICAgdHJ5OgogICAgICAgIHBuID0gUHJvdmlkZXJOYW1lKG5hbWUpCiAgICBleGNlcHQgVmFsdWVFcnJvcjoKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYiVW5rbm93biBwYXltZW50IHByb3ZpZGVyOiB7bmFtZSFyfSIpCiAgICBjbHMgPSBfUkVHSVNUUlkuZ2V0KHBuKQogICAgaWYgY2xzIGlzIE5vbmU6CiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcihmIlVua25vd24gcGF5bWVudCBwcm92aWRlcjoge25hbWUhcn0iKQogICAgcmV0dXJuIGNscygqKmt3YXJncykK
+"""
+backend/billing/provider.py
+Phase 10 — Payment Provider Abstraction
+
+Supports multiple providers:
+  - Stripe  (international)
+  - ZarinPal (Iran)
+  - Manual  (bank transfer / crypto — admin confirms)
+  - Mock    (testing)
+
+All providers return a unified PaymentResult.
+New providers: subclass PaymentProvider, register in _REGISTRY.
+"""
+
+from __future__ import annotations
+
+import abc
+import enum
+import hashlib
+import hmac
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Optional
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Enums
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class PaymentStatus(str, enum.Enum):
+    PENDING   = "pending"
+    SUCCESS   = "success"
+    FAILED    = "failed"
+    REFUNDED  = "refunded"
+    CANCELLED = "cancelled"
+
+
+class ProviderName(str, enum.Enum):
+    STRIPE    = "stripe"
+    ZARINPAL  = "zarinPal"
+    MANUAL    = "manual"
+    MOCK      = "mock"
+
+
+class Currency(str, enum.Enum):
+    USD = "USD"
+    EUR = "EUR"
+    IRR = "IRR"   # Iranian Rial (ZarinPal)
+    IRT = "IRT"   # Toman (ZarinPal display)
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Data models
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+@dataclass(frozen=True)
+class PaymentRequest:
+    amount:        int            # smallest unit (cents / rials)
+    currency:      Currency
+    user_id:       str
+    plan_id:       str
+    idempotency_key: str          # caller must supply — UUID/order-id
+    description:   str = ""
+    metadata:      dict = field(default_factory=dict)
+    callback_url:  str = ""       # redirect after 3DS / ZarinPal
+    webhook_url:   str = ""
+
+
+@dataclass
+class PaymentResult:
+    status:          PaymentStatus
+    provider:        ProviderName
+    provider_ref:    str           # Stripe PaymentIntent ID / ZarinPal Authority
+    idempotency_key: str
+    amount:          int
+    currency:        Currency
+    user_id:         str
+    plan_id:         str
+    redirect_url:    str = ""      # for hosted pages
+    error_message:   str = ""
+    raw_response:    dict = field(default_factory=dict)
+    created_at:      float = field(default_factory=time.time)
+
+    def to_dict(self) -> dict:
+        return {
+            "status":           self.status.value,
+            "provider":         self.provider.value,
+            "provider_ref":     self.provider_ref,
+            "idempotency_key":  self.idempotency_key,
+            "amount":            self.amount,
+            "currency":          self.currency.value,
+            "user_id":           self.user_id,
+            "plan_id":           self.plan_id,
+            "redirect_url":      self.redirect_url,
+            "error_message":     self.error_message,
+            "created_at":        self.created_at,
+        }
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Abstract Base
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class PaymentProvider(abc.ABC):
+    """All providers must implement these methods."""
+
+    @abc.abstractmethod
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        ...
+
+    @abc.abstractmethod
+    def verify_payment(self, provider_ref: str) -> PaymentResult:
+        ...
+
+    @abc.abstractmethod
+    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
+        ...
+
+    @abc.abstractmethod
+    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
+        ...
+
+    @property
+    @abc.abstractmethod
+    def name(self) -> ProviderName:
+        ...
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Mock Provider (testing)
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class MockProvider(PaymentProvider):
+    """
+    Deterministic mock for tests.
+    Control with:
+        mock.force_status = PaymentStatus.FAILED
+        mock.force_verify = PaymentStatus.SUCCESS
+    """
+
+    def __init__(self, secret: str = "mock-secret") as None:
+        self._secret         = secret
+        self.force_status    = PaymentStatus.SUCCESS
+        self.force_verify    = PaymentStatus.SUCCESS
+        self._log:            list[PaymentResult] = []
+        self._refs:           dict[str, PaymentResult] = {}
+        self._refund_log:     list = []
+
+    @property
+    def name(self) -> ProviderName:
+        return ProviderName.MOCK
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        ref = f"mock_{req.idempotency_key}"
+        res = PaymentResult(
+            status=self.force_status,
+            provider=ProviderName.MOCK,
+            provider_ref=ref,
+            idempotency_key=req.idempotency_key,
+            amount=req.amount,
+            currency=req.currency,
+            user_id=req.user_id,
+            plan_id=req.plan_id,
+            redirect_url=f"https://mock.pay/checkout/{ref}" if self.force_status == PaymentStatus.PENDING else "",
+        )
+        self._log.append(res)
+        self._refs[ref] = res
+        return res
+
+    def verify_payment(self, provider_ref: str) -> PaymentResult:
+        if provider_ref in self._refs:
+            res = self._refs[provider_ref]
+            res.status = self.force_verify
+            return res
+        return PaymentResult(
+            status=PaymentStatus.FAILED,
+            provider=ProviderName.MOCK,
+            provider_ref=provider_ref,
+            idempotency_key="",
+            amount=0,
+            currency=Currency.USD,
+            user_id="",
+            plan_id="",
+            error_message="not_found",
+        )
+
+    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
+        self._refund_log.append({"ref": provider_ref, "amount": amount})
+        if provider_ref in self._refs:
+            res = self._refs[provider_ref]
+            res.status = PaymentStatus.REFUNDED
+            return res
+        return PaymentResult(
+            status=PaymentStatus.FAILED,
+            provider=ProviderName.MOCK,
+            provider_ref=provider_ref,
+            idempotency_key="",
+            amount=0,
+            currency=Currency.USD,
+            user_id="",
+            plan_id="",
+            error_message="not_found",
+        )
+
+    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
+        expected = hmac.new(self._secret.encode(), payload, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, sig)
+
+    @property
+    def log(self) -> list[PaymentResult]:
+        return list(self._log)
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Stripe Provider
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class StripeProvider(PaymentProvider):
+    """
+    Stripe PaymentIntent API.
+    Requires: secret_key (sk_...)
+    Install: pip install stripe
+    """
+
+    def __init__(self, secret_key: str, webhook_secret: str = "") -> None:
+        self._key             = secret_key
+        self._wh_secret       = webhook_secret
+        try:
+            import stripe
+            stripe.api_key = secret_key
+            self._stripe = stripe
+        except ImportError:
+            self._stripe = None  # test env fallback
+
+    @property
+    def name(self) -> ProviderName:
+        return ProviderName.STRIPE
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        if not self._stripe:
+            raise RuntimeError("stripe package not installed")
+        try:
+            intent = self._stripe.PaymentIntent.create(
+                amount=req.amount,
+                currency=req.currency.value.lower(),
+                metadata={
+                    "user_id": req.user_id,
+                    "plan_id": req.plan_id,
+                    "idempotency_key": req.idempotency_key,
+                },
+                idempotency_key=req.idempotency_key,
+            )
+            return PaymentResult(
+                status=PaymentStatus.PENDING,
+                provider=ProviderName.STRIPE,
+                provider_ref=intent["id"],
+                idempotency_key=req.idempotency_key,
+                amount=req.amount,
+                currency=req.currency,
+                user_id=req.user_id,
+                plan_id=req.plan_id,
+                redirect_url=intent.get("client_secret", ""),
+            )
+        except Exception as e:
+            return PaymentResult(
+                status=PaymentStatus.FAILED,
+                provider=ProviderName.STRIPE,
+                provider_ref="",
+                idempotency_key=req.idempotency_key,
+                amount=req.amount,
+                currency=req.currency,
+                user_id=req.user_id,
+                plan_id=req.plan_id,
+                error_message=str(e),
+            )
+
+    def verify_payment(self, provider_ref: str) -> PaymentResult:
+        if not self._stripe:
+            raise RuntimeError("stripe not installed")
+        try:
+            intent = self._stripe.PaymentIntent.retrieve(provider_ref)
+            status_map = {
+                "succeeded":       PaymentStatus.SUCCESS,
+                "requires_payment_method": PaymentStatus.FAILED,
+                "canceled":        PaymentStatus.CANCELLED,
+            }
+            status = status_map.get(intent["status"], PaymentStatus.PENDING)
+            return PaymentResult(
+                status=status,
+                provider=ProviderName.STRIPE,
+                provider_ref=provider_ref,
+                idempotency_key=intent["metadata"].get("idempotency_key", ""),
+                amount=intent["amount"],
+                currency=Currency(intent["currency"].upper()),
+                user_id=intent["metadata"].get("user_id", ""),
+                plan_id=intent["metadata"].get("plan_id", ""),
+            )
+        except Exception as e:
+            return PaymentResult(
+                status=PaymentStatus.FAILED,
+                provider=ProviderName.STRIPE,
+                provider_ref=provider_ref,
+                idempotency_key="",
+                amount=0,
+                currency=Currency.USD,
+                user_id="",
+                plan_id="",
+                error_message=str(e),
+            )
+
+    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
+        if not self._stripe:
+            raise RuntimeError("stripe not installed")
+        try:
+            r = self._stripe.Refund.create(payment_intent=provider_ref, amount=amount)
+            return PaymentResult(
+                status=PaymentStatus.REFUNDED,
+                provider=ProviderName.STRIPE,
+                provider_ref=r.get("id", provider_ref),
+                idempotency_key="",
+                amount=amount,
+                currency=Currency.USD,
+                user_id="",
+                plan_id="",
+            )
+        except Exception as e:
+            return PaymentResult(
+                status=PaymentStatus.FAILED,
+                provider=ProviderName.STRIPE,
+                provider_ref="",
+                idempotency_key="",
+                amount=0,
+                currency=Currency.USD,
+                user_id="",
+                plan_id="",
+                error_message=str(e),
+            )
+
+    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
+        if not self._wh_secret:
+            return False
+        try:
+            self._stripe.Webhook.construct_event(payload, sig, self._wh_secret)
+            return True
+        except Exception:
+            return False
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# ZarinPal Provider
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class ZarinPalProvider(PaymentProvider):
+    """
+    ZarinPal Rest API v4.
+    Requires: merchant_id (UUID)
+    Docs: https://dev.zarinpal.com/docs/zarinpal/rest
+    """
+
+    _BASE = "https://api.zarinpal.com/v4/payment"
+
+    def __init__(self, merchant_id: str, sandbox: bool = False) -> None:
+        self._mid     = merchant_id
+        self._sandbox = sandbox
+        if sandbox:
+            self._BASE = "https://sandbox.zarinpal.com/v4/payment"
+
+    @property
+    def name(self) -> ProviderName:
+        return ProviderName.ZARINPAL
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        import urllib.request, json
+        body = json.dumps({
+            "merchant_id": self._mid,
+            "amount": req.amount,
+            "currency": req.currency.value,
+            "description": req.description or f"Bot12 {req.plan_id} subscription",
+            "callback_url": req.callback_url or "https://bot12.io/callback",
+            "metadata": {"user_id": req.user_id, "plan_id": req.plan_id},
+        }).encode()
+        try:
+            r = urllib.request.urlopen(
+                urllib.request.Request(
+                    f"{self._BASE}/request.json",
+                    data=body, headers={"Content-Type": "application/json"}
+                ), timeout=10
+            )
+            data = json.loadr)
+            authority = data["data"]["authority"]
+            return PaymentResult(
+                status=PaymentStatus.PENDING,
+                provider=ProviderName.ZARINPAL,
+                provider_ref=authority,
+                idempotency_key=req.idempotency_key,
+                amount=req.amount,
+                currency=req.currency,
+                user_id=req.user_id,
+                plan_id=req.plan_id,
+                redirect_url=f"https://www.zarinPal.com/Pg2StartPay/Gateway/Payment/{authority}",
+            )
+        except Exception as e:
+            return PaymentResult(
+                status=PaymentStatus.FAILED,
+                provider=ProviderName.ZARINPAL,
+                provider_ref="",
+                idempotency_key=req.idempotency_key,
+                amount=req.amount,
+                currency=req.currency,
+                user_id=req.user_id,
+                plan_id=req.plan_id,
+                error_message=str(e),
+            )
+
+    def verify_payment(self, provider_ref: str) -> PaymentResult:
+        import urllib.request, json
+        body = json.dumps({"merchant_id": self._mid, "amount": 0, "authority": provider_ref}).encode()
+        try:
+            r = urllib.request.urlopen(
+                urllib.request.Request(
+                    f"{self._BASE}/verify.json",
+                    data=body, headers={"Content-Type": "application/json"}
+                ), timeout=10
+            )
+            data = json.load(r)
+            ok = data["data"]["code"] == 100
+            return PaymentResult(
+                status=PaymentStatus.SUCCESS if ok else PaymentStatus.FAILED,
+                provider=ProviderName.ZARINPAL,
+                provider_ref=provider_ref,
+                idempotency_key="",
+                amount=data["data"].get("amount", 0),
+                currency=Currency.IRR,
+                user_id="",
+                plan_id="",
+            )
+        except Exception as e:
+            return PaymentResult(
+                status=PaymentStatus.FAILED,
+                provider=ProviderName.ZARINPAL,
+                provider_ref=provider_ref,
+                idempotency_key="",
+                amount=0,
+                currency=Currency.IRR,
+                user_id="",
+                plan_id="",
+                error_message=str(e),
+            )
+
+    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
+        return PaymentResult(
+            status=PaymentStatus.FAILED,
+            provider=ProviderName.ZARINPAL,
+            provider_ref=provider_ref,
+            idempotency_key="",
+            amount=0,
+            currency=Currency.IRR,
+            user_id="",
+            plan_id="",
+            error_message="ZarinPal does not support API refunds -- use panel",
+        )
+
+    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
+        # ZarinPal uses callback params; no HMAC webhook sig
+        return True
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Manual Provider
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+class ManualProvider(PaymentProvider):
+    """
+    Bank transfer / crypto / offline payments.
+    Admin must call confirm_manual_payment() to activate license.
+    """
+
+    def __init__(self) -> None:
+        self._pending: dict[str, dict] = {}
+
+    @property
+    def name(self) -> ProviderName:
+        return ProviderName.MANUAL
+
+    def create_payment(self, req: PaymentRequest) -> PaymentResult:
+        ref = f"MAN-{req.idempotency_key[:9]}"
+        self._pending[ref] = {"req": req, "status": "pending"}
+        return PaymentResult(
+            status=PaymentStatus.PENDING,
+            provider=ProviderName.MANUAL,
+            provider_ref=ref,
+            idempotency_key=req.idempotency_key,
+            amount=req.amount,
+            currency=req.currency,
+            user_id=req.user_id,
+            plan_id=req.plan_id,
+        )
+
+    def verify_payment(self, provider_ref: str) -> PaymentResult:
+        pending = self._pending.get(provider_ref)
+        if pending and pending["status"] == "success":
+            req = pending["req"]
+            return PaymentResult(
+                status=PaymentStatus.SUCCESS,
+                provider=ProviderName.MANUAL,
+                provider_ref=provider_ref,
+                idempotency_key=req.idempotency_key,
+                amount=req.amount,
+                currency=req.currency,
+                user_id=req.user_id,
+                plan_id=req.plan_id,
+            )
+        return PaymentResult(
+            status=PaymentStatus.PENDING,
+            provider=ProviderName.MANUAL,
+            provider_ref=provider_ref,
+            idempotency_key="",
+            amount=0,
+            currency=Currency.USD,
+            user_id="",
+            plan_id="",
+        )
+
+    def refund(self, provider_ref: str, amount: int) -> PaymentResult:
+        return PaymentResult(
+            status=PaymentStatus.FAILED,
+            provider=ProviderName.MANUAL,
+            provider_ref=provider_ref,
+            idempotency_key="",
+            amount=0,
+            currency=Currency.USD,
+            user_id="",
+            plan_id="",
+            error_message="Manual refunds are processed by admin",
+        )
+
+    def verify_webhook_signature(self, payload: bytes, sig: str) -> bool:
+        return True
+
+    def confirm(self, provider_ref: str) -> bool:
+        """Admin confirms payment receipt."""
+        if provider_ref in self._pending:
+            self._pending[provider_ref]["status"] = "success"
+            return True
+        return False
+
+
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+# Registry + Factory
+# ┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐┐
+
+_REGISTRY: dict[ProviderName, type] = {
+    ProviderName.MOCK:     MockProvider,
+    ProviderName.STRIPE:   StripeProvider,
+    ProviderName.ZARINPAL: ZarinPalProvider,
+    ProviderName.MANUAL:   ManualProvider,
+}
+
+
+def get_provider(name: str | ProviderName, **kwargs) -> PaymentProvider:
+    """Factory — instantiate provider by name."""
+    try:
+        pn = ProviderName(name)
+    except ValueError:
+        raise ValueError(f"Unknown payment provider: {name!r} — valid: {list(_REGISTRY.keys())}")
+    cls = _REGISTRY.get(pn)
+    if cls is None:
+        raise ValueError(f"Unknown payment provider: {name!r} — valid: {list(_REGISTRY.keys())}")
+    return cls(**kwargs)
