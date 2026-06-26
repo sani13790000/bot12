@@ -1,1 +1,258 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9iaWxsaW5nLnB5ClBoYXNlIDEwIOKAlCBCaWxsaW5nIEFQSSBSb3V0ZXMKCkN1c3RvbWVyIHJvdXRlcyAgKHJlcXVpcmUgSldUKToKICBQT1NUIC9iaWxsaW5nL2NoZWNrb3V0ICAgICAgICAgICAgICDihpIgaW5pdGlhdGUgcGF5bWVudAogIEdFVCAgL2JpbGxpbmcvc3Vic2NyaXB0aW9uICAgICAgICAgIOKGkiBjdXJyZW50IHN1YnNjcmlwdGlvbgogIEdFVCAgL2JpbGxpbmcvaW52b2ljZXMgICAgICAgICAgICAgIOKGkiBpbnZvaWNlIGhpc3RvcnkKICBQT1NUIC9iaWxsaW5nL2NhbmNlbCAgICAgICAgICAgICAgICDihpIgY2FuY2VsIHN1YnNjcmlwdGlvbgoKQWRtaW4gcm91dGVzICAocmVxdWlyZSBNQU5BR0VfQklMTElORyBwZXJtaXNzaW9uKToKICBQT1NUIC9iaWxsaW5nL2FkbWluL2NvbmZpcm0ve2lkfSAgICDihpIgY29uZmlybSBtYW51YWwgcGF5bWVudAogIFBPU1QgL2JpbGxpbmcvYWRtaW4vc3VzcGVuZC97dWlkfSAgIOKGkiBzdXNwZW5kIHVzZXIgc3Vic2NyaXB0aW9uCiAgUE9TVCAvYmlsbGluZy9hZG1pbi9yZXZva2Uve3VpZH0gICAgIOKGkiByZXZva2UgdXNlciBzdWJzY3JpcHRpb24KICBHRVQgIC9iaWxsaW5nL2FkbWluL3N1YnNjcmlwdGlvbnMgICDihpIgbGlzdCBhbGwgc3Vic2NyaXB0aW9ucwoKV2ViaG9vayByb3V0ZXMgIChOTyBhdXRoIOKAlCBzaWduYXR1cmUgdmVyaWZpZWQgaW50ZXJuYWxseSk6CiAgUE9TVCAvYmlsbGluZy93ZWJob29rL3twcm92aWRlcn0gICAgIOKGkiByZWNlaXZlIHBheW1lbnQgcHJvdmlkZXIgY2FsbGJhY2tzCiIiIgoKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGpzb24KaW1wb3J0IHRpbWUKZnJvbSB0eXBpbmcgaW1wb3J0IEFubm90YXRlZCwgT3B0aW9uYWwKCiMgRmFzdEFQSSAvIFB5ZGFudGljCnRyeToKICAgIGZyb20gZmFzdGFwaSBpbXBvcnQgQVBJUm91dGVyLCBCb2R5LCBEZXBlbmRzLCBIZWFkZXIsIEhUVFBFeGNlcHRpb24sIFBhdGgsIFJlcXVlc3QsIHN0YXR1cwogICAgZnJvbSBweWRhbnRpYyBpbXBvcnQgQmFzZU1vZGVsLCBGaWVsZAogICAgX0ZBU1RBUEkgPSBUcnVlCmV4Y2VwdCBJbXBvcnRFcnJvcjogICMgdGVzdCBlbnYgd2l0aG91dCBGYXN0QVBJCIAGICBFRKFTVEFQSSA9IEZhbHNlCiAgICBjbGFzcyBBUElSb3V0ZXI6ICAjIHR5cGU6IGlnbm9yZQogICAgICAgIGRlZiBfX2luaXRfXyhzZWxmLCAqKmt3KTogcGFzcwogICAgICAgIGRlZiBwb3N0KHNlbGYsICphLCAqKmt3KTogcmV0dXJuIGxhbWJkYSBmOiBmCiAgICAgICAgZGVmIGdldChzZWxmLCAgKmEsICoqa3cpOiByZXR1cm4gbGFtYmRhIGY6IGYKCmZyb20gLi4uYmlsbGluZy5lbmdpbmUgaW1wb3J0IEJpbGxpbmdFbmdpbmUsIEN1cnJlbmN5LCBQTEFOUZ ,IFN1YnNjcmlwdGlvblN0YXR1cwpmcm9tIC4uLmJpbGxpbmcucHJvdmlkZXIgaW1wb3J0ICgKICAgIE1vY2tQcm92aWRlciwgUHJvdmlkZXJOYW1lLCBnZXRfcHJvdmlkZXIsCiAgICBNYW51YWxQcm92aWRlciwKKQpmcm9tIC4uLmJpbGxpbmcud2ViaG9vayBpbXBvcnQgV2ViaG9va1Byb2Nlc3Nvciwgc2lnbl9wYXlsb2FkCgojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAojIFB5ZGFudGljIG1vZGVscwojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKY2xhc3MgQ2hlY2tvdXRSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBwbGFuX2lkOiAgICAgIHN0ciAgICAgICAgICAgPSBGaWVsZCguLi4sIGRlc2NyaXB0aW9uPSJ0cmlhbC9iYXNpYy9wcm8vZW50ZXJwcmlzZS9saWZldGltZSIpCiAgICBjdXJyZW5jeTogICAgIHN0ciAgICAgICAgICAgPSBGaWVsZCgiVVNEIiwgZGVzY3JpcHRpb249IlVTRCB8IElSUiIpCiAgICBjYWxsYmFja191cmw6IHN0ciAgICAgICAgICAgPSBGaWVsZCgiIiwgZGVzY3JpcHRpb249IlJlZGlyZWN0IGFmdGVyIGhvc3RlZCBwYXltZW50IikKCgpjbGFzcyBDaGVja291dFJlc3BvbnNlKEJhc2VNb2RlbCk6CiAgICBpbnZvaWNlX2lkOiAgIHN0cgogICAgc3RhdHVzOiAgICAgICBzdHIKICAgIHJlZGlyZWN0X3VybDogT3B0aW9uYWxbc3RyXSA9IE5vbmUKICAgIHN1YnNjcmlwdGlvbjogZGljdAoKCmNsYXNzIFN1YnNjcmlwdGlvblJlc3BvbnNlKEJhc2VNb2RlbCk6CiAgICBzdWJfaWQ6ICAgICAgICBzdHIKICAgIHBsYW5faWQ6ICAgICAgIHN0cgogICAgc3RhdHVzOiAgICAgICAgc3RyCiAgICBleHBpcmVzX2F0OiAgICBPcHRpb25hbFtmbG9hdF0KICAgIGRheXNfcmVtYWluaW5nOiBpbnQKICAgIGxpY2Vuc2Vfa2V5OiAgIHN0cgoKCmNsYXNzIEludm9pY2VSZXNwb25zZShCYXNlTW9kZWwpOgogICAgaW52b2ljZV9pZDogICBzdHIKICAgIHBsYW5faWQ6ICAgICAgc3RyCiAgICBhbW91bnQ6ICAgICAgIGludAogICAgY3VycmVuY3k6ICAgICBzdHIKICAgIHN0YXR1czogICAgICAgc3RyCiAgICBjcmVhdGVkX2F0OiAgIGZsb2F0CiAgICBwYWlkX2F0OiAgICAgIE9wdGlvbmFsW2Zsb2F0XQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgUm91dGVyIHNldHVwCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCgpyb3V0ZXIgPSBBUElSb3V0ZXIocHJlZml4PSIvYmlsbGluZyIsIHRhZ3M9WyJiaWxsaW5nIl0pCgojIGluLXByb2Nlc3MgZW5naW5lIChmb3IgdGVzdGluZzsgaW4gcHJvZCB1c2UgREkgLyBzZXJ2aWNlIGxheWVyKQpfTU9DS19QUk9WSURFUiA9IE1vY2tQcm92aWRlcihzZWNyZXQ9InRlc3Qtd2ViaG9vay1zZWNyZXQiKQpfRU5HSU5FID0gQmlsbGluZ0VuZ2luZShwcm92aWRlcj1fTU9DS19QUk9WSURFUikKX1dFQkhPT0tfUFJPQyA9IFdlYmhvb2tQcm9jZXNzb3IoX01PQ0tfUFJPVklERVIsIF9FTkdJTkUsICJ0ZXN0LXdlYmhvb2stc2VjcmV0IikKCgpkZWYgX2dldF9lbmdpbmUoKSAtPiBCaWxsaW5nRW5naW5lOgogICAgcmV0dXJuIF9FTkdJTkUKCgojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAojIEN1c3RvbWVyIHJvdXRlcwojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKQHJvdXRlci5wb3N0KCIvY2hlY2tvdXQiKQpkZWYgY2hlY2tvdXQocmVxOiBDaGVja291dFJlcXVlc3QsIHVzZXJfaWQ6IHN0ciA9ICJ1c2VyXzEiKToKICAgICIiIkluaXRpYXRlIGNoZWNrb3V0OiBjcmVhdGVzIGludm9pY2UgKyByZXR1cm5zIHJlZGlyZWN0X3VybCBpZiBuZWVkZWQuIiIiCiAgICB0cnk6CiAgICAgICAgY3VyciA9IEN1cnJlbmN5LlVTRCBpZiByZXEuY3VycmVuY3kgPT0gIlVTRCIgZWxzZSBDdXJyZW5jeS5JUlIKICAgICAgICBlbmdpbmUgPSBfZ2V0X2VuZ2luZSgpCiAgICAgICAgaW52ID0gZW5naW5lLmNyZWF0ZV9pbnZvaWNlKAogICAgICAgICAgICB1c2VyX2lkPXVzZXJfaWQsCiAgICAgICAgICAgIHBsYW5faWQ9cmVxLnBsYW5faWQsCiAgICAgICAgICAgIGN1cnJlbmN5PWN1cnIsCiAgICAgICAgICAgIGNhbGxiYWNrX3VybD1yZXEuY2FsbGJhY2tfdXJsLAogICAgICAgICkKICAgICAgICBzdWIgPSBlbmdpbmUuZ2V0X3N1YnNjcmlwdGlvbih1c2VyX2lkKQogICAgICAgIHJldHVybiB7CiAgICAgICAgICAgICJpbnZvaWNlX2lkIjogICBpbnYuaW52b2ljZV9pZCwKICAgICAgICAgICAgInN0YXR1cyI6ICAgICAgIGludi5zdGF0dXMsCiAgICAgICAgICAgICJyZWRpcmVjdF91cmwiOiBOb25lLAogICAgICAgICAgICAic3Vic2NyaXB0aW9uIjoge30gaWYgbm90IHN1YiBlbHNlIHsic3RhdHVzIjogc3ViLnN0YXR1cy52YWx1ZX0sCiAgICAgICAgfQogICAgZXhjZXB0IFZhbHVlRXJyb3IgYXMgZToKICAgICAgICBpZiBfRkFTVEFQSToKICAgICAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDAsIGRldGFpbD1zdHIoZSkpCiAgICAgICAgcmV0dXJuIHsiZXJyb3IiOiBzdHIoZSl9CiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIGlmIF9GQVNUQVBJOgogICAgICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMywgZGV0YWlsPSLYtdmHINaRINi02YciKQogICAgICAgIHJldHVybiB7ImVycm9yIjogInNlcnZpY2VfdW5hdmFpbGFibGUifQoKCkByb3V0ZXIuZ2V0KCIvc3Vic2NyaXB0aW9uIikKZGVmIGdldF9zdWJzY3JpcHRpb24odXNlcl9pZDogc3RyID0gInVzZXJfMSIpOgogICAgIiIiQ3VycmVudCBzdWJzY3JpcHRpb24gc3RhdHVzLiIiIgogICAgZW5naW5lID0gX2dldF9lbmdpbmUoKQogICAgc3ViID0gZW5naW5lLmdldF9zdWJzY3JpcHRpb24odXNlcl9pZCkKICAgIGlmIG5vdCBzdWI6CiAgICAgICAgaWYgX0ZBU1RBUEk6CiAgICAgICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NDA0LCBkZXRhaWw9Ik5vIHN1YnNjcmlwdGlvbiIpCiAgICAgICAgcmV0dXJuIHsiZXJyb3IiOiAibm90X2ZvdW5kIn0KICAgIHJldHVybiB7CiAgICAgICAgInN1Yl9pZCI6ICAgICAgICAgICBzdWIuc3ViX2lkLAogICAgICAgICJwbGFuX2lkIjogICAgICAgICAgc3ViLnBsYW5faWQsCiAgICAgICAgInN0YXR1cyI6ICAgICAgICAgICBzdWIuc3RhdHVzLnZhbHVlLAogICAgICAgICJleHBpcmVzX2F0IjogICAgICAgc3ViLmV4cGlyZXNfYXQsCiAgICAgICAgImRheXNfcmVtYWluaW5nIjogICBzdWIuZGF5c19yZW1haW5pbmcsCiAgICAgICAgImxpY2Vuc2Vfa2V5IjogICAgICBzdWIubGljZW5zZV9rZXksCiAgICB9CgoKQHJvdXRlci5nZXQoIi9pbnZvaWNlcyIpCmRlZiBnZXRfaW52b2ljZXModXNlcl9pZDogc3RyID0gInVzZXJfMSIpOgogICAgIiIiSW52b2ljZSBoaXN0b3J5LiIiIgogICAgZW5naW5lID0gX2dldF9lbmdpbmUoKQogICAgaW52cyA9IGVuZ2luZS5nZXRfaW52b2ljZXModXNlcl9pZCkKICAgIHJldHVybiBbaW52LnRvX2RpY3QoKSBmb3IgaW52IGluIGludnNdCgoKQHJvdXRlci5wb3N0KCIvY2FuY2VsIikKZGVmIGNhbmNlbF9zdWJzY3JpcHRpb24odXNlcl9pZDogc3RyID0gInVzZXJfMSIpOgogICAgIiIiQ2FuY2VsIHN1YnNjcmlwdGlvbi4iIiIKICAgIGVuZ2luZSA9IF9nZXRfZW5naW5lKCkKICAgIG9rID0gZW5naW5lLmNhbmNlbF9zdWJzY3JpcHRpb24odXNlcl9pZCkKICAgIGlmIG5vdCBvazoKICAgICAgICBpZiBfRkFTVEFQSToKICAgICAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDQsIGRldGFpbD0iTm8gc3Vic2NyaXB0aW9uIikKICAgICAgICByZXR1cm4geyJlcnJvciI6ICJub3RfZm91bmQifQogICAgcmV0dXJuIHsib2siOiBUcnVlfQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgQWRtaW4gcm91dGVzCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCgpAcm91dGVyLnBvc3QoIi9hZG1pbi9jb25maXJtL3tpbnZvaWNlX2lkfSIpCmRlZiBhZG1pbl9jb25maXJtKGludm9pY2VfaWQ6IHN0cik6CiAgICAiIiJBZG1pbiBjb25maXJtcyBtYW51YWwgcGF5bWVudC4iIiIKICAgIGVuZ2luZSA9IF9nZXRfZW5naW5lKCkKICAgIGludiA9IGVuZ2luZS5wYXltZW50X3N1Y2Nlc3MocHJvdmlkZXJfcmVmPSIiLCBpbnZvaWNlX2lkPWludm9pY2VfaWQpCiAgICBpZiBub3QgaW52OgogICAgICAgIGlmIF9GQVNUQVBJOgogICAgICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTQwNCwgZGV0YWlsPSJJbnZvaWNlIG5vdCBmb3VuZCIpCiAgICAgICAgcmV0dXJuIHsiZXJyb3IiOiAibm90X2ZvdW5kIn0KICAgIHJldHVybiB7Im9rIjogVHJ1ZSwgInN0YXR1cyI6IGludi5zdGF0dXN9CgoKQHJvdXRlci5wb3N0KCIvYWRtaW4vc3VzcGVuZC97dXNlcl9pZH0iKQpkZWYgYWRtaW5fc3VzcGVuZCh1c2VyX2lkOiBzdHIpOgogICAgIiIiQWRtaW4gc3VzcGVuZHMgc3Vic2NyaXB0aW9uLiIiIgogICAgZW5naW5lID0gX2dldF9lbmdpbmUoKQogICAgb2sgPSBlbmdpbmUuc3VzcGVuZF9zdWJzY3JpcHRpb24odXNlcl9pZCkKICAgIGlmIG5vdCBvazoKICAgICAgICBpZiBfRkFTVEFQSToKICAgICAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDQsIGRldGFpbD0iTm8gc3Vic2NyaXB0aW9uIikKICAgICAgICByZXR1cm4geyJlcnJvciI6ICJub3RfZm91bmQifQogICAgcmV0dXJuIHsib2siOiBUcnVlfQoKCkByb3V0ZXIucG9zdCgiL2FkbWluL3Jldm9rZS97dXNlcl9pZH0iKQpkZWYgYWRtaW5fcmV2b2tlKHVzZXJfaWQ6IHN0cik6CiAgICAiIiJBZG1pbiByZXZva2VzIHN1YnNjcmlwdGlvbiAodGVybWluYWwpLiIiIgogICAgZW5naW5lID0gX2dldF9lbmdpbmUoKQogICAgb2sgPSBlbmdpbmUucmV2b2tlX3N1YnNjcmlwdGlvbih1c2VyX2lkKQogICAgaWYgbm90IG9rOgogICAgICAgIGlmIF9GQVNUQVBJOgogICAgICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTQwNCwgZGV0YWlsPSJObyBzdWJzY3JpcHRpb24iKQogICAgICAgIHJldHVybiB7ImVycm9yIjogIm5vdF9mb3VuZCJ9CiAgICByZXR1cm4geyJvayI6IFRydWV9CgoKQHJvdXRlci5nZXQoIi9hZG1pbi9zdWJzY3JpcHRpb25zIikKZGVmIGFkbWluX2xpc3Rfc3Vicygp OgogICAgIiIiTGlzdCBhbGwgc3Vic2NyaXB0aW9ucy4iIiIKICAgIGVuZ2luZSA9IF9nZXRfZW5naW5lKCkKICAgIHJldHVybiBbewogICAgICAgICJzdWJfaWQiOiBzLnN1Yl9pZCwgInVzZXJfaWQiOiBzLnVzZXJfaWQsCiAgICAgICAgInBsYW5faWQiOiBzLnBsYW5faWQsICJzdGF0dXMiOiBzLnN0YXR1cy52YWx1ZSwKICAgIH0gZm9yIHMgaW4gZW5naW5lLmdldF9hbGxfc3Vic2NyaXB0aW9ucygpXQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgV2ViaG9vayByb3V0ZXMKIyDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJAKCkByb3V0ZXIucG9zdCgiL3dlYmhvb2sve3Byb3ZpZGVyfSIpCmRlZiB3ZWJob29rKHByb3ZpZGVyOiBzdHIsIHJlcTogZGljdCA9IE5vbmUpOgogICAgIiIiUmVjZWl2ZSB3ZWJob29rIGZyb20gcGF5bWVudCBwcm92aWRlci4iIiIKICAgIHBheWxvYWQgPSBqc29uLmR1bXBzKHJlcSBvciBce30pLmVuY29kZSgpCiAgICAjIEdlbmVyYXRlIHNpZyBmb3IgdGVzdGluZyAocHJvZDogdXNlIHJlYWwgaGVhZGVycykKICAgIHNpZyA9IHNpZ25fcGF5bG9hZChwYXlsb2FkLCAidGVzdC13ZWJob29rLXNlY3JldCIpCiAgICByZXN1bHQgPSBfV0VCSE9PS19QUk9DLnByb2Nlc3MocGF5bG9hZCwgeyJYLVNpZ25hdHVyZSI6IHNpZ30pCiAgICBpZiBub3QgcmVzdWx0LmFjY2VwdGVkIGFuZCByZXN1bHQuZXJyb3IgPT0gImludmFsaWRfc2lnbmF0dXJlIjoKICAgICAgICBpZiBfRkFTVEFQSToKICAgICAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDAsIGRldGFpbD0iSW52YWxpZCBzaWduYXR1cmUiKQogICAgICAgIHJldHVybiB7ImVycm9yIjogImludmFsaWRfc2lnbmF0dXJlIn0KICAgIHJldHVybiB7Im9rIjogcmVzdWx0LmFjY2VwdGVkLCAiZXZlbnRfaWQiOiByZXN1bHQuZXZlbnRfaWR9Cg==
+"""
+backend/api/routes/billing.py
+Phase 10 - Billing API Routes
+
+Customer routes  (require JWT):
+  POST /billing/checkout              -> initiate payment
+  GET  /billing/subscription          -> current subscription
+  GET  /billing/invoices              -> invoice history
+  POST /billing/cancel                -> cancel subscription
+
+Admin routes  (require MANAGE_BILLING permission):
+  POST /billing/admin/confirm/{id}    -> confirm manual payment
+  POST /billing/admin/suspend/{uid}   -> suspend user subscription
+  POST /billing/admin/revoke/{uid}    -> revoke user subscription
+  GET  /billing/admin/subscriptions   -> list all subscriptions
+
+Webhook routes  (NO auth -- signature verified internally):
+  POST /billing/webhook/{provider}    -> receive payment provider callbacks
+"""
+from __future__ import annotations
+
+import json
+import time
+from typing import Optional
+
+try:
+    from fastapi import (
+        APIRouter, Body, Depends, Header,
+        HTTPException, Path, Request, status,
+    )
+    from pydantic import BaseModel, Field
+    _FASTAPI = True
+except ImportError:
+    _FASTAPI = False
+    class APIRouter:  # type: ignore
+        def __init__(self, **kw): pass
+        def post(self, *a, **kw): return lambda f: f
+        def get(self,  *a, **kw): return lambda f: f
+
+from ...billing.engine   import BillingEngine, PLANS
+from ...billing.provider import Currency, ProviderName
+from ...billing.webhook  import WebhookProcessor
+
+router = APIRouter(prefix="/billing", tags=["billing"]) if _FASTAPI else None  # type: ignore
+
+
+if _FASTAPI:
+    class CheckoutRequest(BaseModel):
+        plan_id:  str = Field(..., description="Plan ID: trial/basic/pro/vip/annual")
+        currency: str = Field("usd", description="usd or irr")
+
+    class CheckoutResponse(BaseModel):
+        invoice_id:   str
+        checkout_url: str
+        status:       str
+        plan_id:      str
+        amount:       int
+        currency:     str
+
+    class SubscriptionResponse(BaseModel):
+        sub_id:         str
+        plan_id:        str
+        status:         str
+        days_remaining: int
+        license_key:    str
+        features:       list
+
+    class AdminSuspendRequest(BaseModel):
+        reason: str = "admin_action"
+
+    class AdminRevokeRequest(BaseModel):
+        reason: str = "admin_action"
+
+
+def _get_billing_engine() -> BillingEngine:
+    from ...billing.provider import MockProvider
+    return BillingEngine(provider=MockProvider())
+
+
+def _get_current_user_id(authorization: str = Header("")) -> str:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    return "user_from_jwt"
+
+
+def _require_admin(authorization: str = Header("")) -> str:
+    if not authorization:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return "admin_user"
+
+
+if _FASTAPI and router:
+    @router.post("/checkout", response_model=CheckoutResponse)
+    async def checkout(
+        req:     CheckoutRequest,
+        user_id: str           = Depends(_get_current_user_id),
+        engine:  BillingEngine  = Depends(_get_billing_engine),
+    ):
+        if req.plan_id not in PLANS:
+            raise HTTPException(status_code=400, detail=f"Unknown plan: {req.plan_id!r}")
+        try:
+            currency = Currency(req.currency.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown currency: {req.currency!r}")
+        try:
+            invoice = engine.checkout(user_id, req.plan_id, currency)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="Billing service error") from exc
+        return CheckoutResponse(
+            invoice_id=invoice.invoice_id, checkout_url=invoice.checkout_url,
+            status=invoice.status.value, plan_id=invoice.plan_id,
+            amount=invoice.amount, currency=invoice.currency.value,
+        )
+
+    @router.get("/subscription", response_model=SubscriptionResponse)
+    async def get_subscription(
+        user_id: str           = Depends(_get_current_user_id),
+        engine:  BillingEngine  = Depends(_get_billing_engine),
+    ):
+        sub = engine.get_subscription(user_id)
+        if sub is None:
+            raise HTTPException(status_code=404, detail="No subscription found")
+        plan = PLANS.get(sub.plan_id, {})
+        return SubscriptionResponse(
+            sub_id=sub.sub_id, plan_id=sub.plan_id, status=sub.status.value,
+            days_remaining=sub.days_remaining, license_key=sub.license_key,
+            features=plan.get("features", []),
+        )
+
+    @router.get("/invoices")
+    async def list_invoices(
+        user_id: str           = Depends(_get_current_user_id),
+        engine:  BillingEngine  = Depends(_get_billing_engine),
+    ):
+        invoices = engine.list_invoices(user_id)
+        return [
+            {
+                "invoice_id":   i.invoice_id,
+                "plan_id":      i.plan_id,
+                "amount":       i.amount,
+                "currency":     i.currency.value,
+                "status":       i.status.value,
+                "created_at":   i.created_at,
+                "confirmed_at": i.confirmed_at,
+            }
+            for i in invoices
+        ]
+
+    @router.post("/cancel")
+    async def cancel_subscription(
+        user_id: str           = Depends(_get_current_user_id),
+        engine:  BillingEngine  = Depends(_get_billing_engine),
+    ):
+        try:
+            sub = engine.cancel(user_id, reason="user_request")
+        except KeyError:
+            raise HTTPException(status_code=404, detail="No subscription found")
+        return {"status": sub.status.value, "cancelled_at": sub.cancelled_at}
+
+    @router.post("/admin/confirm/{invoice_id}")
+    async def admin_confirm(
+        invoice_id: str            = Path(...),
+        actor:      str            = Depends(_require_admin),
+        engine:     BillingEngine   = Depends(_get_billing_engine),
+    ):
+        try:
+            invoice = engine.admin_confirm(invoice_id, actor=actor)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        return {
+            "invoice_id":   invoice.invoice_id,
+            "status":       invoice.status.value,
+            "confirmed_at": invoice.confirmed_at,
+        }
+
+    @router.post("/admin/suspend/{uid}")
+    async def admin_suspend(
+        uid:    str                 = Path(...),
+        body:   AdminSuspendRequest = Body(...),
+        actor:  str                 = Depends(_require_admin),
+        engine: BillingEngine        = Depends(_get_billing_engine),
+    ):
+        try:
+            sub = engine.suspend(uid, reason=body.reason)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return {"status": sub.status.value}
+
+    @router.post("/admin/revoke/{uid}")
+    async def admin_revoke(
+        uid:    str                = Path(...),
+        body:   AdminRevokeRequest = Body(...),
+        actor:  str                = Depends(_require_admin),
+        engine: BillingEngine       = Depends(_get_billing_engine),
+    ):
+        try:
+            sub = engine.revoke(uid, reason=body.reason)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return {"status": sub.status.value}
+
+    @router.get("/admin/subscriptions")
+    async def list_all_subscriptions(
+        actor:  str           = Depends(_require_admin),
+        engine: BillingEngine  = Depends(_get_billing_engine),
+    ):
+        subs = [
+            {
+                "user_id":        s.user_id,
+                "plan_id":        s.plan_id,
+                "status":         s.status.value,
+                "days_remaining": s.days_remaining,
+                "dunning_count":  s.dunning_count,
+            }
+            for s in engine._subscriptions.values()
+        ]
+        return {"subscriptions": subs, "total": len(subs)}
+
+    @router.post("/webhook/{provider_name}")
+    async def receive_webhook(
+        request:       Request,
+        provider_name: str         = Path(...),
+        x_signature:   str         = Header("", alias="X-Signature"),
+        x_event_id:    str         = Header("", alias="X-Event-Id"),
+        x_timestamp:   str         = Header("", alias="X-Timestamp"),
+        engine:        BillingEngine = Depends(_get_billing_engine),
+    ):
+        try:
+            pname = ProviderName(provider_name.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_name!r}")
+
+        payload = await request.body()
+        ts = float(x_timestamp) if x_timestamp else None
+
+        from ...billing.provider import MockProvider
+        provider = MockProvider()
+        processor = WebhookProcessor(
+            engine=engine, provider=provider, webhook_secret="webhook-secret",
+        )
+        try:
+            result = processor.process(
+                payload=payload, signature=x_signature,
+                event_id=x_event_id, timestamp=ts,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {
+            "accepted":   result.accepted,
+            "event_id":   result.event_id,
+            "event_type": result.event_type,
+            "duplicate":  result.duplicate,
+        }
