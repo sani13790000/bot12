@@ -11,6 +11,8 @@ Fixes:
     U-8:  halt state race condition (is_halted_check)
     U-9:  halt reason lost after restart (persist_halt_state/restore_halt_state)
     U-10: daily_loss_usd resets at midnight (maybe_reset_daily)
+  - P4-FIX-V2-1: drawdown_pct = max(0.0,...) — no negative drawdown when equity>HWM
+  - P4-FIX-V2-EP: check() method added — orchestrator calls check(), not can_trade()
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from ..core.logger import get_logger
 
@@ -34,12 +36,20 @@ class ProtectionStatus(str, Enum):
 
 
 @dataclass
+class EquityCheckResult:
+    """P4-FIX-V2-EP: Result of EquityProtectionEngine.check()."""
+    can_trade: bool
+    level: ProtectionStatus
+    reason: str
+
+
+@dataclass
 class EquityProtectionConfig:
     daily_loss_limit_pct:   float = 5.0
     total_drawdown_limit_pct: float = 10.0
     warning_drawdown_pct:   float = 7.0
-    cooldown_minutes:       int   = 60
-    trailing_hwm:           bool  = True
+    cooldown_minutes:           int   = 60
+    trailing_hwm:               bool  = True
 
 
 @dataclass
@@ -106,9 +116,9 @@ class EquityProtectionEngine:
 
     def _evaluate(self) -> None:
         """Evaluate drawdown and update status. Must hold lock."""
-        hwm     = self.state.high_water_mark
-        equity  = self.state.current_equity
-        config  = self.config
+        hwm    = self.state.high_water_mark
+        equity = self.state.current_equity
+        config = self.config
 
         if hwm <= 0:
             return
@@ -125,7 +135,8 @@ class EquityProtectionEngine:
                 logger.debug("halt cooldown expired, resuming")
                 return
 
-        drawdown_pct = (hwm - equity) / hwm * 100
+        # P4-FIX-V2-1: max(0.0,...) prevents negative drawdown when equity > HWM
+        drawdown_pct = max(0.0, (hwm - equity) / hwm * 100)
         daily_pct    = self.state.daily_loss_usd / hwm * 100
 
         if drawdown_pct >= config.total_drawdown_limit_pct or daily_pct >= config.daily_loss_limit_pct:
@@ -145,6 +156,13 @@ class EquityProtectionEngine:
     def can_trade(self) -> bool:
         return self.state.status != ProtectionStatus.HALTED
 
+    def check(self) -> "EquityCheckResult":
+        """P4-FIX-V2-EP: check() method — used by RiskOrchestrator GATE 1."""
+        status = self.state.status
+        can_trade = status != ProtectionStatus.HALTED
+        reason = self.state.halt_reason or ""
+        return EquityCheckResult(can_trade=can_trade, level=status, reason=reason)
+
     def get_status(self) -> dict:
         s = self.state
         return {
@@ -158,26 +176,22 @@ class EquityProtectionEngine:
         }
 
 
-# ── U-6..U-10 helper functions (PHASE1-MERGE) ─────────────────────────────
+# ── U-6..U-10 helper functions (PHASE1-MERGE) ─────────────────────────────────
 
 def safe_initialize(ep_engine: EquityProtectionEngine, balance: float) -> None:
-    """U-6: balance<=0 uses fallback to prevent HWM=0 instant halt."""
     ep_engine.initialize(balance)
 
 
 def auto_init_guard(ep_engine: EquityProtectionEngine, equity: float, balance: float) -> None:
-    """U-7: Initialize engine if not yet done before equity update."""
     if not ep_engine.state.initialized:
         safe_initialize(ep_engine, balance if balance > 0 else equity)
 
 
 def is_halted_check(ep_engine: EquityProtectionEngine) -> bool:
-    """U-8: Thread-safe check of halt status."""
     return ep_engine.state.status == ProtectionStatus.HALTED
 
 
 async def maybe_reset_daily(ep_engine: EquityProtectionEngine) -> None:
-    """U-10: Reset daily loss counter at midnight (UTC)."""
     today = datetime.now(timezone.utc).date().isoformat()
     if ep_engine.state.daily_reset_date != today:
         async with ep_engine._lock:
@@ -187,7 +201,6 @@ async def maybe_reset_daily(ep_engine: EquityProtectionEngine) -> None:
 
 
 async def persist_halt_state(ep_engine: EquityProtectionEngine, db: Any) -> None:
-    """U-9: Persist halt reason to DB so it survives restart."""
     try:
         await db.upsert("equity_protection_state", {
             "status":      ep_engine.state.status.value,
@@ -199,7 +212,6 @@ async def persist_halt_state(ep_engine: EquityProtectionEngine, db: Any) -> None
 
 
 async def restore_halt_state(ep_engine: EquityProtectionEngine, db: Any) -> None:
-    """U-9: Restore halt state from DB on startup."""
     try:
         row = await db.select_one("equity_protection_state", {})
         if row and row.get("status") == ProtectionStatus.HALTED.value:
