@@ -1,12 +1,12 @@
 """
 backend/core/field_encryption.py
-Galaxy Vast AI— Database Field-Level Encryption (Phase 11)
+Galaxy Vast AI — Database Field-Level Encryption (Phase 11)
 
-P11-FE-1: AES-256-GCM encryption braye fieldhaye hassas DB
-P11-FE-2: License keys, MT5 passwords, API tokens ramznegaji showand
-P11-FE-3: Format: "enc:v1:<base64(nonce+ct+tag)>" — qabel tashhis
-P11-FE-4: Transparent encrypt/decrypt dar Pydantic validators
-P11-FE-5: Key rotation — decrypt ba old key, encrypt ba new key
+P11-FE-1: AES-256-GCM encryption برای فیلدهای حساس DB
+P11-FE-2: License keys، MT5 passwords، API tokens رمزنگاری شوند
+P11-FE-3: Format: "enc:v1:<base64(nonce+ct+tag)>" — قابل تشخیص
+P11-FE-4: Transparent encrypt/decrypt در Pydantic validators
+P11-FE-5: Key rotation — decrypt با old key، encrypt با new key
 """
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ class FieldEncryption:
 
     Usage:
         fe = FieldEncryption.from_env()
-        stored  = fe.encrypt("my-secret-value")   # "enc:v1:BASE64..."
-        plain   = fe.decrypt(stored)              # "my-secret-value"
-        plain2  = fe.decrypt("already-plain")     # "already-plain" (passthrough)
+        stored = fe.encrypt("my-secret")    # "enc:v1:BASE64..."
+        plain  = fe.decrypt(stored)          # "my-secret"
+        plain2 = fe.decrypt("already-plain") # passthrough
     """
 
     def __init__(self, key: bytes) -> None:
@@ -45,7 +45,6 @@ class FieldEncryption:
         """P11-FE-1: Load key from environment (64 hex chars = 32 bytes)."""
         hex_key = os.environ.get(env_var, "")
         if not hex_key:
-            # Dev fallback — deterministic from JWT_SECRET_KEY
             jwt = os.environ.get("JWT_SECRET_KEY", "dev-insecure")
             key = hashlib.sha256(jwt.encode()).digest()
             import logging
@@ -61,7 +60,7 @@ class FieldEncryption:
         return cls(key)
 
     def encrypt(self, plaintext: str) -> str:
-        """Encrypt plaintext → "enc:v1:BASE64..." format."""
+        """Encrypt plaintext → 'enc:v1:BASE64...' format."""
         if not plaintext:
             return plaintext
         if plaintext.startswith(_PREFIX):
@@ -70,55 +69,59 @@ class FieldEncryption:
         return _PREFIX + base64.b64encode(raw).decode()
 
     def decrypt(self, value: str) -> str:
-        """Decrypt "enc:v1..." → plaintext. Passthrough for unencrypted values."""
+        """Decrypt 'enc:v1:...' → plaintext. Passthrough for unencrypted values."""
         if not value or not value.startswith(_PREFIX):
-            return value  # P11-FE-4: transparent passthrough
+            return value  # passthrough
         raw = base64.b64decode(value[len(_PREFIX):])
         return self._raw_decrypt(raw).decode()
 
     def is_encrypted(self, value: str) -> bool:
-        return bool(value) and value.startswith(_PREFIX)
+        """Return True if value is an encrypted field."""
+        return isinstance(value, str) and value.startswith(_PREFIX)
 
-    def rotate(self, value: str, new_key: bytes) -> str:
-        """P11-FE-5: Decrypt with current key, re-encrypt with new_key."""
-        plain = self.decrypt(value)
+    def rotate(self, encrypted_value: str, new_key: bytes) -> str:
+        """P11-FE-5: Decrypt with current key, re-encrypt with new key."""
+        plain = self.decrypt(encrypted_value)
         new_fe = FieldEncryption(new_key)
         return new_fe.encrypt(plain)
 
-    def _raw_encrypt(self, data: bytes) -> bytes:
+    # ── Internal crypto ──────────────────────────────────────────────────────
+
+    def _raw_encrypt(self, plaintext: bytes) -> bytes:
+        """AES-256-GCM or fallback HMAC-SIV encrypt. Returns nonce+ct+tag."""
         try:
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
             nonce = secrets.token_bytes(_NONCE)
-            ct = AESGCM(self._key).encrypt(nonce, data, None)
-            return nonce + ct
+            ct_tag = AESGCM(self._key).encrypt(nonce, plaintext, None)
+            return nonce + ct_tag
         except ImportError:
             pass
         # Fallback: HMAC-based stream cipher
         nonce = secrets.token_bytes(_NONCE)
-        ks = self._keystream(nonce, len(data))
-        ct = bytes(p ^ k for p, k in zip(data, ks))
+        ks = self._keystream(nonce, len(plaintext))
+        ct = bytes(p ^ k for p, k in zip(plaintext, ks))
         tag = hmac.new(self._key, nonce + ct, hashlib.sha256).digest()[:_TAG]
         return nonce + ct + tag
 
     def _raw_decrypt(self, data: bytes) -> bytes:
+        """Decrypt and verify. Raises ValueError on tamper."""
         if len(data) < _NONCE + _TAG:
-            raise ValueError("Encrypted data too short")
+            raise ValueError("Encrypted field too short")
         try:
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-            nonce = data[:_NONCE]
-            ct    = data[_NONCE:]
+            nonce, ct_tag = data[:_NONCE], data[_NONCE:]
             try:
-                return AESGCM(self._key).decrypt(nonce, ct, None)
+                return AESGCM(self._key).decrypt(nonce, ct_tag, None)
             except Exception:
-                raise ValueError("Decryption failed — data tampered or wrong key")
+                raise ValueError("Field decryption failed — data tampered or wrong key")
         except ImportError:
             pass
         nonce = data[:_NONCE]
         ct    = data[_NONCE:-_TAG]
         tag   = data[-_TAG:]
-        exp   = hmac.new(self._key, nonce + ct, hashlib.sha256).digest()[:_TAG]
-        if not hmac.compare_digest(exp, tag):
-            raise ValueError("Decryption failed — authentication tag mismatch")
+        mac   = hmac.new(self._key, nonce + ct, hashlib.sha256).digest()[:_TAG]
+        if not hmac.compare_digest(mac, tag):
+            raise ValueError("Field decryption failed — data tampered or wrong key")
         ks = self._keystream(nonce, len(ct))
         return bytes(c ^ k for c, k in zip(ct, ks))
 
@@ -132,7 +135,7 @@ class FieldEncryption:
         return out[:length]
 
 
-# ┠ Global instance (lazy) ┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠┠
+# ── Global instance (lazy) ────────────────────────────────────────────────────
 _fe: Optional[FieldEncryption] = None
 
 
