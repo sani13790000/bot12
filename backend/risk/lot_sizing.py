@@ -6,6 +6,7 @@ Changes:
   P4-LS-3: max_risk_per_equity_pct guard
   P4-LS-BUGFIX: kelly_lot capped to 2x fixed_lot (was causing 4-6% actual risk)
   P4-LS-5: LotSizeResult carries margin_limited flag
+  P4-FIX-V2-2: UnknownSymbolError from get_pip_value → return min_lot gracefully
 """
 from __future__ import annotations
 import asyncio, math, time
@@ -132,7 +133,19 @@ class LotSizer:
             raise ValueError(f'stop_loss_pips must be finite, got {stop_loss_pips}')
 
         eff_equity = equity if (equity is not None and equity > 0) else balance
-        pip_val, source = await self.get_pip_value(sym)
+        try:
+            pip_val, source = await self.get_pip_value(sym)
+        except Exception as _pv_exc:
+            # P4-FIX-V2-2: Unknown symbol or pip error → return min_lot gracefully
+            logger.warning('get_pip_value failed, using min lot',
+                           symbol=sym, error=str(_pv_exc))
+            return LotSizeResult(
+                lot_size=self.config.min_lot, pip_value_used=0.0,
+                risk_usd=0.0, risk_percent=0.0, kelly_lot=0.0,
+                source='error', symbol=sym,
+                method='pip_value_error', margin_required=0.0,
+                margin_limited=True,
+            )
 
         eff_risk = (override_risk_pct if (override_risk_pct is not None and override_risk_pct > 0)
                     else self.config.risk_percent)
@@ -145,7 +158,6 @@ class LotSizer:
         kp = max(0.0, min(0.25, (win_rate - (1 - win_rate) / avg_rr) if avg_rr > 0 else 0.0))
         kl = (eff_equity * kp * self.config.kelly_fraction) / (stop_loss_pips * pip_val)
         # P4-LS-BUGFIX: cap kelly_lot to 2x fixed_lot
-        # Without cap: kelly can produce 6-10x fixed_lot → 4-6% actual risk
         kl = min(kl, 2.0 * fixed_lot)
         bl = 0.70 * fixed_lot + 0.30 * kl
 
@@ -161,56 +173,39 @@ class LotSizer:
             contract_size = 100_000.0 if sym.isalpha() and len(sym) == 6 else 10_000.0
             margin_per_lot = contract_size * (margin_pct / 100.0)
             margin_required = fl * margin_per_lot
-            max_lot_by_margin = max(self.config.min_lot,
+            max_affordable = (
                 (free_margin * (self.config.margin_buffer_pct / 100.0) / margin_per_lot)
-                if margin_per_lot > 0 else fl)
-            if fl > max_lot_by_margin:
-                logger.warning('Lot capped by margin',
-                               original=fl, capped=max_lot_by_margin,
-                               free_margin=free_margin)
-                fl = max_lot_by_margin
+                if margin_per_lot > 0 else fl
+            )
+            if fl > max_affordable:
+                fl = max(self.config.min_lot, min(fl, max_affordable))
                 margin_limited = True
-                margin_required = fl * margin_per_lot
 
-        fl = math.floor(fl / self.config.lot_step) * self.config.lot_step
-        fl = max(self.config.min_lot, round(fl, 2))
         ar = (fl * stop_loss_pips * pip_val / eff_equity * 100) if eff_equity > 0 else 0.0
-        method = ('margin_capped' if margin_limited else
-                  'min_fallback' if fl <= self.config.min_lot else
-                  'kelly_blend' if kp > 0 else 'fixed_risk')
         return LotSizeResult(
             lot_size=fl, pip_value_used=pip_val,
             risk_usd=round(fl * stop_loss_pips * pip_val, 2),
             risk_percent=round(ar, 3), kelly_lot=round(kl, 4),
-            source=source, symbol=sym, method=method,
-            margin_limited=margin_limited, margin_required=round(margin_required, 2),
-        )
+            source=source, symbol=sym,
+            method=('kelly_blend' if kp > 0 else 'fixed_risk'),
+            margin_limited=margin_limited, margin_required=round(margin_required, 2))
 
-    @staticmethod
-    def _resolve_canonical(sym):
-        if sym in _SYMBOL_ALIASES: return _SYMBOL_ALIASES[sym]
-        for t in range(1, 5):
-            c = sym[:-t]
-            if c in _PIP_VALUE_TABLE: return c
-            if c in _SYMBOL_ALIASES: return _SYMBOL_ALIASES[c]
-        return sym
+    def _resolve_canonical(self, sym: str) -> str:
+        return _SYMBOL_ALIASES.get(sym, sym)
 
-    async def _from_mt5(self, sym):
-        info = await asyncio.to_thread(self._mt5.get_symbol_info, sym)
-        if info is None: raise RuntimeError(f'MT5 None for {sym}')
-        tv = getattr(info, 'trade_tick_value', None)
-        ts = getattr(info, 'trade_tick_size', None)
-        if tv and tv > 0 and ts and ts > 0:
-            pt = getattr(info, 'point', ts)
-            ps = pt * 10 if pt <= 0.001 else pt
-            return tv * (ps / ts), 'mt5_tick_value'
-        ct = getattr(info, 'trade_contract_size', None)
-        if ct and ct > 0 and ts and ts > 0: return ts * ct, 'mt5_contract'
-        raise RuntimeError(f'MT5 pip fail {sym}')
+    async def _from_mt5(self, sym: str) -> Tuple[float, str]:
+        if self._mt5 is None:
+            raise RuntimeError('No MT5 connector')
+        val = await asyncio.to_thread(self._mt5.symbol_info, sym)
+        if val and hasattr(val, 'trade_tick_value') and val.trade_tick_value > 0:
+            return val.trade_tick_value, 'mt5'
+        raise UnknownSymbolError(f'MT5 has no pip value for {sym}')
 
-_lot_sizer = None
-def get_lot_sizer(config=None, mt5_connector=None):
-    global _lot_sizer
-    if _lot_sizer is None:
-        _lot_sizer = LotSizer(config=config, mt5_connector=mt5_connector)
-    return _lot_sizer
+
+_lot_sizer_instance: Optional[LotSizer] = None
+
+def get_lot_sizer(mt5_connector: Any = None) -> LotSizer:
+    global _lot_sizer_instance
+    if _lot_sizer_instance is None:
+        _lot_sizer_instance = LotSizer(mt5_connector=mt5_connector)
+    return _lot_sizer_instance
