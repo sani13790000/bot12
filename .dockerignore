@@ -1,4 +1,5 @@
-# .dockerignore — keep Docker image lean
+# .dockerignore — Phase 15 hardened
+# Keeps Docker image lean + protects source code
 
 # Git
 .git
@@ -61,3 +62,16 @@ Dockerfile*
 docs/
 *.md
 !README.md
+
+# P15-FIX-4: MQL5 source MUST NOT go into Docker image
+mql5/
+*.mq5
+*.mqh
+*.ex5
+
+# Release artifacts
+releases/
+source_archive/
+
+# Scripts
+scripts/
