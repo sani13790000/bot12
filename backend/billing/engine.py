@@ -1,1 +1,404 @@
-IiIiCmJhY2tlbmQvYmlsbGluZy9lbmdpbmUucHkKUGhhc2UgMTAg4oCUIEJpbGxpbmcgRW5naW5lCgpPcmNoZXN0cmF0ZXM6CiAgMS4gSWRlbXBvdGVudCBwYXltZW50IGNyZWF0aW9uCiAgMi4gU3Vic2NyaXB0aW9uIGxpZmVjeWNsZSBzdGF0ZSBtYWNoaW5lCiAgMy4gTGljZW5zZSBhY3RpdmF0aW9uIG9uIHN1Y2Nlc3NmdWwgcGF5bWVudAogIDQuIEludm9pY2UgZ2VuZXJhdGlvbgogIDUuIER1bm5pbmcgb24gcGFzdF9kdWUKIiIiCgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgZW51bQppbXBvcnQgdGltZQppbXBvcnQgdXVpZApmcm9tIGRhdGFjbGFzc2VzIGltcG9ydCBkYXRhY2xhc3MsIGZpZWxkCmZyb20gdHlwaW5nIGltcG9ydCBDYWxsYWJsZSwgT3B0aW9uYWwKCmZyb20gLnByb3ZpZGVyIGltcG9ydCAoCiAgICBDdXJyZW5jeSwgUGF5bWVudFByb3ZpZGVyLCBQYXltZW50UmVxdWVzdCwKICAgIFBheW1lbnRSZXN1bHQsIFBheW1lbnRTdGF0dXMsIFByb3ZpZGVyTmFtZSwKKQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgU3Vic2NyaXB0aW9uIGxpZmVjeWNsZQojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKY2xhc3MgU3Vic2NyaXB0aW9uU3RhdHVzKHN0ciwgZW51bS5FbnVtKToKICAgIFRSSUFMICAgICAgPSAidHJpYWwiCiAgICBBQ1RJVkUgICAgID0gImFjdGl2ZSIKICAgIFBBU1RfRFVFICAgPSAicGFzdF9kdWUiCiAgICBTVVNQRU5ERUQgID0gInN1c3BlbmRlZCIKICAgIEVYUElSRUQgICAgPSAiZXhwaXJlZCIKICAgIENBTkNFTExFRCAgPSAiY2FuY2VsbGVkIgogICAgUkVWT0tFRCAgICA9ICJyZXZva2VkIgoKCiMgQWxsb3dlZCB0cmFuc2l0aW9uczogc3RhdHVzIOKGkiBzZXQgb2YgbmV4dCB2YWxpZCBzdGF0dXNlcwpfU1VCX0ZTTTogZGljdFtTdWJzY3JpcHRpb25TdGF0dXMsIHNldFtTdWJzY3JpcHRpb25TdGF0dXNdXSA9IHsKICAgIFN1YnNjcmlwdGlvblN0YXR1cy5UUklBTDogICAgIHtTdWJzY3JpcHRpb25TdGF0dXMuQUNUSVZFLCBTdWJzY3JpcHRpb25TdGF0dXMuRVhQSVJFRCwgU3Vic2NyaXB0aW9uU3RhdHVzLkNBTkNFTExFRH0sCiAgICBTdWJzY3JpcHRpb25TdGF0dXMuQUNUSVZFOiAgICB7U3Vic2NyaXB0aW9uU3RhdHVzLlBBU1RfRFVFLCBTdWJzY3JpcHRpb25TdGF0dXMuRVhQSVJFRCwgU3Vic2NyaXB0aW9uU3RhdHVzLkNBTkNFTExFRCwgU3Vic2NyaXB0aW9uU3RhdHVzLlNVU1BFTkRFRH0sCiAgICBTdWJzY3JpcHRpb25TdGF0dXMuUEFTVF9EVUU6ICB7U3Vic2NyaXB0aW9uU3RhdHVzLkFDVElWRSwgU3Vic2NyaXB0aW9uU3RhdHVzLlNVU1BFTkRFRCwgU3Vic2NyaXB0aW9uU3RhdHVzLkVYUElSRUQsIFN1YnNjcmlwdGlvblN0YXR1cy5DQU5DRUxMRUR9LAogICAgU3Vic2NyaXB0aW9uU3RhdHVzLlNVU1BFTkRFRDoge1N1YnNjcmlwdGlvblN0YXR1cy5BQ1RJVkUsIFN1YnNjcmlwdGlvblN0YXR1cy5SRVZPS0VELCBTdWJzY3JpcHRpb25TdGF0dXMuQ0FOQ0VMTEVEfSwKICAgIFN1YnNjcmlwdGlvblN0YXR1cy5FWFBJUkVEOiAgIHtTdWJzY3JpcHRpb25TdGF0dXMuQUNUSVZFfSwgICAgICAgICMgcmUtc3Vic2NyaWJlCiAgICBTdWJzY3JpcHRpb25TdGF0dXMuQ0FOQ0VMTEVEOiB7U3Vic2NyaXB0aW9uU3RhdHVzLkFDVElWRX0sICAgICAgICAjIHJlLXN1YnNjcmliZQogICAgU3Vic2NyaXB0aW9uU3RhdHVzLlJFVk9LRUQ6ICAgc2V0KCksICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICMgdGVybWluYWwKfQoKCmNsYXNzIFN1YnNjcmlwdGlvblRyYW5zaXRpb25FcnJvcihFeGNlcHRpb24pOgogICAgIiIiUmFpc2VkIHdoZW4gYW4gaW52YWxpZCBGU00gdHJhbnNpdGlvbiBpcyBhdHRlbXB0ZWQuIiIiCgoKQGRhdGFjbGFzcwpjbGFzcyBTdWJzY3JpcHRpb246CiAgICBzdWJfaWQ6ICAgICAgICAgc3RyCiAgICB1c2VyX2lkOiAgICAgICAgc3RyCiAgICBwbGFuX2lkOiAgICAgICAgc3RyCiAgICBzdGF0dXM6ICAgICAgICAgU3Vic2NyaXB0aW9uU3RhdHVzCiAgICBjcmVhdGVkX2F0OiAgICAgZmxvYXQgPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9dGltZS50aW1lKQogICAgZXhwaXJlc19hdDogICAgIGZsb2F0ID0gMC4wCiAgICB0cmlhbF9lbmRzX2F0OiAgZmxvYXQgPSAwLjAKICAgIGNhbmNlbGxlZF9hdDogICBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICBkdW5uaW5nX2NvdW50OiAgaW50ID0gMCAgICAgICAgICAgIyBjb25zZWN1dGl2ZSBmYWlsZWQgcmVuZXdhbHMKICAgIGxpY2Vuc2Vfa2V5OiAgICBzdHIgPSAiIiAgICAgICAgICAjIHNldCBvbiBmaXJzdCBhY3RpdmF0aW9uCiAgICB0cmFuc2l0aW9uczogICAgbGlzdCA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1saXN0KQoKICAgICMg4oCUIEZTTSDigpTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJQKCiAgICBkZWYgdHJhbnNpdGlvbihzZWxmLCBuZXdfc3RhdHVzOiBTdWJzY3JpcHRpb25TdGF0dXMsIHJlYXNvbjogc3RyID0gIiIpIC0+IE5vbmU6CiAgICAgICAgYWxsb3dlZCA9IF9TVUJfRlNNLmdldChzZWxmLnN0YXR1cywgc2V0KCkpCiAgICAgICAgaWYgbmV3X3N0YXR1cyBub3QgaW4gYWxsb3dlZDoKICAgICAgICAgICAgcmFpc2UgU3Vic2NyaXB0aW9uVHJhbnNpdGlvbkVycm9yKAogICAgICAgICAgICAgICAgZiJ7c2VsZi5zdGF0dXN9IOKGkiB7bmV3X3N0YXR1c30gaXMgbm90IGFsbG93ZWQiCiAgICAgICAgICAgICkKICAgICAgICBzZWxmLnRyYW5zaXRpb25zLmFwcGVuZCh7CiAgICAgICAgICAgICJmcm9tIjogICBzZWxmLnN0YXR1cywKICAgICAgICAgICAgInRvIjogICAgIG5ld19zdGF0dXMsCiAgICAgICAgICAgICJ0cyI6ICAgICB0aW1lLnRpbWUoKSwKICAgICAgICAgICAgInJlYXNvbiI6IHJlYXNvbiwKICAgICAgICB9KQogICAgICAgIHNlbGYuc3RhdHVzID0gbmV3X3N0YXR1cwoKICAgIEBwcm9wZXJ0eQogICAgZGVmIGlzX2FjdGl2ZShzZWxmKSAtPiBib29sOgogICAgICAgIHJldHVybiBzZWxmLnN0YXR1cyBpbiB7CiAgICAgICAgICAgIFN1YnNjcmlwdGlvblN0YXR1cy5UUklBTCwKICAgICAgICAgICAgU3Vic2NyaXB0aW9uU3RhdHVzLkFDVElWRSwKICAgICAgICAgICAgU3Vic2NyaXB0aW9uU3RhdHVzLlBBU1RfRFVFLAogICAgICAgIH0KCiAgICBAcHJvcGVydHkKICAgIGRlZiBkYXlzX3JlbWFpbmluZyhzZWxmKSAtPiBpbnQ6CiAgICAgICAgaWYgbm90IHNlbGYuZXhwaXJlc19hdDoKICAgICAgICAgICAgcmV0dXJuIDAKICAgICAgICByZXR1cm4gbWF4KDAsIGludCgoc2VsZi5leHBpcmVzX2F0IC0gdGltZS50aW1lKCkpIC8gODY0MDApKQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgUGxhbiBjb25maWd1cmF0aW9uCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCgpQTEFOUzogZGljdFtzdHIsIGRpY3RdID0gewogICAgInRyaWFsIjogIHsicHJpY2VfdXNkIjogMCwgICAgICJkYXlzIjogMTQsICAgImxhYmVsIjogIlRyaWFsIn0sCiAgICAiYmFzaWMiOiAgeyJwcmljZV91c2QiOiAyOTAwsICJkYXlzIjogMzAsICAgImxhYmVsIjogIkJhc2ljIn0sCiAgICAicHJvIjogICAgeyJwcmljZV91c2QiOiA3OTAwLCAgImRheXMiOiAzMCwgICAibGFiZWwiOiAiUHJvIn0sCiAgICAiZW50ZXJwcmlzZSI6IHsicHJpY2VfdXNkIjogMTk5MDAsICJkYXlzIjogMzAsICAgImxhYmVsIjogIkVudGVycHJpc2UifSwKICAgICJsaWZldGltZSI6IHsicHJpY2VfdXNkIjogNDk5MDAsICJkYXlzIjogMzY1MDAsICJsYWJlbCI6ICJMaWZldGltZSJ9LAp9CgoKIyDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJDilJAKIyBJbnZvaWNlCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCgpAZGF0YWNsYXNzCmNsYXNzIEludm9pY2U6CiAgICBpbnZvaWNlX2lkOiAgc3RyCiAgICB1c2VyX2lkOiAgICAgc3RyCiAgICBwbGFuX2lkOiAgICAgc3RyCiAgICBhbW91bnQ6ICAgICAgaW50CiAgICBjdXJyZW5jeTogICAgQ3VycmVuY3kKICAgIHN0YXR1czogICAgICBzdHIgICAgICAgICAgICAgICAjICJwZW5kaW5nIiAvICJwYWlkIiAvICJmYWlsZWQiCiAgICBwcm92aWRlcjogICAgUHJvdmlkZXJOYW1lCiAgICBwcm92aWRlcl9yZWY6IHN0cgogICAgaWRlbXBvdGVuY3lfa2V5OiBzdHIKICAgIGNyZWF0ZWRfYXQ6ICBmbG9hdCA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT10aW1lLnRpbWUpCiAgICBwYWlkX2F0OiAgICAgT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgZXJyb3I6ICAgICAgIHN0ciA9ICIiCgogICAgZGVmIHRvX2RpY3Qoc2VsZikgLT4gZGljdDoKICAgICAgICByZXR1cm4gewogICAgICAgICAgICAiaW52b2ljZV9pZCI6ICBzZWxmLmludm9pY2VfaWQsCiAgICAgICAgICAgICJ1c2VyX2lkIjogICAgIHNlbGYudXNlcl9pZCwKICAgICAgICAgICAgInBsYW5faWQiOiAgICAgc2VsZi5wbGFuX2lkLAogICAgICAgICAgICAiYW1vdW50IjogICAgICBzZWxmLmFtb3VudCwKICAgICAgICAgICAgImN1cnJlbmN5IjogICAgc2VsZi5jdXJyZW5jeS52YWx1ZSwKICAgICAgICAgICAgInN0YXR1cyI6ICAgICAgc2VsZi5zdGF0dXMsCiAgICAgICAgICAgICJwcm92aWRlciI6ICAgIHNlbGYucHJvdmlkZXIudmFsdWUsCiAgICAgICAgICAgICJwcm92aWRlcl9yZWYiOiBzZWxmLnByb3ZpZGVyX3JlZiwKICAgICAgICAgICAgImNyZWF0ZWRfYXQiOiAgc2VsZi5jcmVhdGVkX2F0LAogICAgICAgICAgICAicGFpZF9hdCI6ICAgICBzZWxmLnBhaWRfYXQsCiAgICAgICAgfQoKCiMg4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQ4pSQCiMgQmlsbGluZ0VuZ2luZQojIOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkOKUkAoKY2xhc3MgQmlsbGluZ0VuZ2luZToKICAgICIiIgogICAgT3JjaGVzdHJhdGVzIHBheW1lbnQgKyBzdWJzY3JpcHRpb24gbGlmZWN5Y2xlLgoKICAgIERlcGVuZGVuY3ktaW5qZWN0ZWQgZm9yIHRlc3RhYmlsaXR5LgogICAgSW4gcHJvZHVjdGlvbjogaW5qZWN0IFN0cmlwZVByb3ZpZGVyIC8gWmFyaW5QYWxQcm92aWRlci4KICAgIEluIHRlc3RzOiBpbmplY3QgTW9ja1Byb3ZpZGVyLgogICAgIiIiCgogICAgZGVmIF9faW5pdF9fKAogICAgICAgIHNlbGYsCiAgICAgICAgcHJvdmlkZXI6IFBheW1lbnRQcm92aWRlciwKICAgICAgICBsaWNlbnNlX2FjdGl2YXRvcjogT3B0aW9uYWxbQ2FsbGFibGVbW3N0ciwgc3RyXSwgYm9vbF1dID0gTm9uZSwKICAgICAgICBkdW5uaW5nX21heF9yZXRyaWVzOiBpbnQgPSAzLAogICAgKSAtPiBOb25lOgogICAgICAgIHNlbGYuX3Byb3ZpZGVyICAgICAgICAgICAgID0gcHJvdmlkZXIKICAgICAgICBzZWxmLl9saWNlbnNlX2FjdGl2YXRvciAgICA9IGxpY2Vuc2VfYWN0aXZhdG9yIG9yIChsYW1iZGEgdWlkLCBwaWQ6IFRydWUpCiAgICAgICAgc2VsZi5fZHVubmluZ19tYXggICAgICAgICAgID0gZHVubmluZ19tYXhfcmV0cmllcwogICAgICAgIHNlbGYuX3N1YnM6ICAgZGljdFtzdHIsIFN1YnNjcmlwdGlvbl0gPSB7fSAgICMgdXNlcl9pZCDihpIgU3ViCiAgICAgICAgc2VsZi5faW52czogICBkaWN0W3N0ciwgSW52b2ljZV0gICAgICAgPSB7fSAgICMgaW52b2ljZV9pZCDihpIgSW52b2ljZQogICAgICAgIHNlbGYuX2lkZW06ICAgZGljdFtzdHIsIEludm9pY2VdICAgICAgID0ge30gICAjIGlkZW1wb3RlbmN5X2tleSDigpIgSW52b2ljZQoKICAgICMg4oCUIGNoZWNrb3V0IC8gY3JlYXRlX2ludm9pY2Ug4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSU4pSUCgogICAgZGVmIGNyZWF0ZV9pbnZvaWNlKAogICAgICAgIHNlbGYsCiAgICAgICAgdXNlcl9pZDogICAgICAgIHN0ciwKICAgICAgICBwbGFuX2lkOiAgICAgICAgc3RyLAogICAgICAgIGN1cnJlbmN5OiAgICAgICBDdXJyZW5jeSA9IEN1cnJlbmN5LlVTRCwKICAgICAgICBjYWxsYmFja191cmw6ICAgc3RyID0gIiIsCiAgICAgICAgaWRlbXBvdGVuY3lfa2V5OiBzdHIgPSAiIiwKICAgICkgLT4gSW52b2ljZToKICAgICAgICAiIiJJZGVtcG90ZW50IGludm9pY2UgY3JlYXRpb24uIiIiCiAgICAgICAgaWYgbm90IHBsYW5faWQgaW4gUExBTlM6CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoZiJVbmtub3duIHBsYW46IHtwbGFuX2lkfSIpCgogICAgICAgIGlkZW1fa2V5ID0gaWRlbXBvdGVuY3lfa2V5IG9yIHN0cih1dWlkLnV1aWQ0KCkpCgogICAgICAgICMgaWRlbXBvdGVuY3kgY2hlY2sgLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQogICAgICAgIGlmIGlkZW1fa2V5IGluIHNlbGYuX2lkZW06CiAgICAgICAgICAgIHJldHVybiBzZWxmLl9pZGVtW2lkZW1fa2V5XQoKICAgICAgICBwbGFuID0gUExBTlNbcGxhbl9pZF0KICAgICAgICBhbW91bnQgPSBwbGFuWyJwcmljZV91c2QiXSBpZiBjdXJyZW5jeSA9PSBDdXJyZW5jeS5VU0QgZWxzZSBwbGFuLmdldCgicHJpY2VfaXJyIiwgMCkKCiAgICAgICAgcHJfcmVzdWx0ID0gc2VsZi5fcHJvdmlkZXIuY3JlYXRlX3BheW1lbnQoUGF5bWVudFJlcXVlc3QoCiAgICAgICAgICAgIGFtb3VudD1hbW91bnQsCiAgICAgICAgICAgIGN1cnJlbmN5PWN1cnJlbmN5LAogICAgICAgICAgICB1c2VyX2lkPXVzZXJfaWQsCiAgICAgICAgICAgIHBsYW5faWQ9cGxhbl9pZCwKICAgICAgICAgICAgaWRlbXBvdGVuY3lfa2V5PWlkZW1fa2V5LAogICAgICAgICAgICBkZXNjcmlwdGlvbj1mIkJvdDEyIHtwbGFuWydsYWJlbCddfSBzdWJzY3JpcHRpb24iLAogICAgICAgICAgICBjYWxsYmFja191cmw9Y2FsbGJhY2tfdXJsLAogICAgICAgICkpCgogICAgICAgIGludiA9IEludm9pY2UoCiAgICAgICAgICAgIGludm9pY2VfaWQ9c3RyKHV1aWQudXVpZDQoKSksCiAgICAgICAgICAgIHVzZXJfaWQ9dXNlcl9pZCwKICAgICAgICAgICAgcGxhbl9pZD1wbGFuX2lkLAogICAgICAgICAgICBhbW91bnQ9YW1vdW50LAogICAgICAgICAgICBjdXJyZW5jeT1jdXJyZW5jeSwKICAgICAgICAgICAgc3RhdHVzPXByX3Jlc3VsdC5zdGF0dXMudmFsdWUsCiAgICAgICAgICAgIHByb3ZpZGVyPXByX3Jlc3VsdC5wcm92aWRlciwKICAgICAgICAgICAgcHJvdmlkZXJfcmVmPXByX3Jlc3VsdC5wcm92aWRlcl9yZWYsCiAgICAgICAgICAgIGlkZW1wb3RlbmN5X2tleT1pZGVtX2tleSwKICAgICAgICApCgogICAgICAgIHNlbGYuX2ludnNbaW52Lmludm9pY2VfaWRdID0gaW52CiAgICAgICAgc2VsZi5faWRlbVtpZGVtX2tleV0gICAgICAgPSBpbnYKCiAgICAgICAgIyBJbW1lZGlhdGVseSBhY3RpdmF0ZSBmb3IgdHJpYWwgb3IgZnJlZSBwbGFucwogICAgICAgIGlmIGFtb3VudCA9PSAwOgogICAgICAgICAgICBzZWxmLl9hY3RpdmF0ZV9saWNlbnNlKHVzZXJfaWQsIHBsYW5faWQsIGludi5pbnZvaWNlX2lkKQogICAgICAgICAgICBpbnYuc3RhdHVzID0gInBhaWQiCiAgICAgICAgICAgIGludi5wYWlkX2F0ID0gdGltZS50aW1lKCkKCiAgICAgICAgcmV0dXJuIGludgoKICAgICMg4oCUIHBheW1lbnRfc3VjY2VzcyDilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJQKCiAgICBkZWYgcGF5bWVudF9zdWNjZXNzKHNlbGYsIHByb3ZpZGVyX3JlZjogc3RyLCBpbnZvaWNlX2lkOiBzdHIgPSAiIikgLT4gT3B0aW9uYWxbSW52b2ljZV06CiAgICAgICAgIiIiQ2FsbGVkIGJ5IHdlYmhvb2sgb24gc3VjY2Vzc2Z1bCBwYXltZW50LiBBY3RpdmF0ZXMgbGljZW5zZS4iIiIKICAgICAgICBpbnYgPSBzZWxmLl9maW5kX2ludm9pY2UocHJvdmlkZXJfcmVmPXByb3ZpZGVyX3JlZiwgaW52b2ljZV9pZD1pbnZvaWNlX2lkKQogICAgICAgIGlmIG5vdCBpbnY6CiAgICAgICAgICAgIHJldHVybiBOb25lCiAgICAgICAgaWYgaW52LnN0YXR1cyA9PSAicGFpZCI6ICAgICAgICAgICAjIGlkZW1wb3RlbnQKICAgICAgICAgICAgcmV0dXJuIGludgogICAgICAgIGludi5zdGF0dXMgPSAicGFpZCIKICAgICAgICBpbnYucGFpZF9hdCA9IHRpbWUudGltZSgpCiAgICAgICAgc2VsZi5fYWN0aXZhdGVfbGljZW5zZShpbnYudXNlcl9pZCwgaW52LnBsYW5faWQsIGludi5pbnZvaWNlX2lkKQogICAgICAgIHJldHVybiBpbnYKCiAgICBkZWYgcGF5bWVudF9mYWlsZWQoc2VsZiwgcHJvdmlkZXJfcmVmOiBzdHIpIC0+IE9wdGlvbmFsW0ludm9pY2VdOgogICAgICAgICIiIkNhbGxlZCBieSB3ZWJob29rIG9uIGZhaWxlZCBwYXltZW50LiBEdW5uaW5nIGxvZ2ljLiIiIgogICAgICAgIGludiA9IHNlbGYuX2ZpbmRfaW52b2ljZShwcm92aWRlcl9yZWY9cHJvdmlkZXJfcmVmKQogICAgICAgIGlmIG5vdCBpbnY6CiAgICAgICAgICAgIHJldHVybiBOb25lCiAgICAgICAgaW52LnN0YXR1cyA9ICJmYWlsZWQiCiAgICAgICAgc3ViID0gc2VsZi5fc3Vicy5nZXQoaW52LnVzZXJfaWQpCiAgICAgICAgaWYgc3ViOgogICAgICAgICAgICBzdWIuZHVubmluZ19jb3VudCArPSAxCiAgICAgICAgICAgIGlmIHN1Yi5kdW5uaW5nX2NvdW50ID49IHNlbGYuX2R1bm5pbmdfbWF4OgogICAgICAgICAgICAgICAgc3ViLnRyYW5zaXRpb24oU3Vic2NyaXB0aW9uU3RhdHVzLlNVU1BFTkRFRCwgImR1bm5pbmdfbWF4X3JlYWNoZWQiKQogICAgICAgICAgICBlbGlmIHN1Yi5zdGF0dXMgPT0gU3Vic2NyaXB0aW9uU3RhdHVzLkFDVElWRToKICAgICAgICAgICAgICAgIHN1Yi50cmFuc2l0aW9uKFN1YnNjcmlwdGlvblN0YXR1cy5QQVNUX0RVRSwgInBheW1lbnRfZmFpbGVkIikKICAgICAgICByZXR1cm4gaW52CgogICAgIyDioCDigJIgQ2FuY2VsIC8gU3VzcGVuZCAvIFJldm9rZSDilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJQKCiAgICBkZWYgY2FuY2VsX3N1YnNjcmlwdGlvbihzZWxmLCB1c2VyX2lkOiBzdHIsIHJlYXNvbjogc3RyID0gIiIpIC0+IGJvb2w6CiAgICAgICAgc3ViID0gc2VsZi5fc3Vicy5nZXQodXNlcl9pZCkKICAgICAgICBpZiBub3Qgc3ViOgogICAgICAgICAgICByZXR1cm4gRmFsc2UKICAgICAgICBzdWIudHJhbnNpdGlvbihTdWJzY3JpcHRpb25TdGF0dXMuQ0FOQ0VMTEVELCByZWFzb24gb3IgInVzZXJfcmVxdWVzdCIpCiAgICAgICAgc3ViLmNhbmNlbGxlZF9hdCA9IHRpbWUudGltZSgpCiAgICAgICAgcmV0dXJuIFRydWUKCiAgICBkZWYgc3VzcGVuZF9zdWJzY3JpcHRpb24oc2VsZiwgdXNlcl9pZDogc3RyLCByZWFzb246IHN0ciA9ICIiKSAtPiBib29sOgogICAgICAgIHN1YiA9IHNlbGYuX3N1YnMuZ2V0KHVzZXJfaWQpCiAgICAgICAgaWYgbm90IHN1YjoKICAgICAgICAgICAgcmV0dXJuIEZhbHNlCiAgICAgICAgc3ViLnRyYW5zaXRpb24oU3Vic2NyaXB0aW9uU3RhdHVzLlNVU1BFTkRFRCwgcmVhc29uIG9yICJhZG1pbl9hY3Rpb24iKQogICAgICAgIHJldHVybiBUcnVlCgogICAgZGVmIHJldm9rZV9zdWJzY3JpcHRpb24oc2VsZiwgdXNlcl9pZDogc3RyLCByZWFzb246IHN0ciA9ICIiKSAtPiBib29sOgogICAgICAgIHN1YiA9IHNlbGYuX3N1YnMuZ2V0KHVzZXJfaWQpCiAgICAgICAgaWYgbm90IHN1YjoKICAgICAgICAgICAgcmV0dXJuIEZhbHNlCiAgICAgICAgc3ViLnRyYW5zaXRpb24oU3Vic2NyaXB0aW9uU3RhdHVzLlJFVk9LRUQsIHJlYXNvbiBvciAiYWRtaW5fYWN0aW9uIikKICAgICAgICByZXR1cm4gVHJ1ZQoKICAgIGRlZiByZWFjdGl2YXRlX3N1YnNjcmlwdGlvbihzZWxmLCB1c2VyX2lkOiBzdHIsIHJlYXNvbjogc3RyID0gIiIpIC0+IGJvb2w6CiAgICAgICAgc3ViID0gc2VsZi5fc3Vicy5nZXQodXNlcl9pZCkKICAgICAgICBpZiBub3Qgc3ViOgogICAgICAgICAgICByZXR1cm4gRmFsc2UKICAgICAgICBzdWIudHJhbnNpdGlvbihTdWJzY3JpcHRpb25TdGF0dXMuQUNUSVZFLCByZWFzb24gb3IgImFkbWluX3JlYWN0aXZhdGUiKQogICAgICAgIHN1Yi5kdW5uaW5nX2NvdW50ID0gMAogICAgICAgIHJldHVybiBUcnVlCgogICAgIyDioCAgZ2V0dGVycyDilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJQKCiAgICBkZWYgZ2V0X3N1YnNjcmlwdGlvbihzZWxmLCB1c2VyX2lkOiBzdHIpIC0+IE9wdGlvbmFsW1N1YnNjcmlwdGlvbl06CiAgICAgICAgcmV0dXJuIHNlbGYuX3N1YnMuZ2V0KHVzZXJfaWQpCgogICAgZGVmIGdldF9pbnZvaWNlcyhzZWxmLCB1c2VyX2lkOiBzdHIpIC0+IGxpc3RbSW52b2ljZV06CiAgICAgICAgcmV0dXJuIFtpbnYgZm9yIGludiAgaW4gc2VsZi5faW52cy52YWx1ZXMoKSBpZiBpbnYudXNlcl9pZCA9PSB1c2VyX2lkXQoKICAgIGRlZiBnZXRfYWxsX3N1YnNjcmlwdGlvbnMoc2VsZikgLT4gbGlzdFtTdWJzY3JpcHRpb25dOgogICAgICAgIHJldHVybiBsaXN0KHNlbGYuX3N1YnMudmFsdWVzKCkpCgogICAgIyDioCAgcHJpdmF0ZSDilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJTilJQKCiAgICBkZWYgX2FjdGl2YXRlX2xpY2Vuc2Uoc2VsZiwgdXNlcl9pZDogc3RyLCBwbGFuX2lkOiBzdHIsIGludm9pY2VfaWQ6IHN0cikgLT4gTm9uZToKICAgICAgICBwbGFuID0gUExBTlMuZ2V0KHBsYW5faWQsIHt9KQogICAgICAgIGRheXMgPSBwbGFuLmdldCgiZGF5cyIsIDMwKQogICAgICAgIG5vdyA9IHRpbWUudGltZSgpCgogICAgICAgIHN1YiA9IHNlbGYuX3N1YnMuZ2V0KHVzZXJfaWQpCiAgICAgICAgaWYgc3ViIGlzIE5vbmU6CiAgICAgICAgICAgICMgbmV3IHN1YnNjcmlwdGlvbgogICAgICAgICAgICBzdGF0dXMgPSAoCiAgICAgICAgICAgICAgICBTdWJzY3JpcHRpb25TdGF0dXMuVFJJQUwgaWYgcGxhbl9pZCA9PSAidHJpYWwiCiAgICAgICAgICAgICAgICBlbHNlIFN1YnNjcmlwdGlvblN0YXR1cy5BQ1RJVkUKICAgICAgICAgICAgKQogICAgICAgICAgICBzdWIgPSBTdWJzY3JpcHRpb24oCiAgICAgICAgICAgICAgICBzdWJfaWQ9c3RyKHV1aWQudXVpZDQoKSksCiAgICAgICAgICAgICAgICB1c2VyX2lkPXVzZXJfaWQsCiAgICAgICAgICAgICAgICBwbGFuX2lkPXBsYW5faWQsCiAgICAgICAgICAgICAgICBzdGF0dXM9c3RhdHVzLAogICAgICAgICAgICAgICAgZXhwaXJlc19hdD1ub3cgKyBkYXlzICogODY0MDAsCiAgICAgICAgICAgICAgICB0cmlhbF9lbmRzX2F0PW5vdyArIGRheXMgKiA4NjQwMCBpZiBwbGFuX2lkID09ICJ0cmlhbCIgZWxzZSAwLjAsCiAgICAgICAgICAgICkKICAgICAgICAgICAgc3ViLmxpY2Vuc2Vfa2V5ID0gZiJCT1QxMi17dXVpZC51dWlkNCgpLmhleFs6MTZdLnVwcGVyKCl9IgogICAgICAgICAgICBzZWxmLl9zdWJzW3VzZXJfaWRdID0gc3ViCiAgICAgICAgZWxzZToKICAgICAgICAgICAgIyByZW5ld2FsIG9yIHVwZ3JhZGUKICAgICAgICAgICAgaWYgc3ViLnN0YXR1cyBpbiB7U3Vic2NyaXB0aW9uU3RhdHVzLkVYUElSRUQsIFN1YnNjcmlwdGlvblN0YXR1cy5DQU5DRUxMRUQsIFN1YnNjcmlwdGlvblN0YXR1cy5QQVNUX0RVRX06CiAgICAgICAgICAgICAgICBzdWIudHJhbnNpdGlvbihTdWJzY3JpcHRpb25TdGF0dXMuQUNUSVZFLCAicmVuZXdhbCIpCiAgICAgICAgICAgIHN1Yi5leHBpcmVzX2F0ID0gbm93ICsgZGF5cyAqIDg2NDAwCiAgICAgICAgICAgIHN1Yi5wbGFuX2lkICAgID0gcGxhbl9pZAogICAgICAgICAgICBzdWIuZHVubmluZ19jb3VudCA9IDAKCiAgICAgICAgIyBjYWxsIGxpY2Vuc2UgYWN0aXZhdG9yIGhvb2sKICAgICAgICBzZWxmLl9saWNlbnNlX2FjdGl2YXRvcih1c2VyX2lkLCBzdWIubGljZW5zZV9rZXkpCgogICAgZGVmIF9maW5kX2ludm9pY2Uoc2VsZiwgcHJvdmlkZXJfcmVmOiBzdHIgPSAiIiwgaW52b2ljZV9pZDogc3RyID0gIiIpIC0+IE9wdGlvbmFsW0ludm9pY2VdOgogICAgICAgIGlmIGludm9pY2VfaWQgYW5kIGludm9pY2VfaWQgaW4gc2VsZi5faW52czoKICAgICAgICAgICAgcmV0dXJuIHNlbGYuX2ludnNbaW52b2ljZV9pZF0KICAgICAgICBmb3IgaW52IGluIHNlbGYuX2ludnMudmFsdWVzKCk6CiAgICAgICAgICAgIGlmIGludi5wcm92aWRlcl9yZWYgPT0gcHJvdmlkZXJfcmVmOgogICAgICAgICAgICAgICAgcmV0dXJuIGludgogICAgICAgIHJldHVybiBOb25lCg==
+from __future__ import annotations
+
+import enum
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
+
+from .provider import (
+    Currency, PaymentProvider, PaymentRequest,
+    PaymentResult, PaymentStatus, ProviderName,
+)
+
+
+class SubscriptionStatus(str, enum.Enum):
+    TRIAL     = "trial"
+    ACTIVE    = "active"
+    PAST_DUE  = "past_due"
+    SUSPENDED = "suspended"
+    EXPIRED   = "expired"
+    CANCELLED = "cancelled"
+    REVOKED   = "revoked"
+
+
+_SUB_FSM: Dict[SubscriptionStatus, set] = {
+    SubscriptionStatus.TRIAL:     {SubscriptionStatus.ACTIVE,
+                                   SubscriptionStatus.EXPIRED,
+                                   SubscriptionStatus.CANCELLED},
+    SubscriptionStatus.ACTIVE:    {SubscriptionStatus.PAST_DUE,
+                                   SubscriptionStatus.EXPIRED,
+                                   SubscriptionStatus.CANCELLED,
+                                   SubscriptionStatus.SUSPENDED},
+    SubscriptionStatus.PAST_DUE:  {SubscriptionStatus.ACTIVE,
+                                   SubscriptionStatus.SUSPENDED,
+                                   SubscriptionStatus.EXPIRED,
+                                   SubscriptionStatus.CANCELLED},
+    SubscriptionStatus.SUSPENDED: {SubscriptionStatus.ACTIVE,
+                                   SubscriptionStatus.REVOKED,
+                                   SubscriptionStatus.CANCELLED},
+    SubscriptionStatus.EXPIRED:   {SubscriptionStatus.ACTIVE},
+    SubscriptionStatus.CANCELLED: {SubscriptionStatus.ACTIVE},
+    SubscriptionStatus.REVOKED:   set(),
+}
+
+
+class SubscriptionTransitionError(Exception):
+    pass
+
+
+@dataclass
+class Subscription:
+    sub_id:         str
+    user_id:        str
+    plan_id:        str
+    status:         SubscriptionStatus
+    created_at:     float = field(default_factory=time.time)
+    expires_at:     float = 0.0
+    trial_ends_at:  float = 0.0
+    cancelled_at:   Optional[float] = None
+    dunning_count:  int   = 0
+    license_key:    str   = ""
+    transitions:    List  = field(default_factory=list)
+
+    def transition(self, new_status: SubscriptionStatus, reason: str = "") -> None:
+        allowed = _SUB_FSM.get(self.status, set())
+        if new_status not in allowed:
+            raise SubscriptionTransitionError(
+                f"Transition {self.status!r} -> {new_status!r} is not allowed"
+            )
+        self.transitions.append({
+            "from":   self.status,
+            "to":     new_status,
+            "ts":     time.time(),
+            "reason": reason,
+        })
+        self.status = new_status
+
+    @property
+    def is_active(self) -> bool:
+        return self.status in {
+            SubscriptionStatus.TRIAL,
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.PAST_DUE,
+        }
+
+    @property
+    def days_remaining(self) -> int:
+        if not self.expires_at:
+            return 0
+        return max(0, int((self.expires_at - time.time()) / 86400))
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status == SubscriptionStatus.REVOKED
+
+
+PLANS: Dict[str, Dict] = {
+    "trial": {
+        "price_usd":      0,
+        "price_irr":      0,
+        "days":           14,
+        "label":          "Trial",
+        "features":       ["signals_read", "signals_write", "dashboard"],
+        "max_devices":    1,
+        "max_positions":  3,
+    },
+    "basic": {
+        "price_usd":      2900,
+        "price_irr":      4_900_000,
+        "days":           30,
+        "label":          "Basic",
+        "features":       ["signals_read", "signals_write", "dashboard", "mt5"],
+        "max_devices":    2,
+        "max_positions":  10,
+    },
+    "pro": {
+        "price_usd":      7900,
+        "price_irr":      12_900_000,
+        "days":           30,
+        "label":          "Pro",
+        "features":       ["signals_read", "signals_write", "dashboard",
+                           "mt5", "ai", "analytics"],
+        "max_devices":    5,
+        "max_positions":  50,
+    },
+    "vip": {
+        "price_usd":      14900,
+        "price_irr":      24_900_000,
+        "days":           30,
+        "label":          "VIP",
+        "features":       ["signals_read", "signals_write", "dashboard",
+                           "mt5", "ai", "analytics", "institutional"],
+        "max_devices":    10,
+        "max_positions":  200,
+    },
+    "annual": {
+        "price_usd":      79900,
+        "price_irr":      129_900_000,
+        "days":           365,
+        "label":          "Annual Pro",
+        "features":       ["signals_read", "signals_write", "dashboard",
+                           "mt5", "ai", "analytics", "institutional"],
+        "max_devices":    10,
+        "max_positions":  500,
+    },
+}
+
+DUNNING_THRESHOLD = 3
+
+
+@dataclass
+class Invoice:
+    invoice_id:    str
+    user_id:       str
+    plan_id:       str
+    amount:        int
+    currency:      Currency
+    provider:      ProviderName
+    status:        PaymentStatus
+    checkout_url:  str   = ""
+    created_at:    float = field(default_factory=time.time)
+    confirmed_at:  Optional[float] = None
+    raw:           Dict  = field(default_factory=dict)
+    idempotency_key: str = ""
+
+
+class BillingEngine:
+    _IDEMPOTENCY_WINDOW_S: int = 3600
+
+    def __init__(
+        self,
+        provider: PaymentProvider,
+        on_license_activate: Optional[Callable[[str, str], None]] = None,
+        on_subscription_change: Optional[Callable[[Subscription], None]] = None,
+    ) -> None:
+        self._provider   = provider
+        self._on_activate = on_license_activate
+        self._on_change   = on_subscription_change
+        self._invoices:      Dict[str, Invoice]      = {}
+        self._subscriptions: Dict[str, Subscription] = {}
+        self._idempotency:   Dict[str, str]          = {}
+        self._audit:         List[Dict]              = []
+
+    def checkout(
+        self,
+        user_id:  str,
+        plan_id:  str,
+        currency: Currency = Currency.USD,
+    ) -> Invoice:
+        plan = PLANS.get(plan_id)
+        if plan is None:
+            raise ValueError(f"Unknown plan: {plan_id!r}")
+
+        # P10-BUG-2 FIX: idempotency check BEFORE creating PaymentRequest
+        idem_key = self._idem_key(user_id, plan_id)
+        if idem_key in self._idempotency:
+            existing_id = self._idempotency[idem_key]
+            if existing_id in self._invoices:
+                return self._invoices[existing_id]
+
+        amount = plan["price_irr"] if currency == Currency.IRR else plan["price_usd"]
+
+        req = PaymentRequest(
+            user_id=user_id,
+            plan_id=plan_id,
+            amount=amount,
+            currency=currency,
+            description=f"{plan['label']} subscription",
+            metadata={"user_id": user_id, "plan_id": plan_id},
+            idempotency_key=idem_key,
+        )
+
+        result: PaymentResult = self._provider.create_payment(req)
+
+        invoice = Invoice(
+            invoice_id=result.invoice_id,
+            user_id=user_id,
+            plan_id=plan_id,
+            amount=amount,
+            currency=currency,
+            provider=result.provider,
+            status=result.status,
+            checkout_url=result.checkout_url,
+            raw=result.raw,
+            idempotency_key=idem_key,
+        )
+        self._invoices[result.invoice_id] = invoice
+        self._idempotency[idem_key] = result.invoice_id
+
+        self._audit_log("CHECKOUT_CREATED", user_id=user_id,
+                        detail=f"plan={plan_id} invoice={result.invoice_id}")
+
+        if result.status == PaymentStatus.SUCCEEDED:
+            self._activate(invoice)
+
+        return invoice
+
+    def confirm_from_webhook(self, invoice_id: str, raw: Dict) -> Invoice:
+        invoice = self._invoices.get(invoice_id)
+        if invoice is None:
+            raise KeyError(f"Invoice not found: {invoice_id!r}")
+
+        if invoice.status == PaymentStatus.SUCCEEDED:
+            return invoice
+
+        result = self._provider.confirm_payment(invoice_id, raw)
+        invoice.status = result.status
+        invoice.raw.update(raw)
+
+        if result.status == PaymentStatus.SUCCEEDED:
+            invoice.confirmed_at = time.time()
+            self._activate(invoice)
+            self._audit_log("PAYMENT_CONFIRMED", user_id=invoice.user_id,
+                            detail=f"invoice={invoice_id}")
+        elif result.status == PaymentStatus.FAILED:
+            self._handle_payment_failure(invoice)
+        elif result.status == PaymentStatus.REFUNDED:
+            self._handle_refund(invoice)
+
+        return invoice
+
+    def admin_confirm(self, invoice_id: str, actor: str = "admin") -> Invoice:
+        invoice = self._invoices.get(invoice_id)
+        if invoice is None:
+            raise KeyError(f"Invoice not found: {invoice_id!r}")
+        if invoice.status == PaymentStatus.SUCCEEDED:
+            return invoice
+        invoice.status = PaymentStatus.SUCCEEDED
+        invoice.confirmed_at = time.time()
+        self._activate(invoice)
+        self._audit_log("ADMIN_CONFIRMED", user_id=invoice.user_id,
+                        detail=f"invoice={invoice_id} actor={actor}")
+        return invoice
+
+    def suspend(self, user_id: str, reason: str = "admin_action") -> Subscription:
+        sub = self._get_or_raise(user_id)
+        sub.transition(SubscriptionStatus.SUSPENDED, reason)
+        self._notify(sub)
+        self._audit_log("SUBSCRIPTION_SUSPENDED", user_id=user_id, detail=reason)
+        return sub
+
+    def revoke(self, user_id: str, reason: str = "admin_action") -> Subscription:
+        sub = self._get_or_raise(user_id)
+        if sub.status != SubscriptionStatus.SUSPENDED:
+            if SubscriptionStatus.SUSPENDED in _SUB_FSM.get(sub.status, set()):
+                sub.transition(SubscriptionStatus.SUSPENDED, "pre-revoke")
+        sub.transition(SubscriptionStatus.REVOKED, reason)
+        self._notify(sub)
+        self._audit_log("SUBSCRIPTION_REVOKED", user_id=user_id, detail=reason)
+        return sub
+
+    def cancel(self, user_id: str, reason: str = "user_request") -> Subscription:
+        sub = self._get_or_raise(user_id)
+        sub.transition(SubscriptionStatus.CANCELLED, reason)
+        sub.cancelled_at = time.time()
+        self._notify(sub)
+        self._audit_log("SUBSCRIPTION_CANCELLED", user_id=user_id, detail=reason)
+        return sub
+
+    def get_subscription(self, user_id: str) -> Optional[Subscription]:
+        return self._subscriptions.get(user_id)
+
+    def get_invoice(self, invoice_id: str) -> Optional[Invoice]:
+        return self._invoices.get(invoice_id)
+
+    def list_invoices(self, user_id: str) -> List[Invoice]:
+        return [i for i in self._invoices.values() if i.user_id == user_id]
+
+    def audit_log(self, user_id: Optional[str] = None) -> List[Dict]:
+        if user_id:
+            return [e for e in self._audit if e.get("user_id") == user_id]
+        return list(self._audit)
+
+    def _activate(self, invoice: Invoice) -> None:
+        user_id = invoice.user_id
+        plan    = PLANS[invoice.plan_id]
+        now     = time.time()
+
+        sub = self._subscriptions.get(user_id)
+
+        if sub is None:
+            is_trial    = invoice.plan_id == "trial"
+            status      = SubscriptionStatus.TRIAL if is_trial else SubscriptionStatus.ACTIVE
+            license_key = f"BOT12-{uuid.uuid4().hex[:16].upper()}"
+            sub = Subscription(
+                sub_id=str(uuid.uuid4()),
+                user_id=user_id,
+                plan_id=invoice.plan_id,
+                status=status,
+                expires_at=now + plan["days"] * 86400,
+                trial_ends_at=(now + plan["days"] * 86400) if is_trial else 0.0,
+                license_key=license_key,
+            )
+            self._subscriptions[user_id] = sub
+        else:
+            target = SubscriptionStatus.ACTIVE
+            if sub.status in (
+                SubscriptionStatus.TRIAL,
+                SubscriptionStatus.PAST_DUE,
+                SubscriptionStatus.EXPIRED,
+                SubscriptionStatus.CANCELLED,
+                SubscriptionStatus.SUSPENDED,
+            ) and target in _SUB_FSM.get(sub.status, set()):
+                sub.transition(target, f"payment_confirmed invoice={invoice.invoice_id}")
+            sub.plan_id       = invoice.plan_id
+            sub.expires_at    = now + plan["days"] * 86400
+            sub.dunning_count = 0
+
+        if self._on_activate and sub.license_key:
+            self._on_activate(user_id, sub.license_key)
+
+        self._notify(sub)
+
+    def _handle_payment_failure(self, invoice: Invoice) -> None:
+        sub = self._subscriptions.get(invoice.user_id)
+        if sub is None:
+            return
+
+        sub.dunning_count += 1
+        self._audit_log("PAYMENT_FAILED", user_id=invoice.user_id,
+                        detail=f"dunning={sub.dunning_count}")
+
+        if sub.status == SubscriptionStatus.ACTIVE:
+            sub.transition(SubscriptionStatus.PAST_DUE,
+                           f"payment_failed dunning={sub.dunning_count}")
+        elif sub.status == SubscriptionStatus.PAST_DUE:
+            if sub.dunning_count >= DUNNING_THRESHOLD:
+                sub.transition(SubscriptionStatus.SUSPENDED,
+                               f"dunning_threshold_reached count={sub.dunning_count}")
+
+        self._notify(sub)
+
+    def _handle_refund(self, invoice: Invoice) -> None:
+        sub = self._subscriptions.get(invoice.user_id)
+        if sub is None:
+            return
+        self._audit_log("PAYMENT_REFUNDED", user_id=invoice.user_id,
+                        detail=f"invoice={invoice.invoice_id}")
+        if sub.status == SubscriptionStatus.ACTIVE:
+            if SubscriptionStatus.SUSPENDED in _SUB_FSM.get(sub.status, set()):
+                sub.transition(SubscriptionStatus.SUSPENDED, "refund_issued")
+        self._notify(sub)
+
+    def _get_or_raise(self, user_id: str) -> Subscription:
+        sub = self._subscriptions.get(user_id)
+        if sub is None:
+            raise KeyError(f"No subscription for user: {user_id!r}")
+        return sub
+
+    def _notify(self, sub: Subscription) -> None:
+        if self._on_change:
+            self._on_change(sub)
+
+    def _idem_key(self, user_id: str, plan_id: str) -> str:
+        window = int(time.time()) // self._IDEMPOTENCY_WINDOW_S
+        return f"{user_id}:{plan_id}:{window}"
+
+    def _audit_log(self, event: str, user_id: str = "", detail: str = "") -> None:
+        self._audit.append({
+            "event":   event,
+            "user_id": user_id,
+            "detail":  detail,
+            "ts":      time.time(),
+        })
