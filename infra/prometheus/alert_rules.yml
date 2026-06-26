@@ -1,35 +1,84 @@
-# infra/prometheus/alert_rules.yml — Phase 15
 groups:
-  - name: galaxyvast
+  # ── License & Subscription 
+  - name: license
     rules:
-      - alert: APIDown
-        expr: up{job="api"} == 0
+      - alert: LicenseFailureHigh
+        expr: increase(galaxyvast_license_failures_total[5m]) > 3
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High rate of license failures"
+          runbook: "https://docs.galaxyvast.com/runbooks/license-failure"
+
+  # ── Heartbeat 
+  - name: heartbeat
+    rules:
+      - alert: HeartbeatLoss
+        expr: increase(galaxyvast_heartbeat_losses_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "EA heartbeat lost"
+          runbook: "https://docs.galaxyvast.com/runbooks/heartbeat-loss"
+
+  # ── Kill Switch  
+  - name: killswitch
+    rules:
+      - alert: KillSwitchActivated
+        expr: galaxyvast_kill_switch_active == 1
+        for: 0m
+        labels:
+          severity: critical
+          pagerduty: "true"
+        annotations:
+          summary: "KILL SWITCH ACTIVATED"
+          runbook: "https://docs.galaxyvast.com/runbooks/kill-switch"
+
+  # ── Drawdown 
+  - name: drawdown
+    rules:
+      - alert: DrawdownCritical
+        expr: galaxyvast_equity_drawdown_pct > 10
         for: 1m
         labels:
           severity: critical
+          pagerduty: "true"
         annotations:
-          summary: "API is down"
+          summary: "Drawdown exceeds 10%"
+          runbook: "https://docs.galaxyvast.com/runbooks/drawdown"
 
-      - alert: HighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+  # ── Reconciliation 
+  - name: reconciliation
+    rules:
+      - alert: ReconciliationMismatch
+        expr: increase(galaxyvast_reconciliation_mismatches_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: trading
+        annotations:
+          summary: "Position reconciliation mismatch"
+          runbook: "https://docs.galaxyvast.com/runbooks/reconciliation"
+
+  # ── API 
+  - name: api
+    rules:
+      - alert: APIDown
+        expr: up{job="api"} == 0
         for: 2m
         labels:
-          severity: warning
+          severity: critical
+          pagerduty: "true"
         annotations:
-          summary: "High 5xx error rate"
-
-      - alert: HighMemoryUsage
-        expr: container_memory_usage_bytes{name=~"galaxyvast.*"} > 1.8e9
+          summary: "API is down"
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Container memory > 1.8GB"
-
-      - alert: DrawdownCritical
-        expr: equity_drawdown_pct > 0.10
-        for: 0s
-        labels:
-          severity: critical
-        annotations:
-          summary: "Drawdown > 10% — kill switch may trigger"
+          summary: "High 5xx error rate"
