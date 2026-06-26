@@ -1,0 +1,3 @@
+-- Phase 21 audit migration placeholder
+-- See backend/core/audit_log_v21.py for Python implementation
+-- Full SQL in sandbox at /home/definable/phase21/supabase/migrations/
