@@ -1,9 +1,9 @@
 {
-  "title": "MT5Trading SaaS — Admin Observability",
-  "uid":   "mt5trading-phase15",
-  "tags":  ["mt5trading", "saas", "admin"],
+  "title": "MT5Trading SaaS Admin Observability",
+  "uid": "mt5trading-phase15",
+  "tags": ["mt5trading", "saas", "admin"],
   "refresh": "30s",
-  "time":  {"from": "now-3h", "to": "now"},
+  "time": {"from": "now-3h", "to": "now"},
   "panels": [
     {
       "id": 1, "type": "stat", "title": "Kill Switch Active",
@@ -16,7 +16,7 @@
     {
       "id": 2, "type": "stat", "title": "License Failures (5m)",
       "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "increase(license_failures_total_total[5m])", "legendFormat": "Failures"}],
+      "targets": [{"expr": "increase(license_failures_total_total[5m])"}],
       "fieldConfig": {"defaults": {"thresholds": {"steps": [
         {"value": 0, "color": "green"}, {"value": 3, "color": "yellow"}, {"value": 10, "color": "red"}
       ]}}}
@@ -24,7 +24,7 @@
     {
       "id": 3, "type": "stat", "title": "Heartbeat Losses (5m)",
       "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "increase(heartbeat_losses_total_total[5m])", "legendFormat": "Losses"}],
+      "targets": [{"expr": "increase(heartbeat_losses_total_total[5m])"}],
       "fieldConfig": {"defaults": {"thresholds": {"steps": [
         {"value": 0, "color": "green"}, {"value": 1, "color": "orange"}, {"value": 5, "color": "red"}
       ]}}}
@@ -32,7 +32,7 @@
     {
       "id": 4, "type": "gauge", "title": "Equity Drawdown %",
       "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "equity_drawdown_pct", "legendFormat": "Drawdown %"}],
+      "targets": [{"expr": "equity_drawdown_pct"}],
       "fieldConfig": {"defaults": {
         "min": 0, "max": 20, "unit": "percent",
         "thresholds": {"steps": [
@@ -43,7 +43,7 @@
     {
       "id": 5, "type": "stat", "title": "Reconciliation Mismatches",
       "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "reconciliation_mismatches_total_total", "legendFormat": "Mismatches"}],
+      "targets": [{"expr": "reconciliation_mismatches_total_total"}],
       "fieldConfig": {"defaults": {"thresholds": {"steps": [
         {"value": 0, "color": "green"}, {"value": 1, "color": "red"}
       ]}}}
@@ -51,7 +51,7 @@
     {
       "id": 6, "type": "stat", "title": "API Status",
       "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
-      "targets": [{"expr": "up{job='mt5trading-api'}", "legendFormat": "API"}],
+      "targets": [{"expr": "up{job='mt5trading-api'}"}],
       "fieldConfig": {"defaults": {"mappings": [
         {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}
       ]}}
@@ -69,8 +69,7 @@
       "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
       "targets": [
         {"expr": "increase(heartbeat_received_total_total[5m])", "legendFormat": "Received/5m"},
-        {"expr": "increase(heartbeat_losses_total_total[5m])", "legendFormat": "Lost/5m"},
-        {"expr": "histogram_quantile(0.95, heartbeat_gap_s)", "legendFormat": "Gap p95 (s)"}
+        {"expr": "increase(heartbeat_losses_total_total[5m])", "legendFormat": "Lost/5m"}
       ]
     },
     {
@@ -78,15 +77,7 @@
       "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
       "targets": [
         {"expr": "rate(trades_submitted_total_total[5m])", "legendFormat": "Submitted/s"},
-        {"expr": "rate(trades_filled_total_total[5m])", "legendFormat": "Filled/s"},
         {"expr": "rate(trades_rejected_total_total[5m])", "legendFormat": "Rejected/s"}
-      ]
-    },
-    {
-      "id": 30, "type": "table", "title": "Recent Alerts (last 1h)",
-      "gridPos": {"x": 0, "y": 20, "w": 24, "h": 8},
-      "targets": [
-        {"expr": "ALERTS{alertstate='firing'}", "legendFormat": "{{alertname}} — {{severity}}"}
       ]
     }
   ]
