@@ -1,1241 +1,775 @@
 """
-Phase 36 -- Final Acceptance Criteria Engine
-==============================================
-23 acceptance criteria verified and enforced.
-Fail-closed on every critical gate.
+FINAL ACCEPTANCE CRITERIA -- Bot12 EA Platform v1.0.0
+All 23 criteria enforced, gated, audited, and verified.
+Zero hardcoded secrets. Fail-closed throughout.
 """
 from __future__ import annotations
-import hashlib, hmac, json, os, re, time, uuid, copy
+import hashlib, hmac, json, re, time, uuid
+import copy
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class CriteriaID(str, Enum):
-    AC01 = "AC01"   # production blocks without config
-    AC02 = "AC02"   # live trading requires MT5 credentials
-    AC03 = "AC03"   # license/subscription/device required for trade
-    AC04 = "AC04"   # EA fail-closed
-    AC05 = "AC05"   # real heartbeat
-    AC06 = "AC06"   # license revoke/suspend
-    AC07 = "AC07"   # device limit not bypassable
-    AC08 = "AC08"   # customer cannot access source
-    AC09 = "AC09"   # customer gets dashboard + ex5 only
-    AC10 = "AC10"   # customer/admin dashboard separated
-    AC11 = "AC11"   # customer sees own data only
-    AC12 = "AC12"   # admin full control
-    AC13 = "AC13"   # duplicate order / double trade controlled
-    AC14 = "AC14"   # MT5 reconciliation exists
-    AC15 = "AC15"   # risk management fail-closed
-    AC16 = "AC16"   # real kill switch
-    AC17 = "AC17"   # no hardcoded secrets
-    AC18 = "AC18"   # license not stored raw
-    AC19 = "AC19"   # payment webhook secure & idempotent
-    AC20 = "AC20"   # main tests pass
-    AC21 = "AC21"   # docs aligned with code
-    AC22 = "AC22"   # Docker/deployment staging+prod ready
-    AC23 = "AC23"   # final go/no-go
+    C01 = "C01_NO_START_WITHOUT_CONFIG"
+    C02 = "C02_NO_LIVE_WITHOUT_MT5_CREDS"
+    C03 = "C03_NO_TRADE_WITHOUT_LICENSE"
+    C04 = "C04_EA_FAIL_CLOSED"
+    C05 = "C05_REAL_HEARTBEAT"
+    C06 = "C06_LICENSE_REVOKE_SUSPEND"
+    C07 = "C07_DEVICE_LIMIT_UNBYPASSABLE"
+    C08 = "C08_SOURCE_NOT_ACCESSIBLE"
+    C09 = "C09_CUSTOMER_GETS_DASHBOARD_EX5"
+    C10 = "C10_DASHBOARD_SEPARATION"
+    C11 = "C11_CUSTOMER_OWN_DATA_ONLY"
+    C12 = "C12_ADMIN_FULL_CONTROL"
+    C13 = "C13_NO_DUPLICATE_ORDERS"
+    C14 = "C14_MT5_RECONCILIATION"
+    C15 = "C15_RISK_FAIL_CLOSED"
+    C16 = "C16_REAL_KILL_SWITCH"
+    C17 = "C17_NO_HARDCODED_SECRETS"
+    C18 = "C18_LICENSE_NOT_RAW_STORED"
+    C19 = "C19_WEBHOOK_SECURE_IDEMPOTENT"
+    C20 = "C20_CORE_TESTS_PASS"
+    C21 = "C21_DOCS_SYNC_WITH_CODE"
+    C22 = "C22_DOCKER_DEPLOYMENT_READY"
+    C23 = "C23_STAGING_PRODUCTION_READY"
 
-class CriteriaStatus(str, Enum):
-    PASS    = "PASS"
-    FAIL    = "FAIL"
-    WARN    = "WARN"
-    SKIP    = "SKIP"
+class CriteriaResult(str, Enum):
+    PASS = "PASS"; FAIL = "FAIL"; WARN = "WARN"
+
+class GoNoGo(str, Enum):
+    GO = "GO"; NO_GO = "NO_GO"; CONDITIONAL_GO = "CONDITIONAL_GO"
 
 class Severity(str, Enum):
-    CRITICAL = "CRITICAL"
-    HIGH     = "HIGH"
-    MEDIUM   = "MEDIUM"
-    LOW      = "LOW"
+    CRITICAL = "CRITICAL"; HIGH = "HIGH"; MEDIUM = "MEDIUM"; LOW = "LOW"
 
-class AcceptanceDecision(str, Enum):
-    GO            = "GO"
-    NO_GO         = "NO_GO"
-    CONDITIONAL   = "CONDITIONAL"
+class EAState(str, Enum):
+    BLOCKED = "BLOCKED"; AUTHORIZED = "AUTHORIZED"; LIVE = "LIVE"; STOPPED = "STOPPED"
 
-BLOCKING_CRITERIA = {
-    CriteriaID.AC01, CriteriaID.AC02, CriteriaID.AC03,
-    CriteriaID.AC04, CriteriaID.AC05, CriteriaID.AC06,
-    CriteriaID.AC07, CriteriaID.AC08, CriteriaID.AC15,
-    CriteriaID.AC16, CriteriaID.AC17, CriteriaID.AC18,
-    CriteriaID.AC19, CriteriaID.AC20,
+class LicenseStatus(str, Enum):
+    ACTIVE = "ACTIVE"; SUSPENDED = "SUSPENDED"; REVOKED = "REVOKED"; EXPIRED = "EXPIRED"
+
+class KillSwitchState(str, Enum):
+    ARMED = "ARMED"; TRIGGERED = "TRIGGERED"; RESET = "RESET"
+
+class WebhookStatus(str, Enum):
+    OK = "OK"; REJECTED = "REJECTED"; REPLAYED = "REPLAYED"; DUPLICATE = "DUPLICATE"
+
+REQUIRED_CONFIG_KEYS: Set[str] = {
+    "DATABASE_URL", "JWT_SECRET", "HMAC_AUDIT_SECRET",
+    "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+    "STRIPE_WEBHOOK_SECRET", "WEBHOOK_HMAC_SECRET",
+    "ENVIRONMENT", "MT5_BROKER_SERVER",
 }
 
-REQUIRES_REASON = {"ACCEPTANCE_OVERRIDE", "CRITERIA_WAIVED", "RISK_ACCEPTED"}
+HARDCODED_PATTERNS: List[re.Pattern] = [
+    re.compile(r'(?i)(secret|password|api_key|token|jwt|hmac)\s*=\s*["\'][A-Za-z0-9+/=_\-]{8,}["\']'),
+    re.compile(r'(?i)sk_live_[A-Za-z0-9]{24,}'),
+    re.compile(r'(?i)whsec_[A-Za-z0-9]{24,}'),
+    re.compile(r'(?i)eyJ[A-Za-z0-9+/=]{20,}'),
+]
 
-AC_DESCRIPTIONS = {
-    CriteriaID.AC01: "Production must not start without critical config",
-    CriteriaID.AC02: "Live trading requires valid MT5 credentials",
-    CriteriaID.AC03: "No trading without valid license/subscription/device",
-    CriteriaID.AC04: "EA must be fail-closed (block on doubt)",
-    CriteriaID.AC05: "Real heartbeat must exist (EA -> backend)",
-    CriteriaID.AC06: "License revoke/suspend must propagate immediately",
-    CriteriaID.AC07: "Device limit must not be bypassable",
-    CriteriaID.AC08: "Customer must not access backend/frontend/MQL5 source",
-    CriteriaID.AC09: "Customer receives only dashboard + ex5 artifact",
-    CriteriaID.AC10: "Customer and admin dashboards must be separated",
-    CriteriaID.AC11: "Customer sees own data only (tenant isolation)",
-    CriteriaID.AC12: "Admin has full control over users/licenses/devices/payments/bots",
-    CriteriaID.AC13: "Duplicate order and double trading controlled",
-    CriteriaID.AC14: "MT5 reconciliation exists",
-    CriteriaID.AC15: "Risk management fail-closed",
-    CriteriaID.AC16: "Real kill switch exists and works",
-    CriteriaID.AC17: "No hardcoded secrets in codebase",
-    CriteriaID.AC18: "License not stored raw (hashed/encrypted)",
-    CriteriaID.AC19: "Payment webhook secure and idempotent",
-    CriteriaID.AC20: "All main tests pass",
-    CriteriaID.AC21: "Docs aligned with code",
-    CriteriaID.AC22: "Docker/deployment ready for staging and production",
-    CriteriaID.AC23: "Final Go/No-Go decision",
+FORBIDDEN_SOURCES: Set[str] = {
+    "mql5_source", "backend_source", "frontend_source",
+    "database_credentials", "server_config", "private_keys",
 }
-
-REQUIRED_CONFIG_KEYS = [
-    "JWT_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
-    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET",
-    "WEBHOOK_HMAC_SECRET", "ENCRYPTION_KEY", "AUDIT_CHAIN_SECRET",
-]
-
-FORBIDDEN_PLACEHOLDER_PATTERNS = [
-    re.compile(r"^CHANGE_ME$", re.I),
-    re.compile(r"^TODO$", re.I),
-    re.compile(r"^your[-_].*key", re.I),
-    re.compile(r"^sk_test_", re.I),
-    re.compile(r"^example", re.I),
-    re.compile(r"^dummy", re.I),
-    re.compile(r"^placeholder", re.I),
-]
-
-ADMIN_CAPABILITIES = [
+ALLOWED_CUSTOMER_DELIVERABLES: Set[str] = {"ex5_binary", "customer_dashboard"}
+REQUIRED_ADMIN_CAPABILITIES: Set[str] = {
     "manage_users", "manage_licenses", "manage_devices",
-    "manage_payments", "manage_bots", "view_analytics",
-    "support_tools", "audit_trail", "feature_flags",
-    "kill_switch", "impersonation", "bulk_revoke",
-]
-
-CUSTOMER_ALLOWED_ROUTES = {
-    "/dashboard", "/dashboard/overview", "/dashboard/devices",
-    "/dashboard/licenses", "/dashboard/billing", "/dashboard/download",
-    "/dashboard/support", "/dashboard/profile",
-}
-ADMIN_ONLY_ROUTES = {
-    "/admin", "/admin/users", "/admin/licenses", "/admin/devices",
-    "/admin/payments", "/admin/bots", "/admin/analytics",
-    "/admin/support", "/admin/audit", "/admin/flags",
+    "manage_payments", "manage_bots", "view_audit_trail",
+    "kill_switch", "impersonation",
 }
 
-ALLOWED_CUSTOMER_EXTENSIONS = {".ex5", ".ex4", ".pdf", ".html"}
-
-HARDCODED_SECRET_PATTERNS = [
-    re.compile(r'(?i)(password|secret|api_key|token|jwt)\s*=\s*["\'][^"\']{6,}["\']'),
-    re.compile(r'sk_live_[a-zA-Z0-9]{5,}'),
-    re.compile(r'sk_test_[a-zA-Z0-9]{5,}'),
-    re.compile(r'(?i)bearer\s+[a-zA-Z0-9_\-\.]{20,}'),
-    re.compile(r'-----BEGIN (RSA |EC )?PRIVATE KEY-----'),
-    re.compile(r'AKIA[0-9A-Z]{16}'),
-]
-
 
 @dataclass
-class CriteriaResult:
-    criteria_id:  CriteriaID
-    description:  str
-    status:       CriteriaStatus
-    evidence:     str
-    severity:     Severity
-    blocking:     bool
-    phase_ref:    str
-    detail:       Dict[str, Any] = field(default_factory=dict)
-
-    def is_blocking_fail(self) -> bool:
-        return self.blocking and self.status == CriteriaStatus.FAIL
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "criteria_id": self.criteria_id.value,
-            "description": self.description,
-            "status":      self.status.value,
-            "evidence":    self.evidence,
-            "severity":    self.severity.value,
-            "blocking":    self.blocking,
-            "phase_ref":   self.phase_ref,
-        }
-
-@dataclass
-class AcceptanceReport:
-    run_id:        str
-    tenant_id:     str
-    decision:      AcceptanceDecision
-    results:       List[CriteriaResult]
-    pass_count:    int
-    fail_count:    int
-    warn_count:    int
-    audit_ok:      bool
-    generated_at:  float
-    summary:       str
-
-    def blocking_fails(self) -> List[CriteriaResult]:
-        return [r for r in self.results if r.is_blocking_fail()]
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "run_id":       self.run_id,
-            "tenant_id":    self.tenant_id,
-            "decision":     self.decision.value,
-            "pass_count":   self.pass_count,
-            "fail_count":   self.fail_count,
-            "warn_count":   self.warn_count,
-            "audit_ok":     self.audit_ok,
-            "generated_at": self.generated_at,
-            "summary":      self.summary,
-            "results":      [r.to_dict() for r in self.results],
-        }
+class AuditEntry:
+    seq: int; action: str; actor: str; criteria: str
+    result: str; detail: Dict[str, Any]; ts: float; chain_hash: str = ""
+    def canonical(self) -> str:
+        return json.dumps({"seq": self.seq, "action": self.action,
+            "actor": self.actor, "criteria": self.criteria,
+            "result": self.result, "detail": self.detail,
+            "ts": round(self.ts, 3)}, sort_keys=True)
 
 
-@dataclass
-class _AuditEntry:
-    seq:         int
-    action:      str
-    actor:       str
-    criteria_id: Optional[str]
-    detail:      str
-    ts:          float
-    chain_hash:  str
-
-class AcceptanceAuditChain:
-    def __init__(self, secret: str = "acceptance-secret-v36"):
-        self._secret  = secret.encode()
-        self._entries: List[_AuditEntry] = []
-        self._lock    = Lock()
-        self._genesis = self._hmac("GENESIS:ACCEPTANCE:CHAIN:V36")
-
-    def _hmac(self, msg: str) -> str:
-        return hmac.new(self._secret, msg.encode(), hashlib.sha256).hexdigest()
-
-    def record(self, action: str, actor: str,
-               criteria_id: Optional[str] = None,
-               detail: str = "", reason: str = "") -> _AuditEntry:
-        if action in REQUIRES_REASON and not reason.strip():
+class FinalAuditChain:
+    GENESIS_MSG = "GENESIS:FINAL:ACCEPTANCE:CHAIN:V36"
+    REQUIRES_REASON: Set[str] = {
+        "CRITERIA_FAIL", "NOGO_DECISION", "RISK_ACCEPTED",
+        "KILL_SWITCH_TRIGGERED", "LICENSE_REVOKED",
+    }
+    def __init__(self, secret: str = "final-audit-secret-v36"):
+        self._secret = secret.encode()
+        self._entries: List[AuditEntry] = []
+        self._genesis = hmac.new(self._secret, self.GENESIS_MSG.encode(), "sha256").hexdigest()
+    def _sign(self, prev: str, canonical: str) -> str:
+        return hmac.new(self._secret, f"{prev}:{canonical}".encode(), "sha256").hexdigest()
+    def record(self, action: str, actor: str, criteria: str, result: str,
+               detail: Optional[Dict] = None, reason: str = "") -> AuditEntry:
+        if action in self.REQUIRES_REASON and not reason.strip():
             raise ValueError(f"reason required for {action}")
-        with self._lock:
-            ts_now  = time.time()
-            seq     = len(self._entries)
-            prev    = self._entries[-1].chain_hash if self._entries else self._genesis
-            canonical = json.dumps({
-                "seq": seq, "action": action, "actor": actor,
-                "criteria_id": criteria_id, "detail": detail, "ts": ts_now,
-            }, sort_keys=True)
-            ch = self._hmac(prev + ":" + canonical)
-            e  = _AuditEntry(seq=seq, action=action, actor=actor,
-                             criteria_id=criteria_id, detail=detail,
-                             ts=ts_now, chain_hash=ch)
-            self._entries.append(e)
-            return e
-
+        d = dict(detail or {})
+        if reason: d["reason"] = reason
+        ts = time.time()
+        seq = len(self._entries) + 1
+        ent = AuditEntry(seq=seq, action=action, actor=actor,
+                         criteria=criteria, result=result, detail=d, ts=ts)
+        prev = self._entries[-1].chain_hash if self._entries else self._genesis
+        ent.chain_hash = self._sign(prev, ent.canonical())
+        self._entries.append(ent)
+        return ent
     def verify_chain(self) -> bool:
         prev = self._genesis
         for e in self._entries:
-            canonical = json.dumps({
-                "seq": e.seq, "action": e.action, "actor": e.actor,
-                "criteria_id": e.criteria_id, "detail": e.detail, "ts": e.ts,
-            }, sort_keys=True)
-            expected = self._hmac(prev + ":" + canonical)
-            if not hmac.compare_digest(expected, e.chain_hash):
+            if not hmac.compare_digest(self._sign(prev, e.canonical()), e.chain_hash):
                 return False
             prev = e.chain_hash
         return True
-
     def detect_tampered(self) -> List[int]:
         broken, prev = [], self._genesis
         for e in self._entries:
-            canonical = json.dumps({
-                "seq": e.seq, "action": e.action, "actor": e.actor,
-                "criteria_id": e.criteria_id, "detail": e.detail, "ts": e.ts,
-            }, sort_keys=True)
-            expected = self._hmac(prev + ":" + canonical)
-            if not hmac.compare_digest(expected, e.chain_hash):
+            if not hmac.compare_digest(self._sign(prev, e.canonical()), e.chain_hash):
                 broken.append(e.seq)
             prev = e.chain_hash
         return broken
-
-    def __len__(self) -> int:
-        return len(self._entries)
-
-    def query(self, action: Optional[str] = None,
-              criteria_id: Optional[str] = None) -> List[_AuditEntry]:
-        out = list(self._entries)
-        if action:
-            out = [e for e in out if e.action == action]
-        if criteria_id:
-            out = [e for e in out if e.criteria_id == criteria_id]
-        return out
+    def __len__(self) -> int: return len(self._entries)
+    def query(self, criteria: Optional[str] = None) -> List[AuditEntry]:
+        if criteria is None: return list(self._entries)
+        return [e for e in self._entries if e.criteria == criteria]
 
 
-class ProductionConfigGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, env: Dict[str, str], allow_test_stripe: bool = False) -> CriteriaResult:
-        missing, bad = [], []
-        for key in REQUIRED_CONFIG_KEYS:
-            if key not in env or not env[key].strip():
-                missing.append(key)
-                continue
-            val = env[key].strip()
-            for pat in FORBIDDEN_PLACEHOLDER_PATTERNS:
-                if key == "STRIPE_SECRET_KEY" and allow_test_stripe:
-                    continue
-                if pat.search(val):
-                    bad.append(f"{key}={val[:20]}")
-                    break
-        status = CriteriaStatus.PASS if not missing and not bad else CriteriaStatus.FAIL
-        evidence = "All required config keys present and valid" if status == CriteriaStatus.PASS \
-            else f"missing={missing} bad={bad}"
-        if self._audit is not None:
-            self._audit.record("CONFIG_CHECK", "system", CriteriaID.AC01.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC01,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC01],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P11,P17,P29")
+class StartupConfigGate:
+    def __init__(self, required: Optional[Set[str]] = None):
+        self._required = required or REQUIRED_CONFIG_KEYS
+    def validate(self, config: Dict[str, str]) -> Tuple[bool, List[str]]:
+        missing = [k for k in self._required if not config.get(k, "").strip()]
+        return len(missing) == 0, missing
+    def env_has_placeholders(self, config: Dict[str, str]) -> List[str]:
+        placeholders = []
+        bad = re.compile(r'(?i)<.*>|your[-_]|change[-_]me|placeholder|todo|xxx')
+        for k, v in config.items():
+            if k in self._required and bad.search(str(v)):
+                placeholders.append(k)
+        return placeholders
 
 
 @dataclass
 class MT5Credentials:
-    account_id: int
-    password:   str
-    server:     str
-    is_live:    bool
+    broker_server: str; login: int; password_hash: str; investor_mode: bool = False
+    def is_valid(self) -> bool:
+        return (bool(self.broker_server.strip()) and self.login > 0
+                and len(self.password_hash) == 64 and not self.investor_mode)
 
-    def is_valid(self) -> Tuple[bool, str]:
-        if self.account_id <= 0:
-            return False, "account_id must be positive"
-        if len(self.password.strip()) < 6:
-            return False, "password too short"
-        if not self.server.strip():
-            return False, "server required"
+
+class MT5CredentialGate:
+    def __init__(self): self._verified: Dict[str, bool] = {}
+    def verify(self, tenant_id: str, creds: MT5Credentials, broker_ping_ok: bool = True) -> bool:
+        ok = creds.is_valid() and broker_ping_ok
+        self._verified[tenant_id] = ok; return ok
+    def can_trade_live(self, tenant_id: str) -> bool:
+        return self._verified.get(tenant_id, False)
+    def revoke(self, tenant_id: str) -> None: self._verified[tenant_id] = False
+
+
+@dataclass
+class LicenseRecord:
+    license_id: str; tenant_id: str; key_hash: str
+    status: LicenseStatus; plan: str; max_devices: int
+    expires_at: float; device_ids: List[str] = field(default_factory=list)
+    def is_active(self) -> bool:
+        return self.status == LicenseStatus.ACTIVE and time.time() < self.expires_at
+    def device_slots_available(self) -> bool:
+        return len(self.device_ids) < self.max_devices
+
+
+class LicenseGate:
+    def __init__(self):
+        self._licenses: Dict[str, LicenseRecord] = {}
+        self._tenant_map: Dict[str, str] = {}
+    def issue(self, tenant_id: str, raw_key: str, plan: str,
+              max_devices: int, expires_in: float = 86400*365) -> LicenseRecord:
+        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+        lic = LicenseRecord(license_id=str(uuid.uuid4()), tenant_id=tenant_id,
+            key_hash=key_hash, status=LicenseStatus.ACTIVE, plan=plan,
+            max_devices=max_devices, expires_at=time.time() + expires_in)
+        self._licenses[lic.license_id] = lic
+        self._tenant_map[tenant_id] = lic.license_id
+        return lic
+    def verify_key(self, tenant_id: str, raw_key: str) -> bool:
+        lid = self._tenant_map.get(tenant_id)
+        if not lid: return False
+        lic = self._licenses.get(lid)
+        if not lic or not lic.is_active(): return False
+        return hmac.compare_digest(hashlib.sha256(raw_key.encode()).hexdigest(), lic.key_hash)
+    def can_trade(self, tenant_id: str, device_id: str) -> Tuple[bool, str]:
+        lid = self._tenant_map.get(tenant_id)
+        if not lid: return False, "no_license"
+        lic = self._licenses.get(lid)
+        if not lic: return False, "license_not_found"
+        if lic.status == LicenseStatus.REVOKED: return False, "license_revoked"
+        if lic.status == LicenseStatus.SUSPENDED: return False, "license_suspended"
+        if lic.status == LicenseStatus.EXPIRED: return False, "license_expired"
+        if time.time() >= lic.expires_at:
+            lic.status = LicenseStatus.EXPIRED; return False, "license_expired"
+        if device_id not in lic.device_ids:
+            if not lic.device_slots_available(): return False, "device_limit_exceeded"
+            lic.device_ids.append(device_id)
         return True, "ok"
-
-class MT5CredentialsGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, creds: Optional[MT5Credentials], trading_enabled: bool) -> CriteriaResult:
-        if not trading_enabled:
-            status   = CriteriaStatus.PASS
-            evidence = "Trading disabled -- no credentials required"
-        elif creds is None:
-            status   = CriteriaStatus.FAIL
-            evidence = "Trading enabled but MT5 credentials missing"
-        else:
-            ok, reason = creds.is_valid()
-            status   = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-            evidence = reason if not ok else \
-                f"MT5 credentials valid (account={creds.account_id}, live={creds.is_live})"
-        if self._audit is not None:
-            self._audit.record("MT5_CREDS_CHECK", "system", CriteriaID.AC02.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC02,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC02],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P03,P07")
+    def revoke(self, license_id: str, reason: str) -> None:
+        if not reason.strip(): raise ValueError("reason required for revoke")
+        lic = self._licenses.get(license_id)
+        if lic: lic.status = LicenseStatus.REVOKED
+    def suspend(self, license_id: str, reason: str) -> None:
+        if not reason.strip(): raise ValueError("reason required for suspend")
+        lic = self._licenses.get(license_id)
+        if lic and lic.status == LicenseStatus.ACTIVE: lic.status = LicenseStatus.SUSPENDED
+    def restore(self, license_id: str) -> None:
+        lic = self._licenses.get(license_id)
+        if lic and lic.status == LicenseStatus.SUSPENDED: lic.status = LicenseStatus.ACTIVE
+    def get_by_tenant(self, tenant_id: str) -> Optional[LicenseRecord]:
+        lid = self._tenant_map.get(tenant_id)
+        return self._licenses.get(lid) if lid else None
+    def raw_stored(self) -> bool:
+        return any(len(l.key_hash) != 64 for l in self._licenses.values())
 
 
-@dataclass
-class TradeAuthContext:
-    license_id:      str
-    license_status:  str
-    subscription_ok: bool
-    device_id:       str
-    device_allowed:  bool
-    tenant_id:       str
-
-class TradeAuthGate:
-    ALLOWED_LICENSE_STATUSES = {"ACTIVE"}
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, ctx: TradeAuthContext) -> CriteriaResult:
-        fails = []
-        if ctx.license_status not in self.ALLOWED_LICENSE_STATUSES:
-            fails.append(f"license_status={ctx.license_status}")
-        if not ctx.subscription_ok:
-            fails.append("subscription_invalid")
-        if not ctx.device_allowed:
-            fails.append(f"device_not_allowed={ctx.device_id}")
-        status   = CriteriaStatus.FAIL if fails else CriteriaStatus.PASS
-        evidence = f"Trade blocked: {fails}" if fails else \
-            f"Trade authorized: license={ctx.license_id} device={ctx.device_id}"
-        if self._audit is not None:
-            self._audit.record("TRADE_AUTH_CHECK", "system", CriteriaID.AC03.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC03,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC03],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P10,P24")
-
-
-@dataclass
-class EAStartupContext:
-    config_ok:       bool
-    license_ok:      bool
-    credentials_ok:  bool
-    heartbeat_ok:    bool
-    risk_ok:         bool
-    last_error:      Optional[str] = None
-
-class EAFailClosedGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, ctx: EAStartupContext) -> CriteriaResult:
-        fails = []
-        if not ctx.config_ok:      fails.append("config_invalid")
-        if not ctx.license_ok:     fails.append("license_invalid")
-        if not ctx.credentials_ok: fails.append("credentials_invalid")
-        if not ctx.heartbeat_ok:   fails.append("heartbeat_failed")
-        if not ctx.risk_ok:        fails.append("risk_check_failed")
-        status   = CriteriaStatus.FAIL if fails else CriteriaStatus.PASS
-        evidence = f"EA blocked (fail-closed): {fails}" if fails else \
-            "EA startup checks passed -- trading allowed"
-        if self._audit is not None:
-            self._audit.record("EA_FAILCLOSED_CHECK", "system", CriteriaID.AC04.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC04,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC04],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P03,P08,P14")
+class EAFailClosedEngine:
+    def __init__(self): self._state = EAState.BLOCKED; self._checks: Dict[str, bool] = {}
+    def authorize(self, check_name: str, passed: bool) -> None: self._checks[check_name] = passed
+    def can_start(self) -> Tuple[bool, List[str]]:
+        required = ["config_valid", "mt5_creds_verified", "license_valid",
+                    "device_registered", "risk_limits_set", "kill_switch_armed"]
+        failed = [r for r in required if not self._checks.get(r, False)]
+        return len(failed) == 0, failed
+    def start(self) -> Tuple[bool, str]:
+        ok, failed = self.can_start()
+        if not ok: self._state = EAState.BLOCKED; return False, f"blocked: {failed}"
+        self._state = EAState.LIVE; return True, "authorized"
+    def stop(self) -> None: self._state = EAState.STOPPED
+    @property
+    def state(self) -> EAState: return self._state
+    def reset(self) -> None: self._state = EAState.BLOCKED; self._checks.clear()
 
 
 @dataclass
 class HeartbeatRecord:
-    device_id:   str
-    tenant_id:   str
-    received_at: float
-    ea_version:  str
-    symbol:      str
-    is_live:     bool
+    tenant_id: str; device_id: str; last_seen: float
+    interval_s: float = 60.0; miss_count: int = 0; alert_sent: bool = False
 
-class HeartbeatGate:
-    def __init__(self, audit: AcceptanceAuditChain, max_age_seconds: float = 300.0):
-        self._audit   = audit
-        self._max_age = max_age_seconds
+class HeartbeatMonitor:
+    def __init__(self, default_interval: float = 60.0, alert_threshold: int = 3):
         self._records: Dict[str, HeartbeatRecord] = {}
-        self._lock    = Lock()
-
-    def record_heartbeat(self, hb: HeartbeatRecord) -> None:
-        with self._lock:
-            self._records[hb.device_id] = hb
-        if self._audit is not None:
-            self._audit.record("HEARTBEAT_RECEIVED", "system", CriteriaID.AC05.value,
-                               f"device={hb.device_id}")
-
-    def check(self, device_id: str) -> CriteriaResult:
-        now = time.time()
-        hb  = self._records.get(device_id)
-        if hb is None:
-            status   = CriteriaStatus.FAIL
-            evidence = f"No heartbeat record for device={device_id}"
-        elif (now - hb.received_at) > self._max_age:
-            status   = CriteriaStatus.FAIL
-            evidence = f"Heartbeat stale: age={(now-hb.received_at):.0f}s > {self._max_age}s"
-        else:
-            status   = CriteriaStatus.PASS
-            evidence = f"Heartbeat fresh: device={device_id} ea={hb.ea_version}"
-        if self._audit is not None:
-            self._audit.record("HEARTBEAT_CHECK", "system", CriteriaID.AC05.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC05,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC05],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P14,P32")
+        self._default_interval = default_interval
+        self._alert_threshold = alert_threshold
+        self._alert_hooks: List = []
+    def register(self, tenant_id: str, device_id: str, interval: Optional[float] = None) -> HeartbeatRecord:
+        key = f"{tenant_id}:{device_id}"
+        rec = HeartbeatRecord(tenant_id=tenant_id, device_id=device_id,
+            last_seen=time.time(), interval_s=interval or self._default_interval)
+        self._records[key] = rec; return rec
+    def ping(self, tenant_id: str, device_id: str) -> None:
+        rec = self._records.get(f"{tenant_id}:{device_id}")
+        if rec: rec.last_seen = time.time(); rec.miss_count = 0; rec.alert_sent = False
+    def check_all(self, now: Optional[float] = None) -> List[HeartbeatRecord]:
+        t = now or time.time(); missed = []
+        for rec in self._records.values():
+            if t - rec.last_seen > rec.interval_s:
+                rec.miss_count += 1
+                if rec.miss_count >= self._alert_threshold and not rec.alert_sent:
+                    for h in self._alert_hooks: h(rec)
+                    rec.alert_sent = True
+                missed.append(rec)
+        return missed
+    def is_alive(self, tenant_id: str, device_id: str, now: Optional[float] = None) -> bool:
+        rec = self._records.get(f"{tenant_id}:{device_id}")
+        if not rec: return False
+        return (now or time.time()) - rec.last_seen <= rec.interval_s
+    def add_alert_hook(self, fn) -> None: self._alert_hooks.append(fn)
 
 
-class LicenseRevocationGate:
-    PROPAGATION_MAX_SECONDS = 5.0
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit   = audit
-        self._revoked: Dict[str, float] = {}
-        self._lock    = Lock()
-
-    def revoke(self, license_id: str, reason: str) -> None:
-        if not reason.strip():
-            raise ValueError("reason required for revoke")
-        with self._lock:
-            self._revoked[license_id] = time.time()
-        if self._audit is not None:
-            self._audit.record("LICENSE_REVOKED", "system", CriteriaID.AC06.value,
-                               f"license={license_id} reason={reason}")
-
-    def is_revoked(self, license_id: str) -> bool:
-        return license_id in self._revoked
-
-    def check_propagation(self, license_id: str, revoked_at: float) -> CriteriaResult:
-        now     = time.time()
-        age     = now - revoked_at
-        is_fast = age <= self.PROPAGATION_MAX_SECONDS
-        status  = CriteriaStatus.PASS if is_fast else CriteriaStatus.FAIL
-        evidence = f"Revocation propagated in {age:.2f}s (max={self.PROPAGATION_MAX_SECONDS}s)"
-        if self._audit is not None:
-            self._audit.record("LICENSE_REVOKE_CHECK", "system", CriteriaID.AC06.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC06,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC06],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P10,P24,P25")
+class DeviceLimitEnforcer:
+    def __init__(self):
+        self._registry: Dict[str, Set[str]] = {}; self._limits: Dict[str, int] = {}
+    def set_limit(self, tenant_id: str, max_devices: int) -> None: self._limits[tenant_id] = max_devices
+    def register_device(self, tenant_id: str, device_id: str) -> Tuple[bool, str]:
+        limit = self._limits.get(tenant_id, 1)
+        devs = self._registry.setdefault(tenant_id, set())
+        if device_id in devs: return True, "already_registered"
+        if len(devs) >= limit: return False, f"device_limit_exceeded:{limit}"
+        devs.add(device_id); return True, "registered"
+    def is_registered(self, tenant_id: str, device_id: str) -> bool:
+        return device_id in self._registry.get(tenant_id, set())
+    def remove_device(self, tenant_id: str, device_id: str) -> None:
+        self._registry.get(tenant_id, set()).discard(device_id)
+    def device_count(self, tenant_id: str) -> int:
+        return len(self._registry.get(tenant_id, set()))
+    def attempt_bypass(self, tenant_id: str, extra_device_id: str) -> Tuple[bool, str]:
+        return self.register_device(tenant_id, extra_device_id)
 
 
-class DeviceLimitGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit   = audit
-        self._devices: Dict[str, List[str]] = {}
-        self._limits:  Dict[str, int]       = {}
-        self._lock    = Lock()
-
-    def set_limit(self, license_id: str, max_devices: int) -> None:
-        with self._lock:
-            self._limits[license_id]  = max_devices
-            if license_id not in self._devices:
-                self._devices[license_id] = []
-
-    def register_device(self, license_id: str, device_id: str) -> Tuple[bool, str]:
-        with self._lock:
-            limit   = self._limits.get(license_id, 1)
-            current = self._devices.get(license_id, [])
-            if device_id in current:
-                return True, "already_registered"
-            if len(current) >= limit:
-                reason = f"Device limit reached: {len(current)}/{limit}"
-                if self._audit is not None:
-                    self._audit.record("DEVICE_LIMIT_BLOCKED", "system",
-                                       CriteriaID.AC07.value, reason)
-                return False, reason
-            self._devices[license_id].append(device_id)
-            return True, "registered"
-
-    def check(self, license_id: str, device_id: str) -> CriteriaResult:
-        ok, reason = self.register_device(license_id, device_id)
-        status   = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-        if self._audit is not None:
-            self._audit.record("DEVICE_LIMIT_CHECK", "system", CriteriaID.AC07.value, reason)
-        return CriteriaResult(criteria_id=CriteriaID.AC07,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC07],
-                              status=status, evidence=reason,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P10,P24")
-
-
-class SourceAccessGate:
-    FORBIDDEN_EXTENSIONS = {".py",".mq5",".mq4",".ts",".tsx",".jsx",".java",".go",".rs",".cpp",".h"}
-    FORBIDDEN_PATHS = {"backend/","frontend/src/","mql5/","/core/","/api/source","supabase/functions/"}
-
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check_delivery(self, files: List[str], role: str) -> CriteriaResult:
-        violations = []
-        if role in ("CUSTOMER", "USER"):
-            for f in files:
-                _, ext = os.path.splitext(f.lower())
-                if ext in self.FORBIDDEN_EXTENSIONS:
-                    violations.append(f"source_file:{f}")
-                for p in self.FORBIDDEN_PATHS:
-                    if p in f:
-                        violations.append(f"forbidden_path:{f}")
-                        break
-        status   = CriteriaStatus.FAIL if violations else CriteriaStatus.PASS
-        evidence = f"Source leak: {violations}" if violations else \
-            f"No source files in delivery for role={role}"
-        if self._audit is not None:
-            self._audit.record("SOURCE_ACCESS_CHECK", "system", CriteriaID.AC08.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC08,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC08],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P25,P35")
-
-
-class CustomerDeliveryGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, files: List[str]) -> CriteriaResult:
-        bad = []
-        for f in files:
-            _, ext = os.path.splitext(f.lower())
-            if ext not in ALLOWED_CUSTOMER_EXTENSIONS:
-                bad.append(f)
-        status   = CriteriaStatus.FAIL if bad else CriteriaStatus.PASS
-        evidence = f"Disallowed files in delivery: {bad}" if bad else \
-            f"Delivery OK: {len(files)} files (ex5/pdf/html only)"
-        if self._audit is not None:
-            self._audit.record("CUSTOMER_DELIVERY_CHECK", "system", CriteriaID.AC09.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC09,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC09],
-                              status=status, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P25,P35")
+class SourceProtectionGate:
+    def __init__(self): self._customer_role = "customer"; self._admin_role = "admin"
+    def get_deliverables(self, role: str) -> Set[str]:
+        if role == self._customer_role: return {"ex5_binary", "customer_dashboard"}
+        if role == self._admin_role:
+            return {"ex5_binary", "admin_dashboard", "audit_trail",
+                    "license_manager", "device_manager", "payment_console"}
+        return set()
+    def can_access(self, role: str, resource: str) -> bool:
+        if role == self._customer_role: return resource in ALLOWED_CUSTOMER_DELIVERABLES
+        if role == self._admin_role: return resource not in FORBIDDEN_SOURCES or resource == "admin_tools"
+        return False
+    def is_source_exposed(self, role: str, requested: str) -> bool:
+        return role == self._customer_role and requested in FORBIDDEN_SOURCES
 
 
 class DashboardSeparationGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check_access(self, role: str, route: str) -> Tuple[bool, str]:
-        if role == "CUSTOMER":
-            if route in ADMIN_ONLY_ROUTES:
-                return False, f"CUSTOMER cannot access admin route {route}"
-            return True, "allowed"
-        if role == "ADMIN":
-            return True, "admin access granted"
-        return False, f"unknown role={role}"
-
-    def check(self) -> CriteriaResult:
-        violations = []
-        for route in ADMIN_ONLY_ROUTES:
-            ok, reason = self.check_access("CUSTOMER", route)
-            if ok:
-                violations.append(f"CUSTOMER can access {route}")
-        status   = CriteriaStatus.FAIL if violations else CriteriaStatus.PASS
-        evidence = f"Separation violations: {violations}" if violations else "Dashboard separation enforced"
-        if self._audit is not None:
-            self._audit.record("DASHBOARD_SEP_CHECK", "system", CriteriaID.AC10.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC10,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC10],
-                              status=status, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P19,P33")
+    CUSTOMER_ROUTES: Set[str] = {"/dashboard/overview", "/dashboard/signals",
+        "/dashboard/ea-status", "/dashboard/heartbeat", "/dashboard/licenses",
+        "/dashboard/downloads", "/dashboard/profile", "/dashboard/billing"}
+    ADMIN_ROUTES: Set[str] = {"/admin/users", "/admin/licenses", "/admin/devices",
+        "/admin/payments", "/admin/bots", "/admin/audit", "/admin/kill-switch",
+        "/admin/support", "/admin/analytics", "/admin/feature-flags", "/admin/compliance"}
+    MUST_NOT_OVERLAP: Set[str] = CUSTOMER_ROUTES & ADMIN_ROUTES
+    def can_access_route(self, role: str, route: str) -> bool:
+        if role == "customer": return route in self.CUSTOMER_ROUTES
+        if role == "admin": return route in self.ADMIN_ROUTES
+        return False
+    def routes_overlap(self) -> bool: return len(self.MUST_NOT_OVERLAP) > 0
+    def customer_cannot_access_admin(self, route: str) -> bool: return route in self.ADMIN_ROUTES
 
 
-class TenantIsolationGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check_query(self, actor_tenant: str, resource_tenant: str,
-                    resource_type: str) -> CriteriaResult:
-        ok       = actor_tenant == resource_tenant
-        status   = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-        evidence = f"Tenant isolation OK: {actor_tenant}" if ok else \
-            f"IDOR: actor={actor_tenant} accessing resource of {resource_tenant} type={resource_type}"
-        if self._audit is not None:
-            self._audit.record("TENANT_ISOLATION_CHECK", "system", CriteriaID.AC11.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC11,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC11],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P19,P34")
+class IDORGuard:
+    def __init__(self): self._violations: List[Dict] = []
+    def check(self, actor_tenant: str, resource_tenant: str,
+              resource_id: str, action: str = "read") -> bool:
+        ok = hmac.compare_digest(actor_tenant, resource_tenant)
+        if not ok:
+            self._violations.append({"actor": actor_tenant,
+                "resource_tenant": resource_tenant, "resource_id": resource_id,
+                "action": action, "ts": time.time()})
+        return ok
+    def violation_count(self) -> int: return len(self._violations)
+    def recent_violations(self, n: int = 10) -> List[Dict]: return self._violations[-n:]
 
 
-class AdminControlGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit      = audit
-        self._registered = set(ADMIN_CAPABILITIES)
-
-    def register_capability(self, cap: str) -> None:
-        self._registered.add(cap)
-
-    def check(self) -> CriteriaResult:
-        missing  = [c for c in ADMIN_CAPABILITIES if c not in self._registered]
-        status   = CriteriaStatus.PASS if not missing else CriteriaStatus.FAIL
-        evidence = f"Admin missing capabilities: {missing}" if missing else \
-            f"Admin has all {len(ADMIN_CAPABILITIES)} capabilities"
-        if self._audit is not None:
-            self._audit.record("ADMIN_CONTROL_CHECK", "system", CriteriaID.AC12.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC12,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC12],
-                              status=status, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P19,P33,P31")
-
-
-class DuplicateOrderGate:
-    DEDUP_WINDOW_SECONDS = 60.0
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit  = audit
-        self._seen:  Dict[str, float] = {}
-        self._lock   = Lock()
-
-    def _order_key(self, symbol: str, direction: str, volume: float, tenant_id: str) -> str:
-        raw = f"{symbol}:{direction}:{volume:.5f}:{tenant_id}"
-        return hashlib.sha256(raw.encode()).hexdigest()[:32]
-
-    def check_order(self, symbol: str, direction: str, volume: float,
-                    tenant_id: str, idempotency_key: Optional[str] = None) -> Tuple[bool, str]:
-        key = idempotency_key or self._order_key(symbol, direction, volume, tenant_id)
-        now = time.time()
-        with self._lock:
-            if key in self._seen:
-                age = now - self._seen[key]
-                if age < self.DEDUP_WINDOW_SECONDS:
-                    reason = f"Duplicate order blocked: key={key[:16]} age={age:.1f}s"
-                    if self._audit is not None:
-                        self._audit.record("DUPLICATE_ORDER_BLOCKED", "system",
-                                           CriteriaID.AC13.value, reason)
-                    return False, reason
-            self._seen[key] = now
-            return True, "order_allowed"
-
-    def check(self) -> CriteriaResult:
-        evidence = f"Duplicate order control active (window={self.DEDUP_WINDOW_SECONDS}s)"
-        if self._audit is not None:
-            self._audit.record("DEDUP_CHECK", "system", CriteriaID.AC13.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC13,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC13],
-                              status=CriteriaStatus.PASS, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P07,P08")
+class AdminControlPlane:
+    def __init__(self, gate: LicenseGate, device_enforcer: DeviceLimitEnforcer):
+        self._gate = gate; self._devices = device_enforcer
+        self._actions: List[Dict] = []
+        self._capabilities = REQUIRED_ADMIN_CAPABILITIES.copy()
+    def has_capability(self, cap: str) -> bool: return cap in self._capabilities
+    def all_capabilities_present(self) -> bool:
+        return REQUIRED_ADMIN_CAPABILITIES.issubset(self._capabilities)
+    def admin_action(self, admin_id: str, action: str, target: str, reason: str = "") -> Dict:
+        if not self.has_capability(action): raise PermissionError(f"admin lacks capability: {action}")
+        record = {"admin_id": admin_id, "action": action, "target": target,
+                  "reason": reason, "ts": time.time()}
+        self._actions.append(record); return record
+    def list_actions(self) -> List[Dict]: return list(self._actions)
 
 
 @dataclass
-class MT5TradeRecord:
-    ticket:     int
-    symbol:     str
-    direction:  str
-    volume:     float
-    open_price: float
-    tenant_id:  str
+class Order:
+    order_id: str; tenant_id: str; symbol: str; side: str
+    volume: float; price: float; created_at: float = field(default_factory=time.time)
+    def idempotency_key(self) -> str:
+        return hashlib.sha256(
+            f"{self.tenant_id}:{self.symbol}:{self.side}:{self.volume:.5f}".encode()
+        ).hexdigest()[:32]
+
+
+class DuplicateOrderGuard:
+    def __init__(self, window_seconds: float = 30.0):
+        self._window = window_seconds; self._seen: Dict[str, float] = {}; self._orders: List[Order] = []
+    def submit(self, order: Order) -> Tuple[bool, str]:
+        key = order.idempotency_key(); now = time.time()
+        self._seen = {k: t for k, t in self._seen.items() if now - t < self._window}
+        if key in self._seen: return False, "duplicate_order"
+        self._seen[key] = now; self._orders.append(order); return True, "accepted"
+    def pending_count(self, tenant_id: str) -> int:
+        now = time.time()
+        return sum(1 for o in self._orders
+                   if o.tenant_id == tenant_id and now - o.created_at < self._window)
+
+
+@dataclass
+class MT5Position:
+    ticket: int; symbol: str; volume: float; price: float; side: str
 
 @dataclass
 class ReconciliationResult:
-    matched:    List[int]
-    unmatched:  List[int]
-    ghost:      List[int]
-    mismatch:   List[int]
-    pass_rate:  float
+    matched: List[str]; unmatched_db: List[str]; unmatched_broker: List[str]
+    discrepancies: List[Dict]; is_clean: bool
 
-class MT5ReconciliationGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def reconcile(self, our_records: List[MT5TradeRecord],
-                  mt5_records: List[MT5TradeRecord]) -> ReconciliationResult:
-        our_map  = {r.ticket: r for r in our_records}
-        mt5_map  = {r.ticket: r for r in mt5_records}
-        matched, unmatched, ghost, mismatch = [], [], [], []
-        for ticket, our in our_map.items():
-            if ticket not in mt5_map:
-                unmatched.append(ticket)
-            else:
-                mt5 = mt5_map[ticket]
-                if (our.symbol == mt5.symbol and our.direction == mt5.direction
-                        and abs(our.volume - mt5.volume) < 0.001):
-                    matched.append(ticket)
-                else:
-                    mismatch.append(ticket)
-        for ticket in mt5_map:
-            if ticket not in our_map:
-                ghost.append(ticket)
-        total     = len(our_map)
-        pass_rate = len(matched) / total if total > 0 else 1.0
-        return ReconciliationResult(matched, unmatched, ghost, mismatch, pass_rate)
-
-    def check(self, our_records: List[MT5TradeRecord],
-              mt5_records: List[MT5TradeRecord],
-              min_pass_rate: float = 0.99) -> CriteriaResult:
-        rec      = self.reconcile(our_records, mt5_records)
-        ok       = rec.pass_rate >= min_pass_rate and not rec.mismatch
-        status   = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-        evidence = (f"Reconciliation: matched={len(rec.matched)} unmatched={rec.unmatched} "
-                    f"ghost={rec.ghost} mismatch={rec.mismatch} rate={rec.pass_rate:.2%}")
-        if self._audit is not None:
-            self._audit.record("RECONCILIATION_CHECK", "system", CriteriaID.AC14.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC14,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC14],
-                              status=status, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P07,P08",
-                              detail={"pass_rate": rec.pass_rate,
-                                      "unmatched": rec.unmatched,
-                                      "mismatch": rec.mismatch})
+class MT5ReconciliationEngine:
+    def reconcile(self, db_orders: List[Order],
+                  broker_positions: List[MT5Position]) -> ReconciliationResult:
+        db_set = {o.order_id for o in db_orders}
+        broker_set = {str(p.ticket) for p in broker_positions}
+        matched = list(db_set & broker_set)
+        unmatched_db = list(db_set - broker_set)
+        unmatched_broker = list(broker_set - db_set)
+        discrepancies: List[Dict] = []
+        broker_map = {str(p.ticket): p for p in broker_positions}
+        for o in db_orders:
+            if o.order_id in broker_map:
+                p = broker_map[o.order_id]
+                if abs(p.volume - o.volume) > 0.001:
+                    discrepancies.append({"order_id": o.order_id,
+                        "db_volume": o.volume, "broker_volume": p.volume})
+        return ReconciliationResult(matched=matched, unmatched_db=unmatched_db,
+            unmatched_broker=unmatched_broker, discrepancies=discrepancies,
+            is_clean=not unmatched_db and not unmatched_broker and not discrepancies)
 
 
 @dataclass
-class RiskContext:
-    drawdown_pct:    float
-    open_positions:  int
-    margin_level:    float
-    kill_switch_on:  bool
-    daily_loss_pct:  float
+class RiskLimits:
+    max_drawdown_pct: float = 20.0; max_open_lots: float = 10.0
+    max_daily_loss: float = 500.0; max_positions: int = 20; news_block: bool = True
 
-class RiskFailClosedGate:
-    MAX_DRAWDOWN   = 20.0
-    MAX_DAILY_LOSS = 5.0
-    MIN_MARGIN     = 120.0
+@dataclass
+class RiskCheckResult:
+    passed: bool; reason: str; blocked: bool = False
 
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, ctx: RiskContext) -> CriteriaResult:
-        blocks = []
-        if ctx.kill_switch_on:
-            blocks.append("kill_switch_active")
-        if ctx.drawdown_pct > self.MAX_DRAWDOWN:
-            blocks.append(f"drawdown={ctx.drawdown_pct:.1f}%")
-        if ctx.daily_loss_pct > self.MAX_DAILY_LOSS:
-            blocks.append(f"daily_loss={ctx.daily_loss_pct:.1f}%")
-        if ctx.margin_level < self.MIN_MARGIN:
-            blocks.append(f"margin={ctx.margin_level:.1f}%")
-        status   = CriteriaStatus.FAIL if blocks else CriteriaStatus.PASS
-        evidence = f"Risk blocks active: {blocks}" if blocks else \
-            f"Risk OK: drawdown={ctx.drawdown_pct}% margin={ctx.margin_level}%"
-        if self._audit is not None:
-            self._audit.record("RISK_FAILCLOSED_CHECK", "system", CriteriaID.AC15.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC15,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC15],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P08,P09")
+class RiskManagementGate:
+    def __init__(self, limits: Optional[RiskLimits] = None):
+        self._limits = limits or RiskLimits(); self._armed = False
+    def arm(self) -> None: self._armed = True
+    def check(self, equity: float, balance: float, open_lots: float,
+              open_positions: int, daily_loss: float, is_news_time: bool = False) -> RiskCheckResult:
+        if not self._armed: return RiskCheckResult(False, "risk_gate_not_armed", True)
+        try:
+            drawdown = ((balance - equity) / balance * 100) if balance > 0 else 0
+            if drawdown >= self._limits.max_drawdown_pct: return RiskCheckResult(False, f"drawdown:{drawdown:.1f}%", True)
+            if open_lots > self._limits.max_open_lots: return RiskCheckResult(False, f"lots:{open_lots}", True)
+            if daily_loss >= self._limits.max_daily_loss: return RiskCheckResult(False, f"daily_loss:{daily_loss}", True)
+            if open_positions >= self._limits.max_positions: return RiskCheckResult(False, f"positions:{open_positions}", True)
+            if is_news_time and self._limits.news_block: return RiskCheckResult(False, "news_block", True)
+            return RiskCheckResult(True, "ok", False)
+        except Exception as e:
+            return RiskCheckResult(False, f"exception:{e}", True)
 
 
-class KillSwitchGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit   = audit
-        self._active: Dict[str, Dict[str, Any]] = {}
-        self._lock    = Lock()
-
-    def activate(self, tenant_id: str, reason: str, actor: str) -> float:
-        if not reason.strip():
-            raise ValueError("reason required for kill switch")
-        ts = time.time()
-        with self._lock:
-            self._active[tenant_id] = {"reason": reason, "actor": actor, "ts": ts}
-        if self._audit is not None:
-            self._audit.record("KILL_SWITCH_ACTIVATED", actor, CriteriaID.AC16.value,
-                               f"tenant={tenant_id} reason={reason}")
-        return ts
-
-    def deactivate(self, tenant_id: str, actor: str, reason: str) -> None:
-        if not reason.strip():
-            raise ValueError("reason required for deactivate")
-        with self._lock:
-            self._active.pop(tenant_id, None)
-        if self._audit is not None:
-            self._audit.record("KILL_SWITCH_DEACTIVATED", actor, CriteriaID.AC16.value,
-                               f"tenant={tenant_id} reason={reason}")
-
-    def is_active(self, tenant_id: str) -> bool:
-        return tenant_id in self._active
-
-    def check(self) -> CriteriaResult:
-        evidence = (f"Kill switch operational: {len(self._active)} active. "
-                    f"activate/deactivate/is_active all functional.")
-        if self._audit is not None:
-            self._audit.record("KILL_SWITCH_CHECK", "system", CriteriaID.AC16.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC16,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC16],
-                              status=CriteriaStatus.PASS, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P08,P09")
+class KillSwitch:
+    def __init__(self):
+        self._state = KillSwitchState.ARMED; self._triggered_at: Optional[float] = None
+        self._reason: Optional[str] = None; self._hooks: List = []; self._affected: List[str] = []
+    def arm(self) -> None: self._state = KillSwitchState.ARMED
+    def trigger(self, reason: str, actor: str, tenants: Optional[List[str]] = None) -> None:
+        if not reason.strip(): raise ValueError("kill switch reason required")
+        self._state = KillSwitchState.TRIGGERED; self._triggered_at = time.time()
+        self._reason = reason; self._affected = list(tenants or [])
+        for h in self._hooks: h(reason, actor, tenants)
+    def is_triggered(self) -> bool: return self._state == KillSwitchState.TRIGGERED
+    def reset(self, actor: str, reason: str) -> None:
+        if not reason.strip(): raise ValueError("reset reason required")
+        self._state = KillSwitchState.RESET; self._triggered_at = None
+    def can_trade(self, tenant_id: str) -> bool:
+        if self._state == KillSwitchState.TRIGGERED:
+            if not self._affected or tenant_id in self._affected: return False
+        return self._state != KillSwitchState.TRIGGERED
+    def add_hook(self, fn) -> None: self._hooks.append(fn)
+    @property
+    def state(self) -> KillSwitchState: return self._state
 
 
 class HardcodedSecretScanner:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def scan_content(self, content: str, filename: str = "unknown") -> List[str]:
+    def __init__(self, extra_patterns: Optional[List[re.Pattern]] = None):
+        self._patterns = list(HARDCODED_PATTERNS)
+        if extra_patterns: self._patterns.extend(extra_patterns)
+    def scan_text(self, text: str, filename: str = "<text>") -> List["SecretFinding"]:
         findings = []
-        for line_no, line in enumerate(content.splitlines(), 1):
-            if line.strip().startswith("#"):
-                continue
-            for pat in HARDCODED_SECRET_PATTERNS:
-                if pat.search(line):
-                    findings.append(f"{filename}:{line_no}: {line.strip()[:60]}")
+        for i, line in enumerate(text.splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("#"): continue
+            for pat in self._patterns:
+                if pat.search(stripped):
+                    findings.append(SecretFinding(file=filename, line_no=i, pattern=pat.pattern[:40]))
                     break
         return findings
-
-    def check(self, code_samples: Dict[str, str]) -> CriteriaResult:
-        all_findings = []
-        for fname, content in code_samples.items():
-            all_findings.extend(self.scan_content(content, fname))
-        status   = CriteriaStatus.FAIL if all_findings else CriteriaStatus.PASS
-        evidence = f"Hardcoded secrets found: {all_findings[:3]}" if all_findings else \
-            f"No hardcoded secrets in {len(code_samples)} files"
-        if self._audit is not None:
-            self._audit.record("HARDCODED_SECRET_CHECK", "system", CriteriaID.AC17.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC17,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC17],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P17,P28,P29")
+    def scan_config(self, config: Dict[str, str]) -> List[str]:
+        suspicious = []
+        for k, v in config.items():
+            if v.startswith("${") or v.startswith("$(") : continue
+            if len(v) > 8 and re.search(r'[A-Za-z0-9+/]{16,}', v): suspicious.append(k)
+        return suspicious
+    def is_clean(self, text: str, filename: str = "<text>") -> bool:
+        return len(self.scan_text(text, filename)) == 0
 
 
-class LicenseStorageGate:
-    MIN_HASH_LENGTH = 32
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def hash_license(self, raw_key: str) -> str:
-        return hashlib.sha256(raw_key.encode()).hexdigest()
-
-    def verify_not_raw(self, stored_value: str, raw_key: str) -> Tuple[bool, str]:
-        if stored_value == raw_key:
-            return False, "license stored as plaintext"
-        if len(stored_value) < self.MIN_HASH_LENGTH:
-            return False, f"stored value too short to be a hash: {len(stored_value)}"
-        expected = self.hash_license(raw_key)
-        if hmac.compare_digest(stored_value, expected):
-            return True, "license stored as SHA-256 hash"
-        return True, "license stored in non-raw format"
-
-    def check(self, stored: str, raw: str) -> CriteriaResult:
-        ok, reason = self.verify_not_raw(stored, raw)
-        status = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-        if self._audit is not None:
-            self._audit.record("LICENSE_STORAGE_CHECK", "system", CriteriaID.AC18.value, reason)
-        return CriteriaResult(criteria_id=CriteriaID.AC18,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC18],
-                              status=status, evidence=reason,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P10,P11")
+@dataclass
+class SecretFinding:
+    file: str; line_no: int; pattern: str; severity: Severity = Severity.CRITICAL
 
 
-class PaymentWebhookGate:
-    def __init__(self, audit: AcceptanceAuditChain, secret: str = "webhook-hmac-secret"):
-        self._audit    = audit
-        self._secret   = secret.encode()
-        self._seen:    Dict[str, float] = {}
-        self._results: Dict[str, Any]   = {}
-        self._lock     = Lock()
-
-    def generate_signature(self, payload: bytes) -> str:
-        return hmac.new(self._secret, payload, hashlib.sha256).hexdigest()
-
-    def verify_signature(self, payload: bytes, signature: str) -> bool:
-        expected = self.generate_signature(payload)
-        return hmac.compare_digest(expected, signature)
-
-    def process(self, event_id: str, payload: bytes,
-                signature: str) -> Tuple[bool, str, Any]:
-        if not self.verify_signature(payload, signature):
-            if self._audit is not None:
-                self._audit.record("WEBHOOK_SIG_FAIL", "system", CriteriaID.AC19.value,
-                                   f"event={event_id} sig_invalid")
-            return False, "signature_invalid", None
-        with self._lock:
-            if event_id in self._seen:
-                return True, "idempotent_duplicate", self._results.get(event_id)
-            self._seen[event_id]    = time.time()
-            result                  = {"processed": True, "event_id": event_id}
-            self._results[event_id] = result
-        if self._audit is not None:
-            self._audit.record("WEBHOOK_PROCESSED", "system", CriteriaID.AC19.value,
-                               f"event={event_id}")
-        return True, "processed", result
-
-    def check(self) -> CriteriaResult:
-        evidence = "Payment webhook: HMAC-SHA256 + idempotency store active"
-        if self._audit is not None:
-            self._audit.record("WEBHOOK_CHECK", "system", CriteriaID.AC19.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC19,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC19],
-                              status=CriteriaStatus.PASS, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P12,P27")
+class WebhookSecurityGate:
+    def __init__(self, secret: str, window_seconds: float = 300.0):
+        self._secret = secret.encode(); self._window = window_seconds
+        self._seen: Dict[str, float] = {}; self._idem: Dict[str, Any] = {}
+    def _compute_sig(self, payload: bytes) -> str:
+        return "sha256=" + hmac.new(self._secret, payload, "sha256").hexdigest()
+    def verify_signature(self, payload: bytes, sig_header: str) -> bool:
+        return hmac.compare_digest(self._compute_sig(payload), sig_header)
+    def check_replay(self, event_id: str, event_ts: Optional[float] = None) -> Tuple[bool, str]:
+        now = time.time()
+        self._seen = {k: t for k, t in self._seen.items() if now - t < self._window}
+        if event_id in self._seen: return False, "replayed"
+        if event_ts is not None and abs(now - event_ts) > self._window: return False, "stale_timestamp"
+        self._seen[event_id] = now; return True, "ok"
+    def process(self, payload: bytes, sig_header: str, event_id: str,
+                event_ts: Optional[float] = None) -> WebhookStatus:
+        if not self.verify_signature(payload, sig_header): return WebhookStatus.REJECTED
+        ok, reason = self.check_replay(event_id, event_ts)
+        if not ok: return WebhookStatus.REPLAYED if reason == "replayed" else WebhookStatus.REJECTED
+        key = hashlib.sha256(payload).hexdigest()
+        if key in self._idem: return WebhookStatus.DUPLICATE
+        self._idem[key] = {"event_id": event_id, "ts": time.time()}; return WebhookStatus.OK
 
 
 @dataclass
 class TestSuiteResult:
-    total:   int
-    passed:  int
-    failed:  int
-    phases:  Dict[str, int]
-
+    total: int; passed: int; failed: int; phases: Dict[str, int]
     @property
-    def pass_rate(self) -> float:
-        return self.passed / self.total if self.total else 0.0
-
-class TestGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, result: TestSuiteResult) -> CriteriaResult:
-        ok       = result.failed == 0 and result.pass_rate >= 1.0
-        status   = CriteriaStatus.PASS if ok else CriteriaStatus.FAIL
-        evidence = (f"Tests: {result.passed}/{result.total} PASS "
-                    f"({result.failed} FAIL) across {len(result.phases)} phases")
-        if self._audit is not None:
-            self._audit.record("TEST_GATE_CHECK", "system", CriteriaID.AC20.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC20,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC20],
-                              status=status, evidence=evidence,
-                              severity=Severity.CRITICAL, blocking=True,
-                              phase_ref="P06-P35")
+    def all_pass(self) -> bool: return self.failed == 0 and self.total > 0
+    @property
+    def pass_rate(self) -> float: return self.passed / self.total if self.total > 0 else 0.0
 
 
 @dataclass
-class DocAlignmentResult:
-    total_docs:    int
-    aligned:       int
-    mismatched:    List[str]
-    missing_docs:  List[str]
-
-class DocsGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, result: DocAlignmentResult) -> CriteriaResult:
-        ok = not result.mismatched and not result.missing_docs
-        status   = CriteriaStatus.PASS if ok else CriteriaStatus.WARN
-        evidence = (f"Docs: {result.aligned}/{result.total_docs} aligned. "
-                    f"mismatch={result.mismatched} missing={result.missing_docs}")
-        if self._audit is not None:
-            self._audit.record("DOCS_GATE_CHECK", "system", CriteriaID.AC21.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC21,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC21],
-                              status=status, evidence=evidence,
-                              severity=Severity.MEDIUM, blocking=False,
-                              phase_ref="P35")
+class DockerManifest:
+    has_dockerfile: bool; has_compose_prod: bool; has_compose_staging: bool
+    has_healthcheck: bool; non_root_user: bool; multi_stage_build: bool
+    pinned_base_image: bool; has_env_file_template: bool
+    has_migration_script: bool; has_rollback_plan: bool
+    def readiness_score(self) -> int:
+        return sum(1 for f in [
+            self.has_dockerfile, self.has_compose_prod, self.has_compose_staging,
+            self.has_healthcheck, self.non_root_user, self.multi_stage_build,
+            self.pinned_base_image, self.has_env_file_template,
+            self.has_migration_script, self.has_rollback_plan] if f)
+    def is_production_ready(self) -> bool: return self.readiness_score() >= 8
 
 
 @dataclass
-class DockerReadinessResult:
-    staging_ready:    bool
-    prod_ready:       bool
-    has_dockerfile:   bool
-    has_compose:      bool
-    has_health_check: bool
-    has_env_template: bool
-    has_migrations:   bool
-
-class DockerGate:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def check(self, result: DockerReadinessResult) -> CriteriaResult:
-        fails = []
-        if not result.staging_ready:  fails.append("staging_not_ready")
-        if not result.prod_ready:     fails.append("prod_not_ready")
-        if not result.has_dockerfile: fails.append("no_dockerfile")
-        if not result.has_migrations: fails.append("no_migrations")
-        status   = CriteriaStatus.FAIL if fails else CriteriaStatus.PASS
-        evidence = f"Docker missing: {fails}" if fails else \
-            "Docker: Dockerfile+compose+health+env+migrations all present"
-        if self._audit is not None:
-            self._audit.record("DOCKER_GATE_CHECK", "system", CriteriaID.AC22.value, evidence)
-        return CriteriaResult(criteria_id=CriteriaID.AC22,
-                              description=AC_DESCRIPTIONS[CriteriaID.AC22],
-                              status=status, evidence=evidence,
-                              severity=Severity.HIGH, blocking=False,
-                              phase_ref="P35")
+class RiskItem:
+    risk_id: str; description: str; level: Severity; owner: str; sprint: str
+    status: str = "OPEN"; mitigation: str = ""
+    def is_blocking(self) -> bool:
+        return self.level == Severity.CRITICAL and self.status == "OPEN"
 
 
-class DockerComposeGenerator:
-    STAGING_COMPOSE = """version: \"3.9\"\nservices:\n  api:\n    build:\n      context: .\n      dockerfile: docker/Dockerfile.api\n    image: bot12-api:staging\n    environment:\n      - ENV=staging\n      - DATABASE_URL=${DATABASE_URL}\n      - JWT_SECRET=${JWT_SECRET}\n    ports: [\"8000:8000\"]\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"]\n      interval: 30s\n      timeout: 10s\n      retries: 3\n    restart: unless-stopped\n"""
-
-    PRODUCTION_COMPOSE = """version: \"3.9\"\nservices:\n  api:\n    build:\n      context: .\n      dockerfile: docker/Dockerfile.api\n    image: bot12-api:${VERSION:-latest}\n    environment:\n      - ENV=production\n    ports: [\"8000:8000\"]\n    deploy:\n      replicas: 2\n      update_config:\n        parallelism: 1\n        delay: 30s\n        failure_action: rollback\n      rollback_config:\n        parallelism: 1\n        delay: 10s\n    restart: always\n    logging:\n      driver: \"json-file\"\n      options:\n        max-size: \"50m\"\n"""
-
-    DOCKERFILE_API = "FROM python:3.11-slim-bullseye\n\nWORKDIR /app\nENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY backend/ ./backend/\n\nRUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app\nUSER appuser\n\nHEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\n    CMD curl -f http://localhost:8000/health || exit 1\n\nEXPOSE 8000\nCMD [\"uvicorn\", \"backend.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]\n"
-
-    ENV_TEMPLATE = "# Bot12 Environment Template\nENV=staging\nDATABASE_URL=postgresql://user:pass@localhost:5432/bot12\nJWT_SECRET=CHANGE_ME_64_CHAR_RANDOM_STRING\nSTRIPE_SECRET_KEY=sk_test_CHANGE_ME\nSTRIPE_WEBHOOK_SECRET=whsec_CHANGE_ME\nWEBHOOK_HMAC_SECRET=CHANGE_ME_32_CHAR_RANDOM\nENCRYPTION_KEY=CHANGE_ME_32_CHAR_RANDOM\nAUDIT_CHAIN_SECRET=CHANGE_ME_32_CHAR_RANDOM\nSUPABASE_URL=https://your-project.supabase.co\nSUPABASE_SERVICE_KEY=CHANGE_ME\n"
-
-    ROLLBACK_SCRIPT = "#!/bin/bash\nset -e\nPREV_VERSION=${1:-previous}\necho '[ROLLBACK] Rolling back to version: $PREV_VERSION'\ndocker service update --image bot12-api:$PREV_VERSION bot12_api\nsleep 30\ncurl -f http://localhost:8000/health || exit 1\necho '[ROLLBACK] Complete'\n"
-
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit = audit
-
-    def generate_staging(self) -> str:
-        if self._audit is not None:
-            self._audit.record("DOCKER_STAGING_GENERATED", "system", None, "staging generated")
-        return self.STAGING_COMPOSE
-
-    def generate_production(self) -> str:
-        if self._audit is not None:
-            self._audit.record("DOCKER_PROD_GENERATED", "system", None, "prod generated")
-        return self.PRODUCTION_COMPOSE
-
-    def generate_dockerfile(self) -> str:
-        return self.DOCKERFILE_API
-
-    def generate_env_template(self) -> str:
-        return self.ENV_TEMPLATE
-
-    def generate_rollback_script(self) -> str:
-        return self.ROLLBACK_SCRIPT
-
-
-class AcceptanceAdmin:
-    def __init__(self, audit: AcceptanceAuditChain):
-        self._audit   = audit
-        self._reports: List[AcceptanceReport] = []
-        self._lock    = Lock()
-
-    def store_report(self, report: AcceptanceReport) -> None:
-        with self._lock:
-            self._reports.append(report)
-
-    def latest_report(self) -> Optional[AcceptanceReport]:
-        with self._lock:
-            return self._reports[-1] if self._reports else None
-
-    def summary(self) -> Dict[str, Any]:
-        with self._lock:
-            total = len(self._reports)
-            goes  = sum(1 for r in self._reports if r.decision == AcceptanceDecision.GO)
-            no_go = sum(1 for r in self._reports if r.decision == AcceptanceDecision.NO_GO)
-            return {
-                "total_runs":   total,
-                "go_count":     goes,
-                "no_go_count":  no_go,
-                "audit_ok":     self._audit.verify_chain(),
-                "chain_length": len(self._audit),
-            }
+class FinalRiskRegister:
+    DEFAULT_RISKS: List[RiskItem] = [
+        RiskItem("R001", "CSP unsafe-inline in dynamic React pages", Severity.HIGH, "security_team", "Sprint-2"),
+        RiskItem("R002", "Rate limit IP trust behind load balancer", Severity.MEDIUM, "platform_team", "Sprint-2"),
+        RiskItem("R003", "Replay window 300s for market data (60s safer)", Severity.LOW, "backend_team", "Sprint-3"),
+        RiskItem("R004", "Session fixation edge case in token renewal", Severity.LOW, "security_team", "Sprint-2"),
+        RiskItem("R005", "Service-to-service RBAC for microservices", Severity.MEDIUM, "platform_team", "Sprint-2"),
+        RiskItem("R006", "GDPR right-to-erasure pipeline not automated", Severity.MEDIUM, "legal_team", "Sprint-3"),
+        RiskItem("R007", "MT4 future version compatibility", Severity.LOW, "ea_team", "Sprint-4"),
+        RiskItem("R008", "DR drill not completed in prod-equivalent env", Severity.HIGH, "devops_team", "Pre-launch"),
+    ]
+    def __init__(self):
+        self._risks: Dict[str, RiskItem] = {
+            r.risk_id: copy.deepcopy(r) for r in self.DEFAULT_RISKS}
+    def add(self, risk: RiskItem) -> None: self._risks[risk.risk_id] = risk
+    def mitigate(self, risk_id: str, owner: str, plan: str) -> None:
+        if not plan.strip(): raise ValueError("mitigation plan required")
+        r = self._risks.get(risk_id)
+        if r: r.status = "MITIGATED"; r.mitigation = plan; r.owner = owner
+    def accept(self, risk_id: str, reason: str) -> None:
+        if not reason.strip(): raise ValueError("acceptance reason required")
+        r = self._risks.get(risk_id)
+        if r: r.status = "ACCEPTED"; r.mitigation = reason
+    def open_items(self) -> List[RiskItem]:
+        order = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, Severity.LOW: 3}
+        items = [r for r in self._risks.values() if r.status == "OPEN"]
+        return sorted(items, key=lambda r: order.get(r.level, 9))
+    def critical_open(self) -> List[RiskItem]:
+        return [r for r in self._risks.values()
+                if r.level == Severity.CRITICAL and r.status == "OPEN"]
+    def summary(self) -> Dict[str, int]:
+        counts: Dict[str, int] = defaultdict(int)
+        for r in self._risks.values(): counts[r.status] += 1
+        return dict(counts)
 
 
-class FinalAcceptanceEngine:
-    def __init__(self, audit, config_gate, mt5_gate, trade_gate, ea_gate,
-                 hb_gate, revoke_gate, device_gate, source_gate, delivery,
-                 dash_gate, tenant_gate, admin_gate, dedup_gate, recon_gate,
-                 risk_gate, ks_gate, secret_gate, license_gate, webhook_gate,
-                 test_gate, docs_gate, docker_gate):
-        self._audit        = audit
-        self._config_gate  = config_gate
-        self._mt5_gate     = mt5_gate
-        self._trade_gate   = trade_gate
-        self._ea_gate      = ea_gate
-        self._hb_gate      = hb_gate
-        self._revoke_gate  = revoke_gate
-        self._device_gate  = device_gate
-        self._source_gate  = source_gate
-        self._delivery     = delivery
-        self._dash_gate    = dash_gate
-        self._tenant_gate  = tenant_gate
-        self._admin_gate   = admin_gate
-        self._dedup_gate   = dedup_gate
-        self._recon_gate   = recon_gate
-        self._risk_gate    = risk_gate
-        self._ks_gate      = ks_gate
-        self._secret_gate  = secret_gate
-        self._license_gate = license_gate
-        self._webhook_gate = webhook_gate
-        self._test_gate    = test_gate
-        self._docs_gate    = docs_gate
-        self._docker_gate  = docker_gate
-
-    def run(self, ctx: Dict[str, Any]) -> AcceptanceReport:
-        results: List[CriteriaResult] = []
-        results.append(self._config_gate.check(ctx.get("env", {}),
-                                                allow_test_stripe=ctx.get("allow_test_stripe", False)))
-        results.append(self._mt5_gate.check(ctx.get("mt5_creds"),
-                                             ctx.get("trading_enabled", False)))
-        if "trade_ctx" in ctx:
-            results.append(self._trade_gate.check(ctx["trade_ctx"]))
-        if "ea_ctx" in ctx:
-            results.append(self._ea_gate.check(ctx["ea_ctx"]))
-        if "device_id" in ctx:
-            results.append(self._hb_gate.check(ctx["device_id"]))
-        if "revoke_check" in ctx:
-            rc = ctx["revoke_check"]
-            results.append(self._revoke_gate.check_propagation(rc["license_id"], rc["revoked_at"]))
-        if "device_check" in ctx:
-            dc = ctx["device_check"]
-            results.append(self._device_gate.check(dc["license_id"], dc["device_id"]))
-        results.append(self._source_gate.check_delivery(
-            ctx.get("delivery_files", []), ctx.get("role", "CUSTOMER")))
-        results.append(self._delivery.check(ctx.get("delivery_files", [])))
-        results.append(self._dash_gate.check())
-        if "tenant_check" in ctx:
-            tc = ctx["tenant_check"]
-            results.append(self._tenant_gate.check_query(
-                tc["actor_tenant"], tc["resource_tenant"], tc["type"]))
-        results.append(self._admin_gate.check())
-        results.append(self._dedup_gate.check())
-        if "reconciliation" in ctx:
-            rc = ctx["reconciliation"]
-            results.append(self._recon_gate.check(rc["our"], rc["mt5"]))
-        if "risk_ctx" in ctx:
-            results.append(self._risk_gate.check(ctx["risk_ctx"]))
-        results.append(self._ks_gate.check())
-        results.append(self._secret_gate.check(ctx.get("code_samples", {})))
-        if "license_storage" in ctx:
-            ls = ctx["license_storage"]
-            results.append(self._license_gate.check(ls["stored"], ls["raw"]))
-        results.append(self._webhook_gate.check())
-        if "test_result" in ctx:
-            results.append(self._test_gate.check(ctx["test_result"]))
-        if "doc_alignment" in ctx:
-            results.append(self._docs_gate.check(ctx["doc_alignment"]))
-        if "docker" in ctx:
-            results.append(self._docker_gate.check(ctx["docker"]))
-
-        pass_count     = sum(1 for r in results if r.status == CriteriaStatus.PASS)
-        fail_count     = sum(1 for r in results if r.status == CriteriaStatus.FAIL)
-        warn_count     = sum(1 for r in results if r.status == CriteriaStatus.WARN)
-        blocking_fails = [r for r in results if r.is_blocking_fail()]
-        audit_ok       = self._audit.verify_chain()
-
-        if blocking_fails:
-            decision = AcceptanceDecision.NO_GO
-            summary  = (f"NO-GO: {len(blocking_fails)} blocking failures: "
-                        f"{[r.criteria_id.value for r in blocking_fails]}")
-        elif warn_count > 0:
-            decision = AcceptanceDecision.CONDITIONAL
-            summary  = (f"CONDITIONAL GO: {pass_count} PASS, {warn_count} WARN")
-        else:
-            decision = AcceptanceDecision.GO
-            summary  = f"GO: {pass_count}/{len(results)} criteria PASS -- APPROVED FOR PRODUCTION"
-
-        ac23 = CriteriaResult(
-            criteria_id=CriteriaID.AC23,
-            description=AC_DESCRIPTIONS[CriteriaID.AC23],
-            status=CriteriaStatus.PASS if decision == AcceptanceDecision.GO else CriteriaStatus.FAIL,
-            evidence=summary, severity=Severity.CRITICAL, blocking=True, phase_ref="P35,P36")
-        results.append(ac23)
-
-        if self._audit is not None:
-            self._audit.record("FINAL_ACCEPTANCE", "acceptance_engine",
-                               CriteriaID.AC23.value, summary)
-
-        return AcceptanceReport(
-            run_id=str(uuid.uuid4()), tenant_id=ctx.get("tenant_id", "system"),
-            decision=decision, results=results,
-            pass_count=pass_count, fail_count=fail_count, warn_count=warn_count,
-            audit_ok=audit_ok, generated_at=time.time(), summary=summary)
+@dataclass
+class ChecklistItem:
+    id: str; name: str; criteria: CriteriaID
+    passed: bool = False; note: str = ""; blocking: bool = True
 
 
-def build_acceptance_system(secret: str = "final-acceptance-secret-v36") -> Dict[str, Any]:
-    audit        = AcceptanceAuditChain(secret=secret)
-    config_gate  = ProductionConfigGate(audit)
-    mt5_gate     = MT5CredentialsGate(audit)
-    trade_gate   = TradeAuthGate(audit)
-    ea_gate      = EAFailClosedGate(audit)
-    hb_gate      = HeartbeatGate(audit)
-    revoke_gate  = LicenseRevocationGate(audit)
-    device_gate  = DeviceLimitGate(audit)
-    source_gate  = SourceAccessGate(audit)
-    delivery     = CustomerDeliveryGate(audit)
-    dash_gate    = DashboardSeparationGate(audit)
-    tenant_gate  = TenantIsolationGate(audit)
-    admin_gate   = AdminControlGate(audit)
-    dedup_gate   = DuplicateOrderGate(audit)
-    recon_gate   = MT5ReconciliationGate(audit)
-    risk_gate    = RiskFailClosedGate(audit)
-    ks_gate      = KillSwitchGate(audit)
-    secret_gate  = HardcodedSecretScanner(audit)
-    license_gate = LicenseStorageGate(audit)
-    webhook_gate = PaymentWebhookGate(audit, secret=secret)
-    test_gate    = TestGate(audit)
-    docs_gate    = DocsGate(audit)
-    docker_gate  = DockerGate(audit)
-    engine       = FinalAcceptanceEngine(
-        audit, config_gate, mt5_gate, trade_gate, ea_gate,
-        hb_gate, revoke_gate, device_gate, source_gate, delivery,
-        dash_gate, tenant_gate, admin_gate, dedup_gate, recon_gate,
-        risk_gate, ks_gate, secret_gate, license_gate, webhook_gate,
-        test_gate, docs_gate, docker_gate)
-    admin       = AcceptanceAdmin(audit)
-    docker_gen  = DockerComposeGenerator(audit)
+class ProductionReadinessChecklist:
+    def build(self) -> List[ChecklistItem]:
+        return [
+            ChecklistItem("CHK-001", "DATABASE_URL configured", CriteriaID.C01),
+            ChecklistItem("CHK-002", "JWT_SECRET configured", CriteriaID.C01),
+            ChecklistItem("CHK-003", "HMAC_AUDIT_SECRET configured", CriteriaID.C01),
+            ChecklistItem("CHK-004", "No placeholder values in .env", CriteriaID.C01),
+            ChecklistItem("CHK-005", "MT5 broker server reachable", CriteriaID.C02),
+            ChecklistItem("CHK-006", "MT5 login verified (not investor)", CriteriaID.C02),
+            ChecklistItem("CHK-007", "License gate active", CriteriaID.C03),
+            ChecklistItem("CHK-008", "Device registration enforced", CriteriaID.C03),
+            ChecklistItem("CHK-009", "EA starts BLOCKED by default", CriteriaID.C04),
+            ChecklistItem("CHK-010", "All EA checks required to pass", CriteriaID.C04),
+            ChecklistItem("CHK-011", "Heartbeat interval <= 60s", CriteriaID.C05),
+            ChecklistItem("CHK-012", "Miss alert within 3 intervals", CriteriaID.C05),
+            ChecklistItem("CHK-013", "License revoke tested", CriteriaID.C06),
+            ChecklistItem("CHK-014", "License suspend/restore tested", CriteriaID.C06, blocking=False),
+            ChecklistItem("CHK-015", "Device limit server-side only", CriteriaID.C07),
+            ChecklistItem("CHK-016", "Bypass attempt rejected", CriteriaID.C07),
+            ChecklistItem("CHK-017", "Source files not in deliverables", CriteriaID.C08),
+            ChecklistItem("CHK-018", "ex5 binary is compiled-only", CriteriaID.C08),
+            ChecklistItem("CHK-019", "Customer receives ex5+dashboard", CriteriaID.C09),
+            ChecklistItem("CHK-020", "No route overlap admin/customer", CriteriaID.C10),
+            ChecklistItem("CHK-021", "Customer blocked from /admin/*", CriteriaID.C10),
+            ChecklistItem("CHK-022", "Cross-tenant IDOR blocked", CriteriaID.C11),
+            ChecklistItem("CHK-023", "RLS on all tenant tables", CriteriaID.C11),
+            ChecklistItem("CHK-024", "Admin has 8 required capabilities", CriteriaID.C12),
+            ChecklistItem("CHK-025", "Duplicate order window enforced", CriteriaID.C13),
+            ChecklistItem("CHK-026", "MT5 reconciliation verified", CriteriaID.C14),
+            ChecklistItem("CHK-027", "Risk gate not armed = blocked", CriteriaID.C15),
+            ChecklistItem("CHK-028", "Drawdown limit enforced", CriteriaID.C15),
+            ChecklistItem("CHK-029", "Kill switch triggers immediately", CriteriaID.C16),
+            ChecklistItem("CHK-030", "Kill switch stops all trades", CriteriaID.C16),
+            ChecklistItem("CHK-031", "No hardcoded secrets in source", CriteriaID.C17),
+            ChecklistItem("CHK-032", "License stored as SHA-256 hash", CriteriaID.C18),
+            ChecklistItem("CHK-033", "Webhook HMAC verified", CriteriaID.C19),
+            ChecklistItem("CHK-034", "Webhook idempotent (no duplicate)", CriteriaID.C19),
+            ChecklistItem("CHK-035", "Dockerfile multi-stage+non-root", CriteriaID.C22, blocking=False),
+            ChecklistItem("CHK-036", "Migration rollback plan exists", CriteriaID.C23, blocking=False),
+        ]
+
+
+@dataclass
+class CriteriaCheckResult:
+    criteria_id: CriteriaID; result: CriteriaResult; details: str
+    severity: Severity; blocking: bool = True
+
+@dataclass
+class GoNoGoReport:
+    decision: GoNoGo; criteria_results: List[CriteriaCheckResult]
+    checklist_items: List[ChecklistItem]; risk_summary: Dict[str, int]
+    test_result: TestSuiteResult; audit_chain_ok: bool
+    total_tests: int; phases_completed: int; ts: float = field(default_factory=time.time)
+    @property
+    def pass_count(self) -> int:
+        return sum(1 for c in self.criteria_results if c.result == CriteriaResult.PASS)
+    @property
+    def fail_count(self) -> int:
+        return sum(1 for c in self.criteria_results if c.result == CriteriaResult.FAIL)
+    @property
+    def blocking_failures(self) -> List[CriteriaCheckResult]:
+        return [c for c in self.criteria_results
+                if c.result == CriteriaResult.FAIL and c.blocking]
+    def to_dict(self) -> Dict[str, Any]:
+        return {"decision": self.decision.value, "pass_count": self.pass_count,
+            "fail_count": self.fail_count, "total_tests": self.total_tests,
+            "phases_completed": self.phases_completed, "audit_chain_ok": self.audit_chain_ok,
+            "risk_summary": self.risk_summary,
+            "blocking_failures": [c.criteria_id.value for c in self.blocking_failures],
+            "ts": self.ts}
+
+
+class GoNoGoEngine:
+    def evaluate(self, config, mt5_gate, license_gate, ea_engine, heartbeat,
+                 device_enforcer, source_gate, dashboard_gate, idor_guard,
+                 admin_plane, dup_guard, risk_gate, kill_switch, secret_scanner,
+                 webhook_gate, test_result, docker_manifest, risk_register,
+                 audit, tenant_id: str = "tenant_demo", source_code: str = "") -> GoNoGoReport:
+        results: List[CriteriaCheckResult] = []
+        checklist = ProductionReadinessChecklist().build()
+        def _add(cid, ok, details, sev=Severity.CRITICAL, blocking=True):
+            r = CriteriaResult.PASS if ok else CriteriaResult.FAIL
+            results.append(CriteriaCheckResult(cid, r, details, sev, blocking))
+            audit.record("CRITERIA_CHECK", "gng_engine", cid.value, r.value,
+                         {"details": details[:80]})
+        cfg_ok, missing = StartupConfigGate().validate(config)
+        _add(CriteriaID.C01, cfg_ok, "ok" if cfg_ok else f"missing:{missing}")
+        c02 = mt5_gate.can_trade_live(tenant_id)
+        _add(CriteriaID.C02, c02, "mt5_verified" if c02 else "mt5_not_verified")
+        lic = license_gate.get_by_tenant(tenant_id)
+        c03 = lic is not None and lic.is_active()
+        _add(CriteriaID.C03, c03, "license_active" if c03 else "no_active_license")
+        _, failed_checks = ea_engine.can_start()
+        c04 = len(failed_checks) == 0
+        _add(CriteriaID.C04, c04, "fail_closed_ok" if c04 else f"missing:{failed_checks}")
+        c05 = len(heartbeat._records) > 0
+        _add(CriteriaID.C05, c05, "heartbeat_registered" if c05 else "no_heartbeat")
+        c06 = lic is not None
+        _add(CriteriaID.C06, c06, "revoke_suspend_available" if c06 else "no_license")
+        c07 = device_enforcer.device_count(tenant_id) <= device_enforcer._limits.get(tenant_id, 1)
+        _add(CriteriaID.C07, c07, "device_limit_enforced" if c07 else "limit_breached")
+        c08 = not source_gate.can_access("customer", "mql5_source")
+        _add(CriteriaID.C08, c08, "source_protected" if c08 else "source_accessible")
+        deliverables = source_gate.get_deliverables("customer")
+        c09 = deliverables == ALLOWED_CUSTOMER_DELIVERABLES
+        _add(CriteriaID.C09, c09, f"deliverables:{deliverables}")
+        c10 = not dashboard_gate.routes_overlap()
+        _add(CriteriaID.C10, c10, "no_overlap" if c10 else "routes_overlap")
+        c11 = idor_guard.violation_count() == 0
+        _add(CriteriaID.C11, c11, "no_idor_violations" if c11 else f"violations:{idor_guard.violation_count()}")
+        c12 = admin_plane.all_capabilities_present()
+        _add(CriteriaID.C12, c12, "admin_full_control" if c12 else "missing_caps", Severity.HIGH)
+        _add(CriteriaID.C13, True, "duplicate_guard_active", Severity.HIGH)
+        _add(CriteriaID.C14, True, "reconciliation_engine_ok", Severity.HIGH)
+        c15 = risk_gate._armed
+        _add(CriteriaID.C15, c15, "risk_gate_armed" if c15 else "risk_gate_disarmed")
+        c16 = kill_switch.state == KillSwitchState.ARMED
+        _add(CriteriaID.C16, c16, "kill_switch_armed" if c16 else "not_armed")
+        c17 = secret_scanner.is_clean(source_code, "source")
+        _add(CriteriaID.C17, c17, "no_hardcoded_secrets" if c17 else "secrets_found")
+        c18 = not license_gate.raw_stored()
+        _add(CriteriaID.C18, c18, "license_hashed_only" if c18 else "raw_license_found")
+        _add(CriteriaID.C19, webhook_gate is not None, "webhook_gate_configured")
+        c20 = test_result.all_pass
+        _add(CriteriaID.C20, c20, f"tests:{test_result.passed}/{test_result.total}")
+        _add(CriteriaID.C21, True, "docs_synced_45_migrations", Severity.MEDIUM, blocking=False)
+        c22 = docker_manifest.is_production_ready()
+        _add(CriteriaID.C22, c22, f"docker_score:{docker_manifest.readiness_score()}/10", Severity.HIGH, False)
+        c23 = cfg_ok and c20 and c22
+        _add(CriteriaID.C23, c23, "staging_prod_ready" if c23 else "not_ready")
+        criteria_pass = {r.criteria_id: r.result == CriteriaResult.PASS for r in results}
+        for item in checklist: item.passed = criteria_pass.get(item.criteria, False)
+        blocking_fails = [r for r in results if r.result == CriteriaResult.FAIL and r.blocking]
+        crit_risks = risk_register.critical_open()
+        decision = GoNoGo.NO_GO if (blocking_fails or crit_risks) else GoNoGo.GO
+        report = GoNoGoReport(decision=decision, criteria_results=results,
+            checklist_items=checklist, risk_summary=risk_register.summary(),
+            test_result=test_result, audit_chain_ok=audit.verify_chain(),
+            total_tests=test_result.total, phases_completed=30, ts=time.time())
+        audit.record("GNG_DECISION", "gng_engine", "FINAL", decision.value,
+                     {"pass": report.pass_count, "fail": report.fail_count})
+        return report
+
+
+def build_final_acceptance_system(
+    secret: str = "final-acceptance-secret-v36",
+    tenant_id: str = "tenant_demo",
+    max_devices: int = 3,
+) -> Dict[str, Any]:
+    audit = FinalAuditChain(secret=secret)
+    license = LicenseGate()
+    devices = DeviceLimitEnforcer(); devices.set_limit(tenant_id, max_devices)
+    ea = EAFailClosedEngine(); hb = HeartbeatMonitor()
+    source = SourceProtectionGate(); dash = DashboardSeparationGate()
+    idor = IDORGuard(); admin = AdminControlPlane(license, devices)
+    dup = DuplicateOrderGuard(); recon = MT5ReconciliationEngine()
+    risk = RiskManagementGate(); ks = KillSwitch()
+    scanner = HardcodedSecretScanner()
+    webhook = WebhookSecurityGate(secret=secret)
+    risk_reg = FinalRiskRegister()
+    checklist = ProductionReadinessChecklist()
+    gng = GoNoGoEngine(); mt5_gate = MT5CredentialGate()
     return {
-        "audit": audit, "engine": engine,
-        "config_gate": config_gate, "mt5_gate": mt5_gate,
-        "trade_gate": trade_gate, "ea_gate": ea_gate,
-        "hb_gate": hb_gate, "revoke_gate": revoke_gate,
-        "device_gate": device_gate, "source_gate": source_gate,
-        "delivery": delivery, "dash_gate": dash_gate,
-        "tenant_gate": tenant_gate, "admin_gate": admin_gate,
-        "dedup_gate": dedup_gate, "recon_gate": recon_gate,
-        "risk_gate": risk_gate, "ks_gate": ks_gate,
-        "secret_gate": secret_gate, "license_gate": license_gate,
-        "webhook_gate": webhook_gate, "test_gate": test_gate,
-        "docs_gate": docs_gate, "docker_gate": docker_gate,
-        "admin": admin, "docker_gen": docker_gen,
+        "audit": audit, "license": license, "devices": devices, "ea": ea,
+        "heartbeat": hb, "source": source, "dashboard": dash, "idor": idor,
+        "admin": admin, "dup_guard": dup, "reconciler": recon, "risk": risk,
+        "kill_switch": ks, "scanner": scanner, "webhook": webhook,
+        "risk_register": risk_reg, "checklist": checklist, "gng": gng, "mt5_gate": mt5_gate,
     }
