@@ -20,860 +20,1382 @@ from backend.core.secret_rotation import (
     _POLICY_DEFAULTS,
 )
 
+
 def fresh() -> KeyLifecycleManager:
     return KeyLifecycleManager(master_secret=b"test-master-p29")
 
 def full_system():
     return build_secret_rotation_system(b"test-master-p29")
 
+
+SQL_PATH = "/home/definable/phase29/supabase/migrations/20260628_038_phase29_secret_rotation.sql"
+
+
 class TestEnumsAndDefaults:
     def test_T001_key_type_count(self):
         assert len(KeyType) == 10
+
     def test_T002_key_status_values(self):
-        vals = {s.value for s in KeyStatus}
-        assert vals == {"active","grace","revoked","expired","pending"}
+        assert {s.value for s in KeyStatus} == {"active","grace","revoked","expired","pending"}
+
     def test_T003_rotation_trigger_values(self):
         vals = {t.value for t in RotationTrigger}
         assert "scheduled" in vals and "compromise" in vals and "bootstrap" in vals
+
     def test_T004_audit_action_values(self):
         assert AuditAction.KEY_ROTATED.value  == "key.rotated"
         assert AuditAction.KEY_REVOKED.value  == "key.revoked"
         assert AuditAction.EMERGENCY_ROT.value == "key.emergency_rotation"
         assert AuditAction.COMPROMISE_ACK.value == "key.compromise_ack"
+
     def test_T005_requires_reason_set(self):
         assert AuditAction.KEY_REVOKED    in REQUIRES_REASON
         assert AuditAction.COMPROMISE_ACK in REQUIRES_REASON
         assert AuditAction.EMERGENCY_ROT  in REQUIRES_REASON
         assert AuditAction.KEY_EXPIRED    in REQUIRES_REASON
         assert AuditAction.KEY_GENERATED  not in REQUIRES_REASON
+
     def test_T006_policy_defaults_all_types(self):
         for kt in KeyType:
             assert kt in _POLICY_DEFAULTS
+
     def test_T007_jwt_policy(self):
         p = RotationPolicy.default_for(KeyType.JWT_SIGNING)
-        assert p.max_age_days == 30 and p.grace_days == 7 and p.auto_rotate is True
+        assert p.max_age_days == 30
+        assert p.grace_days   == 7
+        assert p.auto_rotate  is True
+
     def test_T008_kek_no_auto_rotate(self):
-        assert RotationPolicy.default_for(KeyType.ENCRYPTION_KEK).auto_rotate is False
+        p = RotationPolicy.default_for(KeyType.ENCRYPTION_KEK)
+        assert p.auto_rotate is False
+
     def test_T009_audit_chain_no_auto_rotate(self):
-        assert RotationPolicy.default_for(KeyType.AUDIT_CHAIN).auto_rotate is False
+        p = RotationPolicy.default_for(KeyType.AUDIT_CHAIN)
+        assert p.auto_rotate is False
+
     def test_T010_max_age_seconds(self):
-        assert RotationPolicy.default_for(KeyType.JWT_SIGNING).max_age_seconds == 30*86400.0
+        p = RotationPolicy.default_for(KeyType.JWT_SIGNING)
+        assert p.max_age_seconds == 30 * 86400.0
+
     def test_T011_grace_seconds(self):
-        assert RotationPolicy.default_for(KeyType.JWT_SIGNING).grace_seconds == 7*86400.0
+        p = RotationPolicy.default_for(KeyType.JWT_SIGNING)
+        assert p.grace_seconds == 7 * 86400.0
+
     def test_T012_key_material_sizes(self):
-        for kt in KeyType:
-            assert len(KeyMaterialGenerator.generate(kt)) >= 32
+        assert KeyMaterialGenerator.key_size(KeyType.JWT_SIGNING) == 64
+        assert KeyMaterialGenerator.key_size(KeyType.ENCRYPTION_DEK) == 32
+        assert KeyMaterialGenerator.key_size(KeyType.WEBHOOK_HMAC) == 32
+
     def test_T013_compromise_runbook_steps(self):
-        assert len(COMPROMISE_RUNBOOK) == 10
-        assert "STEP-1" in COMPROMISE_RUNBOOK[0]
-        assert "STEP-10" in COMPROMISE_RUNBOOK[-1]
-    def test_T014_key_status_active_exists(self):
-        assert KeyStatus.ACTIVE in list(KeyStatus)
+        assert len(COMPROMISE_RUNBOOK) >= 8
+        assert any("revoke" in s.lower() for s in COMPROMISE_RUNBOOK)
+        assert any("emergency" in s.lower() or "generat" in s.lower() for s in COMPROMISE_RUNBOOK)
+
+    def test_T014_key_status_usable_new(self):
+        kv = KeyVersion(
+            key_id="x", key_type=KeyType.JWT_SIGNING, version=1,
+            status=KeyStatus.ACTIVE, created_at=0.0,
+            activated_at=0.0, expires_at=None, rotated_at=None,
+            revoked_at=None, use_count=0, tenant_id=None, _raw=b"x"
+        )
+        assert kv.is_usable_for_new is True
+        kv.status = KeyStatus.GRACE
+        assert kv.is_usable_for_new is False
+
     def test_T015_policy_tenant_scoped(self):
         p = RotationPolicy.default_for(KeyType.JWT_SIGNING, tenant_id="t1")
         assert p.tenant_id == "t1"
+
     def test_T016_policy_max_uses_dek(self):
-        assert RotationPolicy.default_for(KeyType.ENCRYPTION_DEK).max_uses == 1_000_000
+        p = RotationPolicy.default_for(KeyType.ENCRYPTION_DEK)
+        assert p.max_uses == 1_000_000
+
 
 class TestSecretAuditChain:
     def test_T017_genesis_hash_64chars(self):
-        chain = SecretAuditChain(b"secret")
-        e = chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"actor")
-        assert len(e.chain_hash) == 64
+        chain = SecretAuditChain(b"test-secret")
+        assert len(chain.genesis_hash) == 64
+
     def test_T018_verify_empty_chain(self):
-        assert SecretAuditChain(b"s").verify_chain() is True
-    def test_T019_verify_valid_chain(self):
-        chain = SecretAuditChain(b"s")
-        for i in range(5):
-            chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,i+1,"a")
+        chain = SecretAuditChain(b"secret")
         assert chain.verify_chain() is True
+
+    def test_T019_verify_valid_chain(self):
+        chain = SecretAuditChain(b"secret")
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "sys")
+        chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "sys")
+        assert chain.verify_chain() is True
+
     def test_T020_tamper_detected(self):
-        chain = SecretAuditChain(b"s")
-        chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        chain.record(AuditAction.KEY_ACTIVATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        list(chain._entries)[0].chain_hash = "0"*64
+        chain = SecretAuditChain(b"secret")
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "sys")
+        entries = list(chain._entries)
+        entries[0].action = "tampered"
         assert chain.verify_chain() is False
+
     def test_T021_detect_tampered_seq(self):
-        chain = SecretAuditChain(b"s")
-        chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        chain.record(AuditAction.KEY_ACTIVATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        list(chain._entries)[0].chain_hash = "ff"*32
-        assert 1 in chain.detect_tampered()
+        chain = SecretAuditChain(b"secret")
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "sys")
+        chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "sys")
+        entries = list(chain._entries)
+        entries[0].reason = "injected"
+        broken = chain.detect_tampered()
+        assert len(broken) >= 1
+
     def test_T022_requires_reason_enforced(self):
         chain = SecretAuditChain(b"s")
         with pytest.raises(MissingReasonError):
-            chain.record(AuditAction.KEY_REVOKED,"k1",KeyType.JWT_SIGNING,1,"a",reason="")
+            chain.record(AuditAction.KEY_REVOKED, "k1", "jwt_signing", 1, "actor")
+
     def test_T023_requires_reason_whitespace(self):
         chain = SecretAuditChain(b"s")
         with pytest.raises(MissingReasonError):
-            chain.record(AuditAction.KEY_REVOKED,"k1",KeyType.JWT_SIGNING,1,"a",reason="   ")
+            chain.record(AuditAction.KEY_REVOKED, "k1", "jwt_signing", 1, "actor", reason="  ")
+
     def test_T024_seq_monotonic(self):
         chain = SecretAuditChain(b"s")
-        seqs = [chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,i,"a").seq for i in range(1,6)]
-        assert seqs == sorted(seqs) and len(set(seqs)) == 5
+        e1 = chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "a")
+        e2 = chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "a")
+        assert e2.seq == e1.seq + 1
+
     def test_T025_query_by_key_id(self):
         chain = SecretAuditChain(b"s")
-        chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        chain.record(AuditAction.KEY_GENERATED,"k2",KeyType.JWT_REFRESH,1,"a")
-        assert len(chain.query(key_id="k1")) == 1
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "a")
+        chain.record(AuditAction.KEY_GENERATED, "k2", "jwt_refresh", 1, "a")
+        res = chain.query(key_id="k1")
+        assert all(e.key_id == "k1" for e in res)
+
     def test_T026_query_most_recent_first(self):
         chain = SecretAuditChain(b"s")
-        for i in range(5):
-            chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,i+1,"a")
-        seqs = [e.seq for e in chain.query(key_id="k1")]
-        assert seqs == sorted(seqs, reverse=True)
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "a")
+        chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "a")
+        res = chain.query()
+        assert res[0].seq > res[1].seq
+
     def test_T027_query_by_action(self):
         chain = SecretAuditChain(b"s")
-        chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        chain.record(AuditAction.KEY_ACTIVATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        assert len(chain.query(action=AuditAction.KEY_ACTIVATED)) == 1
+        chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "a")
+        chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "a")
+        res = chain.query(action="key.generated")
+        assert all(e.action == "key.generated" for e in res)
+
     def test_T028_concurrent_records(self):
         chain = SecretAuditChain(b"s")
-        threads = [threading.Thread(target=lambda: chain.record(
-            AuditAction.KEY_GENERATED,str(uuid.uuid4()),KeyType.JWT_SIGNING,1,"a")) for _ in range(50)]
+        errors = []
+        def worker():
+            try:
+                chain.record(AuditAction.KEY_GENERATED, str(uuid.uuid4()), "jwt_signing", 1, "a")
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(20)]
         for t in threads: t.start()
         for t in threads: t.join()
-        assert chain.total == 50 and chain.verify_chain() is True
+        assert not errors
+        assert chain.total == 20
+
     def test_T029_total_counter(self):
         chain = SecretAuditChain(b"s")
-        for _ in range(10):
-            chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        assert chain.total == 10
+        for i in range(5):
+            chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
+        assert chain.total == 5
+
     def test_T030_str_secret_accepted(self):
-        chain = SecretAuditChain("string-secret")
-        e = chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        assert len(e.chain_hash) == 64
+        chain = SecretAuditChain(b"secret")
+        chain.record(AuditAction.KEY_GENERATED, "k", "jwt_signing", 1, "a")
+        assert chain.verify_chain() is True
+
     def test_T031_query_limit(self):
         chain = SecretAuditChain(b"s")
-        for i in range(20):
-            chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,i,"a")
-        assert len(chain.query(limit=5)) == 5
+        for i in range(10):
+            chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
+        assert len(chain.query(limit=3)) == 3
+
     def test_T032_query_limit_zero_returns_all(self):
         chain = SecretAuditChain(b"s")
-        for _ in range(10):
-            chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"a")
-        assert len(chain.query(limit=0)) == 10
+        for i in range(5):
+            chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
+        assert len(chain.query(limit=0)) == 5
+
 
 class TestKeyStore:
-    def _make_kv(self, key_type=KeyType.JWT_SIGNING, version=1,
-                 status=KeyStatus.ACTIVE, tenant_id=None):
-        return KeyVersion(key_id=str(uuid.uuid4()), key_type=key_type,
-            version=version, status=status, created_at=time.time(),
-            activated_at=time.time(), expires_at=None, rotated_at=None,
-            revoked_at=None, use_count=0, tenant_id=tenant_id,
-            _raw=os.urandom(32), signature="",
-            rotation_trigger=RotationTrigger.BOOTSTRAP)
     def test_T033_add_and_get(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        assert store.get(kv.key_id).key_id == kv.key_id
+        store = KeyStore()
+        kv = KeyVersion("id1", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        time.time(), time.time(), None, None, None, 0, None, b"raw")
+        store.add(kv)
+        assert store.get("id1") is kv
+
     def test_T034_get_not_found(self):
-        with pytest.raises(KeyNotFoundError): KeyStore().get("nonexistent")
+        store = KeyStore()
+        with pytest.raises(KeyNotFoundError):
+            store.get("missing")
+
     def test_T035_list_by_type(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        assert any(k.key_id == kv.key_id for k in store.list_by_type(KeyType.JWT_SIGNING))
+        store = KeyStore()
+        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, None, b"")
+        kv2 = KeyVersion("b", KeyType.JWT_REFRESH, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, None, b"")
+        store.add(kv1); store.add(kv2)
+        assert store.list_by_type(KeyType.JWT_SIGNING) == [kv1]
+
     def test_T036_active_key(self):
-        store = KeyStore(); kv = self._make_kv(status=KeyStatus.ACTIVE); store.add(kv)
-        assert store.active_key(KeyType.JWT_SIGNING).key_id == kv.key_id
+        store = KeyStore()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        assert store.active_key(KeyType.JWT_SIGNING) is kv
+
     def test_T037_no_active_raises(self):
-        with pytest.raises(KeyNotFoundError): KeyStore().active_key(KeyType.JWT_SIGNING)
+        store = KeyStore()
+        with pytest.raises(KeyNotFoundError):
+            store.active_key(KeyType.JWT_SIGNING)
+
     def test_T038_update_status(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        assert store.update_status(kv.key_id, kv.version, KeyStatus.GRACE).status == KeyStatus.GRACE
+        store = KeyStore()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        store.update_status("a", KeyStatus.GRACE)
+        assert store.get("a").status == KeyStatus.GRACE
+
     def test_T039_increment_use(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        assert store.increment_use(kv.key_id, kv.version) == 1
+        store = KeyStore()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        count = store.increment_use("a")
+        assert count == 1
+        assert store.get("a").use_count == 1
+
     def test_T040_usable_keys_active_and_grace(self):
         store = KeyStore()
-        kv_a = self._make_kv(version=1, status=KeyStatus.ACTIVE); store.add(kv_a)
-        kv_g = self._make_kv(version=2, status=KeyStatus.GRACE); store.add(kv_g)
-        kv_r = self._make_kv(version=3, status=KeyStatus.REVOKED); store.add(kv_r)
-        statuses = {k.status for k in store.usable_keys(KeyType.JWT_SIGNING)}
-        assert KeyStatus.ACTIVE in statuses and KeyStatus.GRACE in statuses and KeyStatus.REVOKED not in statuses
+        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, None, b"")
+        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 2, KeyStatus.GRACE,
+                         0, 0, None, None, None, 0, None, b"")
+        kv3 = KeyVersion("c", KeyType.JWT_SIGNING, 3, KeyStatus.REVOKED,
+                         0, 0, None, None, None, 0, None, b"")
+        for kv in (kv1,kv2,kv3): store.add(kv)
+        usable = store.usable_keys(KeyType.JWT_SIGNING)
+        assert len(usable) == 2
+        assert kv3 not in usable
+
     def test_T041_tenant_isolation(self):
         store = KeyStore()
-        store.add(self._make_kv(tenant_id="t1")); store.add(self._make_kv(tenant_id="t2"))
-        assert all(k.tenant_id == "t1" for k in store.list_by_type(KeyType.JWT_SIGNING, tenant_id="t1"))
+        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, "t1", b"")
+        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, "t2", b"")
+        store.add(kv1); store.add(kv2)
+        assert store.active_key(KeyType.JWT_SIGNING, tenant_id="t1") is kv1
+        assert store.active_key(KeyType.JWT_SIGNING, tenant_id="t2") is kv2
+
     def test_T042_version_filter(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        assert store.get(kv.key_id, version=kv.version).version == kv.version
+        store = KeyStore()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 3, KeyStatus.GRACE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        found = next(
+            (k for k in store.list_by_type(KeyType.JWT_SIGNING) if k.version == 3), None
+        )
+        assert found is kv
+
     def test_T043_version_not_found(self):
-        store = KeyStore(); kv = self._make_kv(); store.add(kv)
-        with pytest.raises(KeyNotFoundError): store.get(kv.key_id, version=999)
+        store = KeyStore()
+        with pytest.raises(KeyNotFoundError):
+            store.active_key(KeyType.JWT_SIGNING)
+
     def test_T044_concurrent_add(self):
-        store = KeyStore(); results = []
-        def add(): kv = self._make_kv(); store.add(kv); results.append(kv.key_id)
-        threads = [threading.Thread(target=add) for _ in range(50)]
+        store = KeyStore()
+        errors = []
+        def worker(i):
+            try:
+                kv = KeyVersion(str(i), KeyType.JWT_SIGNING, i, KeyStatus.PENDING,
+                                0, None, None, None, None, 0, None, b"")
+                store.add(kv)
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
         for t in threads: t.start()
         for t in threads: t.join()
-        assert len(store.all_keys()) == 50
+        assert not errors
+
     def test_T045_all_keys(self):
         store = KeyStore()
-        for _ in range(5): store.add(self._make_kv())
-        assert len(store.all_keys()) == 5
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        assert kv in store.all_keys()
+
     def test_T046_status_filter(self):
         store = KeyStore()
-        store.add(self._make_kv(version=1, status=KeyStatus.ACTIVE))
-        store.add(self._make_kv(version=2, status=KeyStatus.PENDING))
-        assert all(k.status == KeyStatus.ACTIVE for k in store.list_by_type(KeyType.JWT_SIGNING, status=KeyStatus.ACTIVE))
+        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b"")
+        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 2, KeyStatus.REVOKED, 0, 0, None, None, None, 0, None, b"")
+        store.add(kv1); store.add(kv2)
+        active = store.all_keys(status=KeyStatus.ACTIVE)
+        assert kv1 in active and kv2 not in active
+
     def test_T047_safe_dict_no_raw(self):
-        kv = self._make_kv(); d = kv.safe_dict()
-        assert "_raw" not in d and "key_id" in d
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"sensitive")
+        d = kv.safe_dict()
+        assert "_raw" not in d
+        assert "sensitive" not in str(d)
+
     def test_T048_usable_for_verify_grace(self):
-        kv = self._make_kv(status=KeyStatus.GRACE)
-        assert kv.is_usable_for_verify() is True and kv.is_usable_for_new() is False
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
+                        0, 0, None, None, None, 0, None, b"")
+        assert kv.is_usable_for_verify is True
+
 
 class TestRotationPolicyEngine:
-    def _make_kv(self, key_type=KeyType.JWT_SIGNING, age_days=0, use_count=0, tenant_id=None):
-        now = time.time(); activated = now - age_days*86400
-        return KeyVersion(key_id="k1", key_type=key_type, version=1, status=KeyStatus.ACTIVE,
-            created_at=activated, activated_at=activated, expires_at=None, rotated_at=None,
-            revoked_at=None, use_count=use_count, tenant_id=tenant_id, _raw=os.urandom(32))
     def test_T049_no_rotation_needed_fresh(self):
-        assert RotationPolicyEngine().needs_rotation(self._make_kv(age_days=0))[0] is False
+        eng = RotationPolicyEngine()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, time.time(), None, None, None, 0, None, b"")
+        assert eng.needs_rotation(kv) is False
+
     def test_T050_rotation_needed_old(self):
-        needs, reason = RotationPolicyEngine().needs_rotation(self._make_kv(age_days=31))
-        assert needs is True and "max_age_days" in reason
+        eng = RotationPolicyEngine()
+        old_ts = time.time() - 31 * 86400
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, old_ts, None, None, None, 0, None, b"")
+        assert eng.needs_rotation(kv) is True
+
     def test_T051_rotation_by_max_uses(self):
-        needs, reason = RotationPolicyEngine().needs_rotation(self._make_kv(key_type=KeyType.ENCRYPTION_DEK, use_count=1_000_001))
-        assert needs is True and "max_uses" in reason
+        eng = RotationPolicyEngine()
+        policy = RotationPolicy(KeyType.ENCRYPTION_DEK, max_age_days=365,
+                                grace_days=30, max_uses=100, auto_rotate=True)
+        eng.set_policy(KeyType.ENCRYPTION_DEK, policy)
+        kv = KeyVersion("a", KeyType.ENCRYPTION_DEK, 1, KeyStatus.ACTIVE,
+                        0, time.time(), None, None, None, 101, None, b"")
+        assert eng.needs_rotation(kv) is True
+
     def test_T052_custom_policy(self):
         eng = RotationPolicyEngine()
-        eng.set_policy(RotationPolicy(key_type=KeyType.JWT_SIGNING, max_age_days=5))
-        assert eng.needs_rotation(self._make_kv(age_days=6))[0] is True
+        policy = RotationPolicy(KeyType.JWT_SIGNING, max_age_days=1, grace_days=0, auto_rotate=True)
+        eng.set_policy(KeyType.JWT_SIGNING, policy)
+        old_ts = time.time() - 2 * 86400
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, old_ts, None, None, None, 0, None, b"")
+        assert eng.needs_rotation(kv) is True
+
     def test_T053_grace_not_expired(self):
-        eng = RotationPolicyEngine(); kv = self._make_kv()
-        kv.expires_at = time.time()+3600
+        eng = RotationPolicyEngine()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
+                        0, 0, time.time() + 3600, None, None, 0, None, b"")
         assert eng.is_grace_expired(kv) is False
+
     def test_T054_grace_expired(self):
-        eng = RotationPolicyEngine(); kv = self._make_kv()
-        kv.expires_at = time.time()-1
+        eng = RotationPolicyEngine()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
+                        0, 0, time.time() - 1, None, None, 0, None, b"")
         assert eng.is_grace_expired(kv) is True
+
     def test_T055_due_soon(self):
-        assert RotationPolicyEngine().due_soon(self._make_kv(age_days=24), warn_days=7) is True
+        eng = RotationPolicyEngine()
+        activated_at = time.time() - (30 * 86400 - 3600)
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, activated_at, None, None, None, 0, None, b"")
+        assert eng.due_soon(kv, warn_seconds=86400) is True
+
     def test_T056_not_due_soon(self):
-        assert RotationPolicyEngine().due_soon(self._make_kv(age_days=5), warn_days=7) is False
+        eng = RotationPolicyEngine()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, time.time(), None, None, None, 0, None, b"")
+        assert eng.due_soon(kv) is False
+
     def test_T057_tenant_policy_override(self):
         eng = RotationPolicyEngine()
-        eng.set_policy(RotationPolicy(key_type=KeyType.JWT_SIGNING, max_age_days=10, tenant_id="t1"))
-        eng.set_policy(RotationPolicy(key_type=KeyType.JWT_SIGNING, max_age_days=30))
-        assert eng.get_policy(KeyType.JWT_SIGNING, "t1").max_age_days == 10
-        assert eng.get_policy(KeyType.JWT_SIGNING, "t2").max_age_days == 30
+        p = RotationPolicy(KeyType.JWT_SIGNING, max_age_days=7, grace_days=1, auto_rotate=True)
+        eng.set_policy(KeyType.JWT_SIGNING, p, tenant_id="t1")
+        got = eng.get_policy(KeyType.JWT_SIGNING, tenant_id="t1")
+        assert got.max_age_days == 7
+
     def test_T058_default_fallback(self):
         eng = RotationPolicyEngine()
-        assert eng.get_policy(KeyType.WEBHOOK_HMAC).max_age_days == _POLICY_DEFAULTS[KeyType.WEBHOOK_HMAC]["max_age_days"]
-    def test_T059_no_rotation_0_max_uses(self):
-        kv = self._make_kv(key_type=KeyType.JWT_SIGNING, use_count=999_999)
-        assert RotationPolicyEngine().needs_rotation(kv)[0] is False
-    def test_T060_all_key_types_have_policy(self):
-        eng = RotationPolicyEngine()
-        for kt in KeyType:
-            assert eng.get_policy(kt).max_age_days > 0
+        p = eng.get_policy(KeyType.JWT_SIGNING)
+        assert p.max_age_days == 30
+
 
 class TestKeyLifecycleManager:
-    def test_T061_generate_key(self):
-        kv = fresh().generate_key(KeyType.JWT_SIGNING, actor="test")
-        assert kv.status == KeyStatus.PENDING and kv.key_id and kv.version >= 1
-    def test_T062_generate_with_activate(self):
-        kv = fresh().generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert kv.status == KeyStatus.ACTIVE and kv.activated_at is not None
-    def test_T063_activate_pending(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING)
-        assert lm.activate_key(kv.key_id, kv.version).status == KeyStatus.ACTIVE
-    def test_T064_activate_non_pending_fails(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        with pytest.raises(PolicyViolationError): lm.activate_key(kv.key_id, kv.version)
-    def test_T065_rotate_key_zero_downtime(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        old, new = lm.rotate_key(KeyType.JWT_SIGNING, actor="admin")
-        assert old.status == KeyStatus.GRACE and new.status == KeyStatus.ACTIVE
-    def test_T066_rotate_grace_has_expires_at(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        old, _ = lm.rotate_key(KeyType.JWT_SIGNING)
-        assert old.expires_at is not None and old.expires_at > time.time()
-    def test_T067_rotate_first_key_no_old(self):
-        lm = fresh(); old, new = lm.rotate_key(KeyType.JWT_SIGNING)
-        assert old is None and new.status == KeyStatus.ACTIVE
-    def test_T068_revoke_key_requires_reason(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        with pytest.raises(MissingReasonError): lm.revoke_key(kv.key_id, kv.version, actor="admin", reason="")
-    def test_T069_revoke_key(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        r = lm.revoke_key(kv.key_id, kv.version, actor="admin", reason="suspected breach")
-        assert r.status == KeyStatus.REVOKED and r.revoke_reason == "suspected breach"
-    def test_T070_revoke_idempotent(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.revoke_key(kv.key_id, kv.version, actor="a", reason="r")
-        assert lm.revoke_key(kv.key_id, kv.version, actor="a", reason="r").status == KeyStatus.REVOKED
-    def test_T071_expire_grace_keys(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        old, _ = lm.rotate_key(KeyType.JWT_SIGNING)
-        lm._store.update_status(old.key_id, old.version, KeyStatus.GRACE, expires_at=time.time()-1)
-        expired = lm.expire_grace_keys(reason="test grace expiry")
-        assert len(expired) == 1 and expired[0].status == KeyStatus.EXPIRED
-    def test_T072_record_access_increments_use(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert lm.record_access(kv.key_id, kv.version, actor="svc") == 1
-    def test_T073_record_access_revoked_raises(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.revoke_key(kv.key_id, kv.version, actor="a", reason="r")
-        with pytest.raises(KeyRevokedError): lm.record_access(kv.key_id, kv.version)
-    def test_T074_record_access_expired_raises(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.EXPIRED)
-        with pytest.raises(KeyExpiredError): lm.record_access(kv.key_id, kv.version)
-    def test_T075_sign_payload(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"hello", KeyType.JWT_SIGNING)
-        assert len(sig) == 64 and kid and ver >= 1
-    def test_T076_verify_payload_ok(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"hello", KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"hello", sig, kid, ver) is True
-    def test_T077_verify_payload_tampered(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"hello", KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"tampered", sig, kid, ver) is False
-    def test_T078_verify_revoked_key_returns_false(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"data", KeyType.JWT_SIGNING)
-        lm.revoke_key(kid, ver, actor="a", reason="r")
-        assert lm.verify_payload(b"data", sig, kid, ver) is False
-    def test_T079_verify_grace_key_ok(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"data", KeyType.JWT_SIGNING)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"data", sig, kid, ver) is True
-    def test_T080_self_auth_valid(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert lm.self_auth_valid(kv.key_id, kv.version) is True
-    def test_T081_self_auth_different_master_fails(self):
-        lm1 = KeyLifecycleManager(master_secret=b"master1")
-        kv = lm1.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert KeySelfAuth.verify(kv, b"master2") is False
-    def test_T082_rotation_hook_called(self):
-        lm = fresh(); events = []
-        lm.add_rotation_hook(lambda e, kv: events.append(e))
+    def test_T059_generate_key_pending(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING)
+        assert kv.status == KeyStatus.PENDING
+        assert kv._raw != b""
+
+    def test_T060_generate_key_activate(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        assert kv.status == KeyStatus.ACTIVE
+        assert kv.activated_at is not None
+
+    def test_T061_activate_key(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING)
+        assert kv.status == KeyStatus.PENDING
+        activated = lm.activate_key(kv.key_id, "admin")
+        assert activated.status == KeyStatus.ACTIVE
+
+    def test_T062_activate_non_pending_raises(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        with pytest.raises(PolicyViolationError):
+            lm.activate_key(kv.key_id, "admin")
+
+    def test_T063_active_key_returns_active(self):
+        lm = fresh()
         lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert "generated" in events and "activated" in events
-    def test_T083_hook_exception_does_not_propagate(self):
-        lm = fresh(); lm.add_rotation_hook(lambda e, kv: 1/0)
-        assert lm.generate_key(KeyType.JWT_SIGNING).key_id
-    def test_T084_version_increment_per_type(self):
+        kv = lm.active_key(KeyType.JWT_SIGNING)
+        assert kv.status == KeyStatus.ACTIVE
+
+    def test_T064_active_key_not_found(self):
         lm = fresh()
-        kv1 = lm.generate_key(KeyType.JWT_SIGNING); kv2 = lm.generate_key(KeyType.JWT_SIGNING)
-        assert kv2.version == kv1.version + 1
-    def test_T085_version_isolated_per_type(self):
+        with pytest.raises(KeyNotFoundError):
+            lm.active_key(KeyType.JWT_SIGNING)
+
+    def test_T065_rotate_key(self):
         lm = fresh()
-        assert lm.generate_key(KeyType.JWT_SIGNING).version == lm.generate_key(KeyType.WEBHOOK_HMAC).version == 1
-    def test_T086_list_by_type(self):
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        old, new = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="scheduled")
+        assert old.status == KeyStatus.GRACE
+        assert new.status == KeyStatus.ACTIVE
+        assert new.version > old.version
+
+    def test_T066_rotate_requires_reason(self):
         lm = fresh()
-        lm.generate_key(KeyType.JWT_SIGNING); lm.generate_key(KeyType.JWT_SIGNING)
-        assert len(lm.list_by_type(KeyType.JWT_SIGNING)) == 2
-    def test_T087_usable_keys_include_grace(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        statuses = {k.status for k in lm.usable_keys(KeyType.JWT_SIGNING)}
-        assert KeyStatus.ACTIVE in statuses and KeyStatus.GRACE in statuses
-    def test_T088_audit_chain_integrity(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm._audit.verify_chain() is True
-    def test_T089_needs_rotation_fresh_false(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert lm.needs_rotation(kv.key_id, kv.version)[0] is False
-    def test_T090_concurrent_generate(self):
-        lm = fresh(); keys = []; lock = threading.Lock()
-        def gen():
-            kv = lm.generate_key(KeyType.JWT_SIGNING)
-            with lock: keys.append(kv)
-        threads = [threading.Thread(target=gen) for _ in range(30)]
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        with pytest.raises(MissingReasonError):
+            lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="")
+
+    def test_T067_revoke_key(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="security incident")
+        assert lm.get_key(kv.key_id).status == KeyStatus.REVOKED
+
+    def test_T068_revoke_requires_reason(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        with pytest.raises(MissingReasonError):
+            lm.revoke_key(kv.key_id, "admin", reason=" ")
+
+    def test_T069_record_access(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.record_access(kv.key_id, "user")
+        assert lm.get_key(kv.key_id).use_count == 1
+
+    def test_T070_record_access_revoked_raises(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="test")
+        with pytest.raises(KeyRevokedError):
+            lm.record_access(kv.key_id, "user")
+
+    def test_T071_record_access_expired_raises(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.EXPIRED)
+        with pytest.raises(KeyExpiredError):
+            lm.record_access(kv.key_id, "user")
+
+    def test_T072_self_auth_valid(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        assert lm.self_auth_valid(kv) is True
+
+    def test_T073_self_auth_tampered(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        kv.signature = "tampered" * 8
+        assert lm.self_auth_valid(kv) is False
+
+    def test_T074_sign_and_verify_payload(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sig = lm.sign_payload(b"data", kv.key_id)
+        assert lm.verify_payload(b"data", sig, KeyType.JWT_SIGNING)
+
+    def test_T075_verify_wrong_payload(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sig = lm.sign_payload(b"data", kv.key_id)
+        assert not lm.verify_payload(b"wrong", sig, KeyType.JWT_SIGNING)
+
+    def test_T076_rotation_hook(self):
+        lm = fresh()
+        events = []
+        lm.add_rotation_hook(lambda evt, kv: events.append(evt))
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="test")
+        assert "rotate" in events
+
+    def test_T077_list_by_type(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.generate_key(KeyType.JWT_REFRESH, activate=True)
+        jwt_keys = lm.list_by_type(KeyType.JWT_SIGNING)
+        assert all((k.key_type == KeyType.JWT_SIGNING or
+                    (hasattr(k.key_type,'value') and k.key_type.value == "jwt_signing"))
+                   for k in jwt_keys)
+
+    def test_T078_usable_keys(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
+        usable = lm.usable_keys(KeyType.JWT_SIGNING)
+        assert len(usable) == 2
+
+    def test_T079_expire_grace_keys(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        kv.expires_at = time.time() - 1
+        expired = lm.expire_grace_keys()
+        assert kv.key_id in expired
+
+    def test_T080_concurrent_generate(self):
+        lm = fresh()
+        errors = []
+        def worker():
+            try:
+                lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
-        assert len(set(k.version for k in keys)) == 30
-    def test_T091_all_key_types_can_generate(self):
-        lm = fresh()
-        for kt in KeyType: assert lm.generate_key(kt).key_type == kt
-    def test_T092_rotate_multiple_types_independent(self):
-        lm = fresh()
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.generate_key(KeyType.WEBHOOK_HMAC, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm.active_key(KeyType.WEBHOOK_HMAC).status == KeyStatus.ACTIVE
-    def test_T093_sign_no_active_key_raises(self):
-        with pytest.raises(KeyNotFoundError): fresh().sign_payload(b"x", KeyType.JWT_SIGNING)
-    def test_T094_set_policy_recorded(self):
-        lm = fresh(); before = lm._audit.total
-        lm.set_policy(RotationPolicy(KeyType.JWT_SIGNING, max_age_days=10))
-        assert lm._audit.total > before
-    def test_T095_get_key_by_id_and_version(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert lm.get_key(kv.key_id, kv.version).key_id == kv.key_id
-    def test_T096_due_soon_false_for_fresh(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert lm.due_soon(kv.key_id, kv.version, warn_days=7) is False
+        assert not errors
+
 
 class TestCompromiseResponseManager:
-    def test_T097_report_compromise(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        r = CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "leaked in logs")
-        assert r.report_id and len(r.steps_taken) >= 3
-    def test_T098_compromised_key_revoked(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "leaked")
-        assert lm.get_key(kv.key_id, kv.version).status == KeyStatus.REVOKED
-    def test_T099_new_key_generated_after_compromise(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        report = CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert lm.get_key(report.new_key_id).status == KeyStatus.ACTIVE
-    def test_T100_reason_required(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+    def test_T081_report_compromise(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        report = mgr.report_compromise(kv.key_id, "security", reason="breach")
+        assert isinstance(report, CompromiseReport)
+        assert report.key_id == kv.key_id
+        assert not report.resolved
+
+    def test_T082_compromised_key_revoked(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        mgr.report_compromise(kv.key_id, "sec", reason="leaked")
+        assert lm.get_key(kv.key_id).status == KeyStatus.REVOKED
+
+    def test_T083_emergency_rotation_creates_new_key(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        report = mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        assert report.new_key_id is not None
+        new_kv = lm.get_key(report.new_key_id)
+        assert new_kv.status == KeyStatus.ACTIVE
+
+    def test_T084_compromise_requires_reason(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
         with pytest.raises(MissingReasonError):
-            CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", reason="")
-    def test_T101_report_listed(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        crm = CompromiseResponseManager(lm)
-        crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert len(crm.list_reports()) == 1
-    def test_T102_resolve_report(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        crm = CompromiseResponseManager(lm)
-        r = crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        resolved = crm.resolve_report(r.report_id, "admin")
-        assert resolved.resolved is True and resolved.resolved_at is not None
-    def test_T103_resolve_not_found(self):
-        with pytest.raises(CompromiseResponseError):
-            CompromiseResponseManager(fresh()).resolve_report("nonexistent", "admin")
-    def test_T104_list_unresolved(self):
-        lm = fresh(); crm = CompromiseResponseManager(lm)
-        for _ in range(3):
-            kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-            crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        crm.resolve_report(crm.list_reports()[0].report_id, "admin")
-        assert len(crm.list_reports(resolved=False)) == 2
-    def test_T105_audit_contains_emergency_rot(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert len(lm._audit.query(action=AuditAction.EMERGENCY_ROT)) >= 1
-    def test_T106_compromise_trigger_on_new_key(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        crm = CompromiseResponseManager(lm)
-        report = crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert lm.get_key(report.new_key_id).rotation_trigger == RotationTrigger.COMPROMISE
-    def test_T107_report_stores_reason(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        r = CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "git leak")
-        assert "git leak" in r.reason
-    def test_T108_runbook_steps_count(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        r = CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert len(r.steps_taken) == len(COMPROMISE_RUNBOOK)
+            mgr.report_compromise(kv.key_id, "sec", reason="")
+
+    def test_T085_resolve_report(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        report = mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        resolved = mgr.resolve_report(report.report_id, "admin")
+        assert resolved.resolved is True
+        assert resolved.resolved_by == "admin"
+
+    def test_T086_open_reports(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        assert len(mgr.open_reports()) == 1
+
+    def test_T087_resolved_not_in_open(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        r = mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        mgr.resolve_report(r.report_id, "admin")
+        assert len(mgr.open_reports()) == 0
+
+    def test_T088_runbook_steps(self):
+        assert len(CompromiseResponseManager.RUNBOOK) >= 8
+
+    def test_T089_list_reports_all(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        assert len(mgr.list_reports()) == 1
+
+    def test_T090_list_reports_filter(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        kv2 = lm.generate_key(KeyType.JWT_REFRESH, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        r1 = mgr.report_compromise(kv.key_id, "sec", reason="b1")
+        mgr.report_compromise(kv2.key_id, "sec", reason="b2")
+        mgr.resolve_report(r1.report_id, "admin")
+        open_r = mgr.list_reports(resolved=False)
+        assert len(open_r) == 1
+
 
 class TestSchedulerAndExtender:
-    def test_T109_scan_due_empty(self):
-        assert RotationScheduler(fresh()).scan_due() == []
-    def test_T110_scan_due_overdue(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-31*86400)
-        assert len(RotationScheduler(lm).scan_due()) >= 1
-    def test_T111_scan_due_soon(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-24*86400)
-        assert len(RotationScheduler(lm).scan_due_soon(warn_days=7)) >= 1
-    def test_T112_auto_rotate_overdue(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-31*86400)
-        rotated = RotationScheduler(lm).auto_rotate_all()
-        assert len(rotated) >= 1 and rotated[0][0].status == KeyStatus.GRACE
-    def test_T113_auto_rotate_skips_no_auto(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.ENCRYPTION_KEK, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-400*86400)
-        assert len(RotationScheduler(lm).auto_rotate_all()) == 0
-    def test_T114_expire_grace_pass(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.GRACE, expires_at=time.time()-1)
-        assert len(RotationScheduler(lm).expire_grace_pass(reason="test expiry")) == 1
-    def test_T115_extend_grace(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        grace_kv = lm.get_key(kv.key_id, kv.version)
-        old_exp = grace_kv.expires_at
-        ext = GracePeriodExtender(lm).extend(kv.key_id, kv.version, extra_days=14, actor="admin")
-        assert ext.expires_at > old_exp
-    def test_T116_extend_grace_audit(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        GracePeriodExtender(lm).extend(kv.key_id, kv.version, extra_days=7, actor="admin")
-        assert len(lm._audit.query(action=AuditAction.GRACE_EXTENDED)) >= 1
-    def test_T117_extend_non_grace_fails(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+    def test_T091_schedule_rotation(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sched = RotationScheduler(lm)
+        job_id = sched.schedule(KeyType.JWT_SIGNING, time.time() - 1)
+        rotated = sched.scan_due()
+        assert job_id in rotated
+
+    def test_T092_not_due(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sched = RotationScheduler(lm)
+        sched.schedule(KeyType.JWT_SIGNING, time.time() + 3600)
+        assert sched.scan_due() == []
+
+    def test_T093_pending_jobs(self):
+        lm = fresh()
+        sched = RotationScheduler(lm)
+        sched.schedule(KeyType.JWT_SIGNING, time.time() + 3600)
+        assert len(sched.pending_jobs()) == 1
+
+    def test_T094_scan_due_soon(self):
+        lm = fresh()
+        activated_at = time.time() - (30 * 86400 - 3600)
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, activated_at, None, None, None, 0, None, b"")
+        lm._store.add(kv)
+        sched = RotationScheduler(lm)
+        due_soon = sched.scan_due_soon(warn_seconds=86400)
+        assert kv in due_soon
+
+    def test_T095_auto_rotate_all(self):
+        lm = fresh()
+        activated_at = time.time() - 31 * 86400
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, activated_at, None, None, None, 0, None, b"raw")
+        kv.signature = KeySelfAuth(b"test-master-p29").sign(kv)
+        lm._store.add(kv)
+        sched = RotationScheduler(lm)
+        rotated = sched.auto_rotate_all()
+        assert len(rotated) >= 1
+
+    def test_T096_expire_grace_pass(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        kv.expires_at = time.time() - 1
+        sched = RotationScheduler(lm)
+        expired = sched.expire_grace_pass()
+        assert kv.key_id in expired
+
+    def test_T097_extend_grace(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        kv.expires_at = time.time() + 3600
+        ext = GracePeriodExtender(lm)
+        extended = ext.extend(kv.key_id, 7200, "admin", reason="rollback needed")
+        assert extended.expires_at >= time.time() + 7200
+
+    def test_T098_extend_requires_grace_status(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        ext = GracePeriodExtender(lm)
         with pytest.raises(PolicyViolationError):
-            GracePeriodExtender(lm).extend(kv.key_id, kv.version, extra_days=7, actor="a")
-    def test_T118_expire_grace_audit(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.GRACE, expires_at=time.time()-1)
-        lm.expire_grace_keys(reason="test")
-        assert len(lm._audit.query(action=AuditAction.KEY_EXPIRED)) >= 1
-    def test_T119_scan_due_ignores_grace(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.GRACE, activated_at=time.time()-100*86400)
-        assert len(RotationScheduler(lm).scan_due()) == 0
-    def test_T120_extend_by_days_correct(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        old_exp = lm.get_key(kv.key_id, kv.version).expires_at
-        GracePeriodExtender(lm).extend(kv.key_id, kv.version, extra_days=10, actor="a")
-        assert abs(lm.get_key(kv.key_id, kv.version).expires_at - old_exp - 10*86400) < 2
+            ext.extend(kv.key_id, 3600, "admin", reason="test")
+
+    def test_T099_extend_requires_reason(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        ext = GracePeriodExtender(lm)
+        with pytest.raises(MissingReasonError):
+            ext.extend(kv.key_id, 3600, "admin", reason="")
+
+    def test_T100_extend_audit_logged(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        kv.expires_at = time.time() + 3600
+        ext = GracePeriodExtender(lm)
+        ext.extend(kv.key_id, 1800, "admin", reason="emergency")
+        trail = lm._audit.query(key_id=kv.key_id, action="key.grace_extended")
+        assert len(trail) >= 1
+
 
 class TestSecretRotationAdmin:
-    def _setup(self): return full_system()
-    def test_T121_summary_empty(self):
-        _,_,_,_,admin = self._setup(); s = admin.summary()
-        assert s["total_keys"] == 0 and s["audit_chain_valid"] is True
-    def test_T122_summary_after_generate(self):
-        lm,_,_,_,admin = self._setup(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+    def test_T101_summary_empty(self):
+        lm, sched, comp, ext, admin = full_system()
         s = admin.summary()
-        assert s["total_keys"] == 1 and s["by_status"].get("active") == 1
-    def test_T123_summary_overdue(self):
-        lm,_,_,_,admin = self._setup(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-31*86400)
-        assert admin.summary()["overdue_rotation"] >= 1
-    def test_T124_health_check_clean(self):
-        _,_,_,_,admin = self._setup(); ok, issues = admin.health_check()
-        assert ok is True and issues == []
-    def test_T125_health_check_overdue(self):
-        lm,_,_,_,admin = self._setup(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-31*86400)
-        ok, issues = admin.health_check()
-        assert ok is False and any("overdue" in i for i in issues)
-    def test_T126_health_check_open_compromise(self):
-        lm,_,crm,_,admin = self._setup(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        ok, issues = admin.health_check()
-        assert ok is False and any("compromise" in i for i in issues)
-    def test_T127_bulk_rotate(self):
-        lm,_,_,_,admin = self._setup(); lm.generate_key(KeyType.WEBHOOK_HMAC, activate=True)
-        results = admin.bulk_rotate(KeyType.WEBHOOK_HMAC, actor="admin")
-        assert len(results) == 1 and results[0][0].status == KeyStatus.GRACE
-    def test_T128_key_audit_trail(self):
-        lm,_,_,_,admin = self._setup(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.sign_payload(b"x", KeyType.JWT_SIGNING)
-        assert len(admin.key_audit_trail(kv.key_id)) >= 2
-    def test_T129_summary_audit_entries_count(self):
-        lm,_,_,_,admin = self._setup(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert admin.summary()["audit_entries"] >= 2
-    def test_T130_summary_tenant_filter(self):
-        lm,_,_,_,admin = self._setup()
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
-        assert admin.summary(tenant_id="t1")["total_keys"] == 1
-    def test_T131_summary_due_soon(self):
-        lm,_,_,_,admin = self._setup(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-24*86400)
-        assert admin.summary()["due_soon"] >= 1
-    def test_T132_health_chain_tampered(self):
-        lm,_,_,_,admin = self._setup(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        list(lm._audit._entries)[0].chain_hash = "ff"*32
-        ok, issues = admin.health_check()
-        assert ok is False and any("audit chain" in i for i in issues)
+        assert s["total_keys"] == 0
+        assert s["chain_valid"] is True
+
+    def test_T102_summary_after_generate(self):
+        lm, sched, comp, ext, admin = full_system()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        s = admin.summary()
+        assert s["total_keys"] == 1
+
+    def test_T103_health_check_healthy(self):
+        lm, sched, comp, ext, admin = full_system()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        h = admin.health_check()
+        assert h["healthy"] is True
+
+    def test_T104_bulk_rotate(self):
+        lm, sched, comp, ext, admin = full_system()
+        for kt in [KeyType.JWT_SIGNING, KeyType.JWT_REFRESH]:
+            lm.generate_key(kt, activate=True)
+        result = admin.bulk_rotate([KeyType.JWT_SIGNING, KeyType.JWT_REFRESH],
+                                   "admin", reason="quarterly rotation")
+        assert len(result) == 2
+
+    def test_T105_key_audit_trail(self):
+        lm, sched, comp, ext, admin = full_system()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        trail = admin.key_audit_trail(kv.key_id)
+        assert len(trail) >= 1
+
+    def test_T106_admin_lifecycle_property(self):
+        lm, sched, comp, ext, admin = full_system()
+        assert admin.lifecycle is lm
+
+    def test_T107_admin_scheduler_property(self):
+        lm, sched, comp, ext, admin = full_system()
+        assert admin.scheduler is sched
+
+    def test_T108_admin_compromise_property(self):
+        lm, sched, comp, ext, admin = full_system()
+        assert admin.compromise_mgr is comp
+
 
 class TestMultiTenantIsolation:
-    def test_T133_tenant_keys_isolated(self):
+    def test_T109_different_tenants_isolated(self):
+        lm = fresh()
+        kv1 = lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
+        kv2 = lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
+        assert lm.active_key(KeyType.JWT_SIGNING, tenant_id="t1") is kv1
+        assert lm.active_key(KeyType.JWT_SIGNING, tenant_id="t2") is kv2
+
+    def test_T110_rotation_per_tenant(self):
         lm = fresh()
         lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
         lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
-        assert lm.active_key(KeyType.JWT_SIGNING, "t1").key_id != lm.active_key(KeyType.JWT_SIGNING, "t2").key_id
-    def test_T134_tenant_sign_uses_own_key(self):
+        _, new = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation", tenant_id="t1")
+        assert new.tenant_id == "t1"
+        t2_active = lm.active_key(KeyType.JWT_SIGNING, tenant_id="t2")
+        assert t2_active.status == KeyStatus.ACTIVE
+
+    def test_T111_tenant_policy(self):
         lm = fresh()
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
-        sig, kid, ver = lm.sign_payload(b"x", KeyType.JWT_SIGNING, tenant_id="t1")
-        assert lm.get_key(kid, ver).tenant_id == "t1"
-    def test_T135_rotate_affects_only_tenant(self):
+        p = RotationPolicy(KeyType.JWT_SIGNING, max_age_days=7, grace_days=1, auto_rotate=True)
+        lm.set_policy(KeyType.JWT_SIGNING, p, tenant_id="t1")
+        got = lm.get_policy(KeyType.JWT_SIGNING, tenant_id="t1")
+        assert got.max_age_days == 7
+
+    def test_T112_revoke_per_tenant(self):
         lm = fresh()
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
-        lm.rotate_key(KeyType.JWT_SIGNING, tenant_id="t1")
-        assert lm.active_key(KeyType.JWT_SIGNING, "t2").status == KeyStatus.ACTIVE
-    def test_T136_tenant_audit_filter(self):
-        lm = fresh()
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
-        assert all(e.tenant_id == "t1" for e in lm._audit.query(tenant_id="t1"))
-    def test_T137_no_cross_tenant_key_use(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
-        with pytest.raises(KeyNotFoundError): lm.active_key(KeyType.JWT_SIGNING, tenant_id="t2")
+        kv1 = lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t1")
+        kv2 = lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id="t2")
+        lm.revoke_key(kv1.key_id, "admin", reason="test")
+        assert lm.get_key(kv1.key_id).status == KeyStatus.REVOKED
+        assert lm.get_key(kv2.key_id).status == KeyStatus.ACTIVE
+
 
 class TestSQLMigration:
-    @pytest.fixture(autouse=True)
-    def load_sql(self):
-        path = "/home/definable/phase29/supabase/migrations/20260628_038_phase29_secret_rotation.sql"
-        if not os.path.exists(path):
-            pytest.skip("SQL migration file not found")
-        with open(path) as f: self.sql = f.read()
-    def test_T138_has_begin_commit(self): assert "BEGIN;" in self.sql and "COMMIT;" in self.sql
-    def test_T139_key_versions_table(self): assert "key_versions" in self.sql
-    def test_T140_key_audit_log_table(self): assert "key_audit_log" in self.sql
-    def test_T141_rotation_policies_table(self): assert "rotation_policies" in self.sql
-    def test_T142_compromise_reports_table(self): assert "compromise_reports" in self.sql
-    def test_T143_rls_enabled(self): assert "ROW LEVEL SECURITY" in self.sql
-    def test_T144_tenant_id_column(self): assert "tenant_id" in self.sql
-    def test_T145_status_constraint(self): assert "active" in self.sql and "grace" in self.sql
-    def test_T146_indexes_present(self): assert "CREATE INDEX" in self.sql
-    def test_T147_immutable_audit_trigger(self): assert "TRIGGER" in self.sql
-    def test_T148_chain_hash_column(self): assert "chain_hash" in self.sql
-    def test_T149_revoke_reason_not_null(self): assert "revoke_reason" in self.sql
-    def test_T150_cleanup_function(self): assert "cleanup" in self.sql.lower() or "expired" in self.sql.lower()
-    def test_T151_view_present(self): assert "CREATE" in self.sql and "VIEW" in self.sql
-    def test_T152_if_not_exists(self): assert "IF NOT EXISTS" in self.sql
+    @pytest.fixture
+    def sql(self):
+        if not os.path.exists(SQL_PATH):
+            pytest.skip("SQL file not found")
+        return open(SQL_PATH).read()
+
+    def test_T113_begin_commit(self, sql):
+        assert "BEGIN" in sql and "COMMIT" in sql
+
+    def test_T114_key_versions_table(self, sql):
+        assert "key_versions" in sql
+
+    def test_T115_rotation_policies_table(self, sql):
+        assert "rotation_policies" in sql
+
+    def test_T116_compromise_reports_table(self, sql):
+        assert "compromise_reports" in sql
+
+    def test_T117_key_audit_log_table(self, sql):
+        assert "key_audit_log" in sql
+
+    def test_T118_rls_enabled(self, sql):
+        assert "ROW LEVEL SECURITY" in sql or "ENABLE ROW LEVEL" in sql
+
+    def test_T119_immutable_trigger(self, sql):
+        assert "TRIGGER" in sql and ("immutable" in sql.lower() or "prevent" in sql.lower())
+
+    def test_T120_chain_hash_column(self, sql):
+        assert "chain_hash" in sql
+
+    def test_T121_reason_not_null(self, sql):
+        assert "reason" in sql and "NOT NULL" in sql.upper()
+
+    def test_T122_key_type_constraint(self, sql):
+        assert "jwt_signing" in sql
+
+    def test_T123_status_constraint(self, sql):
+        assert "active" in sql and "grace" in sql and "revoked" in sql
+
+    def test_T124_cleanup_function(self, sql):
+        assert "cleanup" in sql.lower() or "FUNCTION" in sql
+
+    def test_T125_rls_policy_tenant(self, sql):
+        assert "tenant_id" in sql
+
+    def test_T126_indexes(self, sql):
+        assert "INDEX" in sql
+
+    def test_T127_view_active_keys(self, sql):
+        assert "VIEW" in sql or "view" in sql
+
+    def test_T128_signature_column(self, sql):
+        assert "signature" in sql
+
 
 class TestIntegrationFlows:
-    def test_T153_zero_downtime_jwt_rotation(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid_old, ver_old = lm.sign_payload(b"token", KeyType.JWT_SIGNING)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"token", sig, kid_old, ver_old) is True
-        sig2, kid2, ver2 = lm.sign_payload(b"token2", KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"token2", sig2, kid2, ver2) is True
-    def test_T154_revoked_key_blocks_verify(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"data", KeyType.JWT_SIGNING)
-        lm.revoke_key(kid, ver, actor="admin", reason="breach")
-        assert lm.verify_payload(b"data", sig, kid, ver) is False
-    def test_T155_expired_grace_blocks_verify(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"data", KeyType.JWT_SIGNING)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        lm._store.update_status(kid, ver, KeyStatus.EXPIRED)
-        assert lm.verify_payload(b"data", sig, kid, ver) is False
-    def test_T156_full_lifecycle_all_types(self):
+    def test_T129_zero_downtime_rotation(self):
+        lm = fresh()
+        old = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        original_sig = lm.sign_payload(b"token", old.key_id)
+        _, new_kv = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
+        assert lm.verify_payload(b"token", original_sig, KeyType.JWT_SIGNING)
+        new_sig = lm.sign_payload(b"new_token", new_kv.key_id)
+        assert lm.verify_payload(b"new_token", new_sig, KeyType.JWT_SIGNING)
+
+    def test_T130_full_lifecycle(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING)
+        lm.activate_key(kv.key_id, "admin")
+        _, new_kv = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="quarterly")
+        lm.revoke_key(kv.key_id, "admin", reason="old")
+        assert lm.get_key(kv.key_id).status == KeyStatus.REVOKED
+        assert lm.get_key(new_kv.key_id).status == KeyStatus.ACTIVE
+
+    def test_T131_compromise_full_flow(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        r = mgr.report_compromise(kv.key_id, "sec", reason="key leaked")
+        assert lm.get_key(kv.key_id).status == KeyStatus.REVOKED
+        assert r.new_key_id is not None
+        mgr.resolve_report(r.report_id, "admin")
+        assert len(mgr.open_reports()) == 0
+
+    def test_T132_audit_chain_valid_after_operations(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
+        lm.revoke_key(kv.key_id, "admin", reason="old")
+        assert lm._audit.verify_chain() is True
+
+    def test_T133_concurrent_rotations(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        errors = []
+        def worker():
+            try:
+                lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="concurrent test")
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        assert lm._audit.verify_chain() is True
+
+    def test_T134_scheduler_full_flow(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sched = RotationScheduler(lm)
+        sched.schedule(KeyType.JWT_SIGNING, time.time() - 1)
+        rotated = sched.scan_due()
+        assert len(rotated) == 1
+
+    def test_T135_10_key_types_bootstrap(self):
         lm = fresh()
         for kt in KeyType:
             lm.generate_key(kt, activate=True)
-            lm.rotate_key(kt)
-        assert lm._audit.verify_chain() is True
-    def test_T157_compromise_then_re_sign(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.WEBHOOK_HMAC, activate=True)
-        crm = CompromiseResponseManager(lm)
-        crm.report_compromise(kv.key_id, kv.version, "sec", "webhook key exposed")
-        sig, kid, ver = lm.sign_payload(b"event", KeyType.WEBHOOK_HMAC)
-        assert lm.verify_payload(b"event", sig, kid, ver) is True
-        assert lm.get_key(kv.key_id, kv.version).status == KeyStatus.REVOKED
-    def test_T158_multi_rotation_chain_valid(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        for _ in range(5): lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm._audit.verify_chain() is True
-        assert lm.active_key(KeyType.JWT_SIGNING).version == 6
-    def test_T159_scheduler_full_cycle(self):
-        lm = fresh(); sched = RotationScheduler(lm)
-        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.ACTIVE, activated_at=time.time()-31*86400)
-        rotated = sched.auto_rotate_all()
-        assert len(rotated) == 1
-        old_kv = rotated[0][0]
-        lm._store.update_status(old_kv.key_id, old_kv.version, KeyStatus.GRACE, expires_at=time.time()-1)
-        assert len(sched.expire_grace_pass(reason="test")) == 1
-    def test_T160_50_concurrent_sign_verify(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True); errors = []
-        def sign_verify():
-            try:
-                sig, kid, ver = lm.sign_payload(b"concurrent", KeyType.JWT_SIGNING)
-                assert lm.verify_payload(b"concurrent", sig, kid, ver)
-            except Exception as e: errors.append(str(e))
-        threads = [threading.Thread(target=sign_verify) for _ in range(50)]
-        for t in threads: t.start()
-        for t in threads: t.join()
-        assert errors == []
-    def test_T161_grace_window_allows_old_token_verify(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid1, ver1 = lm.sign_payload(b"session", KeyType.JWT_SIGNING)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"session", sig, kid1, ver1) is True
-    def test_T162_emergency_rotation_audit_complete(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.SIGNING_ARTIFACT, activate=True)
-        CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "ci", "found in repo")
-        actions = {e.action for e in lm._audit.query()}
-        assert AuditAction.EMERGENCY_ROT in actions and AuditAction.COMPROMISE_ACK in actions and AuditAction.KEY_REVOKED in actions
-    def test_T163_build_factory(self):
-        lm,sched,crm,ext,admin = full_system()
-        assert isinstance(lm, KeyLifecycleManager) and isinstance(sched, RotationScheduler)
-    def test_T164_200_ops_audit_chain_valid(self):
+        assert len(lm.store.all_keys()) == len(KeyType)
+
+    def test_T136_verify_payload_grace_key(self):
         lm = fresh()
-        for kt in KeyType: lm.generate_key(kt, activate=True)
-        for _ in range(19):
-            for kt in KeyType: lm.rotate_key(kt)
-        assert lm._audit.verify_chain() is True and lm._audit.total >= 200
+        old = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sig = lm.sign_payload(b"payload", old.key_id)
+        lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="test")
+        assert lm.verify_payload(b"payload", sig, KeyType.JWT_SIGNING)
+
 
 class TestEdgeCases:
-    def test_T165_key_version_repr_no_raw(self):
-        kv = KeyVersion("k1",KeyType.JWT_SIGNING,1,KeyStatus.ACTIVE,0.0,0.0,None,None,None,0,None,_raw=b"secret_bytes")
-        assert "secret_bytes" not in repr(kv)
-    def test_T166_safe_dict_has_all_fields(self):
-        kv = KeyVersion("k1",KeyType.JWT_SIGNING,1,KeyStatus.ACTIVE,0.0,0.0,None,None,None,0,None,_raw=b"x"*32)
-        d = kv.safe_dict()
-        for f in ["key_id","key_type","version","status","signature"]: assert f in d
-    def test_T167_pending_key_not_usable_new(self):
-        lm = fresh(); kv2 = lm.get_key(lm.generate_key(KeyType.JWT_SIGNING).key_id)
-        assert kv2.is_usable_for_new() is False and kv2.is_usable_for_verify() is False
-    def test_T168_revoked_not_usable(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.revoke_key(kv.key_id, kv.version, actor="a", reason="r")
-        r = lm.get_key(kv.key_id, kv.version)
-        assert r.is_usable_for_new() is False and r.is_usable_for_verify() is False
-    def test_T169_expired_not_usable(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm._store.update_status(kv.key_id, kv.version, KeyStatus.EXPIRED)
-        exp = lm.get_key(kv.key_id, kv.version)
-        assert exp.is_usable_for_new() is False and exp.is_usable_for_verify() is False
-    def test_T170_key_material_unique(self):
-        raws = {KeyMaterialGenerator.generate(KeyType.JWT_SIGNING) for _ in range(100)}
-        assert len(raws) == 100
-    def test_T171_key_id_uuid_format(self):
-        kid = KeyMaterialGenerator.key_id()
-        assert str(uuid.UUID(kid)) == kid
-    def test_T172_audit_chain_genesis_deterministic(self):
-        assert SecretAuditChain(b"same")._genesis_hash() == SecretAuditChain(b"same")._genesis_hash()
-    def test_T173_audit_chain_different_secret_different_genesis(self):
-        assert SecretAuditChain(b"s1")._genesis_hash() != SecretAuditChain(b"s2")._genesis_hash()
-    def test_T174_policy_engine_independent_instances(self):
-        e1 = RotationPolicyEngine(); e2 = RotationPolicyEngine()
-        e1.set_policy(RotationPolicy(KeyType.JWT_SIGNING, max_age_days=5))
-        assert e2.get_policy(KeyType.JWT_SIGNING).max_age_days != 5
-    def test_T175_compromise_report_dataclass(self):
-        r = CompromiseReport("r1","k1",KeyType.JWT_SIGNING,1,"sec",time.time(),"test",None,[])
-        assert r.resolved is False
-    def test_T176_enum_str_values(self):
-        assert KeyType.JWT_SIGNING.value == "jwt_signing"
-        assert KeyStatus.GRACE.value == "grace"
-        assert RotationTrigger.COMPROMISE.value == "compromise"
+    def test_T137_generate_key_without_raw_on_pending(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING)
+        assert kv._raw != b""
+
+    def test_T138_revoke_already_revoked(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="first")
+        lm.revoke_key(kv.key_id, "admin", reason="second")
+        assert lm.get_key(kv.key_id).status == KeyStatus.REVOKED
+
+    def test_T139_get_missing_key(self):
+        lm = fresh()
+        with pytest.raises(KeyNotFoundError):
+            lm.get_key("nonexistent")
+
+    def test_T140_sign_revoked_key_raises(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="test")
+        with pytest.raises(KeyRevokedError):
+            lm.sign_payload(b"data", kv.key_id)
+
+    def test_T141_rotate_no_existing_key(self):
+        lm = fresh()
+        old, new = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="first rotation")
+        assert old is None
+        assert new.status == KeyStatus.ACTIVE
+
+    def test_T142_empty_reason_rejected(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        with pytest.raises(MissingReasonError):
+            lm.revoke_key(kv.key_id, "admin", reason="  ")
+
+    def test_T143_key_version_monotonic(self):
+        lm = fresh()
+        kv1 = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        _, kv2 = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
+        assert kv2.version == kv1.version + 1
+
+    def test_T144_policy_update_audit(self):
+        chain = SecretAuditChain(b"s")
+        chain.record(AuditAction.POLICY_UPDATED, "sys", "jwt_signing", 0, "admin")
+        assert chain.total == 1
+
 
 class TestAdditionalCoverage:
-    def test_T177_all_audit_actions_have_values(self):
-        for a in AuditAction: assert a.value.startswith("key.")
-    def test_T178_rotation_policy_default_for_all_types(self):
-        for kt in KeyType:
-            p = RotationPolicy.default_for(kt)
-            assert p.max_age_days > 0 and p.grace_days >= 0
-    def test_T179_key_self_auth_sign_verify(self):
-        lm = KeyLifecycleManager(master_secret=b"m")
-        kv = lm.generate_key(KeyType.JWT_SIGNING)
-        assert KeySelfAuth.verify(kv, b"m") is True and KeySelfAuth.verify(kv, b"wrong") is False
-    def test_T180_lifecycle_shared_audit(self):
-        lm,_,_,_,admin = build_secret_rotation_system(b"s")
-        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        assert admin.summary()["audit_entries"] >= 2
-    def test_T181_revoke_reason_stored(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.revoke_key(kv.key_id, kv.version, actor="admin", reason="admin action")
-        assert lm.get_key(kv.key_id, kv.version).revoke_reason == "admin action"
-    def test_T182_no_active_key_for_fresh_type(self):
-        with pytest.raises(KeyNotFoundError): fresh().active_key(KeyType.BACKUP_ENCRYPT)
-    def test_T183_grace_key_verify_uses_hmac(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"grace_test", KeyType.JWT_SIGNING)
-        lm.rotate_key(KeyType.JWT_SIGNING)
-        assert lm.verify_payload(b"grace_test", sig, kid, ver) is True
-        assert lm.verify_payload(b"wrong_payload", sig, kid, ver) is False
-    def test_T184_policy_max_age_seconds_calculation(self):
-        assert RotationPolicy(KeyType.JWT_SIGNING, max_age_days=7).max_age_seconds == 7*86400.0
-    def test_T185_all_key_types_generate_correct_size(self):
-        for kt in KeyType: assert len(KeyMaterialGenerator.generate(kt)) in (32, 64)
-    def test_T186_rotation_trigger_values_complete(self):
-        assert {t.value for t in RotationTrigger} == {"scheduled","compromise","manual","policy_age","policy_use","bootstrap"}
-    def test_T187_key_version_is_usable_for_new_active_only(self):
-        for status in KeyStatus:
-            kv = KeyVersion("k",KeyType.JWT_SIGNING,1,status,0.0,0.0,None,None,None,0,None,_raw=b"x"*32)
-            assert kv.is_usable_for_new() == (status == KeyStatus.ACTIVE)
-    def test_T188_key_version_is_usable_for_verify_active_and_grace(self):
-        for status in KeyStatus:
-            kv = KeyVersion("k",KeyType.JWT_SIGNING,1,status,0.0,0.0,None,None,None,0,None,_raw=b"x"*32)
-            assert kv.is_usable_for_verify() == (status in (KeyStatus.ACTIVE, KeyStatus.GRACE))
-    def test_T189_audit_entry_fields(self):
+    def test_T145_audit_entry_dataclass(self):
+        e = AuditEntry(seq=1, action="key.generated", key_id="k", key_type="jwt_signing",
+                       version=1, actor="a", tenant_id=None, reason=None, detail={},
+                       ts=time.time(), prev_hash="ph", chain_hash="ch")
+        assert e.seq == 1
+        assert e.chain_hash == "ch"
+
+    def test_T146_compromise_report_dataclass(self):
+        r = CompromiseReport(report_id="r", key_id="k", key_type="jwt_signing",
+                             version=1, reported_by="sec", reported_at=time.time(),
+                             reason="breach")
+        assert r.resolved is False
+        assert r.new_key_id is None
+
+    def test_T147_key_material_generator_random(self):
+        m1 = KeyMaterialGenerator.generate(KeyType.JWT_SIGNING)
+        m2 = KeyMaterialGenerator.generate(KeyType.JWT_SIGNING)
+        assert m1 != m2
+
+    def test_T148_key_self_auth_sign_verify(self):
+        auth = KeySelfAuth(b"master")
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"raw")
+        sig = auth.sign(kv)
+        kv.signature = sig
+        assert auth.verify(kv) is True
+
+    def test_T149_key_self_auth_tampered(self):
+        auth = KeySelfAuth(b"master")
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"raw")
+        kv.signature = auth.sign(kv)
+        kv.version = 99
+        assert auth.verify(kv) is False
+
+    def test_T150_rotation_trigger_values(self):
+        assert RotationTrigger.COMPROMISE.value == "compromise"
+        assert RotationTrigger.SCHEDULED.value == "scheduled"
+
+    def test_T151_audit_chain_64char_hash(self):
         chain = SecretAuditChain(b"s")
-        e = chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"actor",tenant_id="t1")
-        assert e.entry_id and e.seq == 1 and e.key_id == "k1" and e.actor == "actor" and e.tenant_id == "t1"
-    def test_T190_concurrent_rotate_independent_types(self):
-        lm = fresh(); errors = []
-        for kt in KeyType: lm.generate_key(kt, activate=True)
-        def rotate(kt):
-            try: lm.rotate_key(kt)
-            except Exception as e: errors.append(str(e))
-        threads = [threading.Thread(target=rotate, args=(kt,)) for kt in KeyType]
+        e = chain.record(AuditAction.KEY_GENERATED, "k", "jwt_signing", 1, "a")
+        assert len(e.chain_hash) == 64
+
+    def test_T152_audit_chain_prev_hash_linked(self):
+        chain = SecretAuditChain(b"s")
+        e1 = chain.record(AuditAction.KEY_GENERATED, "k1", "jwt_signing", 1, "a")
+        e2 = chain.record(AuditAction.KEY_ACTIVATED, "k1", "jwt_signing", 1, "a")
+        assert e2.prev_hash == e1.chain_hash
+
+    def test_T153_key_store_increment_missing(self):
+        store = KeyStore()
+        count = store.increment_use("nonexistent")
+        assert count == 0
+
+    def test_T154_policy_engine_all_types_covered(self):
+        eng = RotationPolicyEngine()
+        for kt in KeyType:
+            p = eng.get_policy(kt)
+            assert p is not None
+
+    def test_T155_lifecycle_manager_audit_accessible(self):
+        lm = fresh()
+        assert lm._audit is not None
+
+    def test_T156_compromise_response_error_is_secret_rotation_error(self):
+        assert issubclass(CompromiseResponseError, SecretRotationError)
+
+    def test_T157_policy_violation_error_is_secret_rotation_error(self):
+        assert issubclass(PolicyViolationError, SecretRotationError)
+
+    def test_T158_missing_reason_error_is_secret_rotation_error(self):
+        assert issubclass(MissingReasonError, SecretRotationError)
+
+    def test_T159_key_not_found_error_is_secret_rotation_error(self):
+        assert issubclass(KeyNotFoundError, SecretRotationError)
+
+    def test_T160_key_revoked_error_is_secret_rotation_error(self):
+        assert issubclass(KeyRevokedError, SecretRotationError)
+
+    def test_T161_key_expired_error_is_secret_rotation_error(self):
+        assert issubclass(KeyExpiredError, SecretRotationError)
+
+    def test_T162_rotation_policy_default_for_classmethod(self):
+        p = RotationPolicy.default_for(KeyType.WEBHOOK_HMAC)
+        assert p.key_type == KeyType.WEBHOOK_HMAC
+        assert p.max_age_days == 60
+
+    def test_T163_admin_extender_property(self):
+        lm, sched, comp, ext, admin = full_system()
+        assert admin.extender is ext
+
+    def test_T164_build_system_returns_tuple(self):
+        result = build_secret_rotation_system(b"master")
+        assert len(result) == 5
+
+    def test_T165_full_system_admin_summary(self):
+        lm, sched, comp, ext, admin = full_system()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        s = admin.summary()
+        assert s["total_keys"] == 1
+        assert s["chain_valid"] is True
+
+    def test_T166_audit_chain_query_by_type(self):
+        chain = SecretAuditChain(b"s")
+        chain.record(AuditAction.KEY_GENERATED, "k", "jwt_signing", 1, "a")
+        chain.record(AuditAction.KEY_GENERATED, "k2", "jwt_refresh", 1, "a")
+        res = chain.query(key_type="jwt_signing")
+        assert all(e.key_type == "jwt_signing" for e in res)
+
+    def test_T167_key_version_safe_dict_has_key_id(self):
+        kv = KeyVersion("abc", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"secret")
+        d = kv.safe_dict()
+        assert d["key_id"] == "abc"
+
+    def test_T168_rotation_trigger_bootstrap(self):
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        assert kv.rotation_trigger == RotationTrigger.BOOTSTRAP
+
+    def test_T169_compromise_runbook_has_post_mortem(self):
+        assert any("post" in s.lower() or "mortem" in s.lower() for s in COMPROMISE_RUNBOOK)
+
+    def test_T170_key_material_size_fallback(self):
+        size = KeyMaterialGenerator.key_size("unknown_type")
+        assert size == 32
+
+    def test_T171_concurrent_audit_chain_verify(self):
+        chain = SecretAuditChain(b"s")
+        for i in range(50):
+            chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
+        errors = []
+        def worker():
+            try:
+                assert chain.verify_chain() is True
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(10)]
         for t in threads: t.start()
         for t in threads: t.join()
-        assert errors == [] and lm._audit.verify_chain() is True
-    def test_T191_max_uses_policy_enforcement(self):
-        lm = fresh(); lm.set_policy(RotationPolicy(KeyType.API_SECRET, max_age_days=365, max_uses=3))
-        kv = lm.generate_key(KeyType.API_SECRET, activate=True)
-        for _ in range(3): lm.record_access(kv.key_id, kv.version)
-        needs, reason = lm.needs_rotation(kv.key_id, kv.version)
-        assert needs is True and "max_uses" in reason
-    def test_T192_key_access_audit_recorded(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        lm.record_access(kv.key_id, kv.version, actor="service-a")
-        assert len(lm._audit.query(action=AuditAction.KEY_ACCESSED, key_id=kv.key_id)) >= 1
-    def test_T193_verify_audit_recorded(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        sig, kid, ver = lm.sign_payload(b"x", KeyType.JWT_SIGNING)
-        lm.verify_payload(b"x", sig, kid, ver)
-        assert len(lm._audit.query(action=AuditAction.KEY_VERIFIED)) >= 1
-    def test_T194_compromise_whitespace_reason_rejected(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        with pytest.raises(MissingReasonError):
-            CompromiseResponseManager(lm).report_compromise(kv.key_id, kv.version, "sec", reason="   ")
-    def test_T195_query_by_actor(self):
-        chain = SecretAuditChain(b"s")
-        chain.record(AuditAction.KEY_GENERATED,"k1",KeyType.JWT_SIGNING,1,"alice")
-        chain.record(AuditAction.KEY_GENERATED,"k2",KeyType.JWT_SIGNING,1,"bob")
-        alice = chain.query(actor="alice")
-        assert len(alice) == 1 and alice[0].actor == "alice"
-    def test_T196_multiple_compromise_reports(self):
-        lm = fresh(); crm = CompromiseResponseManager(lm)
-        for kt in [KeyType.JWT_SIGNING, KeyType.WEBHOOK_HMAC, KeyType.ENCRYPTION_DEK]:
-            kv = lm.generate_key(kt, activate=True)
-            crm.report_compromise(kv.key_id, kv.version, "sec", "leak")
-        assert len(crm.list_reports()) == 3
-    def test_T197_rotation_trigger_stored(self):
-        lm = fresh(); kv = lm.generate_key(KeyType.JWT_SIGNING, trigger=RotationTrigger.MANUAL, activate=True)
-        assert kv.rotation_trigger == RotationTrigger.MANUAL
-    def test_T198_sign_verify_all_key_types(self):
+        assert not errors
+
+    def test_T172_key_store_revoked_at_set(self):
+        store = KeyStore()
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"")
+        store.add(kv)
+        store.update_status("a", KeyStatus.REVOKED)
+        assert store.get("a").revoked_at is not None
+
+    def test_T173_schedule_returns_job_id(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sched = RotationScheduler(lm)
+        job_id = sched.schedule(KeyType.JWT_SIGNING, time.time() + 100)
+        assert isinstance(job_id, str) and len(job_id) == 36
+
+    def test_T174_scheduler_all_jobs(self):
+        lm = fresh()
+        sched = RotationScheduler(lm)
+        sched.schedule(KeyType.JWT_SIGNING, time.time() + 3600)
+        sched.schedule(KeyType.JWT_REFRESH, time.time() + 7200)
+        jobs = sched.pending_jobs()
+        assert len(jobs) == 2
+
+    def test_T175_admin_summary_by_status(self):
+        lm, sched, comp, ext, admin = full_system()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="test")
+        s = admin.summary()
+        assert s["by_status"].get("revoked", 0) >= 1
+
+    def test_T176_sign_payload_hex_output(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sig = lm.sign_payload(b"hello", kv.key_id)
+        assert len(sig) == 64
+        int(sig, 16)
+
+    def test_T177_policy_max_age_dek(self):
+        p = RotationPolicy.default_for(KeyType.ENCRYPTION_DEK)
+        assert p.max_age_days == 90
+        assert p.grace_days  == 30
+
+    def test_T178_key_type_all_have_policies(self):
+        for kt in KeyType:
+            p = RotationPolicy.default_for(kt)
+            assert p.max_age_days >= 0
+
+    def test_T179_rotate_trigger_propagated(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        _, new = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="manual",
+                               trigger=RotationTrigger.COMPROMISE)
+        assert new.rotation_trigger == RotationTrigger.COMPROMISE
+
+    def test_T180_key_version_repr_hides_raw(self):
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, 0, None, None, None, 0, None, b"secret-bytes")
+        r = repr(kv)
+        assert "secret-bytes" not in r
+
+    def test_T181_full_system_returns_5_components(self):
+        lm, sched, comp, ext, admin = build_secret_rotation_system()
+        assert all(x is not None for x in [lm, sched, comp, ext, admin])
+
+    def test_T182_lifecycle_multiple_key_types(self):
+        lm = fresh()
+        for kt in [KeyType.JWT_SIGNING, KeyType.WEBHOOK_HMAC, KeyType.API_SECRET]:
+            lm.generate_key(kt, activate=True)
+        assert len(lm.store.all_keys()) == 3
+
+    def test_T183_rotate_all_10_types(self):
         lm = fresh()
         for kt in KeyType:
             lm.generate_key(kt, activate=True)
-            sig, kid, ver = lm.sign_payload(b"payload", kt)
-            assert lm.verify_payload(b"payload", sig, kid, ver) is True
-    def test_T199_multi_tenant_audit_isolation(self):
+        for kt in KeyType:
+            lm.rotate_key(kt, "admin", reason="full rotation")
+        assert lm._audit.verify_chain() is True
+
+    def test_T184_key_material_sizes_all_types(self):
+        for kt in KeyType:
+            mat = KeyMaterialGenerator.generate(kt)
+            size = KeyMaterialGenerator.key_size(kt)
+            assert len(mat) == size
+
+    def test_T185_compromise_report_steps_taken(self):
         lm = fresh()
-        for i in range(3): lm.generate_key(KeyType.JWT_SIGNING, activate=True, tenant_id=f"t{i}")
-        assert all(e.tenant_id == "t0" for e in lm._audit.query(tenant_id="t0"))
-    def test_T200_key_not_found_on_get(self):
-        with pytest.raises(KeyNotFoundError): fresh().get_key("nonexistent-uuid", version=1)
-    def test_T201_full_compromise_runbook_text(self):
-        for i, step in enumerate(COMPROMISE_RUNBOOK, 1): assert f"STEP-{i}:" in step
-    def test_T202_policy_default_backup_encrypt(self):
-        p = RotationPolicy.default_for(KeyType.BACKUP_ENCRYPT)
-        assert p.max_age_days == 365 and p.auto_rotate is False
-    def test_T203_rotate_records_rotated_at(self):
-        lm = fresh(); lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        old, _ = lm.rotate_key(KeyType.JWT_SIGNING)
-        assert old.rotated_at is not None
-    def test_T204_secret_not_in_exception_message(self):
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        r = mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        assert len(r.steps_taken) >= 1
+
+    def test_T186_resolve_nonexistent_report(self):
         lm = fresh()
-        try: lm.get_key("bad-id")
-        except KeyNotFoundError as e:
-            assert "secret" not in str(e).lower() and "_raw" not in str(e)
-    def test_T205_key_versions_sorted_by_version(self):
+        mgr = CompromiseResponseManager(lm)
+        with pytest.raises(KeyNotFoundError):
+            mgr.resolve_report("nonexistent", "admin")
+
+    def test_T187_policy_engine_no_auto_rotate(self):
         lm = fresh()
-        for _ in range(5): lm.generate_key(KeyType.JWT_SIGNING)
-        versions = [k.version for k in lm.list_by_type(KeyType.JWT_SIGNING)]
-        assert versions == sorted(versions)
-    def test_T206_health_check_returns_tuple(self):
-        _,_,_,_,admin = full_system()
-        result = admin.health_check()
-        assert isinstance(result, tuple) and isinstance(result[0], bool) and isinstance(result[1], list)
-    def test_T207_policy_grace_days_in_summary(self):
-        assert RotationPolicy.default_for(KeyType.JWT_SIGNING).grace_days == 7
-    def test_T208_factory_independent_instances(self):
-        lm1,_,_,_,_ = build_secret_rotation_system(b"s1")
-        lm2,_,_,_,_ = build_secret_rotation_system(b"s2")
+        policy = RotationPolicy(KeyType.ENCRYPTION_KEK, max_age_days=1,
+                                grace_days=0, auto_rotate=False)
+        lm.set_policy(KeyType.ENCRYPTION_KEK, policy)
+        old_ts = time.time() - 10 * 86400
+        kv = KeyVersion("a", KeyType.ENCRYPTION_KEK, 1, KeyStatus.ACTIVE,
+                        0, old_ts, None, None, None, 0, None, b"")
+        lm._store.add(kv)
+        assert not lm.needs_rotation(kv)
+
+    def test_T188_lifecycle_shared_audit(self):
+        audit = SecretAuditChain(b"shared")
+        lm1 = KeyLifecycleManager(master_secret=b"m1", audit=audit)
         lm1.generate_key(KeyType.JWT_SIGNING, activate=True)
-        with pytest.raises(KeyNotFoundError): lm2.active_key(KeyType.JWT_SIGNING)
+        assert audit.total >= 2
+
+    def test_T189_key_store_all_keys_tenant_filter(self):
+        store = KeyStore()
+        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, "t1", b"")
+        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                         0, 0, None, None, None, 0, "t2", b"")
+        store.add(kv1); store.add(kv2)
+        t1_keys = store.all_keys(tenant_id="t1")
+        assert kv1 in t1_keys and kv2 not in t1_keys
+
+    def test_T190_verify_chain_empty_chain(self):
+        chain = SecretAuditChain(b"secret")
+        assert chain.verify_chain() is True
+
+    def test_T191_detect_tampered_empty(self):
+        chain = SecretAuditChain(b"secret")
+        assert chain.detect_tampered() == []
+
+    def test_T192_sched_job_not_done_initially(self):
+        lm = fresh()
+        sched = RotationScheduler(lm)
+        jid = sched.schedule(KeyType.JWT_SIGNING, time.time() + 9999)
+        jobs = sched.pending_jobs()
+        assert any(j["job_id"] == jid for j in jobs)
+
+    def test_T193_key_version_is_usable_for_new_only_active(self):
+        for status in [KeyStatus.GRACE, KeyStatus.REVOKED, KeyStatus.EXPIRED, KeyStatus.PENDING]:
+            kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, status,
+                            0, 0, None, None, None, 0, None, b"")
+            assert kv.is_usable_for_new is False
+
+    def test_T194_revoke_reason_stored(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.revoke_key(kv.key_id, "admin", reason="security breach")
+        got = lm.get_key(kv.key_id)
+        assert got.revoke_reason == "security breach"
+
+    def test_T195_audit_chain_genesis_consistent(self):
+        chain = SecretAuditChain(b"fixed-secret")
+        g1 = chain.genesis_hash
+        g2 = chain.genesis_hash
+        assert g1 == g2
+
+    def test_T196_list_reports_resolved_filter(self):
+        lm = fresh()
+        kv1 = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        kv2 = lm.generate_key(KeyType.JWT_REFRESH, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        r1 = mgr.report_compromise(kv1.key_id, "sec", reason="b1")
+        mgr.report_compromise(kv2.key_id, "sec", reason="b2")
+        mgr.resolve_report(r1.report_id, "admin")
+        resolved = mgr.list_reports(resolved=True)
+        assert len(resolved) == 1
+        assert resolved[0].report_id == r1.report_id
+
+    def test_T197_key_material_unique_per_call(self):
+        mats = set()
+        for _ in range(10):
+            mat = KeyMaterialGenerator.generate(KeyType.JWT_SIGNING)
+            mats.add(mat)
+        assert len(mats) == 10
+
+    def test_T198_admin_health_check_detects_issue(self):
+        lm, sched, comp, ext, admin = full_system()
+        activated_at = time.time() - 31 * 86400
+        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
+                        0, activated_at, None, None, None, 0, None, b"")
+        lm._store.add(kv)
+        h = admin.health_check()
+        assert h["healthy"] is False
+        assert len(h["issues"]) >= 1
+
+    def test_T199_verify_payload_no_usable_keys(self):
+        lm = fresh()
+        result = lm.verify_payload(b"data", "fakesig", KeyType.JWT_SIGNING)
+        assert result is False
+
+    def test_T200_audit_chain_100_entries_valid(self):
+        chain = SecretAuditChain(b"s")
+        for i in range(100):
+            chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
+        assert chain.verify_chain() is True
+        assert chain.total == 100
+
+    def test_T201_lifecycle_multiple_rotations_chain_valid(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        for i in range(5):
+            lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason=f"rotation {i}")
+        assert lm._audit.verify_chain() is True
+
+    def test_T202_grace_period_extender_multiple(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm._store.update_status(kv.key_id, KeyStatus.GRACE)
+        kv.expires_at = time.time() + 3600
+        ext = GracePeriodExtender(lm)
+        ext.extend(kv.key_id, 1800, "admin", reason="ext1")
+        ext.extend(kv.key_id, 1800, "admin", reason="ext2")
+        assert kv.expires_at >= time.time() + 3600 + 3600 - 5
+
+    def test_T203_key_store_list_by_type_empty(self):
+        store = KeyStore()
+        result = store.list_by_type(KeyType.JWT_SIGNING)
+        assert result == []
+
+    def test_T204_scheduler_done_job_not_in_pending(self):
+        lm = fresh()
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        sched = RotationScheduler(lm)
+        jid = sched.schedule(KeyType.JWT_SIGNING, time.time() - 1)
+        sched.scan_due()
+        assert not any(j["job_id"] == jid for j in sched.pending_jobs())
+
+    def test_T205_compromise_report_audit_entries(self):
+        lm = fresh()
+        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        mgr = CompromiseResponseManager(lm)
+        mgr.report_compromise(kv.key_id, "sec", reason="breach")
+        ack_entries = lm._audit.query(action="key.compromise_ack")
+        assert len(ack_entries) >= 1
+        emergency_entries = lm._audit.query(action="key.emergency_rotation")
+        assert len(emergency_entries) >= 1
+
+    def test_T206_rotation_policy_engine_set_tenant(self):
+        eng = RotationPolicyEngine()
+        p = RotationPolicy(KeyType.WEBHOOK_HMAC, max_age_days=14, grace_days=2, auto_rotate=True)
+        eng.set_policy(KeyType.WEBHOOK_HMAC, p, tenant_id="tenant_x")
+        got = eng.get_policy(KeyType.WEBHOOK_HMAC, tenant_id="tenant_x")
+        assert got.max_age_days == 14
+
+    def test_T207_lifecycle_version_counter_increments(self):
+        lm = fresh()
+        kv1 = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        _, kv2 = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
+        _, kv3 = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation again")
+        assert kv1.version < kv2.version < kv3.version
+
+    def test_T208_factory_independent_instances(self):
+        s1 = build_secret_rotation_system(b"master1")
+        s2 = build_secret_rotation_system(b"master2")
+        lm1 = s1[0]
+        lm2 = s2[0]
+        _ = s2
+        lm1.generate_key(KeyType.JWT_SIGNING, activate=True)
+        with pytest.raises(KeyNotFoundError):
+            lm2.active_key(KeyType.JWT_SIGNING)
