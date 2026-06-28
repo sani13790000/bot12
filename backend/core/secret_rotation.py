@@ -41,20 +41,20 @@ class KeyType(str, Enum):
 
 
 class KeyStatus(str, Enum):
-    ACTIVE    = "active"     # current key -- used for new sign/encrypt
-    GRACE     = "grace"      # old key -- still valid for verify/decrypt
-    REVOKED   = "revoked"    # compromised -- rejected immediately
-    EXPIRED   = "expired"    # past grace period -- no longer accepted
-    PENDING   = "pending"    # generated, not yet activated
+    ACTIVE    = "active"
+    GRACE     = "grace"
+    REVOKED   = "revoked"
+    EXPIRED   = "expired"
+    PENDING   = "pending"
 
 
 class RotationTrigger(str, Enum):
-    SCHEDULED   = "scheduled"   # normal rotation per policy
-    COMPROMISE  = "compromise"  # emergency: suspected/confirmed breach
-    MANUAL      = "manual"      # operator-initiated
-    POLICY_AGE  = "policy_age"  # max_age_days exceeded
-    POLICY_USE  = "policy_use"  # max_uses exceeded
-    BOOTSTRAP   = "bootstrap"   # first-time key generation
+    SCHEDULED   = "scheduled"
+    COMPROMISE  = "compromise"
+    MANUAL      = "manual"
+    POLICY_AGE  = "policy_age"
+    POLICY_USE  = "policy_use"
+    BOOTSTRAP   = "bootstrap"
 
 
 class AuditAction(str, Enum):
@@ -79,16 +79,16 @@ REQUIRES_REASON = {
 }
 
 _POLICY_DEFAULTS: Dict[KeyType, Dict] = {
-    KeyType.JWT_SIGNING:      dict(max_age_days=30,  grace_days=7,  max_uses=0,        auto_rotate=True),
-    KeyType.JWT_REFRESH:      dict(max_age_days=90,  grace_days=14, max_uses=0,        auto_rotate=True),
+    KeyType.JWT_SIGNING:      dict(max_age_days=30,  grace_days=7,  max_uses=0, auto_rotate=True),
+    KeyType.JWT_REFRESH:      dict(max_age_days=90,  grace_days=14, max_uses=0, auto_rotate=True),
     KeyType.ENCRYPTION_DEK:   dict(max_age_days=90,  grace_days=30, max_uses=1_000_000, auto_rotate=True),
-    KeyType.ENCRYPTION_KEK:   dict(max_age_days=365, grace_days=60, max_uses=0,        auto_rotate=False),
-    KeyType.SIGNING_ARTIFACT: dict(max_age_days=180, grace_days=30, max_uses=0,        auto_rotate=True),
-    KeyType.WEBHOOK_HMAC:     dict(max_age_days=60,  grace_days=14, max_uses=0,        auto_rotate=True),
-    KeyType.AUDIT_CHAIN:      dict(max_age_days=365, grace_days=90, max_uses=0,        auto_rotate=False),
-    KeyType.API_SECRET:       dict(max_age_days=90,  grace_days=7,  max_uses=0,        auto_rotate=True),
-    KeyType.BACKUP_ENCRYPT:   dict(max_age_days=365, grace_days=60, max_uses=0,        auto_rotate=False),
-    KeyType.TENANT_ISOLATION: dict(max_age_days=180, grace_days=30, max_uses=0,        auto_rotate=True),
+    KeyType.ENCRYPTION_KEK:   dict(max_age_days=365, grace_days=60, max_uses=0, auto_rotate=False),
+    KeyType.SIGNING_ARTIFACT: dict(max_age_days=180, grace_days=30, max_uses=0, auto_rotate=True),
+    KeyType.WEBHOOK_HMAC:     dict(max_age_days=60,  grace_days=14, max_uses=0, auto_rotate=True),
+    KeyType.AUDIT_CHAIN:      dict(max_age_days=365, grace_days=90, max_uses=0, auto_rotate=False),
+    KeyType.API_SECRET:       dict(max_age_days=90,  grace_days=7,  max_uses=0, auto_rotate=True),
+    KeyType.BACKUP_ENCRYPT:   dict(max_age_days=365, grace_days=60, max_uses=0, auto_rotate=False),
+    KeyType.TENANT_ISOLATION: dict(max_age_days=180, grace_days=30, max_uses=0, auto_rotate=True),
 }
 
 COMPROMISE_RUNBOOK: List[str] = [
@@ -106,39 +106,38 @@ COMPROMISE_RUNBOOK: List[str] = [
 
 
 class SecretRotationError(Exception):
-    """Base exception."""
+    pass
 
 class KeyNotFoundError(SecretRotationError):
-    """Requested key version does not exist."""
+    pass
 
 class KeyRevokedError(SecretRotationError):
-    """Key has been revoked -- reject operation."""
+    pass
 
 class KeyExpiredError(SecretRotationError):
-    """Key is past grace period -- no longer accepted."""
+    pass
 
 class MissingReasonError(SecretRotationError):
-    """Reason is mandatory for this action."""
+    pass
 
 class PolicyViolationError(SecretRotationError):
-    """Action violates rotation policy."""
+    pass
 
 class CompromiseResponseError(SecretRotationError):
-    """Error during compromise response."""
+    pass
 
 
 @dataclass
 class RotationPolicy:
-    key_type:      KeyType
-    max_age_days:  int   = 90
-    grace_days:    int   = 14
-    max_uses:      int   = 0
-    auto_rotate:   bool  = True
-    tenant_id:     Optional[str] = None
+    key_type:     KeyType
+    max_age_days: int  = 90
+    grace_days:   int  = 14
+    max_uses:     int  = 0
+    auto_rotate:  bool = True
+    tenant_id:    Optional[str] = None
 
     @classmethod
-    def default_for(cls, key_type: KeyType,
-                    tenant_id: Optional[str] = None) -> "RotationPolicy":
+    def default_for(cls, key_type: KeyType, tenant_id: Optional[str] = None) -> "RotationPolicy":
         d = _POLICY_DEFAULTS.get(key_type, {})
         return cls(key_type=key_type, tenant_id=tenant_id, **d)
 
@@ -164,17 +163,17 @@ class KeyVersion:
     revoked_at:    Optional[float]
     use_count:     int
     tenant_id:     Optional[str]
-    _raw:          bytes = field(repr=False, compare=False)
+    _raw:          bytes = field(repr=False, compare=False, default=b"")
     signature:     str   = ""
     rotation_trigger: RotationTrigger = RotationTrigger.BOOTSTRAP
-    revoke_reason: Optional[str] = None
+    revoke_reason:    Optional[str]   = None
 
     def safe_dict(self) -> dict:
         return {
             "key_id":           self.key_id,
-            "key_type":         self.key_type.value if hasattr(self.key_type, 'value') else self.key_type,
+            "key_type":         self.key_type.value if hasattr(self.key_type,'value') else self.key_type,
             "version":          self.version,
-            "status":           self.status.value if hasattr(self.status, 'value') else self.status,
+            "status":           self.status.value if hasattr(self.status,'value') else self.status,
             "created_at":       self.created_at,
             "activated_at":     self.activated_at,
             "expires_at":       self.expires_at,
@@ -183,12 +182,12 @@ class KeyVersion:
             "use_count":        self.use_count,
             "tenant_id":        self.tenant_id,
             "signature":        self.signature,
-            "rotation_trigger": self.rotation_trigger.value if hasattr(self.rotation_trigger, 'value') else self.rotation_trigger,
+            "rotation_trigger": self.rotation_trigger.value if hasattr(self.rotation_trigger,'value') else self.rotation_trigger,
         }
 
     @property
-    def is_usable(self) -> bool:
-        return self.status in (KeyStatus.ACTIVE, KeyStatus.GRACE)
+    def is_usable_for_new(self) -> bool:
+        return self.status == KeyStatus.ACTIVE
 
     @property
     def is_usable_for_verify(self) -> bool:
@@ -220,7 +219,7 @@ class CompromiseReport:
     reported_by: str
     reported_at: float
     reason:      str
-    new_key_id:  Optional[str]
+    new_key_id:  Optional[str] = None
     resolved:    bool = False
     resolved_at: Optional[float] = None
     resolved_by: Optional[str] = None
@@ -230,8 +229,8 @@ class CompromiseReport:
 class SecretAuditChain:
     GENESIS_CONST = "GENESIS:SECRET:CHAIN:V29"
 
-    def __init__(self, secret: bytes | str = b"audit-secret"):
-        self._secret = secret.encode() if isinstance(secret, str) else secret
+    def __init__(self, secret: Optional[bytes] = None):
+        self._secret = secret or os.urandom(32)
         self._entries: deque = deque(maxlen=10_000)
         self._lock = threading.Lock()
         self._seq = 0
@@ -321,12 +320,9 @@ class SecretAuditChain:
             entries = [e for e in entries if e.key_type == key_type]
         if limit and limit > 0:
             entries = entries[:limit]
+        elif limit == 0:
+            pass
         return entries
-
-    def query_limit_zero(self) -> List[AuditEntry]:
-        """query with limit=0 returns all entries."""
-        with self._lock:
-            return list(reversed(list(self._entries)))
 
     @property
     def total(self) -> int:
@@ -336,16 +332,10 @@ class SecretAuditChain:
 
 class KeyMaterialGenerator:
     KEY_SIZES: Dict[str, int] = {
-        KeyType.JWT_SIGNING.value:      64,
-        KeyType.JWT_REFRESH.value:      64,
-        KeyType.ENCRYPTION_DEK.value:   32,
-        KeyType.ENCRYPTION_KEK.value:   32,
-        KeyType.SIGNING_ARTIFACT.value: 64,
-        KeyType.WEBHOOK_HMAC.value:     32,
-        KeyType.AUDIT_CHAIN.value:      32,
-        KeyType.API_SECRET.value:       32,
-        KeyType.BACKUP_ENCRYPT.value:   32,
-        KeyType.TENANT_ISOLATION.value: 32,
+        "jwt_signing": 64, "jwt_refresh": 64, "encryption_dek": 32,
+        "encryption_kek": 32, "signing_artifact": 64, "webhook_hmac": 32,
+        "audit_chain": 32, "api_secret": 32, "backup_encrypt": 32,
+        "tenant_isolation": 32,
     }
 
     @classmethod
@@ -355,28 +345,29 @@ class KeyMaterialGenerator:
         return secrets.token_bytes(size)
 
     @classmethod
+    def key_id(cls) -> str:
+        return str(uuid.uuid4())
+
+    @classmethod
     def key_size(cls, key_type: str) -> int:
         kt = key_type.value if hasattr(key_type, 'value') else key_type
         return cls.KEY_SIZES.get(kt, 32)
 
 
 class KeySelfAuth:
-    def __init__(self, master_secret: bytes | str):
-        self._master = master_secret.encode() if isinstance(master_secret, str) else master_secret
+    def __init__(self, master: bytes):
+        self._master = master
 
     def sign(self, kv: KeyVersion) -> str:
-        kt = kv.key_type.value if hasattr(kv.key_type, 'value') else kv.key_type
+        kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
         canonical = json.dumps({
-            "key_id":    kv.key_id,
-            "key_type":  kt,
-            "version":   kv.version,
-            "tenant_id": kv.tenant_id,
+            "key_id": kv.key_id, "key_type": kt,
+            "version": kv.version, "tenant_id": kv.tenant_id,
         }, sort_keys=True)
         return hmac.new(self._master, canonical.encode(), hashlib.sha256).hexdigest()
 
     def verify(self, kv: KeyVersion) -> bool:
-        expected = self.sign(kv)
-        return hmac.compare_digest(expected, kv.signature)
+        return hmac.compare_digest(self.sign(kv), kv.signature)
 
 
 class KeyStore:
@@ -395,19 +386,8 @@ class KeyStore:
             raise KeyNotFoundError(f"key_id={key_id}")
         return kv
 
-    def get_version(self, key_type: str, version: int,
-                    tenant_id: Optional[str] = None) -> KeyVersion:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
-        with self._lock:
-            for kv in self._store.values():
-                kv_kt = kv.key_type.value if hasattr(kv.key_type, 'value') else kv.key_type
-                if kv_kt == kt and kv.version == version:
-                    if tenant_id is None or kv.tenant_id == tenant_id:
-                        return kv
-        raise KeyNotFoundError(f"type={kt} v={version}")
-
     def active_key(self, key_type: str, tenant_id: Optional[str] = None) -> KeyVersion:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
             candidates = [
                 kv for kv in self._store.values()
@@ -420,7 +400,7 @@ class KeyStore:
         return max(candidates, key=lambda k: k.version)
 
     def usable_keys(self, key_type: str, tenant_id: Optional[str] = None) -> List[KeyVersion]:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
             return [
                 kv for kv in self._store.values()
@@ -430,19 +410,19 @@ class KeyStore:
             ]
 
     def list_by_type(self, key_type: str) -> List[KeyVersion]:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
             return [kv for kv in self._store.values()
                     if (kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type) == kt]
 
-    def list_all(self, tenant_id: Optional[str] = None,
+    def all_keys(self, tenant_id: Optional[str] = None,
                  status: Optional[str] = None) -> List[KeyVersion]:
         with self._lock:
             result = list(self._store.values())
         if tenant_id:
             result = [k for k in result if k.tenant_id == tenant_id]
         if status:
-            st = status.value if hasattr(status, 'value') else status
+            st = status.value if hasattr(status,'value') else status
             result = [k for k in result if (k.status.value if hasattr(k.status,'value') else k.status) == st]
         return result
 
@@ -466,56 +446,44 @@ class KeyStore:
                 return kv.use_count
             return 0
 
-    def count_by_status(self) -> Dict[str, int]:
-        with self._lock:
-            counts: Dict[str, int] = {}
-            for kv in self._store.values():
-                st = kv.status.value if hasattr(kv.status, 'value') else kv.status
-                counts[st] = counts.get(st, 0) + 1
-        return counts
-
 
 class RotationPolicyEngine:
-    def __init__(self, policies: Optional[Dict] = None):
-        if policies is not None:
-            self._policies = copy.deepcopy(policies)
-        else:
-            self._policies = {
-                kt: RotationPolicy.default_for(kt)
-                for kt in KeyType
-            }
+    def __init__(self):
+        self._policies: Dict[str, RotationPolicy] = {
+            kt: RotationPolicy.default_for(kt) for kt in KeyType
+        }
         self._lock = threading.Lock()
 
     def get_policy(self, key_type: KeyType | str,
                    tenant_id: Optional[str] = None) -> RotationPolicy:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt_val = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
-            tenant_key = f"{kt}:{tenant_id}" if tenant_id else None
+            tenant_key = f"{kt_val}:{tenant_id}" if tenant_id else None
             if tenant_key and tenant_key in self._policies:
                 return self._policies[tenant_key]
-            # Try both KeyType enum and string
-            for key_type_obj in KeyType:
-                if key_type_obj.value == kt or key_type_obj == key_type:
-                    if key_type_obj in self._policies:
-                        return self._policies[key_type_obj]
-            if kt in self._policies:
-                return self._policies[kt]
-            return RotationPolicy.default_for(KeyType(kt) if kt in [k.value for k in KeyType] else key_type)
+            for kt in KeyType:
+                if kt.value == kt_val and kt in self._policies:
+                    return self._policies[kt]
+            if kt_val in self._policies:
+                return self._policies[kt_val]
+        return RotationPolicy.default_for(key_type if isinstance(key_type, KeyType) else KeyType(kt_val))
 
-    def set_tenant_policy(self, key_type: str, tenant_id: str,
-                          policy: RotationPolicy) -> None:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+    def set_policy(self, key_type: KeyType | str, policy: RotationPolicy,
+                   tenant_id: Optional[str] = None) -> None:
+        kt_val = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
-            self._policies[f"{kt}:{tenant_id}"] = policy
+            if tenant_id:
+                self._policies[f"{kt_val}:{tenant_id}"] = policy
+            else:
+                for kt in KeyType:
+                    if kt.value == kt_val:
+                        self._policies[kt] = policy
+                        return
+                self._policies[kt_val] = policy
 
-    def needs_rotation(self, kv: KeyVersion,
-                       policy: Optional[RotationPolicy] = None) -> bool:
-        p = policy or self.get_policy(kv.key_type, kv.tenant_id)
-        if not p.auto_rotate:
-            return False
-        if kv.status != KeyStatus.ACTIVE:
-            return False
-        if kv.activated_at is None:
+    def needs_rotation(self, kv: KeyVersion) -> bool:
+        p = self.get_policy(kv.key_type, kv.tenant_id)
+        if not p.auto_rotate or kv.status != KeyStatus.ACTIVE or kv.activated_at is None:
             return False
         age = time.time() - kv.activated_at
         if p.max_age_seconds > 0 and age >= p.max_age_seconds:
@@ -524,115 +492,100 @@ class RotationPolicyEngine:
             return True
         return False
 
-    def grace_expired(self, kv: KeyVersion,
-                      policy: Optional[RotationPolicy] = None) -> bool:
-        if kv.status != KeyStatus.GRACE:
-            return False
-        if kv.expires_at is None:
+    def is_grace_expired(self, kv: KeyVersion) -> bool:
+        if kv.status != KeyStatus.GRACE or kv.expires_at is None:
             return False
         return time.time() >= kv.expires_at
 
-    def due_soon(self, kv: KeyVersion, warn_seconds: float = 86400.0,
-                 policy: Optional[RotationPolicy] = None) -> bool:
-        p = policy or self.get_policy(kv.key_type, kv.tenant_id)
-        if kv.status != KeyStatus.ACTIVE or kv.activated_at is None:
+    def due_soon(self, kv: KeyVersion, warn_seconds: float = 86400.0) -> bool:
+        p = self.get_policy(kv.key_type, kv.tenant_id)
+        if kv.status != KeyStatus.ACTIVE or kv.activated_at is None or p.max_age_seconds <= 0:
             return False
-        if p.max_age_seconds <= 0:
-            return False
-        age = time.time() - kv.activated_at
-        return (p.max_age_seconds - age) <= warn_seconds
+        return (p.max_age_seconds - (time.time() - kv.activated_at)) <= warn_seconds
 
 
 class KeyLifecycleManager:
-    def __init__(self, master_secret: bytes | str = b"master",
-                 audit: Optional[SecretAuditChain] = None,
-                 policy_engine: Optional[RotationPolicyEngine] = None):
-        self._master = master_secret.encode() if isinstance(master_secret, str) else master_secret
+    """
+    Central manager for zero-downtime key rotation.
+    Flow: generate() -> activate() -> [rotate()] -> [revoke()/expire()]
+    During rotation: old key moves to GRACE, new key is ACTIVE.
+    Verifiers try ACTIVE first, then GRACE keys.
+    """
+
+    def __init__(self, master_secret: Optional[bytes] = None,
+                 audit: Optional[SecretAuditChain] = None):
+        self._master = master_secret or os.urandom(32)
         self._store = KeyStore()
-        self._audit = audit if audit is not None else SecretAuditChain()
-        self._policy = policy_engine if policy_engine is not None else RotationPolicyEngine()
+        self._audit = audit if audit is not None else SecretAuditChain(self._master)
+        self._policy_engine = RotationPolicyEngine()
         self._signer = KeySelfAuth(self._master)
-        self._generator = KeyMaterialGenerator()
         self._hooks: List[Callable] = []
         self._lock = threading.Lock()
+        self._version_counters: Dict[str, int] = {}
 
-    def generate(self, key_type: KeyType | str, actor: str = "system",
-                 tenant_id: Optional[str] = None) -> KeyVersion:
-        """Generate a new key in PENDING state (not yet active)."""
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
-        mat = KeyMaterialGenerator.generate(kt)
-        existing = self._store.list_by_type(kt)
-        version = max((kv.version for kv in existing), default=0) + 1
+    def _next_version(self, key_type: str, tenant_id: Optional[str] = None) -> int:
+        kt = key_type.value if hasattr(key_type,'value') else key_type
+        counter_key = f"{kt}:{tenant_id}"
+        with self._lock:
+            v = self._version_counters.get(counter_key, 0) + 1
+            self._version_counters[counter_key] = v
+        return v
+
+    def generate_key(self, key_type: KeyType | str, actor: str = "system",
+                     tenant_id: Optional[str] = None,
+                     activate: bool = False) -> KeyVersion:
+        kt = key_type.value if hasattr(key_type,'value') else key_type
+        raw = KeyMaterialGenerator.generate(kt)
+        version = self._next_version(kt, tenant_id)
+        status = KeyStatus.ACTIVE if activate else KeyStatus.PENDING
         kv = KeyVersion(
             key_id=str(uuid.uuid4()), key_type=key_type, version=version,
-            status=KeyStatus.PENDING, created_at=time.time(),
-            activated_at=None, expires_at=None, rotated_at=None,
-            revoked_at=None, use_count=0, tenant_id=tenant_id,
-            _raw=mat, rotation_trigger=RotationTrigger.BOOTSTRAP,
+            status=status, created_at=time.time(),
+            activated_at=time.time() if activate else None,
+            expires_at=None, rotated_at=None, revoked_at=None,
+            use_count=0, tenant_id=tenant_id, _raw=raw,
         )
         kv.signature = self._signer.sign(kv)
         self._store.add(kv)
-        self._audit.record(AuditAction.KEY_GENERATED, kv.key_id, kt, kv.version,
-                           actor, tenant_id)
+        self._audit.record(AuditAction.KEY_GENERATED, kv.key_id, kt, version, actor, tenant_id)
+        if activate:
+            self._audit.record(AuditAction.KEY_ACTIVATED, kv.key_id, kt, version, actor, tenant_id)
+        self._fire_hooks("generate", kv)
         return kv
 
-    def activate(self, key_id: str, actor: str) -> KeyVersion:
-        """Move a PENDING key to ACTIVE."""
+    def activate_key(self, key_id: str, actor: str) -> KeyVersion:
         kv = self._store.get(key_id)
         if kv.status != KeyStatus.PENDING:
-            raise PolicyViolationError(f"key {key_id} not PENDING")
+            raise PolicyViolationError(f"key {key_id} is not PENDING")
         self._store.update_status(key_id, KeyStatus.ACTIVE)
         kv.activated_at = time.time()
-        self._audit.record(AuditAction.KEY_ACTIVATED, key_id, 
-                           kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type,
-                           kv.version, actor, kv.tenant_id)
-        self._run_hooks("activate", kv)
+        kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
+        self._audit.record(AuditAction.KEY_ACTIVATED, key_id, kt, kv.version, actor, kv.tenant_id)
+        self._fire_hooks("activate", kv)
         return kv
 
-    def bootstrap(self, key_type: KeyType | str, actor: str = "system",
-                  tenant_id: Optional[str] = None) -> KeyVersion:
-        """Generate + immediately activate a key (bootstrap shortcut)."""
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
-        mat = KeyMaterialGenerator.generate(kt)
-        existing = self._store.list_by_type(kt)
-        existing_tenant = [k for k in existing if k.tenant_id == tenant_id]
-        version = max((kv.version for kv in existing_tenant), default=0) + 1
-        kv = KeyVersion(
-            key_id=str(uuid.uuid4()), key_type=key_type, version=version,
-            status=KeyStatus.ACTIVE, created_at=time.time(),
-            activated_at=time.time(), expires_at=None, rotated_at=None,
-            revoked_at=None, use_count=0, tenant_id=tenant_id,
-            _raw=mat, rotation_trigger=RotationTrigger.BOOTSTRAP,
-        )
-        kv.signature = self._signer.sign(kv)
-        self._store.add(kv)
-        self._audit.record(AuditAction.KEY_GENERATED, kv.key_id, kt, kv.version,
-                           actor, tenant_id)
-        self._audit.record(AuditAction.KEY_ACTIVATED, kv.key_id, kt, kv.version,
-                           actor, tenant_id)
-        self._run_hooks("bootstrap", kv)
-        return kv
+    def active_key(self, key_type: KeyType | str, tenant_id: Optional[str] = None) -> KeyVersion:
+        return self._store.active_key(key_type, tenant_id)
 
-    def rotate(self, key_type: KeyType | str, actor: str, reason: str,
-               trigger: RotationTrigger = RotationTrigger.MANUAL,
-               tenant_id: Optional[str] = None) -> Tuple[Optional[KeyVersion], KeyVersion]:
-        """Zero-downtime rotation: old -> GRACE, new -> ACTIVE."""
+    def rotate_key(self, key_type: KeyType | str, actor: str, reason: str,
+                   trigger: RotationTrigger = RotationTrigger.MANUAL,
+                   tenant_id: Optional[str] = None) -> Tuple[Optional[KeyVersion], KeyVersion]:
         if not reason or not reason.strip():
             raise MissingReasonError("reason required for rotation")
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt = key_type.value if hasattr(key_type,'value') else key_type
         try:
             old = self._store.active_key(kt, tenant_id)
         except KeyNotFoundError:
             old = None
-        policy = self._policy.get_policy(key_type, tenant_id)
-        new_version = (old.version + 1) if old else 1
-        mat = KeyMaterialGenerator.generate(kt)
+        policy = self._policy_engine.get_policy(key_type, tenant_id)
+        raw = KeyMaterialGenerator.generate(kt)
+        version = self._next_version(kt, tenant_id)
         new_kv = KeyVersion(
-            key_id=str(uuid.uuid4()), key_type=key_type, version=new_version,
+            key_id=str(uuid.uuid4()), key_type=key_type, version=version,
             status=KeyStatus.ACTIVE, created_at=time.time(),
             activated_at=time.time(), expires_at=None, rotated_at=None,
             revoked_at=None, use_count=0, tenant_id=tenant_id,
-            _raw=mat, rotation_trigger=trigger,
+            _raw=raw, rotation_trigger=trigger,
         )
         new_kv.signature = self._signer.sign(new_kv)
         self._store.add(new_kv)
@@ -641,40 +594,51 @@ class KeyLifecycleManager:
             self._store.update_status(old.key_id, KeyStatus.GRACE)
             old.expires_at = grace_exp
             old.rotated_at = time.time()
-        self._audit.record(AuditAction.KEY_ROTATED, new_kv.key_id, kt,
-                           new_kv.version, actor, tenant_id, reason=reason)
-        self._run_hooks("rotate", new_kv)
+        self._audit.record(AuditAction.KEY_ROTATED, new_kv.key_id, kt, version, actor,
+                           tenant_id, reason=reason)
+        self._fire_hooks("rotate", new_kv)
         return old, new_kv
 
-    def revoke(self, key_id: str, actor: str, reason: str) -> KeyVersion:
+    def revoke_key(self, key_id: str, actor: str, reason: str) -> KeyVersion:
         if not reason or not reason.strip():
             raise MissingReasonError("reason required for revoke")
         kv = self._store.get(key_id)
         self._store.update_status(key_id, KeyStatus.REVOKED, revoke_reason=reason)
         kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
-        self._audit.record(AuditAction.KEY_REVOKED, key_id, kt, kv.version,
-                           actor, kv.tenant_id, reason=reason)
-        self._run_hooks("revoke", kv)
+        self._audit.record(AuditAction.KEY_REVOKED, key_id, kt, kv.version, actor,
+                           kv.tenant_id, reason=reason)
+        self._fire_hooks("revoke", kv)
         return kv
 
-    def access(self, key_type: KeyType | str, actor: str,
-               tenant_id: Optional[str] = None) -> KeyVersion:
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
-        kv = self._store.active_key(kt, tenant_id)
+    def record_access(self, key_id: str, actor: str) -> None:
+        kv = self._store.get(key_id)
         if kv.status == KeyStatus.REVOKED:
-            raise KeyRevokedError(kt)
-        self._store.increment_use(kv.key_id)
-        self._audit.record(AuditAction.KEY_ACCESSED, kv.key_id, kt, kv.version,
-                           actor, tenant_id)
-        return kv
+            raise KeyRevokedError(f"key {key_id} is REVOKED")
+        if kv.status == KeyStatus.EXPIRED:
+            raise KeyExpiredError(f"key {key_id} is EXPIRED")
+        self._store.increment_use(key_id)
+        kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
+        self._audit.record(AuditAction.KEY_ACCESSED, key_id, kt, kv.version, actor, kv.tenant_id)
 
-    def verify_key_signature(self, kv: KeyVersion) -> bool:
-        return self._signer.verify(kv)
+    def get_key(self, key_id: str) -> KeyVersion:
+        return self._store.get(key_id)
+
+    def list_by_type(self, key_type: KeyType | str,
+                     tenant_id: Optional[str] = None) -> List[KeyVersion]:
+        kt = key_type.value if hasattr(key_type,'value') else key_type
+        keys = self._store.list_by_type(kt)
+        if tenant_id:
+            keys = [k for k in keys if k.tenant_id == tenant_id]
+        return keys
+
+    def usable_keys(self, key_type: KeyType | str,
+                    tenant_id: Optional[str] = None) -> List[KeyVersion]:
+        return self._store.usable_keys(key_type, tenant_id)
 
     def expire_grace_keys(self, actor: str = "scheduler") -> List[str]:
         expired = []
-        for kv in self._store.list_all(status=KeyStatus.GRACE):
-            if self._policy.grace_expired(kv):
+        for kv in self._store.all_keys(status=KeyStatus.GRACE):
+            if self._policy_engine.is_grace_expired(kv):
                 self._store.update_status(kv.key_id, KeyStatus.EXPIRED)
                 kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
                 self._audit.record(AuditAction.KEY_EXPIRED, kv.key_id, kt, kv.version,
@@ -682,10 +646,46 @@ class KeyLifecycleManager:
                 expired.append(kv.key_id)
         return expired
 
-    def add_hook(self, fn: Callable) -> None:
+    def needs_rotation(self, kv: KeyVersion) -> bool:
+        return self._policy_engine.needs_rotation(kv)
+
+    def due_soon(self, kv: KeyVersion, warn_seconds: float = 86400.0) -> bool:
+        return self._policy_engine.due_soon(kv, warn_seconds)
+
+    def get_policy(self, key_type: KeyType | str,
+                   tenant_id: Optional[str] = None) -> RotationPolicy:
+        return self._policy_engine.get_policy(key_type, tenant_id)
+
+    def set_policy(self, key_type: KeyType | str, policy: RotationPolicy,
+                   tenant_id: Optional[str] = None) -> None:
+        self._policy_engine.set_policy(key_type, policy, tenant_id)
+
+    def self_auth_valid(self, kv: KeyVersion) -> bool:
+        return self._signer.verify(kv)
+
+    def sign_payload(self, payload: bytes, key_id: str) -> str:
+        kv = self._store.get(key_id)
+        if kv.status == KeyStatus.REVOKED:
+            raise KeyRevokedError(f"key {key_id} is REVOKED")
+        if not kv._raw:
+            raise PolicyViolationError("no key material")
+        return hmac.new(kv._raw, payload, hashlib.sha256).hexdigest()
+
+    def verify_payload(self, payload: bytes, signature: str,
+                       key_type: KeyType | str, tenant_id: Optional[str] = None) -> bool:
+        usable = self._store.usable_keys(key_type, tenant_id)
+        for kv in usable:
+            if not kv._raw:
+                continue
+            expected = hmac.new(kv._raw, payload, hashlib.sha256).hexdigest()
+            if hmac.compare_digest(expected, signature):
+                return True
+        return False
+
+    def add_rotation_hook(self, fn: Callable) -> None:
         self._hooks.append(fn)
 
-    def _run_hooks(self, event: str, kv: KeyVersion) -> None:
+    def _fire_hooks(self, event: str, kv: KeyVersion) -> None:
         for fn in self._hooks:
             try:
                 fn(event, kv)
@@ -697,16 +697,8 @@ class KeyLifecycleManager:
         return self._store
 
     @property
-    def audit(self) -> SecretAuditChain:
+    def _audit_chain(self) -> SecretAuditChain:
         return self._audit
-
-    @property
-    def policy(self) -> RotationPolicyEngine:
-        return self._policy
-
-    @property
-    def signer(self) -> KeySelfAuth:
-        return self._signer
 
 
 class CompromiseResponseManager:
@@ -717,41 +709,31 @@ class CompromiseResponseManager:
         self._reports: Dict[str, CompromiseReport] = {}
         self._lock = threading.Lock()
 
-    def report_compromise(self, key_id: str, reported_by: str,
-                          reason: str) -> CompromiseReport:
+    def report_compromise(self, key_id: str, reported_by: str, reason: str) -> CompromiseReport:
         if not reason or not reason.strip():
-            raise MissingReasonError("reason required for compromise report")
-        kv = self._lc.store.get(key_id)
-        kt = kv.key_type.value if hasattr(kv.key_type, 'value') else kv.key_type
-        # Revoke the compromised key immediately
-        self._lc.store.update_status(key_id, KeyStatus.REVOKED, revoke_reason=reason)
-        self._lc._audit.record(
-            AuditAction.COMPROMISE_ACK, key_id, kt, kv.version,
-            reported_by, kv.tenant_id, reason=reason,
-        )
-        # Emergency rotation
-        _, new_kv = self._lc.rotate(
-            kv.key_type, reported_by,
-            reason=f"emergency rotation after compromise: {reason}",
-            trigger=RotationTrigger.COMPROMISE,
-            tenant_id=kv.tenant_id,
-        )
-        self._lc._audit.record(
-            AuditAction.EMERGENCY_ROT, new_kv.key_id, kt, new_kv.version,
-            reported_by, kv.tenant_id, reason=f"emergency: {reason}",
-        )
+            raise MissingReasonError("reason required")
+        kv = self._lc.get_key(key_id)
+        kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
+        self._lc._store.update_status(key_id, KeyStatus.REVOKED, revoke_reason=reason)
+        self._lc._audit.record(AuditAction.COMPROMISE_ACK, key_id, kt, kv.version,
+                               reported_by, kv.tenant_id, reason=reason)
+        _, new_kv = self._lc.rotate_key(kv.key_type, reported_by,
+                                         reason=f"emergency rotation: {reason}",
+                                         trigger=RotationTrigger.COMPROMISE,
+                                         tenant_id=kv.tenant_id)
+        self._lc._audit.record(AuditAction.EMERGENCY_ROT, new_kv.key_id, kt, new_kv.version,
+                               reported_by, kv.tenant_id, reason=f"emergency: {reason}")
         report = CompromiseReport(
             report_id=str(uuid.uuid4()), key_id=key_id, key_type=kt,
-            version=kv.version, reported_by=reported_by,
-            reported_at=time.time(), reason=reason,
-            new_key_id=new_kv.key_id, resolved=False,
+            version=kv.version, reported_by=reported_by, reported_at=time.time(),
+            reason=reason, new_key_id=new_kv.key_id, resolved=False,
             steps_taken=self.RUNBOOK[:5],
         )
         with self._lock:
             self._reports[report.report_id] = report
         return report
 
-    def resolve_compromise(self, report_id: str, resolved_by: str) -> CompromiseReport:
+    def resolve_report(self, report_id: str, resolved_by: str) -> CompromiseReport:
         with self._lock:
             r = self._reports.get(report_id)
             if r is None:
@@ -762,13 +744,15 @@ class CompromiseResponseManager:
             r.steps_taken = self.RUNBOOK
         return r
 
-    def open_reports(self) -> List[CompromiseReport]:
+    def list_reports(self, resolved: Optional[bool] = None) -> List[CompromiseReport]:
         with self._lock:
-            return [r for r in self._reports.values() if not r.resolved]
+            reports = list(self._reports.values())
+        if resolved is not None:
+            reports = [r for r in reports if r.resolved == resolved]
+        return reports
 
-    def all_reports(self) -> List[CompromiseReport]:
-        with self._lock:
-            return list(self._reports.values())
+    def open_reports(self) -> List[CompromiseReport]:
+        return self.list_reports(resolved=False)
 
 
 class RotationScheduler:
@@ -777,34 +761,29 @@ class RotationScheduler:
         self._jobs: Dict[str, dict] = {}
         self._lock = threading.Lock()
 
-    def schedule(self, key_type: KeyType | str, at_ts: float,
-                 actor: str = "scheduler",
+    def schedule(self, key_type: KeyType | str, at_ts: float, actor: str = "scheduler",
                  tenant_id: Optional[str] = None) -> str:
         job_id = str(uuid.uuid4())
-        kt = key_type.value if hasattr(key_type, 'value') else key_type
+        kt = key_type.value if hasattr(key_type,'value') else key_type
         with self._lock:
             self._jobs[job_id] = {
-                "job_id": job_id, "key_type": kt,
-                "at_ts": at_ts, "actor": actor,
-                "tenant_id": tenant_id, "done": False,
+                "job_id": job_id, "key_type": kt, "at_ts": at_ts,
+                "actor": actor, "tenant_id": tenant_id, "done": False,
                 "created_at": time.time(),
             }
         return job_id
 
-    def run_due(self) -> List[str]:
+    def scan_due(self) -> List[str]:
         now = time.time()
         rotated = []
         with self._lock:
-            due = [j for j in self._jobs.values()
-                   if not j["done"] and j["at_ts"] <= now]
+            due = [j for j in self._jobs.values() if not j["done"] and j["at_ts"] <= now]
         for job in due:
             try:
-                self._lc.rotate(
-                    job["key_type"], job["actor"],
-                    reason="scheduled rotation",
-                    trigger=RotationTrigger.SCHEDULED,
-                    tenant_id=job["tenant_id"],
-                )
+                self._lc.rotate_key(job["key_type"], job["actor"],
+                                     reason="scheduled rotation",
+                                     trigger=RotationTrigger.SCHEDULED,
+                                     tenant_id=job["tenant_id"])
                 with self._lock:
                     self._jobs[job["job_id"]]["done"] = True
                 rotated.append(job["job_id"])
@@ -812,33 +791,47 @@ class RotationScheduler:
                 pass
         return rotated
 
+    def scan_due_soon(self, warn_seconds: float = 86400.0) -> List[KeyVersion]:
+        all_keys = self._lc.store.all_keys()
+        return [kv for kv in all_keys if self._lc.due_soon(kv, warn_seconds)]
+
+    def auto_rotate_all(self, actor: str = "scheduler") -> List[KeyVersion]:
+        rotated = []
+        for kv in self._lc.store.all_keys():
+            if self._lc.needs_rotation(kv):
+                try:
+                    _, new_kv = self._lc.rotate_key(
+                        kv.key_type, actor, reason="auto-rotation by policy",
+                        trigger=RotationTrigger.POLICY_AGE, tenant_id=kv.tenant_id,
+                    )
+                    rotated.append(new_kv)
+                except Exception:
+                    pass
+        return rotated
+
+    def expire_grace_pass(self, actor: str = "scheduler") -> List[str]:
+        return self._lc.expire_grace_keys(actor)
+
     def pending_jobs(self) -> List[dict]:
         with self._lock:
             return [j for j in self._jobs.values() if not j["done"]]
-
-    def all_jobs(self) -> List[dict]:
-        with self._lock:
-            return list(self._jobs.values())
 
 
 class GracePeriodExtender:
     def __init__(self, lifecycle: KeyLifecycleManager):
         self._lc = lifecycle
 
-    def extend(self, key_id: str, extra_seconds: float,
-               actor: str, reason: str) -> KeyVersion:
+    def extend(self, key_id: str, extra_seconds: float, actor: str, reason: str) -> KeyVersion:
         if not reason or not reason.strip():
             raise MissingReasonError("reason required for grace extension")
-        kv = self._lc.store.get(key_id)
+        kv = self._lc.get_key(key_id)
         if kv.status != KeyStatus.GRACE:
             raise PolicyViolationError(f"key {key_id} not in GRACE status")
         old_exp = kv.expires_at or time.time()
         kv.expires_at = old_exp + extra_seconds
-        kt = kv.key_type.value if hasattr(kv.key_type, 'value') else kv.key_type
-        self._lc._audit.record(
-            AuditAction.GRACE_EXTENDED, key_id, kt, kv.version,
-            actor, kv.tenant_id, reason=reason,
-        )
+        kt = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
+        self._lc._audit.record(AuditAction.GRACE_EXTENDED, key_id, kt, kv.version,
+                               actor, kv.tenant_id, reason=reason)
         return kv
 
 
@@ -846,71 +839,58 @@ class SecretRotationAdmin:
     def __init__(self, lifecycle: KeyLifecycleManager,
                  scheduler: Optional[RotationScheduler] = None,
                  compromise: Optional[CompromiseResponseManager] = None):
-        self._lifecycle = lifecycle
+        self._lc = lifecycle
         self._scheduler = scheduler or RotationScheduler(lifecycle)
         self._compromise = compromise or CompromiseResponseManager(lifecycle)
         self._extender = GracePeriodExtender(lifecycle)
 
-    def bootstrap_all(self, actor: str = "system",
-                      tenant_id: Optional[str] = None) -> Dict[str, KeyVersion]:
+    def summary(self, tenant_id: Optional[str] = None) -> dict:
+        all_keys = self._lc.store.all_keys(tenant_id=tenant_id)
+        by_status: Dict[str, int] = {}
+        for kv in all_keys:
+            st = kv.status.value if hasattr(kv.status,'value') else kv.status
+            by_status[st] = by_status.get(st, 0) + 1
+        return {
+            "total_keys":        len(all_keys),
+            "by_status":         by_status,
+            "open_compromises":  len(self._compromise.open_reports()),
+            "pending_rotations": len(self._scheduler.scan_due_soon()),
+            "audit_total":       self._lc._audit.total,
+            "chain_valid":       self._lc._audit.verify_chain(),
+        }
+
+    def health_check(self) -> dict:
+        issues = []
+        for kv in self._lc.store.all_keys():
+            if self._lc.needs_rotation(kv):
+                issues.append(f"{kv.key_id}: needs rotation")
+        return {"healthy": len(issues) == 0, "issues": issues}
+
+    def bulk_rotate(self, key_types: List[KeyType], actor: str, reason: str,
+                    tenant_id: Optional[str] = None) -> Dict[str, KeyVersion]:
         result = {}
-        for kt in KeyType:
+        for kt in key_types:
             try:
-                kv = self._lifecycle.bootstrap(kt, actor, tenant_id)
-                result[kt.value] = kv
+                _, new_kv = self._lc.rotate_key(kt, actor, reason, tenant_id=tenant_id)
+                result[kt.value if hasattr(kt,'value') else kt] = new_kv
             except Exception:
                 pass
         return result
 
-    def rotate_key(self, key_type: KeyType | str, actor: str, reason: str,
-                   tenant_id: Optional[str] = None) -> Tuple[Optional[KeyVersion], KeyVersion]:
-        return self._lifecycle.rotate(key_type, actor, reason, tenant_id=tenant_id)
-
-    def revoke_key(self, key_id: str, actor: str, reason: str) -> KeyVersion:
-        return self._lifecycle.revoke(key_id, actor, reason)
-
-    def report_compromise(self, key_id: str, reported_by: str,
-                          reason: str) -> CompromiseReport:
-        return self._compromise.report_compromise(key_id, reported_by, reason)
-
-    def summary(self, tenant_id: Optional[str] = None) -> dict:
-        all_keys = self._lifecycle.store.list_all(tenant_id=tenant_id)
-        by_type: Dict[str, dict] = {}
-        for kv in all_keys:
-            t = kv.key_type.value if hasattr(kv.key_type,'value') else kv.key_type
-            if t not in by_type:
-                by_type[t] = {"active": 0, "grace": 0, "revoked": 0, "expired": 0, "pending": 0}
-            st = kv.status.value if hasattr(kv.status,'value') else kv.status
-            by_type[t][st] = by_type[t].get(st, 0) + 1
-        return {
-            "total_keys":    len(all_keys),
-            "by_type":       by_type,
-            "open_compromises": len(self._compromise.open_reports()),
-            "audit_total":   self._lifecycle.audit.total,
-            "chain_valid":   self._lifecycle.audit.verify_chain(),
-        }
-
-    def verify_audit_chain(self) -> bool:
-        return self._lifecycle.audit.verify_chain()
-
-    def get_runbook(self) -> List[str]:
-        return CompromiseResponseManager.RUNBOOK
+    def key_audit_trail(self, key_id: str) -> List[AuditEntry]:
+        return self._lc._audit.query(key_id=key_id, limit=0)
 
     @property
     def lifecycle(self) -> KeyLifecycleManager:
-        return self._lifecycle
-
-    @property
-    def audit(self) -> SecretAuditChain:
-        return self._lifecycle.audit
-
-    @property
-    def compromise(self) -> CompromiseResponseManager:
-        return self._compromise
+        return self._lc
 
     @property
     def scheduler(self) -> RotationScheduler:
         return self._scheduler
+
+    @property
+    def compromise_mgr(self) -> CompromiseResponseManager:
+        return self._compromise
 
     @property
     def extender(self) -> GracePeriodExtender:
@@ -918,14 +898,11 @@ class SecretRotationAdmin:
 
 
 def build_secret_rotation_system(
-        master_secret: bytes | str = b"master",
-        audit_secret: bytes | str = b"audit-secret",
+        master_secret: Optional[bytes] = None,
 ) -> Tuple[KeyLifecycleManager, RotationScheduler,
            CompromiseResponseManager, GracePeriodExtender, SecretRotationAdmin]:
-    audit = SecretAuditChain(audit_secret)
-    policy = RotationPolicyEngine()
-    lifecycle = KeyLifecycleManager(master_secret=master_secret, audit=audit,
-                                    policy_engine=policy)
+    audit = SecretAuditChain(master_secret or os.urandom(32))
+    lifecycle = KeyLifecycleManager(master_secret=master_secret, audit=audit)
     scheduler = RotationScheduler(lifecycle)
     compromise = CompromiseResponseManager(lifecycle)
     extender = GracePeriodExtender(lifecycle)
