@@ -1,1 +1,69 @@
-"""\nbackend/telegram/bot.py\nGalaxy Vast AI Trading Platform — Telegram Bot Entry Point\n"""\nfrom __future__ import annotations\n\nimport logging\nimport os\n\nfrom aiogram import Bot, Dispatcher\nfrom aiogram.client.default import DefaultBotProperties\nfrom aiogram.enums import ParseMode\n\n_LOG = logging.getLogger(__name__)\n\n_bot_instance: Bot | None = None\n_dp_instance:  Dispatcher | None = None\n\n\ndef get_bot() -> Bot:\n    global _bot_instance\n    if _bot_instance is None:\n        token = os.environ.get('TELEGRAM_BOT_TOKEN', '')\n        if not token:\n            raise RuntimeError('TELEGRAM_BOT_TOKEN not set')\n        _bot_instance = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))\n    return _bot_instance\n\n\ndef get_dispatcher() -> Dispatcher:\n    global _dp_instance\n    if _dp_instance is None:\n        _dp_instance = Dispatcher()\n    return _dp_instance\n\n\nasync def on_startup(bot: Bot) -> None:\n    """Called when bot starts."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u2705 <b>Galaxy Vast Bot started</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — startup notify optional\n            _LOG.debug('startup_notify failed admin=%s: %s', admin_id, _e)\n\n\nasync def on_shutdown(bot: Bot) -> None:\n    """Called when bot stops."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u26d4 <b>Galaxy Vast Bot stopped</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — shutdown notify optional\n            _LOG.debug('shutdown_notify failed admin=%s: %s', admin_id, _e)\n    await bot.session.close()\n\n\nasync def main() -> None:\n    logging.basicConfig(\n        level=logging.INFO,\n        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',\n    )\n    bot = get_bot()\n    dp  = get_dispatcher()\n    dp.startup.register(on_startup)\n    dp.shutdown.register(on_shutdown)\n    await dp.start_polling(bot)\n\n\nif __name__ == '__main__':\n    import asyncio\n    asyncio.run(main())\n
+"""
+backend/telegram/bot.py
+Galaxy Vast AI — Telegram Bot Gateway
+
+Responsibilities:
+- Initialize aiogram Bot + Dispatcher.
+- Register routers from backend.telegram.handlers.*.
+- Provide safe startup / shutdown lifecycle.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+from typing import Optional
+
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+
+from backend.telegram.handlers import alerts, control, intelligence, reports, semi_auto
+from backend.core.logger import get_logger
+
+_LOGGER = get_logger(__name__)
+
+
+class TelegramBotService:
+    """Lifecycle manager for the Telegram bot."""
+
+    def __init__(self, token: Optional[str] = None) -> None:
+        self.token = token or os.getenv("TELEGRAM_BOT_TOKEN")
+        self.bot: Optional[Bot] = None
+        self.dispatcher: Optional[Dispatcher] = None
+
+    async def start(self) -> None:
+        if not self.token:
+            _LOGGER.warning("TELEGRAM_BOT_TOKEN not set; Telegram bot disabled.")
+            return
+        self.bot = Bot(token=self.token, parse_mode=ParseMode.HTML)
+        self.dispatcher = Dispatcher()
+        self._register_routers()
+        _LOGGER.info("Telegram bot starting polling...")
+        await self.dispatcher.start_polling(self.bot)
+
+    async def stop(self) -> None:
+        if self.bot:
+            await self.bot.session.close()
+            _LOGGER.info("Telegram bot session closed.")
+
+    def _register_routers(self) -> None:
+        self.dispatcher.include_router(control.router)
+        self.dispatcher.include_router(semi_auto.router)
+        self.dispatcher.include_router(intelligence.router)
+        self.dispatcher.include_router(reports.router)
+        self.dispatcher.include_router(alerts.router)
+
+
+# Global singleton for dependency injection
+_bot_service: Optional[TelegramBotService] = None
+
+
+async def start_telegram_bot(token: Optional[str] = None) -> TelegramBotService:
+    global _bot_service
+    _bot_service = TelegramBotService(token=token)
+    asyncio.create_task(_bot_service.start())
+    return _bot_service
+
+
+def get_bot_service() -> Optional[TelegramBotService]:
+    return _bot_service

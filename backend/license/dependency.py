@@ -1,4 +1,4 @@
-backend/license/dependency.py
+"""backend/license/dependency.py
 Phase 6 FastAPI dependencies for license enforcement
 
 Usage:
@@ -9,3 +9,4 @@ Usage:
         lic: LicenseCheckResult = Depends(require_feature('signals_read')),
     ):
         ...
+"""

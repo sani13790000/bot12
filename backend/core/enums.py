@@ -12,259 +12,121 @@ from enum import Enum, IntEnum
 class PermissionLevel(IntEnum):
     """سطح دسترسی عددی"""
     SUPER_ADMIN = 100      # دسترسی کامل
-    ADMIN = 80             # مدیریت کاربران
-    TRADER = 60            # معامله‌گر حرفه‌ای
-    USER = 40              # کاربر عادی
-    GUEST = 20             # مهمان
-    BANNED = 0             # مسدود شده
+    ADMIN = 80             # مدیر سیستم
+    SUPPORT = 50           # پشتیبانی
+    USER = 20              # کاربر عادی
+    READONLY = 10          # فقط مشاهده
 
 
-class UserStatus(str, Enum):
-    """وضعیت کاربر"""
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    BANNED = "banned"
-    DELETED = "deleted"
-
-
-class UserRole(str, Enum):
-    """نقش کاربر"""
-    USER = "user"
-    TRADER = "trader"
-    ADMIN = "admin"
-    SUPER_ADMIN = "super_admin"
-
-
-# ─── License ──────────────────────────────────────────────────────────────────
-class LicenseType(str, Enum):
-    """نوع لایسنس"""
-    TRIAL = "trial"
-    BASIC = "basic"
-    PROFESSIONAL = "professional"
-    ENTERPRISE = "enterprise"
-    LIFETIME = "lifetime"
-    DEVELOPER = "developer"
-
-
-class LicenseStatus(str, Enum):
-    """وضعیت لایسنس"""
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-    EXPIRED = "expired"
-    REVOKED = "revoked"
-    SUSPENDED = "suspended"
-
-
-class LicenseFeature(str, Enum):
-    """ویژگی‌های لایسنس"""
-    # Analysis
-    SMC_ENGINE = "smc_engine"
-    PRICE_ACTION_ENGINE = "price_action_engine"
-    DECISION_ENGINE = "decision_engine"
-
-    # Features
-    MULTI_TIMEFRAME = "multi_timeframe"
-    KILLZONE_ALERTS = "killzone_alerts"
-    LIQUIDITY_VIZ = "liquidity_visualization"
-    ORDERBLOCK_VIZ = "orderblock_visualization"
-    FVG_VIZ = "fvg_visualization"
-
-    # Risk
-    RISK_MANAGER = "risk_manager"
-    CUSTOM_STRATEGIES = "custom_strategies"
-
-    # Integrations
-    TELEGRAM_BOT = "telegram_bot"
-    DASHBOARD = "dashboard"
-
-    # API
-    API_ACCESS = "api_access"
-
-
-# ─── Trading ──────────────────────────────────────────────────────────────────
+# ─── Trading directions ───────────────────────────────────────────────────────
 class TradeDirection(str, Enum):
     """جهت معامله"""
-    BUY = "buy"
-    SELL = "sell"
-    NEUTRAL = "neutral"
+    BUY = "BUY"
+    SELL = "SELL"
+    NEUTRAL = "NEUTRAL"
 
 
-class TradeType(str, Enum):
-    """نوع معامله"""
-    MARKET = "market"
-    LIMIT = "limit"
-    STOP = "stop"
-    STOP_LIMIT = "stop_limit"
+# ─── Trend directions ─────────────────────────────────────────────────────────
+class TrendDirection(str, Enum):
+    """جهت روند"""
+    UP = "UP"
+    DOWN = "DOWN"
+    RANGE = "RANGE"
+    UNDEFINED = "UNDEFINED"
 
 
-class TradeStatus(str, Enum):
-    """وضعیت معامله"""
-    PENDING = "pending"
-    OPEN = "open"
-    CLOSED = "closed"
-    CANCELLED = "cancelled"
-    REJECTED = "rejected"
-    PARTIAL = "partial"
+# ─── Signal confidence ────────────────────────────────────────────────────────
+class SignalConfidence(str, Enum):
+    """سطح اطمینان سیگنال"""
+    STRONG = "STRONG"
+    MODERATE = "MODERATE"
+    WEAK = "WEAK"
 
 
-class SignalStatus(str, Enum):
-    """وضعیت سیگنال"""
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    EXECUTED = "executed"
-    CANCELLED = "cancelled"
-    EXPIRED = "expired"
-
-
-class SignalDirection(str, Enum):
-    """جهت سیگنال"""
-    BUY = "buy"
-    SELL = "sell"
-    NEUTRAL = "neutral"
-
-
-class OrderType(str, Enum):
-    """نوع سفارش"""
-    MARKET = "market"
-    LIMIT = "limit"
-    STOP = "stop"
-    STOP_LIMIT = "stop_limit"
-
-
+# ─── Order status ─────────────────────────────────────────────────────────────
 class OrderStatus(str, Enum):
     """وضعیت سفارش"""
-    PENDING = "pending"
-    SUBMITTED = "submitted"
-    FILLED = "filled"
-    PARTIALLY_FILLED = "partially_filled"
-    CANCELLED = "cancelled"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
+    PENDING = "PENDING"
+    OPEN = "OPEN"
+    PARTIAL_FILL = "PARTIAL_FILL"
+    FILLED = "FILLED"
+    CLOSED = "CLOSED"
+    CANCELLED = "CANCELLED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
 
 
-class PositionSide(str, Enum):
-    """طرف پوزیشن"""
-    LONG = "long"
-    SHORT = "short"
-    FLAT = "flat"
+# ─── Risk modes ─────────────────────────────────────────────────────────────────
+class RiskMode(str, Enum):
+    """حالت ریسک"""
+    CONSERVATIVE = "CONSERVATIVE"
+    MODERATE = "MODERATE"
+    AGGRESSIVE = "AGGRESSIVE"
 
 
-# ─── Analysis ─────────────────────────────────────────────────────────────────
-class MarketSession(str, Enum):
-    """سشن بازار"""
+# ─── Fail closed / open ───────────────────────────────────────────────────────
+class FailMode(str, Enum):
+    """حالت خطا"""
+    FAIL_CLOSED = "FAIL_CLOSED"
+    FAIL_OPEN = "FAIL_OPEN"
+
+
+# ─── Agent vote ─────────────────────────────────────────────────────────────────
+class AgentVote(str, Enum):
+    """رأی عامل"""
+    BUY = "BUY"
+    SELL = "SELL"
+    HOLD = "HOLD"
+    ABSTAIN = "ABSTAIN"
+
+
+# ─── License status ─────────────────────────────────────────────────────────────
+class LicenseStatus(str, Enum):
+    """وضعیت لایسنس"""
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    EXPIRED = "EXPIRED"
+    REVOKED = "REVOKED"
+
+
+# ─── Device status ──────────────────────────────────────────────────────────────
+class DeviceStatus(str, Enum):
+    """وضعیت دستگاه"""
+    TRUSTED = "TRUSTED"
+    UNTRUSTED = "UNTRUSTED"
+    BLOCKED = "BLOCKED"
+
+
+# ─── Subscription tier ──────────────────────────────────────────────────────────
+class SubscriptionTier(str, Enum):
+    """سطح اشتراک"""
+    FREE = "FREE"
+    BASIC = "BASIC"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"
+
+
+# ─── Alert severity ─────────────────────────────────────────────────────────────
+class AlertSeverity(str, Enum):
+    """شدت هشدار"""
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+
+# ─── Environment ────────────────────────────────────────────────────────────────
+class Environment(str, Enum):
+    """محیط اجرا"""
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+
+# ─── Trading sessions ─────────────────────────────────────────────────────────
+class TradingSession(Enum):
+    """Forex trading sessions by city."""
     SYDNEY = "sydney"
     TOKYO = "tokyo"
     LONDON = "london"
     NEW_YORK = "new_york"
-    OVERLAP_LONDON_NY = "overlap_london_ny"
-    OVERLAP_TOKYO_LONDON = "overlap_tokyo_london"
-    CLOSED = "closed"
-
-
-class TimeframeCategory(str, Enum):
-    """دسته‌بندی تایم‌فریم"""
-    SCALP = "scalp"
-    INTRADAY = "intraday"
-    SWING = "swing"
-    POSITION = "position"
-
-
-class MarketStructure(str, Enum):
-    """ساختار بازار"""
-    BULLISH_BOS = "bullish_bos"
-    BEARISH_BOS = "bearish_bos"
-    BULLISH_CHOCH = "bullish_choch"
-    BEARISH_CHOCH = "bearish_choch"
-    RANGING = "ranging"
-    UNDEFINED = "undefined"
-
-
-class LiquidityType(str, Enum):
-    """نوع نقدینگی"""
-    EQUAL_HIGHS = "equal_highs"
-    EQUAL_LOWS = "equal_lows"
-    BUY_SIDE = "buy_side"
-    SELL_SIDE = "sell_side"
-    STOP_HUNT = "stop_hunt"
-
-
-class FVGType(str, Enum):
-    """نوع Fair Value Gap"""
-    BULLISH = "bullish_fvg"
-    BEARISH = "bearish_fvg"
-
-
-# ─── Trend / Direction ────────────────────────────────────────────────────────
-class TrendDirection(str, Enum):
-    """جهت روند
-
-    CONFLICT-FIX-2: UNDEFINED added to match decision_engine.TrendDirection.UNDEFINED.
-    decision_engine.py defines TrendDirection locally with UNDEFINED; callers using
-    enums.TrendDirection.UNDEFINED would get AttributeError without this.
-    NEUTRAL preserved for API backward compatibility.
-    """
-    BULLISH   = "bullish"
-    BEARISH   = "bearish"
-    NEUTRAL   = "neutral"
-    RANGING   = "ranging"
-    UNDEFINED = "undefined"  # CONFLICT-FIX-2: added for decision_engine compatibility
-
-
-class TradeQuality(str, Enum):
-    """کیفیت معامله"""
-    EXCELLENT = "excellent"
-    GOOD = "good"
-    MODERATE = "moderate"
-    LOW = "low"
-    POOR = "poor"
-
-
-class ConfidenceLevel(str, Enum):
-    """سطح اطمینان"""
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-
-
-class RiskLevel(str, Enum):
-    """سطح ریسک"""
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    EXTREME = "extreme"
-
-
-# ─── System ───────────────────────────────────────────────────────────────────
-class AlertSeverity(str, Enum):
-    """شدت هشدار"""
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
-class AlertCategory(str, Enum):
-    """دسته هشدار"""
-    TRADING = "trading"
-    RISK = "risk"
-    SYSTEM = "system"
-    SECURITY = "security"
-    PERFORMANCE = "performance"
-
-
-class BacktestStatus(str, Enum):
-    """وضعیت بک‌تست"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class HealthStatus(str, Enum):
-    """وضعیت سلامت"""
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"

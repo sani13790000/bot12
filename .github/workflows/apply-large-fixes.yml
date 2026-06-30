@@ -1,0 +1,37 @@
+name: Apply remaining large file fixes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/base64-decode
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download fixed artifact
+        run: |
+          curl -L -o bot12-fixed.tar.gz "https://storage.googleapis.com/definable-prod-public-06042026/chat-artifacts/27d4c4b8-5b70-449a-8f59-bf0aebafc5a4/1566ef51-2dbf-463f-b8a2-613daef29123/05c8698f-6fb6-4c0e-8099-30158e54f437/bot12-fixed.tar.gz"
+          tar -xzf bot12-fixed.tar.gz
+          rm bot12-fixed.tar.gz
+
+      - name: Copy remaining large fixed files
+        run: |
+          cp backend/core/customer_lifecycle.py backend/core/customer_lifecycle.py
+          cp backend/tests/test_fix8_coverage.py backend/tests/test_fix8_coverage.py
+          cp backend/tests/test_phase22_incident.py backend/tests/test_phase22_incident.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/core/customer_lifecycle.py backend/tests/test_fix8_coverage.py backend/tests/test_phase22_incident.py
+          git diff --cached --quiet || git commit -m "fix: apply remaining large file fixes from artifact"
+          git push origin fix/base64-decode
