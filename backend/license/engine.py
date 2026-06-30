@@ -1,4 +1,4 @@
-backend/license/engine.py
+"""backend/license/engine.py
 Phase 6 — License, Subscription & Device Enforcement
 
 GAPs FIXED:
@@ -11,3 +11,4 @@ GAPs FIXED:
   P6-FIX-7: device limit atomic check+increment
   P6-FIX-8: license lifecycle: PENDING->ACTIVE->SUSPENDED->EXPIRED->REVOKED
   P6-FIX-9: admin-only revoke with audit log
+"""

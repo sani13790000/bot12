@@ -1,4 +1,4 @@
-backend/license/routes.py
+"""backend/license/routes.py
 Phase 6 License API routes
 
 Customer endpoints:
@@ -17,3 +17,4 @@ Admin endpoints:
   GET  /admin/license/{hash}
   GET  /admin/license/{hash}/audit
   GET  /admin/license/stats
+"""
