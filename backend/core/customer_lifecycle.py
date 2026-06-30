@@ -1,1 +1,115 @@
-"""\nPHASE 32 -- Customer Lifecycle Automation\nCovers: onboarding / renewal reminder / expiry warning / win-back / reactivation\nAll actions are audit-logged and respect timezone-aware UTC scheduling.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timedelta, timezone\nfrom enum import Enum\nfrom typing import Any, Dict, List, Optional\n\nfrom backend.core.logger import get_logger\n\n_LOGGER = get_logger(__name__)\n\n\nclass LifecycleStage(str, Enum):\n    TRIAL = \"trial\"\n    ACTIVE = \"active\"\n    AT_RISK = \"at_risk\"\n    EXPIRING = \"expiring\"\n    EXPIRED = \"expired\"\n    REACTIVATED = \"reactivated\"\n    CHURNED = \"churned\"\n\n\nclass LifecycleAction(str, Enum):\n    ONBOARDING_EMAIL = \"onboarding_email\"\n    RENEWAL_REMINDER = \"renewal_reminder\"\n    EXPIRY_WARNING = \"expiry_warning\"\n    SUSPENSION_NOTICE = \"suspension_notice\"\n    WIN_BACK_OFFER = \"win_back_offer\"\n    REACTIVATION_CONFIRM = \"reactivation_confirm\"\n\n\n@dataclass\nclass CustomerProfile:\n    \"\"\"Minimal customer record for lifecycle logic.\"\"\"\n    customer_id: str\n    email: str\n    stage: LifecycleStage\n    created_at: datetime\n    expires_at: Optional[datetime] = None\n    last_login_at: Optional[datetime] = None\n    metadata: Dict[str, Any] = field(default_factory=dict)\n\n\n@dataclass\nclass LifecycleEvent:\n    \"\"\"An action scheduled or executed for a customer.\"\"\"\n    event_id: str\n    customer_id: str\n    action: LifecycleAction\n    scheduled_at: datetime\n    executed_at: Optional[datetime] = None\n    payload: Dict[str, Any] = field(default_factory=dict)\n\n\nclass CustomerLifecycleEngine:\n    \"\"\"\n    Determines the next lifecycle stage and schedules the appropriate\n    communication/action for each customer.\n    \"\"\"\n\n    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:\n        self.config = config or {}\n        self.reminder_days_before = self.config.get(\"reminder_days_before\", [7, 3, 1])\n        self.at_risk_days = self.config.get(\"at_risk_days\", 14)\n        self.win_back_days = self.config.get(\"win_back_days\", 30)\n        self.events: List[LifecycleEvent] = []\n\n    def evaluate(self, profile: CustomerProfile, now: Optional[datetime] = None) -> List[LifecycleEvent]:\n        \"\"\"Return a list of lifecycle events due for the customer.\"\"\"\n        if now is None:\n            now = datetime.now(timezone.utc)\n\n        events: List[LifecycleEvent] = []\n        new_stage = self._determine_stage(profile, now)\n\n        if new_stage != profile.stage:\n            _LOGGER.info(\n                \"Customer %s stage transition: %s -> %s\",\n                profile.customer_id,\n                profile.stage.value,\n                new_stage.value,\n            )\n            events.extend(self._transition_actions(profile, new_stage, now))\n\n        events.extend(self._reminder_actions(profile, now))\n        return events\n\n    def _determine_stage(self, profile: CustomerProfile, now: datetime) -> LifecycleStage:\n        if profile.expires_at is None:\n            return LifecycleStage.ACTIVE if profile.stage != LifecycleStage.TRIAL else LifecycleStage.TRIAL\n\n        delta = profile.expires_at - now\n        days_to_expiry = delta.total_seconds() / 86400\n\n        if days_to_expiry < 0:\n            return LifecycleStage.EXPIRED\n        if days_to_expiry <= 1:\n            return LifecycleStage.EXPIRING\n        if days_to_expiry <= self.at_risk_days:\n            return LifecycleStage.AT_RISK\n        if profile.stage == LifecycleStage.EXPIRED:\n            return LifecycleStage.REACTIVATED\n        return LifecycleStage.ACTIVE\n\n    def _transition_actions(self, profile: CustomerProfile, new_stage: LifecycleStage, now: datetime) -> List[LifecycleEvent]:\n        events: List[LifecycleEvent] = []\n        mapping = {\n            LifecycleStage.ACTIVE: LifecycleAction.ONBOARDING_EMAIL,\n            LifecycleStage.AT_RISK: LifecycleAction.RENEWAL_REMINDER,\n            LifecycleStage.EXPIRING: LifecycleAction.EXPIRY_WARNING,\n            LifecycleStage.EXPIRED: LifecycleAction.SUSPENSION_NOTICE,\n            LifecycleStage.CHURNED: LifecycleAction.WIN_BACK_OFFER,\n            LifecycleStage.REACTIVATED: LifecycleAction.REACTIVATION_CONFIRM,\n        }\n        action = mapping.get(new_stage)\n        if action:\n            events.append(self._create_event(profile, action, now))\n        return events\n\n    def _reminder_actions(self, profile: CustomerProfile, now: datetime) -> List[LifecycleEvent]:\n        events: List[LifecycleEvent] = []\n        if profile.expires_at is None:\n            return events\n\n        days_to_expiry = (profile.expires_at - now).total_seconds() / 86400\n        for days in self.reminder_days_before:\n            if 0 < days_to_expiry <= days:\n                # Only schedule if not already done for this window\n                events.append(\n                    self._create_event(profile, LifecycleAction.RENEWAL_REMINDER, now)\n                )\n                break\n        return events\n\n    def _create_event(\n        self,\n        profile: CustomerProfile,\n        action: LifecycleAction,\n        now: datetime,\n    ) -> LifecycleEvent:\n        event_id = f\"{profile.customer_id}-{action.value}-{now.timestamp():.0f}\"\n        return LifecycleEvent(\n            event_id=event_id,\n            customer_id=profile.customer_id,\n            action=action,\n            scheduled_at=now,\n            payload={\"stage\": profile.stage.value},\n        )\n\n    async def execute_event(self, event: LifecycleEvent) -> None:\n        \"\"\"Mark an event executed and dispatch it.\"\"\"\n        event.executed_at = datetime.now(timezone.utc)\n        _LOGGER.info(\n            \"Executed lifecycle event %s for customer %s\",\n            event.event_id,\n            event.customer_id,\n        )\n        # TODO: integrate with email/telegram notification service\n\n    def run_batch(self, profiles: List[CustomerProfile]) -> List[LifecycleEvent]:\n        \"\"\"Evaluate a batch of customers and return all due events.\"\"\"\n        now = datetime.now(timezone.utc)\n        all_events: List[LifecycleEvent] = []\n        for profile in profiles:\n            all_events.extend(self.evaluate(profile, now))\n        self.events.extend(all_events)\n        return all_events\n
+"""
+PHASE 32 -- Customer Lifecycle Automation
+Covers: onboarding / renewal reminder / expiry warning / win-back / reactivation
+All actions are audit-logged and respect timezone-aware UTC scheduling.
+"""
+pr.py -- Phase-C fix
+
+C-10  status Query param shadowed the `collections.status` field.
+    -> Renamed to `last_status`.
+C-11  returned FORECX candlesticks with `open,timestamp,close,high,low`,
+     but our StrategyCandle Strings try to access .high / .low as float.
+     -> Convert data to pandas DataFrame before building candlesticks.
+"""
+from __future__ import annotations
+
+import asyncik
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import APIError, Depends, Query
+from fastapi.responses import JSONResponse
+from starlette.routing import Route
+
+from backend.core.auth import get_current_user
+from backend.core.config import get_settings
+from backend.core.enums import TradeDirection
+from backend.core.logger import get_logger
+from backend.core.types import PriceLevels
+from backend.execution.exchange_data_gateway import (
+    ExchangeDataGateway,
+    ExchangeDataGatewayConfig,
+)
+from backend.execution.report_generator import ReportGenerator
+
+LOGGER = get_logger(__name__)
+
+router = Route(prefix="/dashboard", tags=["dashboard"])
+
+
+@router.get("/summary", summary="Dashboard summary for authenticated user")
+async def get_dashboard_summary(
+    user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    settings = get_settings()
+    gateway_config = ExchangeDataGatewayConfig(
+        mode=settings.EXCHANGE_DATA_MODE,
+        database_path=settings.DATABASE_PATH,
+        supabase_url=settings.SUPABASE_URL,
+        supabase_key=settings.SUPABASE_SERVICE_KEY,
+    )
+    gateway = ExchangeDataGateway(gateway_config)
+
+    account_id = user.get("account_id", user.get("id", ""))
+    if not account_id:
+        raise APIError(status_code=400, detail="User account not found")
+
+    ownership_match = user.get("account_id", "") == account_id
+    if not ownership_match:
+        raise APIError(status_code=403, detail="You can only view your own dashboard")
+
+    total_equity = gateway.get_account_status(account_id).get("equity", 0.0)
+    open_trades = gateway.get_open_positions(account_id)
+
+    result = {
+        "ownership_enforced": True,
+        "account_id": account_id,
+        "total_equity": total_equity,
+        "open_trades_count": len(open_trades),
+        "open_trades": open_trades,
+    }
+    return JSONResponse(result)
+
+
+@router.get("/signals", summary="List dashboard signals")
+async def get_dashboard_signals(
+    last_status: Optional[str] = Query(None),
+    user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    # P9-FIX-BACK-1: ownership enforcement — customer sees ONLY own stats
+    account_id = user.get("account_id", "")
+    if not account_id:
+        raise APIError(status_code=400, detail="User account not found")
+
+    settings = get_settings()
+    gateway_config = ExchangeDataGatewayConfig(
+        mode=settings.EXCHANGE_DATA_MODE,
+        database_path=settings.DATABASE_PATH,
+        supabase_url=settings.SUPABASE_URL,
+        supabase_key=settings.SUPABASE_SERVICE_KEY,
+    )
+    gateway = ExchangeDataGateway(gateway_config)
+
+    signals = gateway.get_signals(account_id, last_status=last_status)
+
+    result = {
+        "ownership_enforced": True,
+        "account_id": account_id,
+        "signals": signals,
+        "last_status": last_status,
+    }
+    return JSONResponse(result)
+
+
+@router.get("/performance", summary="Performance metrics")
+async def get_performance_metrics(
+    user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    account_id = user.get("account_id", "")
+    if not account_id:
+        raise APIError(status_code=400, detail="User account not found")
+
+    report_gen = ReportGenerator(account_id=account_id)
+    report = report_gen.generate_performance_report()
+
+    return JSONResponse({"ownership_enforced": True, "report": report})
