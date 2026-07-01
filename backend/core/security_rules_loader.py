@@ -1,1 +1,110 @@
-"""\nbackend/core/security_rules_loader.py\nPhase-5 — Security Rule Engine loader\n\nReads backend/core/security_rules.json and reloads it periodically.\nSecurity AI Agent can update rules at runtime via update_rules().\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport json\nimport logging\nimport os\nimport time\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, Optional\n\nlog = logging.getLogger(__name__)\n\n_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "security_rules.json")\n\n\n@dataclass(frozen=True)\nclass RateLimitRules:\n    global_max: int\n    auth_login: int\n    auth_register: int\n    auth_refresh: int\n    analysis: int\n    backtest: int\n    websocket: int\n    health: int\n    dynamic_reduction_enabled: bool\n    dynamic_reduction_factor_medium: float\n    dynamic_reduction_factor_high: float\n    dynamic_reduction_factor_critical: float\n\n\n@dataclass(frozen=True)\nclass AnomalyRules:\n    contamination: float\n    n_estimators: int\n    medium: float\n    high: float\n    critical: float\n    retrain_interval_seconds: int\n    min_training_samples: int\n    feature_window_seconds: int\n\n\nclass SecurityRules:\n    def __init__(self, path: Optional[str] = None) -> None:\n        self._path = path or _DEFAULT_PATH\n        self._rules: Dict[str, Any] = {}\n        self._mtime: float = 0.0\n        self._lock = asyncio.Lock()\n        self._last_check = 0.0\n        self._load()\n\n    def _load(self) -> None:\n        try:\n            with open(self._path, "r", encoding="utf-8") as f:\n                self._rules = json.load(f)\n            self._mtime = os.path.getmtime(self._path)\n            log.info("SecurityRules loaded from %s", self._path)\n        except Exception as exc:\n            log.error("SecurityRules failed to load %s: %s", self._path, exc)\n            self._rules = {"auth": {"max_failed_logins": 5}, "rate_limits": {"global_max_requests_per_minute": 120}}\n\n    async def _maybe_reload(self) -> None:\n        now = time.monotonic()\n        if now - self._last_check < 5.0:\n            return\n        self._last_check = now\n        try:\n            mtime = os.path.getmtime(self._path)\n            if mtime > self._mtime:\n                self._load()\n        except OSError:\n            pass\n\n    async def get(self) -> Dict[str, Any]:\n        async with self._lock:\n            await self._maybe_reload()\n            return self._rules\n\n    async def update(self, patch: Dict[str, Any]) -> None:\n        async with self._lock:\n            self._deep_merge(self._rules, patch)\n            with open(self._path, "w", encoding="utf-8") as f:\n                json.dump(self._rules, f, indent=2)\n            self._mtime = os.path.getmtime(self._path)\n            log.info("SecurityRules updated and persisted")\n\n    def _deep_merge(self, base: Dict[str, Any], patch: Dict[str, Any]) -> None:\n        for k, v in patch.items():\n            if isinstance(v, dict) and isinstance(base.get(k), dict):\n                self._deep_merge(base[k], v)\n            else:\n                base[k] = v\n\n    async def rate_limits(self) -> RateLimitRules:\n        r = (await self.get()).get("rate_limits", {})\n        return RateLimitRules(\n            global_max=r.get("global_max_requests_per_minute", 120),\n            auth_login=r.get("auth_login_per_minute", 5),\n            auth_register=r.get("auth_register_per_minute", 3),\n            auth_refresh=r.get("auth_refresh_per_minute", 10),\n            analysis=r.get("analysis_per_minute", 30),\n            backtest=r.get("backtest_per_minute", 10),\n            websocket=r.get("websocket_per_minute", 20),\n            health=r.get("health_per_minute", 300),\n            dynamic_reduction_enabled=r.get("dynamic_reduction_enabled", True),\n            dynamic_reduction_factor_medium=r.get("dynamic_reduction_factor_medium", 0.5),\n            dynamic_reduction_factor_high=r.get("dynamic_reduction_factor_high", 0.25),\n            dynamic_reduction_factor_critical=r.get("dynamic_reduction_factor_critical", 0.0),\n        )\n\n    async def anomaly(self) -> AnomalyRules:\n        a = (await self.get()).get("anomaly_detection", {})\n        return AnomalyRules(\n            contamination=a.get("isolation_forest_contamination", 0.05),\n            n_estimators=a.get("isolation_forest_n_estimators", 200),\n            medium=a.get("anomaly_score_medium", -0.10),\n            high=a.get("anomaly_score_high", -0.25),\n            critical=a.get("anomaly_score_critical", -0.40),\n            retrain_interval_seconds=a.get("retrain_interval_seconds", 3600),\n            min_training_samples=a.get("min_training_samples", 50),\n            feature_window_seconds=a.get("feature_window_seconds", 300),\n        )\n\n\nsecurity_rules = SecurityRules()\n
+"""
+backend/core/security_rules_loader.py
+Phase-5 — Security Rule Engine loader
+
+Loads YAML/JSON security rule definitions and provides a query interface.
+Rules are evaluated at runtime against request context to enforce policies.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SecurityRule:
+    rule_id: str
+    name: str
+    category: str
+    severity: str
+    enabled: bool = True
+    conditions: Dict[str, Any] = field(default_factory=dict)
+    actions: List[str] = field(default_factory=list)
+    description: str = ""
+
+
+class SecurityRulesLoader:
+    """Loads and caches security rules from files or env."""
+
+    def __init__(self, rules_path: Optional[str] = None) -> None:
+        self._path = rules_path or os.getenv("SECURITY_RULES_PATH", "config/security_rules.json")
+        self._rules: Dict[str, SecurityRule] = {}
+        self._log = logging.getLogger(self.__class__.__name__)
+
+    def load(self) -> int:
+        """Load rules from the configured path. Returns count loaded."""
+        path = Path(self._path)
+        if not path.exists():
+            self._log.warning("Security rules file not found: %s", path)
+            return 0
+        try:
+            with open(path) as fh:
+                data = json.load(fh)
+            rules_data = data if isinstance(data, list) else data.get("rules", [])
+            for item in rules_data:
+                rule = SecurityRule(
+                    rule_id=item["rule_id"],
+                    name=item.get("name", item["rule_id"]),
+                    category=item.get("category", "general"),
+                    severity=item.get("severity", "medium"),
+                    enabled=item.get("enabled", True),
+                    conditions=item.get("conditions", {}),
+                    actions=item.get("actions", []),
+                    description=item.get("description", ""),
+                )
+                self._rules[rule.rule_id] = rule
+            self._log.info("Loaded %d security rules from %s", len(self._rules), path)
+            return len(self._rules)
+        except Exception as exc:
+            self._log.error("Failed to load security rules: %s", exc)
+            return 0
+
+    def get_rule(self, rule_id: str) -> Optional[SecurityRule]:
+        return self._rules.get(rule_id)
+
+    def list_rules(self, category: Optional[str] = None, enabled_only: bool = True) -> List[SecurityRule]:
+        rules = list(self._rules.values())
+        if enabled_only:
+            rules = [r for r in rules if r.enabled]
+        if category:
+            rules = [r for r in rules if r.category == category]
+        return rules
+
+    def evaluate(self, context: Dict[str, Any]) -> List[SecurityRule]:
+        """Return rules whose conditions match the given context."""
+        matched = []
+        for rule in self.list_rules():
+            if self._matches(rule, context):
+                matched.append(rule)
+        return matched
+
+    def _matches(self, rule: SecurityRule, context: Dict[str, Any]) -> bool:
+        for key, expected in rule.conditions.items():
+            actual = context.get(key)
+            if isinstance(expected, list):
+                if actual not in expected:
+                    return False
+            elif actual != expected:
+                return False
+        return True
+
+    @property
+    def rule_count(self) -> int:
+        return len(self._rules)
+
+
+_loader: Optional[SecurityRulesLoader] = None
+
+
+def get_security_rules_loader() -> SecurityRulesLoader:
+    global _loader
+    if _loader is None:
+        _loader = SecurityRulesLoader()
+        _loader.load()
+    return _loader
