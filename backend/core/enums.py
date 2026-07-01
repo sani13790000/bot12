@@ -8,19 +8,17 @@ from __future__ import annotations
 from enum import Enum, IntEnum
 
 
-# ─── Access control ───────────────────────────────────────────────────────────
+# ─── Access control ──────────────────────────────────────────
 class PermissionLevel(IntEnum):
-    """سطح دسترسی عددی"""
-    SUPER_ADMIN = 100      # دسترسی کامل
-    ADMIN = 80             # مدیریت کاربران
-    TRADER = 60            # معامله‌گر حرفه‌ای
-    USER = 40              # کاربر عادی
-    GUEST = 20             # مهمان
-    BANNED = 0             # مسدود شده
+    SUPER_ADMIN = 100
+    ADMIN = 80
+    TRADER = 60
+    USER = 40
+    GUEST = 20
+    BANNED = 0
 
 
 class UserStatus(str, Enum):
-    """وضعیت کاربر"""
     ACTIVE = "active"
     SUSPENDED = "suspended"
     BANNED = "banned"
@@ -28,16 +26,14 @@ class UserStatus(str, Enum):
 
 
 class UserRole(str, Enum):
-    """نقش کاربر"""
     USER = "user"
     TRADER = "trader"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
 
 
-# ─── License ──────────────────────────────────────────────────────────────────
+# ─── License ─────────────────────────────────────────────────────────────────
 class LicenseType(str, Enum):
-    """نوع لایسنس"""
     TRIAL = "trial"
     BASIC = "basic"
     PROFESSIONAL = "professional"
@@ -47,7 +43,6 @@ class LicenseType(str, Enum):
 
 
 class LicenseStatus(str, Enum):
-    """وضعیت لایسنس"""
     INACTIVE = "inactive"
     ACTIVE = "active"
     EXPIRED = "expired"
@@ -56,7 +51,6 @@ class LicenseStatus(str, Enum):
 
 
 class LicenseFeature(str, Enum):
-    """ویژگی‌های لایسنس"""
     # Analysis
     SMC_ENGINE = "smc_engine"
     PRICE_ACTION_ENGINE = "price_action_engine"
@@ -81,16 +75,14 @@ class LicenseFeature(str, Enum):
     API_ACCESS = "api_access"
 
 
-# ─── Trading ──────────────────────────────────────────────────────────────────
+# ─── Trading ─────────────────────────────────────────────────────────────────
 class TradeDirection(str, Enum):
-    """جهت معامله"""
     BUY = "buy"
     SELL = "sell"
     NEUTRAL = "neutral"
 
 
 class TradeType(str, Enum):
-    """نوع معامله"""
     MARKET = "market"
     LIMIT = "limit"
     STOP = "stop"
@@ -98,7 +90,6 @@ class TradeType(str, Enum):
 
 
 class TradeStatus(str, Enum):
-    """وضعیت معامله"""
     PENDING = "pending"
     OPEN = "open"
     CLOSED = "closed"
@@ -108,7 +99,6 @@ class TradeStatus(str, Enum):
 
 
 class SignalStatus(str, Enum):
-    """وضعیت سیگنال"""
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -118,14 +108,12 @@ class SignalStatus(str, Enum):
 
 
 class SignalDirection(str, Enum):
-    """جهت سیگنال"""
     BUY = "buy"
     SELL = "sell"
     NEUTRAL = "neutral"
 
 
 class OrderType(str, Enum):
-    """نوع سفارش"""
     MARKET = "market"
     LIMIT = "limit"
     STOP = "stop"
@@ -133,7 +121,6 @@ class OrderType(str, Enum):
 
 
 class OrderStatus(str, Enum):
-    """وضعیت سفارش"""
     PENDING = "pending"
     SUBMITTED = "submitted"
     FILLED = "filled"
@@ -144,15 +131,13 @@ class OrderStatus(str, Enum):
 
 
 class PositionSide(str, Enum):
-    """طرف پوزیشن"""
     LONG = "long"
     SHORT = "short"
     FLAT = "flat"
 
 
-# ─── Analysis ─────────────────────────────────────────────────────────────────
+# ─── Analysis ────────────────────────────────────────────────────────────────
 class MarketSession(str, Enum):
-    """سشن بازار"""
     SYDNEY = "sydney"
     TOKYO = "tokyo"
     LONDON = "london"
@@ -163,7 +148,6 @@ class MarketSession(str, Enum):
 
 
 class TimeframeCategory(str, Enum):
-    """دسته‌بندی تایم‌فریم"""
     SCALP = "scalp"
     INTRADAY = "intraday"
     SWING = "swing"
@@ -171,7 +155,6 @@ class TimeframeCategory(str, Enum):
 
 
 class MarketStructure(str, Enum):
-    """ساختار بازار"""
     BULLISH_BOS = "bullish_bos"
     BEARISH_BOS = "bearish_bos"
     BULLISH_CHOCH = "bullish_choch"
@@ -181,7 +164,6 @@ class MarketStructure(str, Enum):
 
 
 class LiquidityType(str, Enum):
-    """نوع نقدینگی"""
     EQUAL_HIGHS = "equal_highs"
     EQUAL_LOWS = "equal_lows"
     BUY_SIDE = "buy_side"
@@ -190,20 +172,12 @@ class LiquidityType(str, Enum):
 
 
 class FVGType(str, Enum):
-    """نوع Fair Value Gap"""
     BULLISH = "bullish_fvg"
     BEARISH = "bearish_fvg"
 
 
-# ─── Trend / Direction ────────────────────────────────────────────────────────
+# ─── Trend / Direction ───────────────────────────────────────────────────────
 class TrendDirection(str, Enum):
-    """جهت روند
-
-    CONFLICT-FIX-2: UNDEFINED added to match decision_engine.TrendDirection.UNDEFINED.
-    decision_engine.py defines TrendDirection locally with UNDEFINED; callers using
-    enums.TrendDirection.UNDEFINED would get AttributeError without this.
-    NEUTRAL preserved for API backward compatibility.
-    """
     BULLISH   = "bullish"
     BEARISH   = "bearish"
     NEUTRAL   = "neutral"
@@ -212,7 +186,6 @@ class TrendDirection(str, Enum):
 
 
 class TradeQuality(str, Enum):
-    """کیفیت معامله"""
     EXCELLENT = "excellent"
     GOOD = "good"
     MODERATE = "moderate"
@@ -221,23 +194,20 @@ class TradeQuality(str, Enum):
 
 
 class ConfidenceLevel(str, Enum):
-    """سطح اطمینان"""
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
 class RiskLevel(str, Enum):
-    """سطح ریسک"""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     EXTREME = "extreme"
 
 
-# ─── System ───────────────────────────────────────────────────────────────────
+# ─── System ────────────────────────────────────────────────────────────────────
 class AlertSeverity(str, Enum):
-    """شدت هشدار"""
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -245,7 +215,6 @@ class AlertSeverity(str, Enum):
 
 
 class AlertCategory(str, Enum):
-    """دسته هشدار"""
     TRADING = "trading"
     RISK = "risk"
     SYSTEM = "system"
@@ -254,7 +223,6 @@ class AlertCategory(str, Enum):
 
 
 class BacktestStatus(str, Enum):
-    """وضعیت بک‌تست"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -263,8 +231,13 @@ class BacktestStatus(str, Enum):
 
 
 class HealthStatus(str, Enum):
-    """وضعیت سلامت"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Backward-compatibility aliases
+# Many modules do: from backend.core.enums import TradingSession
+TradingSession = MarketSession
