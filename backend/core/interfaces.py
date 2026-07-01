@@ -1,1 +1,53 @@
-"""\nbackend/core/interfaces.py\nGalaxy Vast AI Trading Platform — Enterprise Interfaces (SOLID/DI/Clean Architecture)\n\nWHAT THIS FILE DOES:\n  Defines all Protocol (structural typing) interfaces used across the backend.\n  Every concrete class implements one or more of these protocols.\n  Dependency injection uses these types — never concrete classes.\n\nWHY:\n  - Removes circular imports (concrete classes import each other)\n  - Enables unit testing with lightweight mocks\n  - Enforces Liskov Substitution Principle (any impl can replace another)\n  - Single source of truth for interface contracts\n"""\nfrom __future__ import annotations\n\nfrom typing import Any, Dict, List, Optional, Protocol, runtime_checkable\n\n\n# Risk\n\n@runtime_checkable\nclass IRiskGate(Protocol):\n    async def check(self, **kwargs: Any) -> Any: ...\n    @property\n    def name(self) -> str: ...\n\n@runtime_checkable\nclass IRiskOrchestrator(Protocol):\n    async def assess(self, inp: Any) -> Any: ...\n    async def check(self, **kwargs: Any) -> Any: ...\n\n\n# Execution\n\n@runtime_checkable\nclass IOrderBroker(Protocol):\n    async def send_order(self, request: Any) -> Any: ...\n    async def close_position(self, ticket: int, volume: float) -> bool: ...\n    async def get_positions(self) -> List[Any]: ...\n    async def health_check(self) -> bool: ...\n    async def initialize(self) -> bool: ...\n    async def shutdown(self) -> None: ...\n\n@runtime_checkable\nclass IOrderStateMachine(Protocol):\n    async def create_order(self, **kwargs: Any) -> Any: ...\n    async def transition(self, order_id: str, new_state: Any, **meta: Any) -> bool: ...\n    def get_order(self, order_id: str) -> Optional[Any]: ...\n\n@runtime_checkable\nclass IFailureRecovery(Protocol):\n    async def handle_failure(self, order: Any, error: str) -> None: ...\n    def set_retry_callback(self, cb: Any) -> None: ...\n    async def start(self) -> None: ...\n    async def stop(self) -> None: ...\n\n@runtime_checkable\nclass IPositionReconciliation(Protocol):\n    async def run_once(self) -> Any: ...\n    def set_mt5(self, connector: Any) -> None: ...\n    async def start(self) -> None: ...\n    async def stop(self) -> None: ...\n\n\n# Lot Sizing\n\n@runtime_checkable\nclass ILotSizer(Protocol):\n    async def calculate(\n        self,\n        balance: float,\n        stop_loss_pips: float,\n        symbol: str,\n        *,\n        volatility_ratio: float = 1.0,\n        override_risk_pct: Optional[float] = None,\n        win_rate: float = 0.55,\n        avg_rr: float = 1.5,\n    ) -> Any: ...\n\n\n# Agents\n\n@runtime_checkable\nclass IAgent(Protocol):\n    async def analyze(self, context: Dict[str, Any]) -> Any: ...\n    @property\n    def agent_id(self) -> str: ...\n    @property\n    def weight(self) -> float: ...\n\n@runtime_checkable\nclass IVotingEngine(Protocol):\n    async def vote(self, context: Dict[str, Any]) -> Any: ...\n\n\n# Observability\n\n@runtime_checkable\nclass ILogger(Protocol):\n    def info(self, msg: str, **kwargs: Any) -> None: ...\n    def warning(self, msg: str, **kwargs: Any) -> None: ...\n    def error(self, msg: str, **kwargs: Any) -> None: ...\n    def debug(self, msg: str, **kwargs: Any) -> None: ...\n    def critical(self, msg: str, **kwargs: Any) -> None: ...\n\n@runtime_checkable\nclass IMetricsCollector(Protocol):\n    def increment(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None: ...\n    def gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None: ...\n    def histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None: ...\n\n@runtime_checkable\nclass IHealthCheck(Protocol):\n    async def health(self) -> Dict[str, Any]: ...\n
+"""
+backend/core/interfaces.py
+Galaxy Vast AI Trading Platform — Enterprise Interfaces (SOLID/DI/Clean Architecture)
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class ISignalGenerator(Protocol):
+    """Protocol for signal generators."""
+
+    async def generate(self, market_data: Dict[str, Any]) -> Optional[Dict[str, Any]]: ...
+
+
+@runtime_checkable
+class IRiskGate(Protocol):
+    """Protocol for risk gates."""
+
+    async def check(self, signal: Dict[str, Any]) -> bool: ...
+
+
+@runtime_checkable
+class IExecutionEngine(Protocol):
+    """Protocol for execution engines."""
+
+    async def execute(self, order: Dict[str, Any]) -> Dict[str, Any]: ...
+
+
+@runtime_checkable
+class ILearningService(Protocol):
+    """Protocol for learning/feedback services."""
+
+    async def record(self, event: Any) -> None: ...
+
+
+@runtime_checkable
+class IMetricsCollector(Protocol):
+    """Protocol for metrics collection."""
+
+    def increment(self, name: str, value: float = 1.0) -> None: ...
+    def gauge(self, name: str, value: float) -> None: ...
+    def histogram(self, name: str, value: float) -> None: ...
+
+
+@runtime_checkable
+class ICache(Protocol):
+    """Protocol for cache implementations."""
+
+    async def get(self, key: str) -> Optional[Any]: ...
+    async def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None: ...
+    async def delete(self, key: str) -> None: ...

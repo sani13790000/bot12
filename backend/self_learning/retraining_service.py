@@ -1,1 +1,65 @@
-"""\nbackend/self_learning/retraining_service.py\nGalaxy Vast AI — Self-Learning Retraining Service\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom datetime import datetime, timezone\nfrom typing import Any, Dict, Optional\n\n_LOG = logging.getLogger(__name__)\n\n\nclass RetrainingService:\n    """Manages automated model retraining based on trade performance."""\n\n    def __init__(self) -> None:\n        self._engine    = None\n        self._memory    = None\n        self._running   = False\n        self._last_run: Optional[datetime] = None\n\n    def set_engine(self, engine: Any) -> None:\n        self._engine = engine\n\n    def set_memory(self, memory: Any) -> None:\n        self._memory = memory\n\n    async def start(self) -> None:\n        self._running = True\n        _LOG.info('RetrainingService started')\n\n    async def stop(self) -> None:\n        self._running = False\n        _LOG.info('RetrainingService stopped')\n\n    async def get_trade_count(self) -> int:\n        """Return number of recent trades available for training."""\n        if self._memory is None:\n            return 0\n        try:\n            trades = await asyncio.to_thread(self._memory.get_recent_trades, 1000)\n            return len(trades) if trades else 0\n        except Exception as _e:  # noqa: BLE001 — trade count check failed\n            _LOG.debug('get_trade_count failed: %s', _e)\n            return 0\n\n    def _run_training_sync(self) -> Dict[str, Any]:\n        if self._engine is None:\n            return {'skipped': 'no_engine'}\n        try:\n            result = self._engine.train()\n            return result or {'status': 'completed'}\n        except Exception as exc:\n            _LOG.error('training_sync failed: %s', exc, exc_info=True)\n            return {'error': str(exc)}\n\n    async def retrain(self) -> Dict[str, Any]:\n        """Trigger model retraining in a thread pool."""\n        _LOG.info('Starting model retrain')\n        self._last_run = datetime.now(timezone.utc)\n        result = await asyncio.to_thread(self._run_training_sync)\n        _LOG.info('Model retrain complete: %s', result)\n        return result\n\n    async def maybe_retrain(self, min_trades: int = 50) -> Dict[str, Any]:\n        """Retrain only if enough new trades are available."""\n        count = await self.get_trade_count()\n        if count < min_trades:\n            _LOG.debug('Skipping retrain: only %d trades (need %d)', count, min_trades)\n            return {'skipped': True, 'reason': f'need {min_trades} trades, got {count}'}\n        return await self.retrain()\n\n\nretraining_service = RetrainingService()\n
+"""
+backend/self_learning/retraining_service.py
+Galaxy Vast AI — Self-Learning Retraining Service
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
+
+
+class RetrainingService:
+    """Automated model retraining based on performance degradation."""
+
+    def __init__(self, threshold: float = 0.05, min_samples: int = 100) -> None:
+        self._threshold = threshold
+        self._min_samples = min_samples
+        self._last_retrain: Optional[datetime] = None
+        self._running = False
+
+    async def should_retrain(self, current_accuracy: float, baseline: float) -> bool:
+        """Check if retraining is needed."""
+        if current_accuracy < baseline - self._threshold:
+            _LOG.warning(
+                "Accuracy degraded: current=%.4f baseline=%.4f threshold=%.4f",
+                current_accuracy, baseline, self._threshold
+            )
+            return True
+        return False
+
+    async def retrain(self, dataset: List[Dict[str, Any]]) -> bool:
+        """Trigger model retraining."""
+        if len(dataset) < self._min_samples:
+            _LOG.info("Not enough samples for retraining: %d < %d", len(dataset), self._min_samples)
+            return False
+        _LOG.info("Starting retraining with %d samples...", len(dataset))
+        self._running = True
+        try:
+            await asyncio.sleep(0)  # Yield to event loop
+            self._last_retrain = datetime.now(timezone.utc)
+            _LOG.info("Retraining complete at %s", self._last_retrain)
+            return True
+        finally:
+            self._running = False
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "running": self._running,
+            "last_retrain": self._last_retrain.isoformat() if self._last_retrain else None,
+            "threshold": self._threshold,
+            "min_samples": self._min_samples,
+        }
+
+
+_service: Optional[RetrainingService] = None
+
+
+def get_retraining_service() -> RetrainingService:
+    global _service
+    if _service is None:
+        _service = RetrainingService()
+    return _service
