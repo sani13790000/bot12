@@ -1,1 +1,99 @@
-"""\nbackend/execution/semi_auto.py\nGalaxy Vast AI — Semi-Automatic Trading Handler\n\nHandles human-in-the-loop signal approval via Telegram.\nPending signals expire after a configurable timeout.\n\nSA-1 FIX: snapshot inside lock to prevent race condition on dict access after release.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom collections import deque\nfrom datetime import datetime, timedelta, timezone\nfrom typing import Any, Callable, Deque, Dict, List, Optional, Tuple\n\n_LOG = logging.getLogger(__name__)\n\n_MAX_PENDING   = 100\n_DEFAULT_TTL_S = 300.0   # 5 minutes\n\n\nclass PendingSignal:\n    """A signal awaiting human approval."""\n\n    __slots__ = ('signal_id', 'signal_data', 'expires_at', 'created_at')\n\n    def __init__(self, signal_id: str, signal_data: Dict[str, Any], ttl_s: float) -> None:\n        self.signal_id   = signal_id\n        self.signal_data = signal_data\n        now = datetime.now(timezone.utc)\n        self.created_at  = now\n        self.expires_at  = now + timedelta(seconds=ttl_s)\n\n    def is_expired(self, now: Optional[datetime] = None) -> bool:\n        return (now or datetime.now(timezone.utc)) >= self.expires_at\n\n    def to_dict(self) -> Dict[str, Any]:\n        return {\n            'signal_id':  self.signal_id,\n            'signal_data': self.signal_data,\n            'created_at': self.created_at.isoformat(),\n            'expires_at': self.expires_at.isoformat(),\n        }\n\n\nclass SemiAutoHandler:\n    """\n    Manages pending signals and their human-approval lifecycle.\n\n    Thread-safety: all public methods acquire self._lock.\n    SA-1 FIX: snapshot (sid, sig, cb) INSIDE lock — prevents dict access after release.\n    """\n\n    def __init__(self, ttl_s: float = _DEFAULT_TTL_S) -> None:\n        self._ttl_s    = ttl_s\n        self._pending: Dict[str, PendingSignal] = {}\n        self._callbacks: Dict[str, Optional[Callable]] = {}\n        self._lock     = asyncio.Lock()\n        self._history: Deque[Dict[str, Any]] = deque(maxlen=200)\n        self._sweep_task: Optional[asyncio.Task] = None\n\n    async def start(self) -> None:\n        self._sweep_task = asyncio.create_task(self._sweep_loop())\n        _LOG.info('SemiAutoHandler started (ttl_s=%.0f)', self._ttl_s)\n\n    async def stop(self) -> None:\n        if self._sweep_task and not self._sweep_task.done():\n            self._sweep_task.cancel()\n            try:\n                await self._sweep_task\n            except asyncio.CancelledError:\n                pass\n        _LOG.info('SemiAutoHandler stopped')\n\n    async def submit(\n        self,\n        signal_id:   str,\n        signal_data: Dict[str, Any],\n        on_expire:   Optional[Callable] = None,\n    ) -> bool:\n        """Submit a signal for human review. Returns False if at capacity."""\n        async with self._lock:\n            if len(self._pending) >= _MAX_PENDING:\n                _LOG.warning('semi_auto_capacity_full signal_id=%s', signal_id)\n                return False\n            self._pending[signal_id]   = PendingSignal(signal_id, signal_data, self._ttl_s)\n            self._callbacks[signal_id] = on_expire\n            _LOG.info('semi_auto_submitted signal_id=%s', signal_id)\n            return True\n\n    async def approve(self, signal_id: str) -> Optional[Dict[str, Any]]:\n        """Approve a pending signal. Returns signal_data or None if not found."""\n        async with self._lock:\n            sig = self._pending.pop(signal_id, None)\n            self._callbacks.pop(signal_id, None)\n        if sig is None:\n            _LOG.warning('semi_auto_approve_not_found signal_id=%s', signal_id)\n            return None\n        self._history.append({**sig.to_dict(), 'outcome': 'approved'})\n        _LOG.info('semi_auto_approved signal_id=%s', signal_id)\n        return sig.signal_data\n\n    async def reject(self, signal_id: str) -> bool:\n        """Reject a pending signal. Returns True if found."""\n        async with self._lock:\n            sig = self._pending.pop(signal_id, None)\n            self._callbacks.pop(signal_id, None)\n        if sig is None:\n            return False\n        self._history.append({**sig.to_dict(), 'outcome': 'rejected'})\n        _LOG.info('semi_auto_rejected signal_id=%s', signal_id)\n        return True\n\n    async def list_pending(self) -> List[Dict[str, Any]]:\n        async with self._lock:\n            return [s.to_dict() for s in self._pending.values()]\n\n    async def _sweep_loop(self) -> None:\n        """Periodically expire timed-out signals."""\n        while True:\n            try:\n                await asyncio.sleep(10.0)\n                await self._sweep_terminal_signals()\n            except asyncio.CancelledError:\n                break\n            except Exception as exc:\n                _LOG.error('sweep_loop error: %s', exc, exc_info=True)\n\n    async def _sweep_terminal_signals(self) -> None:\n        now = datetime.now(timezone.utc)\n        # SA-1 FIX: snapshot (sid, sig, cb) INSIDE lock — prevents dict access after release.\n        to_expire: List[Tuple[str, PendingSignal, Optional[Callable]]] = []\n        async with self._lock:\n            for sid, sig in list(self._pending.items()):\n                if sig.is_expired(now):\n                    cb = self._callbacks.pop(sid, None)\n                    del self._pending[sid]\n                    to_expire.append((sid, sig, cb))\n\n        # Call callbacks OUTSIDE lock to avoid deadlock\n        for sid, sig, cb in to_expire:\n            self._history.append({**sig.to_dict(), 'outcome': 'expired'})\n            _LOG.warning('semi_auto_expired signal_id=%s', sid)\n            if cb:\n                try:\n                    await cb(sig.signal_data)\n                except Exception as exc:  # noqa: BLE001 — expire callback is best-effort\n                    _LOG.warning('expire_callback failed signal_id=%s: %s', sid, exc)\n\n    async def health(self) -> Dict[str, Any]:\n        async with self._lock:\n            return {\n                'status':   'ok',\n                'pending':  len(self._pending),\n                'capacity': _MAX_PENDING,\n            }\n\n\nsemi_auto_handler = SemiAutoHandler()\n
+"""
+backend/execution/semi_auto.py
+Galaxy Vast AI — Semi-Automatic Trading
+
+Semi-auto mode: AI generates signals, human confirms before execution.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
+
+
+@dataclass
+class PendingTrade:
+    id: str
+    symbol: str
+    direction: str
+    lots: float
+    stop_loss: Optional[float]
+    take_profit: Optional[float]
+    created_at: float = field(default_factory=time.time)
+    expires_at: Optional[float] = None
+    approved: Optional[bool] = None
+
+
+class SemiAutoTrader:
+    """Semi-automatic trade approval system."""
+
+    def __init__(self, approval_timeout: float = 300.0) -> None:
+        self._pending: Dict[str, PendingTrade] = {}
+        self._timeout = approval_timeout
+        self._callbacks: List[Callable] = []
+
+    async def propose_trade(self, trade_data: Dict[str, Any]) -> str:
+        import uuid
+        trade_id = str(uuid.uuid4())[:8]
+        trade = PendingTrade(
+            id=trade_id,
+            symbol=trade_data['symbol'],
+            direction=trade_data['direction'],
+            lots=trade_data.get('lots', 0.01),
+            stop_loss=trade_data.get('stop_loss'),
+            take_profit=trade_data.get('take_profit'),
+            expires_at=time.time() + self._timeout,
+        )
+        self._pending[trade_id] = trade
+        _LOG.info('Trade proposed: %s %s %s (id=%s)', trade.symbol, trade.direction, trade.lots, trade_id)
+        for cb in self._callbacks:
+            try:
+                await cb(trade)
+            except Exception as e:
+                _LOG.debug('Callback error: %s', e)
+        return trade_id
+
+    async def approve(self, trade_id: str) -> bool:
+        trade = self._pending.get(trade_id)
+        if not trade:
+            return False
+        if trade.expires_at and time.time() > trade.expires_at:
+            del self._pending[trade_id]
+            _LOG.warning('Trade %s expired', trade_id)
+            return False
+        trade.approved = True
+        _LOG.info('Trade %s approved', trade_id)
+        return True
+
+    async def reject(self, trade_id: str) -> bool:
+        trade = self._pending.get(trade_id)
+        if not trade:
+            return False
+        trade.approved = False
+        del self._pending[trade_id]
+        _LOG.info('Trade %s rejected', trade_id)
+        return True
+
+    def get_pending(self) -> List[PendingTrade]:
+        now = time.time()
+        expired = [tid for tid, t in self._pending.items() if t.expires_at and now > t.expires_at]
+        for tid in expired:
+            del self._pending[tid]
+        return list(self._pending.values())
+
+    def on_proposal(self, callback: Callable) -> None:
+        self._callbacks.append(callback)
+
+
+_trader: Optional[SemiAutoTrader] = None
+
+
+def get_semi_auto_trader() -> SemiAutoTrader:
+    global _trader
+    if _trader is None:
+        _trader = SemiAutoTrader()
+    return _trader
