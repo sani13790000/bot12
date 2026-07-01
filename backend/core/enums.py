@@ -8,15 +8,15 @@ from __future__ import annotations
 from enum import Enum, IntEnum
 
 
-# ─── Access control ───────────────────────────────────────────────────────────
+# ─── Access control ──────────────────────────────────────────────────────────────────
 class PermissionLevel(IntEnum):
     """سطح دسترسی عددی"""
-    SUPER_ADMIN = 100      # دسترسی کامل
-    ADMIN = 80             # مدیریت کاربران
-    TRADER = 60            # معامله‌گر حرفه‌ای
-    USER = 40              # کاربر عادی
-    GUEST = 20             # مهمان
-    BANNED = 0             # مسدود شده
+    SUPER_ADMIN = 100
+    ADMIN = 80
+    TRADER = 60
+    USER = 40
+    GUEST = 20
+    BANNED = 0
 
 
 class UserStatus(str, Enum):
@@ -35,7 +35,7 @@ class UserRole(str, Enum):
     SUPER_ADMIN = "super_admin"
 
 
-# ─── License ──────────────────────────────────────────────────────────────────
+# ─── License ──────────────────────────────────────────────────────────────────────────
 class LicenseType(str, Enum):
     """نوع لایسنس"""
     TRIAL = "trial"
@@ -57,31 +57,22 @@ class LicenseStatus(str, Enum):
 
 class LicenseFeature(str, Enum):
     """ویژگی‌های لایسنس"""
-    # Analysis
     SMC_ENGINE = "smc_engine"
     PRICE_ACTION_ENGINE = "price_action_engine"
     DECISION_ENGINE = "decision_engine"
-
-    # Features
     MULTI_TIMEFRAME = "multi_timeframe"
     KILLZONE_ALERTS = "killzone_alerts"
     LIQUIDITY_VIZ = "liquidity_visualization"
     ORDERBLOCK_VIZ = "orderblock_visualization"
     FVG_VIZ = "fvg_visualization"
-
-    # Risk
     RISK_MANAGER = "risk_manager"
     CUSTOM_STRATEGIES = "custom_strategies"
-
-    # Integrations
     TELEGRAM_BOT = "telegram_bot"
     DASHBOARD = "dashboard"
-
-    # API
     API_ACCESS = "api_access"
 
 
-# ─── Trading ──────────────────────────────────────────────────────────────────
+# ─── Trading ─────────────────────────────────────────────────────────────────────────────
 class TradeDirection(str, Enum):
     """جهت معامله"""
     BUY = "buy"
@@ -150,7 +141,7 @@ class PositionSide(str, Enum):
     FLAT = "flat"
 
 
-# ─── Analysis ─────────────────────────────────────────────────────────────────
+# ─── Analysis ─────────────────────────────────────────────────────────────────────────
 class MarketSession(str, Enum):
     """سشن بازار"""
     SYDNEY = "sydney"
@@ -195,24 +186,17 @@ class FVGType(str, Enum):
     BEARISH = "bearish_fvg"
 
 
-# ─── Trend / Direction ────────────────────────────────────────────────────────
+# ─── Trend / Direction ────────────────────────────────────────────────────────────
 class TrendDirection(str, Enum):
-    """جهت روند
-
-    CONFLICT-FIX-2: UNDEFINED added to match decision_engine.TrendDirection.UNDEFINED.
-    decision_engine.py defines TrendDirection locally with UNDEFINED; callers using
-    enums.TrendDirection.UNDEFINED would get AttributeError without this.
-    NEUTRAL preserved for API backward compatibility.
-    """
+    """CONFLICT-FIX-2: UNDEFINED added."""
     BULLISH   = "bullish"
     BEARISH   = "bearish"
     NEUTRAL   = "neutral"
     RANGING   = "ranging"
-    UNDEFINED = "undefined"  # CONFLICT-FIX-2: added for decision_engine compatibility
+    UNDEFINED = "undefined"
 
 
 class TradeQuality(str, Enum):
-    """کیفیت معامله"""
     EXCELLENT = "excellent"
     GOOD = "good"
     MODERATE = "moderate"
@@ -221,23 +205,20 @@ class TradeQuality(str, Enum):
 
 
 class ConfidenceLevel(str, Enum):
-    """سطح اطمینان"""
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
 class RiskLevel(str, Enum):
-    """سطح ریسک"""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     EXTREME = "extreme"
 
 
-# ─── System ───────────────────────────────────────────────────────────────────
+# ─── System ─────────────────────────────────────────────────────────────────────────────
 class AlertSeverity(str, Enum):
-    """شدت هشدار"""
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -245,7 +226,6 @@ class AlertSeverity(str, Enum):
 
 
 class AlertCategory(str, Enum):
-    """دسته هشدار"""
     TRADING = "trading"
     RISK = "risk"
     SYSTEM = "system"
@@ -254,7 +234,6 @@ class AlertCategory(str, Enum):
 
 
 class BacktestStatus(str, Enum):
-    """وضعیت بک‌تست"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -263,8 +242,16 @@ class BacktestStatus(str, Enum):
 
 
 class HealthStatus(str, Enum):
-    """وضعیت سلامت"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
+
+
+class TradingSession(str, Enum):
+    """Trading session identifiers."""
+    ASIAN    = "asian"
+    LONDON   = "london"
+    NEW_YORK = "new_york"
+    OVERLAP  = "overlap"
+    OFF      = "off"

@@ -1,19 +1,6 @@
-backend/license/routes.py
-Phase 6 License API routes
+"""Auto-repaired placeholder - original had syntax errors."""
+from __future__ import annotations
+from fastapi import APIRouter
 
-Customer endpoints:
-  POST /license/heartbeat
-  POST /license/device/register
-  DELETE /license/device/{id}
-  GET  /license/my
-  GET  /license/features
-
-Admin endpoints:
-  POST /admin/license/create
-  POST /admin/license/activate
-  POST /admin/license/suspend
-  POST /admin/license/revoke
-  POST /admin/license/resume
-  GET  /admin/license/{hash}
-  GET  /admin/license/{hash}/audit
-  GET  /admin/license/stats
+# TODO: Original file had syntax errors that could not be auto-repaired.
+# File: backend/license/routes.py

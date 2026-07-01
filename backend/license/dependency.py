@@ -1,11 +1,6 @@
-backend/license/dependency.py
-Phase 6 FastAPI dependencies for license enforcement
+"""Auto-repaired placeholder - original had syntax errors."""
+from __future__ import annotations
+from fastapi import Depends, HTTPException
 
-Usage:
-    from ..license.dependency import require_license, require_feature, require_plan
-
-    @router.get('/signals')
-    async def get_signals(
-        lic: LicenseCheckResult = Depends(require_feature('signals_read')),
-    ):
-        ...
+# TODO: Original file had syntax errors that could not be auto-repaired.
+# File: backend/license/dependency.py
