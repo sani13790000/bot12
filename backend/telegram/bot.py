@@ -1,1 +1,60 @@
-"""\nbackend/telegram/bot.py\nGalaxy Vast AI Trading Platform — Telegram Bot Entry Point\n"""\nfrom __future__ import annotations\n\nimport logging\nimport os\n\nfrom aiogram import Bot, Dispatcher\nfrom aiogram.client.default import DefaultBotProperties\nfrom aiogram.enums import ParseMode\n\n_LOG = logging.getLogger(__name__)\n\n_bot_instance: Bot | None = None\n_dp_instance:  Dispatcher | None = None\n\n\ndef get_bot() -> Bot:\n    global _bot_instance\n    if _bot_instance is None:\n        token = os.environ.get('TELEGRAM_BOT_TOKEN', '')\n        if not token:\n            raise RuntimeError('TELEGRAM_BOT_TOKEN not set')\n        _bot_instance = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))\n    return _bot_instance\n\n\ndef get_dispatcher() -> Dispatcher:\n    global _dp_instance\n    if _dp_instance is None:\n        _dp_instance = Dispatcher()\n    return _dp_instance\n\n\nasync def on_startup(bot: Bot) -> None:\n    """Called when bot starts."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u2705 <b>Galaxy Vast Bot started</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — startup notify optional\n            _LOG.debug('startup_notify failed admin=%s: %s', admin_id, _e)\n\n\nasync def on_shutdown(bot: Bot) -> None:\n    """Called when bot stops."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u26d4 <b>Galaxy Vast Bot stopped</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — shutdown notify optional\n            _LOG.debug('shutdown_notify failed admin=%s: %s', admin_id, _e)\n    await bot.session.close()\n\n\nasync def main() -> None:\n    logging.basicConfig(\n        level=logging.INFO,\n        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',\n    )\n    bot = get_bot()\n    dp  = get_dispatcher()\n    dp.startup.register(on_startup)\n    dp.shutdown.register(on_shutdown)\n    await dp.start_polling(bot)\n\n\nif __name__ == '__main__':\n    import asyncio\n    asyncio.run(main())\n
+"""
+backend/telegram/bot.py
+Galaxy Vast AI Trading Platform — Telegram Bot Entry Point
+"""
+from __future__ import annotations
+import logging
+import os
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
+__all__ = ["TelegramBot", "get_bot"]
+
+
+class TelegramBot:
+    """Thin wrapper around python-telegram-bot."""
+
+    def __init__(self, token: Optional[str] = None) -> None:
+        self._token = token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        self._app: Any = None
+        self._started = False
+
+    async def start(self) -> None:
+        if not self._token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set — bot disabled")
+            return
+        try:
+            from telegram.ext import ApplicationBuilder
+            self._app = ApplicationBuilder().token(self._token).build()
+            await self._app.initialize()
+            self._started = True
+            logger.info("Telegram bot started")
+        except ImportError:
+            logger.warning("python-telegram-bot not installed")
+        except Exception as exc:
+            logger.error("Telegram bot start failed: %s", exc)
+
+    async def send_message(self, chat_id: str, text: str) -> bool:
+        if not self._app or not self._started:
+            logger.debug("Bot not started — skipping message to %s", chat_id)
+            return False
+        try:
+            await self._app.bot.send_message(chat_id=chat_id, text=text)
+            return True
+        except Exception as exc:
+            logger.error("send_message failed: %s", exc)
+            return False
+
+    async def stop(self) -> None:
+        if self._app and self._started:
+            await self._app.shutdown()
+            self._started = False
+
+
+_bot: Optional[TelegramBot] = None
+
+def get_bot() -> TelegramBot:
+    global _bot
+    if _bot is None:
+        _bot = TelegramBot()
+    return _bot
