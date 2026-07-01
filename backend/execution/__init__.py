@@ -1,23 +1,35 @@
-IiIiRXhlY3V0aW9uIHBhY2thZ2Ug4oCUIFBoYXNlIDMuIiIiCmZyb20gLm10
-NV9jb25uZWN0b3IgaW1wb3J0IE1UNUNvbm5lY3RvciwgTVQ1T3JkZXJSZXF1
-ZXN0LCBNVDVPcmRlclJlc3VsdCwgbXQ1X2Nvbm5lY3Rvcgpmcm9tIC5vcmRl
-cl9zdGF0ZV9tYWNoaW5lIGltcG9ydCAoCiAgICBNYW5hZ2VkT3JkZXIsCiAg
-ICBPcmRlclN0YXRlLAogICAgT3JkZXJTdGF0ZU1hY2hpbmUsCiAgICBPcmRl
-clRyYW5zaXRpb24sCiAgICBTaWduYWxJZGVtcG90ZW5jeUd1YXJkLAogICAg
-Z2V0X29yZGVyX3N0YXRlX21hY2hpbmUsCikKZnJvbSAucG9zaXRpb25fcmVj
-b25jaWxpYXRpb24gaW1wb3J0IFBvc2l0aW9uUmVjb25jaWxpYXRpb24KZnJv
-bSAuZmFpbHVyZV9yZWNvdmVyeSBpbXBvcnQgRmFpbGVkT3JkZXIsIEZhaWx1
-cmVSZWNvdmVyeUVuZ2luZSwgUmVjb3ZlcnlTdHJhdGVneQpmcm9tIC5leGVj
-dXRpb25fc2VydmljZSBpbXBvcnQgRXhlY3V0aW9uU2VydmljZSwgZ2V0X2V4
-ZWN1dGlvbl9zZXJ2aWNlCmZyb20gLm9yZGVyX2pvdXJuYWwgaW1wb3J0IE9y
-ZGVySm91cm5hbCwgSm91cm5hbEV2ZW50VHlwZSwgZ2V0X29yZGVyX2pvdXJu
-YWwKCl9fYWxsX18gPSBbCiAgICAiTVQ1Q29ubmVjdG9yIiwgIk1UNU9yZGVy
-UmVxdWVzdCIsICJNVDVPcmRlclJlc3VsdCIsICJtdDVfY29ubmVjdG9yIiwK
-ICAgICJNYW5hZ2VkT3JkZXIiLCAiT3JkZXJTdGF0ZSIsICJPcmRlclN0YXRl
-TWFjaGluZSIsICJPcmRlclRyYW5zaXRpb24iLAogICAgIlNpZ25hbElkZW1w
-b3RlbmN5R3VhcmQiLCAiZ2V0X29yZGVyX3N0YXRlX21hY2hpbmUiLAogICAg
-IlBvc2l0aW9uUmVjb25jaWxpYXRpb24iLAogICAgIkZhaWxlZE9yZGVyIiwg
-IkZhaWx1cmVSZWNvdmVyeUVuZ2luZSIsICJSZWNvdmVyeVN0cmF0ZWd5IiwK
-ICAgICJFeGVjdXRpb25TZXJ2aWNlIiwgImdldF9leGVjdXRpb25fc2Vydmlj
-ZSIsCiAgICAiT3JkZXJKb3VybmFsIiwgIkpvdXJuYWxFdmVudFR5cGUiLCAi
-Z2V0X29yZGVyX2pvdXJuYWwiLApdCg==
+"""Execution package — Phase 3."""
+from __future__ import annotations
+
+__all__ = [
+    "MT5Connector",
+    "TradeExecutor",
+    "PositionManager",
+    "FailureRecovery",
+    "SemiAutoHandler",
+]
+
+try:
+    from .mt5_connector import MT5Connector, MT5Order, MT5Position
+except ImportError:
+    pass
+
+try:
+    from .trade_executor import TradeExecutor
+except ImportError:
+    pass
+
+try:
+    from .position_manager import PositionManager
+except ImportError:
+    pass
+
+try:
+    from .failure_recovery import FailureRecovery
+except ImportError:
+    pass
+
+try:
+    from .semi_auto import SemiAutoHandler, get_semi_auto_handler
+except ImportError:
+    pass
