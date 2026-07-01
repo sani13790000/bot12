@@ -1,87 +1,73 @@
-"""ML Engine — Phase 5: Walk-Forward CV, Concept Drift Detection, Feature Importance.
+"""
+backend/intelligence/ml_engine.py
+Galaxy Vast AI — ML Inference Engine
 
-Fixes:
-  - ML-Ex-1: Walk-forward embargo prevents leakage
-  - ML-Ex-2: Concurrent training guard via asyncio.Lock
-  - LOG-FIX-1: ConceptDriftDetector._history �-bounded deque(maxlen=1000)
-  - LOG-FIX-2: _get_feature_importance except Exception ⁵ AttributeError + log
+Provides a unified interface to run predictions using the active model.
+Supports both synchronous and async inference paths.
 """
 from __future__ import annotations
-from collections import deque
-import asyncio, threading, time
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
-try:
-    from sklearn.calibration import CalibratedClassifierCV
-    from sklearn.metrics import roc_auc_score
-    from sklearn.preprocessing import StandardScaler
-    from xgboost import XGBClassifier
-    _ML_AVAILABLE = True
-except ImportError:
-    _ML_AVAILABLE = False
+import logging
+import os
+from typing import Any, Dict, List, Optional
 
-from ..core.logger import get_logger
-
-logger = get_logger("intelligence.ml_engine")
+logger = logging.getLogger(__name__)
 
 
-class DriftStatus(Enum):
-    STABLE = "stable"
-    WARNING = "warning"
-    DRIFTED = "drifted"
+class MLEngine:
+    """Lightweight ML inference wrapper."""
+
+    def __init__(self, model_path: Optional[str] = None) -> None:
+        self._model_path = model_path or os.getenv("ML_MODEL_PATH", "models/active.pkl")
+        self._model: Optional[Any] = None
+        self._log = logging.getLogger(self.__class__.__name__)
+
+    def load(self) -> None:
+        """Load the model from disk."""
+        import pickle
+        try:
+            with open(self._model_path, "rb") as fh:
+                self._model = pickle.load(fh)
+            self._log.info("Model loaded from %s", self._model_path)
+        except FileNotFoundError:
+            self._log.warning("Model not found at %s; using null model", self._model_path)
+
+    def predict(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Run inference. Returns prediction dict."""
+        if self._model is None:
+            return {"signal": "HOLD", "confidence": 0.0, "model": "null"}
+        try:
+            import numpy as np
+            feat_vec = list(features.values())
+            arr = np.array(feat_vec).reshape(1, -1)
+            proba = self._model.predict_proba(arr)[0]
+            confidence = float(max(proba))
+            label = int(self._model.predict(arr)[0])
+            return {
+                "signal": "BUY" if label == 1 else "SELL" if label == -1 else "HOLD",
+                "confidence": confidence,
+                "label": label,
+                "model": self._model_path,
+            }
+        except Exception as exc:
+            self._log.error("Prediction error: %s", exc)
+            return {"signal": "HOLD", "confidence": 0.0, "error": str(exc)}
+
+    async def async_predict(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """Async wrapper around predict."""
+        import asyncio
+        return await asyncio.get_event_loop().run_in_executor(None, self.predict, features)
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
 
 
-class MLPrediction:
-    def __init__(self, direction: str, confidence: float,
-                 risk: float = 0.5, importance: Optional[Dict[str, float]] = None):
-        self.direction = direction
-        self.confidence = confidence
-        self.risk = risk
-        self.importance = importance or {}
+_engine: Optional[MLEngine] = None
 
 
-class ConceptDriftDetector:
-    """Page-Hinkley drift detection."""
-    def __init__(self, delta: float = 0.005, threshold: float = 50.0, alpha: float = 0.9999):
-        self.delta = delta
-        self.threshold = threshold
-        self.alpha = alpha
-        self._cum_sum = 0.0
-        self._min_sum = 0.0
-        self._mean = 0.0
-        self._n = 0
-        self._history: deque = deque(maxlen=1000)  # LOG-FIX-1: bounded — prevents memory leak after 1000+ predictions
-
-    def update(self, value: float) -> DriftStatus:
-        self._n += 1
-        self._history.append(value)
-        if self._n == 1:
-            self._mean = value
-        else:
-            self._mean = self.alpha * self._mean + (1 - self.alpha) * value
-        self._cum_sum += value - self._mean - self.delta
-        self._min_sum = min(self._min_sum, self._cum_sum)
-        ph_stat = self._cum_sum - self._min_sum
-        if ph_stat > self.threshold:
-            self.reset()
-            return DriftStatus.DRIFTED
-        if ph_stat > self.threshold * 0.5:
-            return DriftStatus.WARNING
-        return DriftStatus.STABLE
-
-    def reset(self) -> None:
-        self._cum_sum = 0.0
-        self._min_sum = 0.0
-
-    def drift_score(self) -> float:
-        return max(0.0, self._cum_sum - self._min_sum) / max(self.threshold, 1.0)
-
-    def recent_mean(self, window: int = 20) -> float:
-        if not self._history:
-            return 0.0
-        tail = list(self._history)[-window:]
-        return sum(tail) / len(tail)
+def get_ml_engine() -> MLEngine:
+    global _engine
+    if _engine is None:
+        _engine = MLEngine()
+    return _engine

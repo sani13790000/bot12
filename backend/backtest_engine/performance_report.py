@@ -6,349 +6,157 @@ Sections:
   1. Executive Summary
   2. Portfolio Metrics
   3. Per-Symbol Breakdown
-  4. Trade Distribution Analysis
-  5. Equity + Drawdown Charts (Chart.js data)
-  6. Monte Carlo Summary
-  7. Risk Metrics
+  4. Time-Series Equity Curve
+  5. Drawdown Analysis
+  6. Risk-Adjusted Returns
+  7. Trade Log (last 50)
 """
-
 from __future__ import annotations
 
-import json
-from datetime import datetime
-from typing import Optional
+import logging
+import math
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from .multi_symbol_engine import MultiSymbolResult
-from .monte_carlo_advanced import MonteCarloAdvancedResult
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PerformanceMetrics:
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    win_rate: float = 0.0
+    total_pnl: float = 0.0
+    avg_win: float = 0.0
+    avg_loss: float = 0.0
+    profit_factor: float = 0.0
+    sharpe_ratio: float = 0.0
+    sortino_ratio: float = 0.0
+    max_drawdown: float = 0.0
+    max_drawdown_pct: float = 0.0
+    calmar_ratio: float = 0.0
+    expectancy: float = 0.0
+    avg_holding_h: float = 0.0
+    best_trade: float = 0.0
+    worst_trade: float = 0.0
 
 
 class PerformanceReportGenerator:
-    """
-    Generates branded Galaxy Vast performance reports in HTML and JSON.
-    """
+    """Generate institutional performance reports."""
 
-    BRAND = "Galaxy Vast AI Trading Platform"
-    VERSION = "v3.0.0"
+    def __init__(self) -> None:
+        self._log = logging.getLogger(self.__class__.__name__)
 
-    def generate_json(
-        self,
-        backtest: MultiSymbolResult,
-        monte_carlo: Optional[MonteCarloAdvancedResult] = None,
-    ) -> dict:
-        """Return structured JSON report."""
-        report = {
-            "brand":      self.BRAND,
-            "version":    self.VERSION,
-            "generated":  datetime.utcnow().isoformat(),
-            "type":       "PERFORMANCE_REPORT",
-            "backtest":   backtest.to_dict(),
+    def compute_metrics(self, trades: List[Dict[str, Any]], initial_equity: float = 10000.0) -> PerformanceMetrics:
+        """Compute all performance metrics from trade list."""
+        if not trades:
+            return PerformanceMetrics()
+
+        pnls = [t.get("pnl", 0.0) for t in trades]
+        wins = [p for p in pnls if p > 0]
+        losses = [p for p in pnls if p < 0]
+
+        total = len(pnls)
+        n_wins = len(wins)
+        n_losses = len(losses)
+        total_pnl = sum(pnls)
+        win_rate = n_wins / total if total else 0.0
+        avg_win = sum(wins) / n_wins if wins else 0.0
+        avg_loss = sum(losses) / n_losses if losses else 0.0
+        profit_factor = abs(sum(wins) / sum(losses)) if losses and sum(losses) != 0 else float("inf")
+        expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss
+
+        # Equity curve
+        equity = [initial_equity]
+        for pnl in pnls:
+            equity.append(equity[-1] + pnl)
+
+        # Max drawdown
+        peak = equity[0]
+        max_dd = 0.0
+        max_dd_pct = 0.0
+        for v in equity:
+            if v > peak:
+                peak = v
+            dd = peak - v
+            dd_pct = dd / peak if peak > 0 else 0
+            max_dd = max(max_dd, dd)
+            max_dd_pct = max(max_dd_pct, dd_pct)
+
+        # Sharpe (daily returns)
+        n = len(pnls)
+        if n > 1:
+            mean_r = total_pnl / n
+            std_r = math.sqrt(sum((p - mean_r) ** 2 for p in pnls) / (n - 1))
+            sharpe = (mean_r / std_r * math.sqrt(252)) if std_r > 0 else 0.0
+            neg_pnls = [p for p in pnls if p < 0]
+            down_std = math.sqrt(sum(p**2 for p in neg_pnls) / max(len(neg_pnls), 1))
+            sortino = (mean_r / down_std * math.sqrt(252)) if down_std > 0 else 0.0
+        else:
+            sharpe = sortino = 0.0
+
+        annual_return = total_pnl / initial_equity * (252 / max(n, 1))
+        calmar = annual_return / max_dd_pct if max_dd_pct > 0 else 0.0
+
+        return PerformanceMetrics(
+            total_trades=total, winning_trades=n_wins, losing_trades=n_losses,
+            win_rate=win_rate, total_pnl=total_pnl,
+            avg_win=avg_win, avg_loss=avg_loss, profit_factor=profit_factor,
+            sharpe_ratio=sharpe, sortino_ratio=sortino,
+            max_drawdown=max_dd, max_drawdown_pct=max_dd_pct, calmar_ratio=calmar,
+            expectancy=expectancy,
+            best_trade=max(pnls) if pnls else 0.0,
+            worst_trade=min(pnls) if pnls else 0.0,
+        )
+
+    def generate_json(self, trades: List[Dict], initial_equity: float = 10000.0, title: str = "Performance Report") -> Dict[str, Any]:
+        """Generate JSON report."""
+        p = self.compute_metrics(trades, initial_equity)
+        return {
+            "title": title,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "initial_equity": initial_equity,
+            "summary": {
+                "total_trades": p.total_trades, "winning": p.winning_trades, "losing": p.losing_trades,
+                "win_rate": f"{p.win_rate:.1%}", "total_pnl": f"{p.total_pnl:+.2f}",
+                "profit_factor": f"{p.profit_factor:.2f}",
+                "sharpe_ratio": f"{p.sharpe_ratio:.2f}", "max_drawdown": f"{p.max_drawdown_pct:.2%}",
+                "calmar_ratio": f"{p.calmar_ratio:.2f}",
+            },
         }
-        if monte_carlo:
-            report["monte_carlo"] = monte_carlo.to_dict()
-        return report
 
-    def generate_html(
-        self,
-        backtest: MultiSymbolResult,
-        monte_carlo: Optional[MonteCarloAdvancedResult] = None,
-        title: str = "Performance Report",
-    ) -> str:
-        """Return full standalone HTML performance report."""
-        mc_section = ""
-        if monte_carlo:
-            mc = monte_carlo.to_dict()
-            mc_section = f"""
-            <div class="section">
-                <h2>🎲 Monte Carlo Analysis ({mc['simulations_run']:,} simulations)</h2>
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">Win Probability</div>
-                        <div class="metric-value positive">{mc['probability_profit_pct']}%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Ruin Probability</div>
-                        <div class="metric-value {'negative' if mc['probability_ruin_pct'] > 5 else 'positive'}">{mc['probability_ruin_pct']}%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Median Final Balance</div>
-                        <div class="metric-value">${mc['median_final_balance']:,.2f}</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">VaR 95%</div>
-                        <div class="metric-value negative">{mc['var'].get('95pct', 0):.2f}%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Expected Max DD</div>
-                        <div class="metric-value">{mc['drawdown']['expected_max_pct']:.2f}%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Half-Kelly Risk</div>
-                        <div class="metric-value">{mc['optimal_risk_pct']:.2f}%</div>
-                    </div>
-                </div>
-            </div>"""
-
-        p = backtest.to_dict()["portfolio"]
-        by_sym = backtest.to_dict()["by_symbol"]
-
-        symbol_rows = ""
-        for sym, sr in by_sym.items():
-            color = "positive" if sr["net_profit"] > 0 else "negative"
-            symbol_rows += f"""
-            <tr>
-                <td><strong>{sym}</strong></td>
-                <td>{sr['total_trades']}</td>
-                <td>{sr['win_rate']}%</td>
-                <td class="{color}">${sr['net_profit']:,.2f}</td>
-                <td>{sr['profit_factor']}</td>
-                <td>{sr['max_drawdown']}%</td>
-            </tr>"""
-
-        equity_data = json.dumps([e["equity"] for e in backtest.equity_curve[:200]])
-        dd_data     = json.dumps([round(e["drawdown"], 3) for e in backtest.drawdown_curve[:200]])
-        labels      = json.dumps([e["time"][:10] for e in backtest.equity_curve[:200]])
-
-        profit_color = "positive" if p["net_profit"] > 0 else "negative"
-        sharpe_color = "positive" if p["sharpe_ratio"] >= 1 else ("neutral" if p["sharpe_ratio"] >= 0.5 else "negative")
-
+    def generate_html(self, trades: List[Dict], initial_equity: float = 10000.0, title: str = "Performance Report") -> str:
+        """Generate HTML report."""
+        p = self.compute_metrics(trades, initial_equity)
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        sharpe_color = "positive" if p.sharpe_ratio >= 1 else ("neutral" if p.sharpe_ratio >= 0 else "negative")
         return f"""<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galaxy Vast — {title}</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0f1e; color: #e2e8f0; }}
-        .header {{ background: linear-gradient(135deg, #1a1f3e 0%, #0d1530 100%);
-                   border-bottom: 2px solid #3b82f6; padding: 24px 40px;
-                   display: flex; justify-content: space-between; align-items: center; }}
-        .brand {{ font-size: 22px; font-weight: 700; color: #60a5fa; }}
-        .brand span {{ color: #f8fafc; }}
-        .subtitle {{ font-size: 13px; color: #94a3b8; margin-top: 4px; }}
-        .badge {{ background: #1e3a5f; color: #60a5fa; border: 1px solid #3b82f6;
-                  border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 600; }}
-        .content {{ max-width: 1400px; margin: 0 auto; padding: 32px 40px; }}
-        .section {{ margin-bottom: 40px; }}
-        h2 {{ font-size: 18px; font-weight: 600; color: #f1f5f9;
-              border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 20px; }}
-        .metrics-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }}
-        .metric-card {{ background: #111827; border: 1px solid #1f2937;
-                        border-radius: 12px; padding: 20px; text-align: center;
-                        transition: border-color 0.2s; }}
-        .metric-card:hover {{ border-color: #3b82f6; }}
-        .metric-label {{ font-size: 12px; color: #6b7280; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }}
-        .metric-value {{ font-size: 24px; font-weight: 700; }}
-        .positive {{ color: #10b981; }}
-        .negative {{ color: #ef4444; }}
-        .neutral  {{ color: #f59e0b; }}
-        .chart-container {{ background: #111827; border: 1px solid #1f2937;
-                            border-radius: 12px; padding: 24px; margin-bottom: 24px; }}
-        canvas {{ max-height: 300px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th {{ background: #1f2937; color: #9ca3af; font-size: 12px;
-              text-transform: uppercase; padding: 12px 16px; text-align: left; }}
-        td {{ padding: 12px 16px; border-bottom: 1px solid #1f2937; font-size: 14px; }}
-        tr:hover td {{ background: #1a2233; }}
-        .footer {{ text-align: center; padding: 24px; color: #4b5563; font-size: 12px;
-                   border-top: 1px solid #1f2937; }}
-        .tag {{ display: inline-block; background: #1e3a5f; color: #60a5fa;
-                border-radius: 4px; padding: 2px 8px; font-size: 11px; margin: 2px; }}
-    </style>
-</head>
+<head><meta charset="UTF-8"><title>{title}</title>
+<style>
+body{{font-family:monospace;padding:20px;background:#1a1a2e;color:#e0e0e0}}
+.card{{background:#16213e;border-radius:8px;padding:16px;margin:12px 0}}
+.positive{{color:#00ff88}} .negative{{color:#ff4444}} .neutral{{color:#ffaa00}}
+h1{{color:#0f3460}} table{{width:100%;border-collapse:collapse}}
+td,th{{padding:8px;border:1px solid #333;text-align:left}}
+th{{background:#0f3460}}
+</style></head>
 <body>
-    <div class="header">
-        <div>
-            <div class="brand">🌌 Galaxy <span>Vast</span></div>
-            <div class="subtitle">Institutional AI Trading Platform — {self.VERSION}</div>
-        </div>
-        <div>
-            <span class="badge">📊 {title}</span>
-            <div style="font-size:11px; color:#6b7280; margin-top:6px;">
-                Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
-            </div>
-        </div>
-    </div>
-
-    <div class="content">
-
-        <!-- Executive Summary -->
-        <div class="section">
-            <h2>📈 Executive Summary</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Net Profit</div>
-                    <div class="metric-value {profit_color}">${p['net_profit']:,.2f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Net Profit %</div>
-                    <div class="metric-value {profit_color}">{p['net_profit_pct']:+.2f}%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Win Rate</div>
-                    <div class="metric-value {'positive' if p['win_rate'] >= 50 else 'neutral'}">{p['win_rate']:.1f}%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Total Trades</div>
-                    <div class="metric-value">{p['total_trades']}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Profit Factor</div>
-                    <div class="metric-value {'positive' if p['profit_factor'] >= 1.5 else 'neutral'}">{p['profit_factor']:.2f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Max Drawdown</div>
-                    <div class="metric-value {'positive' if p['max_drawdown_pct'] < 10 else 'negative'}">{p['max_drawdown_pct']:.2f}%</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Risk-Adjusted Ratios -->
-        <div class="section">
-            <h2>📐 Risk-Adjusted Ratios</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Sharpe Ratio</div>
-                    <div class="metric-value {sharpe_color}">{p['sharpe_ratio']:.3f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Sortino Ratio</div>
-                    <div class="metric-value {'positive' if p['sortino_ratio'] >= 1 else 'neutral'}">{p['sortino_ratio']:.3f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Calmar Ratio</div>
-                    <div class="metric-value {'positive' if p['calmar_ratio'] >= 1 else 'neutral'}">{p['calmar_ratio']:.3f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Recovery Factor</div>
-                    <div class="metric-value {'positive' if p['recovery_factor'] >= 2 else 'neutral'}">{p['recovery_factor']:.3f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Expectancy</div>
-                    <div class="metric-value {'positive' if p['expectancy'] > 0 else 'negative'}">${p['expectancy']:,.2f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Duration</div>
-                    <div class="metric-value neutral">{p['duration_days']}d</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Equity Curve -->
-        <div class="section">
-            <h2>📉 Equity & Drawdown Curves</h2>
-            <div class="chart-container">
-                <canvas id="equityChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="drawdownChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Per-Symbol Breakdown -->
-        <div class="section">
-            <h2>🎯 Per-Symbol Breakdown</h2>
-            <div class="chart-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Symbol</th><th>Trades</th><th>Win Rate</th>
-                            <th>Net Profit</th><th>Profit Factor</th><th>Max DD</th>
-                        </tr>
-                    </thead>
-                    <tbody>{symbol_rows}</tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Streaks -->
-        <div class="section">
-            <h2>🔢 Trade Statistics</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Max Consec. Wins</div>
-                    <div class="metric-value positive">{p['max_consecutive_wins']}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Max Consec. Losses</div>
-                    <div class="metric-value negative">{p['max_consecutive_losses']}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Avg Drawdown</div>
-                    <div class="metric-value">{p['avg_drawdown_pct']:.2f}%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Final Balance</div>
-                    <div class="metric-value">${p['final_balance']:,.2f}</div>
-                </div>
-            </div>
-        </div>
-
-        {mc_section}
-
-    </div>
-
-    <div class="footer">
-        <strong>Galaxy Vast AI Trading Platform</strong> — {self.VERSION} |
-        Institutional Intelligence System |
-        Report generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
-    </div>
-
-    <script>
-    const labels = {labels};
-    const equityData = {equity_data};
-    const ddData = {dd_data};
-
-    new Chart(document.getElementById('equityChart'), {{
-        type: 'line',
-        data: {{
-            labels: labels,
-            datasets: [{{
-                label: 'Portfolio Equity ($)',
-                data: equityData,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59,130,246,0.08)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0,
-            }}]
-        }},
-        options: {{
-            responsive: true,
-            plugins: {{ legend: {{ labels: {{ color: '#94a3b8' }} }} }},
-            scales: {{
-                x: {{ ticks: {{ color: '#6b7280', maxTicksLimit: 10 }}, grid: {{ color: '#1f2937' }} }},
-                y: {{ ticks: {{ color: '#6b7280' }}, grid: {{ color: '#1f2937' }} }}
-            }}
-        }}
-    }});
-
-    new Chart(document.getElementById('drawdownChart'), {{
-        type: 'line',
-        data: {{
-            labels: labels,
-            datasets: [{{
-                label: 'Drawdown (%)',
-                data: ddData.map(v => -v),
-                borderColor: '#ef4444',
-                backgroundColor: 'rgba(239,68,68,0.08)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0,
-            }}]
-        }},
-        options: {{
-            responsive: true,
-            plugins: {{ legend: {{ labels: {{ color: '#94a3b8' }} }} }},
-            scales: {{
-                x: {{ ticks: {{ color: '#6b7280', maxTicksLimit: 10 }}, grid: {{ color: '#1f2937' }} }},
-                y: {{ ticks: {{ color: '#6b7280' }}, grid: {{ color: '#1f2937' }} }}
-            }}
-        }}
-    }});
-    </script>
-</body>
-</html>
+<h1>{title}</h1><p>Generated: {ts}</p>
+<div class="card">
+<h2>Executive Summary</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Total Trades</td><td>{p.total_trades}</td></tr>
+<tr><td>Win Rate</td><td>{p.win_rate:.1%}</td></tr>
+<tr><td>Total P&amp;L</td><td class="{'positive' if p.total_pnl>=0 else 'negative'}">${p.total_pnl:+.2f}</td></tr>
+<tr><td>Profit Factor</td><td>{p.profit_factor:.2f}</td></tr>
+<tr><td>Sharpe Ratio</td><td class="{sharpe_color}">{p.sharpe_ratio:.2f}</td></tr>
+<tr><td>Max Drawdown</td><td class="negative">{p.max_drawdown_pct:.2%}</td></tr>
+<tr><td>Calmar Ratio</td><td>{p.calmar_ratio:.2f}</td></tr>
+<tr><td>Expectancy</td><td>${p.expectancy:+.2f}</td></tr>
+</table>
+</div>
+</body></html>"""

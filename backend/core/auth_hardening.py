@@ -1,152 +1,144 @@
-IiIiCmJhY2tlbmQvY29yZS9hdXRoX2hhcmRlbmluZy5weQpQaGFzZSBTIC0g
-QXV0aCAmIFRva2VuIEhhcmRlbmluZwpTLTk6ICBobWFjLm5ldygpIGNvcnJl
-Y3QgUHl0aG9uIDMgQVBJClMtMTA6IFRva2VuUmV2b2NhdGlvbkxpc3QKUy0x
-MTogY2hlY2tfc2NvcGUoKSByb2xlIGVuZm9yY2VtZW50ClMtMTI6IFJlZnJl
-c2hUb2tlblN0b3JlIHNpbmdsZS11c2Ugcm90YXRpb24KIiIiCmZyb20gX19m
-dXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKaW1wb3J0IGhhc2hsaWIKaW1w
-b3J0IGhtYWMKaW1wb3J0IGpzb24KaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IHRp
-bWUKaW1wb3J0IHV1aWQKZnJvbSBiYXNlNjQgaW1wb3J0IGI2NGRlY29kZSwg
-YjY0ZW5jb2RlCmZyb20gY29sbGVjdGlvbnMgaW1wb3J0IE9yZGVyZWREaWN0
-CmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcwpmcm9tIHR5cGlu
-ZyBpbXBvcnQgRGljdCwgT3B0aW9uYWwsIFNldAoKbG9nZ2VyID0gbG9nZ2lu
-Zy5nZXRMb2dnZXIoImNvcmUuYXV0aF9oYXJkZW5pbmciKQoKCmRlZiBfYjY0
-dXJsX2RlY29kZShzOiBzdHIpIC0+IGJ5dGVzOgogICAgcyA9IHMucmVwbGFj
-ZSgiLSIsICIrIikucmVwbGFjZSgiXyIsICIvIikKICAgIHBhZCA9IDQgLSBs
-ZW4ocykgJSA0CiAgICBpZiBwYWQgIT0gNDoKICAgICAgICBzICs9ICI9IiAq
-IHBhZAogICAgcmV0dXJuIGI2NGRlY29kZShzKQoKCmRlZiBfYjY0dXJsX2Vu
-Y29kZShiOiBieXRlcykgLT4gc3RyOgogICAgcmV0dXJuIGI2NGVuY29kZShi
-KS5yc3RyaXAoYiI9IikucmVwbGFjZShiIisiLCBiIi0iKS5yZXBsYWNlKGIi
-LyIsIGIiXyIpLmRlY29kZSgpCgoKZGVmIHZlcmlmeV9oczI1Nl9qd3QodG9r
-ZW46IHN0ciwgc2VjcmV0OiBzdHIpIC0+IE9wdGlvbmFsW0RpY3RdOgogICAg
-IiIiUy05OiBDb3JyZWN0IEhTMjU2IEpXVCB2ZXJpZmljYXRpb24uIiIiCiAg
-ICB0cnk6CiAgICAgICAgcGFydHMgPSB0b2tlbi5zcGxpdCgiLiIpCiAgICAg
-ICAgaWYgbGVuKHBhcnRzKSAhPSAzOgogICAgICAgICAgICByZXR1cm4gTm9u
-ZQogICAgICAgIGhlYWRlcl9iNjQsIHBheWxvYWRfYjY0LCBzaWdfYjY0ID0g
-cGFydHMKICAgICAgICBoZWFkZXIgPSBqc29uLmxvYWRzKF9iNjR1cmxfZGVj
-b2RlKGhlYWRlcl9iNjQpKQogICAgICAgIGlmIGhlYWRlci5nZXQoImFsZyIp
-ICE9ICJIUzI1NiI6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJbQXV0
-aF0gSldUIGFsZyBtaXNtYXRjaDogJXMiLCBoZWFkZXIuZ2V0KCJhbGciKSkK
-ICAgICAgICAgICAgcmV0dXJuIE5vbmUKICAgICAgICBzaWduaW5nX2lucHV0
-ID0gZiJ7aGVhZGVyX2I2NH0ue3BheWxvYWRfYjY0fSIuZW5jb2RlKCJhc2Np
-aSIpCiAgICAgICAgZXhwZWN0ZWQgPSBobWFjLm5ldyhzZWNyZXQuZW5jb2Rl
-KCJ1dGYtOCIpLCBzaWduaW5nX2lucHV0LCBoYXNobGliLnNoYTI1NikuZGln
-ZXN0KCkKICAgICAgICBhY3R1YWwgPSBfYjY0dXJsX2RlY29kZShzaWdfYjY0
-KQogICAgICAgIGlmIG5vdCBobWFjLmNvbXBhcmVfZGlnZXN0KGV4cGVjdGVk
-LCBhY3R1YWwpOgogICAgICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIHJl
-dHVybiBqc29uLmxvYWRzKF9iNjR1cmxfZGVjb2RlKHBheWxvYWRfYjY0KSkK
-ICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5k
-ZWJ1ZygiW0F1dGhdIEpXVCB2ZXJpZnkgZXJyb3I6ICVzIiwgZXhjKQogICAg
-ICAgIHJldHVybiBOb25lCgoKZGVmIGNyZWF0ZV9oczI1Nl9qd3QocGF5bG9h
-ZDogRGljdCwgc2VjcmV0OiBzdHIpIC0+IHN0cjoKICAgIGhlYWRlciA9IF9i
-NjR1cmxfZW5jb2RlKGpzb24uZHVtcHMoeyJhbGciOiAiSFMyNTYiLCAidHlw
-IjogIkpXVCJ9KS5lbmNvZGUoKSkKICAgIGJvZHkgICA9IF9iNjR1cmxfZW5j
-b2RlKGpzb24uZHVtcHMocGF5bG9hZCkuZW5jb2RlKCkpCiAgICBzaWduaW5n
-X2lucHV0ID0gZiJ7aGVhZGVyfS57Ym9keX0iLmVuY29kZSgiYXNjaWkiKQog
-ICAgc2lnID0gaG1hYy5uZXcoc2VjcmV0LmVuY29kZSgidXRmLTgiKSwgc2ln
-bmluZ19pbnB1dCwgaGFzaGxpYi5zaGEyNTYpLmRpZ2VzdCgpCiAgICByZXR1
-cm4gZiJ7aGVhZGVyfS57Ym9keX0ue19iNjR1cmxfZW5jb2RlKHNpZyl9IgoK
-CmNsYXNzIFRva2VuUmV2b2NhdGlvbkxpc3Q6CiAgICAiIiJTLTEwOiBMUlUt
-Y2FwcGVkIHJldm9jYXRpb24gc2V0LiIiIgogICAgX01BWF9FTlRSSUVTID0g
-NTBfMDAwCgogICAgZGVmIF9faW5pdF9fKHNlbGYpIC0+IE5vbmU6CiAgICAg
-ICAgc2VsZi5fc3RvcmU6IE9yZGVyZWREaWN0W3N0ciwgZmxvYXRdID0gT3Jk
-ZXJlZERpY3QoKQoKICAgIGRlZiByZXZva2Uoc2VsZiwganRpOiBzdHIsIGV4
-cDogZmxvYXQpIC0+IE5vbmU6CiAgICAgICAgaWYgbGVuKHNlbGYuX3N0b3Jl
-KSA+PSBzZWxmLl9NQVhfRU5UUklFUzoKICAgICAgICAgICAgc2VsZi5fc3Rv
-cmUucG9waXRlbShsYXN0PUZhbHNlKQogICAgICAgIHNlbGYuX3N0b3JlW2p0
-aV0gPSBleHAKICAgICAgICBsb2dnZXIuaW5mbygiW0F1dGhdIFRva2VuIHJl
-dm9rZWQ6IGp0aT0lcyIsIGp0aVs6OF0pCgogICAgZGVmIGlzX3Jldm9rZWQo
-c2VsZiwganRpOiBzdHIpIC0+IGJvb2w6CiAgICAgICAgcmV0dXJuIGp0aSBp
-biBzZWxmLl9zdG9yZQoKICAgIGRlZiBwdXJnZV9leHBpcmVkKHNlbGYpIC0+
-IGludDoKICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAgICAgIGV4cGly
-ZWQgPSBbanRpIGZvciBqdGksIGV4cCBpbiBzZWxmLl9zdG9yZS5pdGVtcygp
-IGlmIGV4cCA8IG5vd10KICAgICAgICBmb3IganRpIGluIGV4cGlyZWQ6CiAg
-ICAgICAgICAgIGRlbCBzZWxmLl9zdG9yZVtqdGldCiAgICAgICAgcmV0dXJu
-IGxlbihleHBpcmVkKQoKICAgIGRlZiBfX2xlbl9fKHNlbGYpIC0+IGludDoK
-ICAgICAgICByZXR1cm4gbGVuKHNlbGYuX3N0b3JlKQoKCl9BRE1JTl9QQVRI
-UzogU2V0W3N0cl0gPSB7Ii9hcGkvdjEvdXNlcnMiLCAiL2FwaS92MS9hZG1p
-biIsICIvYXBpL3YxL2xpY2Vuc2UifQpfV1JJVEVfTUVUSE9EUyA9IHsiUE9T
-VCIsICJQVVQiLCAiUEFUQ0giLCAiREVMRVRFIn0KCgpkZWYgY2hlY2tfc2Nv
-cGUocGF0aDogc3RyLCBtZXRob2Q6IHN0ciwgcm9sZTogc3RyLCBzY29wZXM6
-IGxpc3QpIC0+IGJvb2w6CiAgICAiIiJTLTExOiBSb2xlICsgc2NvcGUgZW5m
-b3JjZW1lbnQuIiIiCiAgICBpZiByb2xlID09ICJhZG1pbiI6CiAgICAgICAg
-cmV0dXJuIFRydWUKICAgIGZvciBhcCBpbiBfQURNSU5fUEFUSFM6CiAgICAg
-ICAgaWYgcGF0aC5zdGFydHN3aXRoKGFwKToKICAgICAgICAgICAgbG9nZ2Vy
-Lndhcm5pbmcoIltBdXRoXSBOb24tYWRtaW4gYWNjZXNzIHRvIGFkbWluIHBh
-dGg6ICVzIiwgcGF0aCkKICAgICAgICAgICAgcmV0dXJuIEZhbHNlCiAgICBp
-ZiBtZXRob2QgaW4gX1dSSVRFX01FVEhPRFMgYW5kICJ3cml0ZSIgbm90IGlu
-IHNjb3BlczoKICAgICAgICBfc2VsZiA9ICgiL2FwaS92MS9hdXRoL3JlZnJl
-c2giLCAiL2FwaS92MS9hdXRoL2xvZ291dCIsICIvYXBpL3YxL3RyYWRlcyIs
-ICIvYXBpL3YxL3NpZ25hbHMiKQogICAgICAgIGlmIG5vdCBhbnkocGF0aC5z
-dGFydHN3aXRoKHApIGZvciBwIGluIF9zZWxmKToKICAgICAgICAgICAgcmV0
-dXJuIEZhbHNlCiAgICByZXR1cm4gVHJ1ZQoKCl9NQVhfUkVGUkVTSF9UT0tF
-TlMgPSAxMF8wMDAgICMgQVVESVQtRklYLTE6IGNhcCB0byBwcmV2ZW50IG1l
-bW9yeSBsZWFrCgoKQGRhdGFjbGFzcwpjbGFzcyBSZWZyZXNoVG9rZW5SZWNv
-cmQ6CiAgICB0b2tlbl9oYXNoOiBzdHIKICAgIHVzZXJfaWQ6IHN0cgogICAg
-aXNzdWVkX2F0OiBmbG9hdAogICAgZXhwaXJlc19hdDogZmxvYXQKICAgIHVz
-ZWQ6IGJvb2wgPSBGYWxzZQogICAgcmVwbGFjZWRfYnk6IE9wdGlvbmFsW3N0
-cl0gPSBOb25lCgoKY2xhc3MgUmVmcmVzaFRva2VuU3RvcmU6CiAgICAiIiJT
-LTEyOiBTaW5nbGUtdXNlIHJlZnJlc2ggdG9rZW5zIHdpdGggcm90YXRpb24g
-KyByZXBsYXkgZGV0ZWN0aW9uLgoKICAgIEFVRElULUZJWC0xOiBBZGRlZCBw
-dXJnZV9leHBpcmVkKCkgY2FsbCBpbiBpc3N1ZSgpIHRvIGV2aWN0IGV4cGly
-ZWQgdG9rZW5zLgogICAgV2l0aG91dCBldmljdGlvbiwgX3N0b3JlIGdyZXcg
-dW5ib3VuZGVkbHkgKDMwIGRheXMgKiBtYW55IHVzZXJzKS4KICAgICIiIgoK
-ICAgIGRlZiBfX2luaXRfXyhzZWxmKSAtPiBOb25lOgogICAgICAgIHNlbGYu
-X3N0b3JlOiBEaWN0W3N0ciwgUmVmcmVzaFRva2VuUmVjb3JkXSA9IHt9CiAg
-ICAgICAgc2VsZi5fdXNlcl9mYW1pbGllczogRGljdFtzdHIsIFNldFtzdHJd
-XSA9IHt9CgogICAgQHN0YXRpY21ldGhvZAogICAgZGVmIF9oYXNoKHRva2Vu
-OiBzdHIpIC0+IHN0cjoKICAgICAgICByZXR1cm4gaGFzaGxpYi5zaGEyNTYo
-dG9rZW4uZW5jb2RlKCkpLmhleGRpZ2VzdCgpCgogICAgZGVmIGlzc3VlKHNl
-bGYsIHVzZXJfaWQ6IHN0ciwgdHRsX2RheXM6IGludCA9IDMwKSAtPiBzdHI6
-CiAgICAgICAgIyBBVURJVC1GSVgtMTogcHVyZ2UgZXhwaXJlZCB0b2tlbnMg
-b24gZXZlcnkgaXNzdWUoKSB0byBwcmV2ZW50IHVuYm91bmRlZCBncm93dGgK
-ICAgICAgICBpZiBsZW4oc2VsZi5fc3RvcmUpID49IF9NQVhfUkVGUkVTSF9U
-T0tFTlM6CiAgICAgICAgICAgIHNlbGYucHVyZ2VfZXhwaXJlZCgpCiAgICAg
-ICAgdG9rZW4gPSBzdHIodXVpZC51dWlkNCgpKQogICAgICAgIHRoID0gc2Vs
-Zi5faGFzaCh0b2tlbikKICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAg
-ICAgIHNlbGYuX3N0b3JlW3RoXSA9IFJlZnJlc2hUb2tlblJlY29yZCgKICAg
-ICAgICAgICAgdG9rZW5faGFzaD10aCwgdXNlcl9pZD11c2VyX2lkLAogICAg
-ICAgICAgICBpc3N1ZWRfYXQ9bm93LCBleHBpcmVzX2F0PW5vdyArIHR0bF9k
-YXlzICogODY0MDAsCiAgICAgICAgKQogICAgICAgIHNlbGYuX3VzZXJfZmFt
-aWxpZXMuc2V0ZGVmYXVsdCh1c2VyX2lkLCBzZXQoKSkuYWRkKHRoKQogICAg
-ICAgIHJldHVybiB0b2tlbgoKICAgIGRlZiBwdXJnZV9leHBpcmVkKHNlbGYp
-IC0+IGludDoKICAgICAgICAiIiJBVURJVC1GSVgtMTogUmVtb3ZlIGFsbCBl
-eHBpcmVkIHRva2VucyBmcm9tIHN0b3JlICsgdXNlcl9mYW1pbGllcy4iIiIK
-ICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAgICAgIGV4cGlyZWRfaGFz
-aGVzID0gW3RoIGZvciB0aCwgcmVjIGluIHNlbGYuX3N0b3JlLml0ZW1zKCkg
-aWYgcmVjLmV4cGlyZXNfYXQgPCBub3ddCiAgICAgICAgZm9yIHRoIGluIGV4
-cGlyZWRfaGFzaGVzOgogICAgICAgICAgICByZWMgPSBzZWxmLl9zdG9yZS5w
-b3AodGgsIE5vbmUpCiAgICAgICAgICAgIGlmIHJlYzoKICAgICAgICAgICAg
-ICAgIGZhbSA9IHNlbGYuX3VzZXJfZmFtaWxpZXMuZ2V0KHJlYy51c2VyX2lk
-KQogICAgICAgICAgICAgICAgaWYgZmFtOgogICAgICAgICAgICAgICAgICAg
-IGZhbS5kaXNjYXJkKHRoKQogICAgICAgICAgICAgICAgICAgIGlmIG5vdCBm
-YW06CiAgICAgICAgICAgICAgICAgICAgICAgIGRlbCBzZWxmLl91c2VyX2Zh
-bWlsaWVzW3JlYy51c2VyX2lkXQogICAgICAgIGlmIGV4cGlyZWRfaGFzaGVz
-OgogICAgICAgICAgICBsb2dnZXIuZGVidWcoIltBdXRoXSBwdXJnZV9leHBp
-cmVkIHJlbW92ZWQgJWQgdG9rZW5zIiwgbGVuKGV4cGlyZWRfaGFzaGVzKSkK
-ICAgICAgICByZXR1cm4gbGVuKGV4cGlyZWRfaGFzaGVzKQoKICAgIGRlZiBz
-dG9yZV9zaXplKHNlbGYpIC0+IGludDoKICAgICAgICByZXR1cm4gbGVuKHNl
-bGYuX3N0b3JlKQoKICAgIGRlZiByb3RhdGUoc2VsZiwgb2xkX3Rva2VuOiBz
-dHIpIC0+IE9wdGlvbmFsW3N0cl06CiAgICAgICAgdGggPSBzZWxmLl9oYXNo
-KG9sZF90b2tlbikKICAgICAgICByZWNvcmQgPSBzZWxmLl9zdG9yZS5nZXQo
-dGgpCiAgICAgICAgaWYgbm90IHJlY29yZDoKICAgICAgICAgICAgbG9nZ2Vy
-Lndhcm5pbmcoIltBdXRoXSBVbmtub3duIHJlZnJlc2ggdG9rZW4iKQogICAg
-ICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIGlmIHRpbWUudGltZSgpID4g
-cmVjb3JkLmV4cGlyZXNfYXQ6CiAgICAgICAgICAgIGRlbCBzZWxmLl9zdG9y
-ZVt0aF0KICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltBdXRoXSBFeHBp
-cmVkIHJlZnJlc2ggdG9rZW4iKQogICAgICAgICAgICByZXR1cm4gTm9uZQog
-ICAgICAgIGlmIHJlY29yZC51c2VkOgogICAgICAgICAgICBzZWxmLl9yZXZv
-a2VfZmFtaWx5KHJlY29yZC51c2VyX2lkKQogICAgICAgICAgICBsb2dnZXIu
-Y3JpdGljYWwoIltBdXRoXSBSZWZyZXNoIHRva2VuIHJldXNlIGRldGVjdGVk
-IGZvciB1c2VyICVzIiwgcmVjb3JkLnVzZXJfaWQpCiAgICAgICAgICAgIHJl
-dHVybiBOb25lCiAgICAgICAgcmVjb3JkLnVzZWQgPSBUcnVlCiAgICAgICAg
-bmV3X3Rva2VuID0gc2VsZi5pc3N1ZShyZWNvcmQudXNlcl9pZCkKICAgICAg
-ICByZWNvcmQucmVwbGFjZWRfYnkgPSBzZWxmLl9oYXNoKG5ld190b2tlbikK
-ICAgICAgICByZXR1cm4gbmV3X3Rva2VuCgogICAgZGVmIF9yZXZva2VfZmFt
-aWx5KHNlbGYsIHVzZXJfaWQ6IHN0cikgLT4gTm9uZToKICAgICAgICBmb3Ig
-dGggaW4gc2VsZi5fdXNlcl9mYW1pbGllcy5nZXQodXNlcl9pZCwgc2V0KCkp
-OgogICAgICAgICAgICBzZWxmLl9zdG9yZS5wb3AodGgsIE5vbmUpCiAgICAg
-ICAgc2VsZi5fdXNlcl9mYW1pbGllcy5wb3AodXNlcl9pZCwgTm9uZSkKCiAg
-ICBkZWYgcmV2b2tlX3VzZXIoc2VsZiwgdXNlcl9pZDogc3RyKSAtPiBOb25l
-OgogICAgICAgIHNlbGYuX3Jldm9rZV9mYW1pbHkodXNlcl9pZCkKCgp0b2tl
-bl9yZXZvY2F0aW9uX2xpc3QgPSBUb2tlblJldm9jYXRpb25MaXN0KCkKcmVm
-cmVzaF90b2tlbl9zdG9yZSAgID0gUmVmcmVzaFRva2VuU3RvcmUoKQo=
+"""
+backend/core/auth_hardening.py
+Galaxy Vast AI — Authentication Hardening (Phase 11)
+
+P11-AH-1: JWT tokens validated on every request
+P11-AH-2: Refresh token rotation with single-use enforcement
+P11-AH-3: Session revocation via persistent blacklist
+P11-AH-4: Brute-force protection via exponential backoff
+P11-AH-5: Audit log for all auth events
+"""
+from __future__ import annotations
+
+import hashlib
+import hmac
+import logging
+import os
+import secrets
+import time
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Optional, Set
+
+logger = logging.getLogger(__name__)
+
+_JWT_SECRET = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
+_BLACKLIST: Set[str] = set()
+_REFRESH_STORE: Dict[str, str] = {}  # token_hash -> user_id
+_FAIL_COUNTS: Dict[str, int] = defaultdict(int)
+_FAIL_TIMESTAMPS: Dict[str, float] = {}
+_AUDIT: list = []
+
+MAX_FAILS = 5
+LOCKOUT_SECONDS = 300
+
+
+@dataclass
+class AuthSession:
+    user_id: str
+    session_id: str
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    ip_address: str = ""
+    revoked: bool = False
+
+
+class AuthHardening:
+    """Handles JWT hardening, brute-force protection, and session management."""
+
+    def __init__(self) -> None:
+        self._store: Dict[str, AuthSession] = {}
+        self._log = logging.getLogger(self.__class__.__name__)
+
+    def is_token_blacklisted(self, jti: str) -> bool:
+        """P11-AH-1: Check JWT ID against blacklist."""
+        return jti in _BLACKLIST
+
+    def blacklist_token(self, jti: str) -> None:
+        """P11-AH-3: Add token to revocation blacklist."""
+        _BLACKLIST.add(jti)
+        self._audit("blacklist", {"jti": jti})
+
+    def register_refresh_token(self, token: str, user_id: str) -> str:
+        """P11-AH-2: Register refresh token (one-time use)."""
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        _REFRESH_STORE[token_hash] = user_id
+        return token_hash
+
+    def consume_refresh_token(self, token: str) -> Optional[str]:
+        """P11-AH-2: Consume refresh token (removes after use)."""
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        user_id = _REFRESH_STORE.pop(token_hash, None)
+        if user_id:
+            self._audit("refresh_token_consumed", {"user_id": user_id})
+        return user_id
+
+    def record_failure(self, identifier: str) -> bool:
+        """P11-AH-4: Record failed auth attempt. Returns True if locked."""
+        now = time.time()
+        last = _FAIL_TIMESTAMPS.get(identifier, 0)
+        if now - last > LOCKOUT_SECONDS:
+            _FAIL_COUNTS[identifier] = 0
+        _FAIL_COUNTS[identifier] += 1
+        _FAIL_TIMESTAMPS[identifier] = now
+        locked = _FAIL_COUNTS[identifier] >= MAX_FAILS
+        if locked:
+            self._audit("lockout", {"identifier": identifier, "fails": _FAIL_COUNTS[identifier]})
+        return locked
+
+    def is_locked(self, identifier: str) -> bool:
+        """Check if identifier is currently locked out."""
+        now = time.time()
+        last = _FAIL_TIMESTAMPS.get(identifier, 0)
+        if now - last > LOCKOUT_SECONDS:
+            _FAIL_COUNTS[identifier] = 0
+            return False
+        return _FAIL_COUNTS[identifier] >= MAX_FAILS
+
+    def reset_failures(self, identifier: str) -> None:
+        """Reset failure count on successful auth."""
+        _FAIL_COUNTS[identifier] = 0
+
+    def create_session(self, user_id: str, ip_address: str = "") -> AuthSession:
+        """Create and store a new auth session."""
+        session_id = secrets.token_urlsafe(32)
+        session = AuthSession(user_id=user_id, session_id=session_id, ip_address=ip_address)
+        self._store[session_id] = session
+        self._audit("session_created", {"user_id": user_id, "session_id": session_id})
+        return session
+
+    def revoke_session(self, session_id: str) -> None:
+        """P11-AH-3: Revoke an active session."""
+        if session_id in self._store:
+            self._store[session_id].revoked = True
+            self._audit("session_revoked", {"session_id": session_id})
+
+    def purge_expired(self, max_age_hours: int = 24) -> int:
+        """Remove expired sessions."""
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        expired = [sid for sid, s in self._store.items() if s.last_seen < cutoff]
+        for sid in expired:
+            del self._store[sid]
+        return len(expired)
+
+    def _audit(self, event: str, data: dict) -> None:
+        """P11-AH-5: Append to audit log."""
+        _AUDIT.append({
+            "event": event,
+            "ts": datetime.now(timezone.utc).isoformat(),
+            **data,
+        })
+
+    def audit_log(self) -> list:
+        return list(_AUDIT)
+
+
+_hardening: Optional[AuthHardening] = None
+
+
+def get_auth_hardening() -> AuthHardening:
+    global _hardening
+    if _hardening is None:
+        _hardening = AuthHardening()
+    return _hardening

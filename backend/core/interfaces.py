@@ -1,1 +1,89 @@
-"""\nbackend/core/interfaces.py\nGalaxy Vast AI Trading Platform — Enterprise Interfaces (SOLID/DI/Clean Architecture)\n\nWHAT THIS FILE DOES:\n  Defines all Protocol (structural typing) interfaces used across the backend.\n  Every concrete class implements one or more of these protocols.\n  Dependency injection uses these types — never concrete classes.\n\nWHY:\n  - Removes circular imports (concrete classes import each other)\n  - Enables unit testing with lightweight mocks\n  - Enforces Liskov Substitution Principle (any impl can replace another)\n  - Single source of truth for interface contracts\n"""\nfrom __future__ import annotations\n\nfrom typing import Any, Dict, List, Optional, Protocol, runtime_checkable\n\n\n# Risk\n\n@runtime_checkable\nclass IRiskGate(Protocol):\n    async def check(self, **kwargs: Any) -> Any: ...\n    @property\n    def name(self) -> str: ...\n\n@runtime_checkable\nclass IRiskOrchestrator(Protocol):\n    async def assess(self, inp: Any) -> Any: ...\n    async def check(self, **kwargs: Any) -> Any: ...\n\n\n# Execution\n\n@runtime_checkable\nclass IOrderBroker(Protocol):\n    async def send_order(self, request: Any) -> Any: ...\n    async def close_position(self, ticket: int, volume: float) -> bool: ...\n    async def get_positions(self) -> List[Any]: ...\n    async def health_check(self) -> bool: ...\n    async def initialize(self) -> bool: ...\n    async def shutdown(self) -> None: ...\n\n@runtime_checkable\nclass IOrderStateMachine(Protocol):\n    async def create_order(self, **kwargs: Any) -> Any: ...\n    async def transition(self, order_id: str, new_state: Any, **meta: Any) -> bool: ...\n    def get_order(self, order_id: str) -> Optional[Any]: ...\n\n@runtime_checkable\nclass IFailureRecovery(Protocol):\n    async def handle_failure(self, order: Any, error: str) -> None: ...\n    def set_retry_callback(self, cb: Any) -> None: ...\n    async def start(self) -> None: ...\n    async def stop(self) -> None: ...\n\n@runtime_checkable\nclass IPositionReconciliation(Protocol):\n    async def run_once(self) -> Any: ...\n    def set_mt5(self, connector: Any) -> None: ...\n    async def start(self) -> None: ...\n    async def stop(self) -> None: ...\n\n\n# Lot Sizing\n\n@runtime_checkable\nclass ILotSizer(Protocol):\n    async def calculate(\n        self,\n        balance: float,\n        stop_loss_pips: float,\n        symbol: str,\n        *,\n        volatility_ratio: float = 1.0,\n        override_risk_pct: Optional[float] = None,\n        win_rate: float = 0.55,\n        avg_rr: float = 1.5,\n    ) -> Any: ...\n\n\n# Agents\n\n@runtime_checkable\nclass IAgent(Protocol):\n    async def analyze(self, context: Dict[str, Any]) -> Any: ...\n    @property\n    def agent_id(self) -> str: ...\n    @property\n    def weight(self) -> float: ...\n\n@runtime_checkable\nclass IVotingEngine(Protocol):\n    async def vote(self, context: Dict[str, Any]) -> Any: ...\n\n\n# Observability\n\n@runtime_checkable\nclass ILogger(Protocol):\n    def info(self, msg: str, **kwargs: Any) -> None: ...\n    def warning(self, msg: str, **kwargs: Any) -> None: ...\n    def error(self, msg: str, **kwargs: Any) -> None: ...\n    def debug(self, msg: str, **kwargs: Any) -> None: ...\n    def critical(self, msg: str, **kwargs: Any) -> None: ...\n\n@runtime_checkable\nclass IMetricsCollector(Protocol):\n    def increment(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None: ...\n    def gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None: ...\n    def histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None: ...\n\n@runtime_checkable\nclass IHealthCheck(Protocol):\n    async def health(self) -> Dict[str, Any]: ...\n
+"""
+backend/core/interfaces.py
+Galaxy Vast AI Trading Platform — Enterprise Interfaces
+
+Abstract base classes and protocols for all major components.
+Enables dependency injection and clean separation of concerns.
+"""
+from __future__ import annotations
+
+import abc
+from typing import Any, Dict, List, Optional
+
+
+class IAgent(abc.ABC):
+    """Abstract trading agent interface."""
+    name: str
+    weight: float = 1.0
+
+    @abc.abstractmethod
+    async def vote(self, context: Dict[str, Any]) -> Any:
+        """Cast a vote given market context."""
+
+    @abc.abstractmethod
+    async def analyze(self, symbol: str, data: Dict) -> Dict[str, Any]:
+        """Analyze market data and return signals."""
+
+
+class IRiskManager(abc.ABC):
+    """Abstract risk management interface."""
+
+    @abc.abstractmethod
+    async def check(self, signal: Dict) -> bool:
+        """Return True if signal passes risk checks."""
+
+    @abc.abstractmethod
+    async def calculate_lot_size(self, symbol: str, risk_pct: float, balance: float) -> float:
+        """Calculate position size based on risk percentage."""
+
+
+class IExecutor(abc.ABC):
+    """Abstract trade executor interface."""
+
+    @abc.abstractmethod
+    async def open_trade(self, signal: Dict) -> Dict:
+        """Open a trade and return order result."""
+
+    @abc.abstractmethod
+    async def close_trade(self, trade_id: str) -> Dict:
+        """Close an open trade."""
+
+    @abc.abstractmethod
+    async def get_open_trades(self) -> List[Dict]:
+        """Return list of currently open trades."""
+
+
+class IDataFeed(abc.ABC):
+    """Abstract market data feed interface."""
+
+    @abc.abstractmethod
+    async def get_tick(self, symbol: str) -> Dict[str, float]:
+        """Get latest tick data for symbol."""
+
+    @abc.abstractmethod
+    async def get_ohlcv(self, symbol: str, timeframe: str, count: int) -> List[Dict]:
+        """Get OHLCV candles for symbol."""
+
+
+class INotifier(abc.ABC):
+    """Abstract notification interface."""
+
+    @abc.abstractmethod
+    async def send(self, message: str, level: str = "INFO", **kwargs) -> bool:
+        """Send a notification. Returns True on success."""
+
+
+class ILicenseValidator(abc.ABC):
+    """Abstract license validation interface."""
+
+    @abc.abstractmethod
+    def is_valid(self) -> bool:
+        """Return True if license is currently valid."""
+
+    @abc.abstractmethod
+    def get_plan(self) -> str:
+        """Return current plan name."""
+
+    @abc.abstractmethod
+    def has_feature(self, feature: str) -> bool:
+        """Return True if feature is included in current plan."""
