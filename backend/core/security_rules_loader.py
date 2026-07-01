@@ -1,1 +1,66 @@
-"""\nbackend/core/security_rules_loader.py\nPhase-5 — Security Rule Engine loader\n\nReads backend/core/security_rules.json and reloads it periodically.\nSecurity AI Agent can update rules at runtime via update_rules().\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport json\nimport logging\nimport os\nimport time\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, Optional\n\nlog = logging.getLogger(__name__)\n\n_DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "security_rules.json")\n\n\n@dataclass(frozen=True)\nclass RateLimitRules:\n    global_max: int\n    auth_login: int\n    auth_register: int\n    auth_refresh: int\n    analysis: int\n    backtest: int\n    websocket: int\n    health: int\n    dynamic_reduction_enabled: bool\n    dynamic_reduction_factor_medium: float\n    dynamic_reduction_factor_high: float\n    dynamic_reduction_factor_critical: float\n\n\n@dataclass(frozen=True)\nclass AnomalyRules:\n    contamination: float\n    n_estimators: int\n    medium: float\n    high: float\n    critical: float\n    retrain_interval_seconds: int\n    min_training_samples: int\n    feature_window_seconds: int\n\n\nclass SecurityRules:\n    def __init__(self, path: Optional[str] = None) -> None:\n        self._path = path or _DEFAULT_PATH\n        self._rules: Dict[str, Any] = {}\n        self._mtime: float = 0.0\n        self._lock = asyncio.Lock()\n        self._last_check = 0.0\n        self._load()\n\n    def _load(self) -> None:\n        try:\n            with open(self._path, "r", encoding="utf-8") as f:\n                self._rules = json.load(f)\n            self._mtime = os.path.getmtime(self._path)\n            log.info("SecurityRules loaded from %s", self._path)\n        except Exception as exc:\n            log.error("SecurityRules failed to load %s: %s", self._path, exc)\n            self._rules = {"auth": {"max_failed_logins": 5}, "rate_limits": {"global_max_requests_per_minute": 120}}\n\n    async def _maybe_reload(self) -> None:\n        now = time.monotonic()\n        if now - self._last_check < 5.0:\n            return\n        self._last_check = now\n        try:\n            mtime = os.path.getmtime(self._path)\n            if mtime > self._mtime:\n                self._load()\n        except OSError:\n            pass\n\n    async def get(self) -> Dict[str, Any]:\n        async with self._lock:\n            await self._maybe_reload()\n            return self._rules\n\n    async def update(self, patch: Dict[str, Any]) -> None:\n        async with self._lock:\n            self._deep_merge(self._rules, patch)\n            with open(self._path, "w", encoding="utf-8") as f:\n                json.dump(self._rules, f, indent=2)\n            self._mtime = os.path.getmtime(self._path)\n            log.info("SecurityRules updated and persisted")\n\n    def _deep_merge(self, base: Dict[str, Any], patch: Dict[str, Any]) -> None:\n        for k, v in patch.items():\n            if isinstance(v, dict) and isinstance(base.get(k), dict):\n                self._deep_merge(base[k], v)\n            else:\n                base[k] = v\n\n    async def rate_limits(self) -> RateLimitRules:\n        r = (await self.get()).get("rate_limits", {})\n        return RateLimitRules(\n            global_max=r.get("global_max_requests_per_minute", 120),\n            auth_login=r.get("auth_login_per_minute", 5),\n            auth_register=r.get("auth_register_per_minute", 3),\n            auth_refresh=r.get("auth_refresh_per_minute", 10),\n            analysis=r.get("analysis_per_minute", 30),\n            backtest=r.get("backtest_per_minute", 10),\n            websocket=r.get("websocket_per_minute", 20),\n            health=r.get("health_per_minute", 300),\n            dynamic_reduction_enabled=r.get("dynamic_reduction_enabled", True),\n            dynamic_reduction_factor_medium=r.get("dynamic_reduction_factor_medium", 0.5),\n            dynamic_reduction_factor_high=r.get("dynamic_reduction_factor_high", 0.25),\n            dynamic_reduction_factor_critical=r.get("dynamic_reduction_factor_critical", 0.0),\n        )\n\n    async def anomaly(self) -> AnomalyRules:\n        a = (await self.get()).get("anomaly_detection", {})\n        return AnomalyRules(\n            contamination=a.get("isolation_forest_contamination", 0.05),\n            n_estimators=a.get("isolation_forest_n_estimators", 200),\n            medium=a.get("anomaly_score_medium", -0.10),\n            high=a.get("anomaly_score_high", -0.25),\n            critical=a.get("anomaly_score_critical", -0.40),\n            retrain_interval_seconds=a.get("retrain_interval_seconds", 3600),\n            min_training_samples=a.get("min_training_samples", 50),\n            feature_window_seconds=a.get("feature_window_seconds", 300),\n        )\n\n\nsecurity_rules = SecurityRules()\n
+"""
+backend/core/security_rules_loader.py
+Galaxy Vast AI — Security Rules Loader
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
+
+
+class SecurityRulesLoader:
+    """Load and manage security rules from config."""
+
+    def __init__(self, rules_path: Optional[str] = None) -> None:
+        self._rules_path = rules_path or os.environ.get('SECURITY_RULES_PATH', '')
+        self._rules: Dict[str, Any] = {}
+        self._loaded = False
+
+    def load(self) -> Dict[str, Any]:
+        if self._rules_path and Path(self._rules_path).exists():
+            try:
+                with open(self._rules_path, 'r') as f:
+                    self._rules = json.load(f)
+                self._loaded = True
+            except Exception as e:
+                _LOG.error('Failed to load security rules: %s', e)
+        else:
+            self._rules = self._default_rules()
+            self._loaded = True
+        return self._rules
+
+    def _default_rules(self) -> Dict[str, Any]:
+        return {
+            'max_login_attempts': 5,
+            'lockout_duration_seconds': 300,
+            'password_min_length': 12,
+            'session_timeout_seconds': 3600,
+            'require_2fa': False,
+        }
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if not self._loaded:
+            self.load()
+        return self._rules.get(key, default)
+
+    @property
+    def rules(self) -> Dict[str, Any]:
+        if not self._loaded:
+            self.load()
+        return self._rules
+
+
+_loader: Optional[SecurityRulesLoader] = None
+
+
+def get_security_rules() -> SecurityRulesLoader:
+    global _loader
+    if _loader is None:
+        _loader = SecurityRulesLoader()
+        _loader.load()
+    return _loader
