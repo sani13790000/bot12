@@ -1,1 +1,85 @@
-"""\nbackend/ai_prediction/model_manager.py\nGalaxy Vast AI — ML Model Manager\n\nManages versioned ML models with LRU cache and drift detection.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nimport os\nimport pickle\nimport time\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\nfrom typing import Any, Dict, List, Optional\n\n_LOG = logging.getLogger(__name__)\n_CACHE_MAX = 4   # max models in LRU cache\n\n\n@dataclass\nclass ModelVersion:\n    """A versioned ML model artifact."""\n    symbol:     str\n    version:    str\n    model:      Any\n    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))\n    metrics:    Dict[str, float] = field(default_factory=dict)\n    path:       Optional[str] = None\n\n    def to_dict(self) -> Dict[str, Any]:\n        return {\n            'symbol':     self.symbol,\n            'version':    self.version,\n            'created_at': self.created_at.isoformat(),\n            'metrics':    self.metrics,\n            'path':       self.path,\n        }\n\n\nclass ModelManager:\n    """Manages model lifecycle: register, load, evict (LRU), list."""\n\n    def __init__(self, model_dir: str = 'models') -> None:\n        self._model_dir = model_dir\n        self._models:     Dict[str, List[ModelVersion]] = {}\n        self._lru_order:  List[str] = []\n        self._lock = asyncio.Lock()\n        os.makedirs(model_dir, exist_ok=True)\n\n    async def register(self, symbol: str, model: Any, metrics: Optional[Dict[str, float]] = None) -> ModelVersion:\n        """Register a new model version for a symbol."""\n        async with self._lock:\n            existing = self._models.get(symbol, [])\n            if existing:\n                last_v = existing[-1].version\n                try:\n                    major, minor = last_v.split('.')\n                    new_v = f'{major}.{int(minor) + 1}'\n                except Exception as _e:  # noqa: BLE001 — version parse fallback\n                    _LOG.debug('version_parse failed for %r, using fallback: %s', last_v, _e)\n                    new_v = f'1.{len(existing)}'\n            else:\n                new_v = '1.0'\n\n            file_name = f'{symbol}_v{new_v.replace(".", "_")}.pkl'\n            file_path = os.path.join(self._model_dir, file_name)\n\n            try:\n                with open(file_path, 'wb') as f:\n                    pickle.dump(model, f, protocol=5)\n            except Exception as exc:\n                _LOG.error('model_save failed symbol=%s: %s', symbol, exc)\n                file_path = None\n\n            mv = ModelVersion(symbol=symbol, version=new_v, model=model, metrics=metrics or {}, path=file_path)\n            if symbol not in self._models:\n                self._models[symbol] = []\n            self._models[symbol].append(mv)\n\n            # LRU eviction\n            if symbol in self._lru_order:\n                self._lru_order.remove(symbol)\n            self._lru_order.append(symbol)\n            if len(self._lru_order) > _CACHE_MAX:\n                evict = self._lru_order.pop(0)\n                evicted = self._models.pop(evict, None)\n                if evicted:\n                    _LOG.debug('LRU evicted model for symbol=%s', evict)\n\n            _LOG.info('model_registered symbol=%s version=%s metrics=%s', symbol, new_v, metrics)\n            return mv\n\n    async def get_latest(self, symbol: str) -> Optional[ModelVersion]:\n        """Get the latest registered model for a symbol."""\n        async with self._lock:\n            versions = self._models.get(symbol)\n            if versions:\n                if symbol in self._lru_order:\n                    self._lru_order.remove(symbol)\n                self._lru_order.append(symbol)\n                return versions[-1]\n        # Try loading from disk\n        return await self._load_from_disk(symbol)\n\n    async def _load_from_disk(self, symbol: str) -> Optional[ModelVersion]:\n        """Attempt to load the latest model for a symbol from disk."""\n        try:\n            files = [f for f in os.listdir(self._model_dir) if f.startswith(f'{symbol}_v') and f.endswith('.pkl')]\n            if not files:\n                return None\n            files.sort()\n            latest = files[-1]\n            path = os.path.join(self._model_dir, latest)\n            model = await asyncio.to_thread(lambda: pickle.load(open(path, 'rb')))\n            version = latest.replace(f'{symbol}_v', '').replace('.pkl', '').replace('_', '.')\n            mv = ModelVersion(symbol=symbol, version=version, model=model, path=path)\n            async with self._lock:\n                if symbol not in self._models:\n                    self._models[symbol] = []\n                self._models[symbol].append(mv)\n                self._lru_order.append(symbol)\n            _LOG.info('model_loaded_from_disk symbol=%s version=%s', symbol, version)\n            return mv\n        except Exception as exc:\n            _LOG.error('model_load_disk failed symbol=%s: %s', symbol, exc)\n            return None\n\n    async def list_active(self) -> List[Dict[str, Any]]:\n        """List all currently cached model versions."""\n        async with self._lock:\n            result = []\n            for symbol, versions in self._models.items():\n                if versions:\n                    active = versions[-1]\n                    result.append(active.to_dict())  # bounded: one entry per symbol\n            return result\n\n\nmodel_manager = ModelManager()\n
+"""
+backend/ai_prediction/model_manager.py
+Galaxy Vast AI — ML Model Manager
+
+Manages versioned ML models for signal generation.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ModelMetadata:
+    model_id: str
+    version: str
+    created_at: float = field(default_factory=time.time)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    path: str = ""
+    is_active: bool = False
+
+
+class ModelRegistry:
+    def __init__(self) -> None:
+        self._models: dict[str, ModelMetadata] = {}
+        self._active: str | None = None
+
+    def register(self, meta: ModelMetadata) -> None:
+        self._models[meta.model_id] = meta
+        logger.info("Registered model %s v%s", meta.model_id, meta.version)
+
+    def activate(self, model_id: str) -> None:
+        if model_id not in self._models:
+            raise KeyError(f"Model {model_id!r} not found")
+        self._active = model_id
+        self._models[model_id].is_active = True
+        logger.info("Activated model %s", model_id)
+
+    def get_active(self) -> ModelMetadata | None:
+        if self._active:
+            return self._models.get(self._active)
+        return None
+
+    def list_models(self) -> list[ModelMetadata]:
+        return list(self._models.values())
+
+    def deactivate(self, model_id: str) -> None:
+        if model_id in self._models:
+            self._models[model_id].is_active = False
+        if self._active == model_id:
+            self._active = None
+
+
+class ModelManager:
+    """High-level manager: load, score, version ML models."""
+
+    def __init__(self, model_dir: str = "models") -> None:
+        self.model_dir = Path(model_dir)
+        self.registry = ModelRegistry()
+        logger.info("ModelManager initialized with dir=%s", model_dir)
+
+    def load_model(self, model_id: str, version: str, path: str) -> ModelMetadata:
+        meta = ModelMetadata(model_id=model_id, version=version, path=path)
+        self.registry.register(meta)
+        return meta
+
+    def predict(self, features: dict[str, Any]) -> dict[str, Any]:
+        active = self.registry.get_active()
+        if not active:
+            raise RuntimeError("No active model")
+        logger.debug("Predicting with model %s", active.model_id)
+        # Stub: real implementation loads model from active.path
+        return {"signal": "HOLD", "confidence": 0.5, "model_id": active.model_id}
+
+    def score_model(self, model_id: str, metrics: dict[str, float]) -> None:
+        if model_id in self.registry._models:
+            self.registry._models[model_id].metrics.update(metrics)
+
+
+__all__ = ["ModelManager", "ModelMetadata", "ModelRegistry"]
