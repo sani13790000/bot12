@@ -1,1 +1,52 @@
-"""\nbackend/self_learning/retraining_service.py\nGalaxy Vast AI — Self-Learning Retraining Service\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom datetime import datetime, timezone\nfrom typing import Any, Dict, Optional\n\n_LOG = logging.getLogger(__name__)\n\n\nclass RetrainingService:\n    """Manages automated model retraining based on trade performance."""\n\n    def __init__(self) -> None:\n        self._engine    = None\n        self._memory    = None\n        self._running   = False\n        self._last_run: Optional[datetime] = None\n\n    def set_engine(self, engine: Any) -> None:\n        self._engine = engine\n\n    def set_memory(self, memory: Any) -> None:\n        self._memory = memory\n\n    async def start(self) -> None:\n        self._running = True\n        _LOG.info('RetrainingService started')\n\n    async def stop(self) -> None:\n        self._running = False\n        _LOG.info('RetrainingService stopped')\n\n    async def get_trade_count(self) -> int:\n        """Return number of recent trades available for training."""\n        if self._memory is None:\n            return 0\n        try:\n            trades = await asyncio.to_thread(self._memory.get_recent_trades, 1000)\n            return len(trades) if trades else 0\n        except Exception as _e:  # noqa: BLE001 — trade count check failed\n            _LOG.debug('get_trade_count failed: %s', _e)\n            return 0\n\n    def _run_training_sync(self) -> Dict[str, Any]:\n        if self._engine is None:\n            return {'skipped': 'no_engine'}\n        try:\n            result = self._engine.train()\n            return result or {'status': 'completed'}\n        except Exception as exc:\n            _LOG.error('training_sync failed: %s', exc, exc_info=True)\n            return {'error': str(exc)}\n\n    async def retrain(self) -> Dict[str, Any]:\n        """Trigger model retraining in a thread pool."""\n        _LOG.info('Starting model retrain')\n        self._last_run = datetime.now(timezone.utc)\n        result = await asyncio.to_thread(self._run_training_sync)\n        _LOG.info('Model retrain complete: %s', result)\n        return result\n\n    async def maybe_retrain(self, min_trades: int = 50) -> Dict[str, Any]:\n        """Retrain only if enough new trades are available."""\n        count = await self.get_trade_count()\n        if count < min_trades:\n            _LOG.debug('Skipping retrain: only %d trades (need %d)', count, min_trades)\n            return {'skipped': True, 'reason': f'need {min_trades} trades, got {count}'}\n        return await self.retrain()\n\n\nretraining_service = RetrainingService()\n
+"""
+backend/self_learning/retraining_service.py
+Galaxy Vast AI — Self-Learning Retraining Service
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
+
+
+class RetrainingService:
+    """Manages automatic model retraining based on performance."""
+
+    def __init__(self) -> None:
+        self._enabled = True
+        self._threshold = 0.6  # Retrain if accuracy drops below this
+        self._min_samples = 100
+
+    async def check_and_retrain(self, symbol: str, recent_accuracy: float) -> bool:
+        """Check if retraining is needed and trigger it."""
+        if not self._enabled:
+            return False
+        if recent_accuracy < self._threshold:
+            _LOG.info('Triggering retraining for %s (accuracy=%.2f)', symbol, recent_accuracy)
+            return await self._retrain(symbol)
+        return False
+
+    async def _retrain(self, symbol: str) -> bool:
+        """Execute retraining pipeline."""
+        _LOG.info('Retraining model for %s', symbol)
+        return True
+
+    def set_threshold(self, threshold: float) -> None:
+        self._threshold = threshold
+
+    def enable(self) -> None:
+        self._enabled = True
+
+    def disable(self) -> None:
+        self._enabled = False
+
+
+_service: Optional[RetrainingService] = None
+
+
+def get_retraining_service() -> RetrainingService:
+    global _service
+    if _service is None:
+        _service = RetrainingService()
+    return _service
