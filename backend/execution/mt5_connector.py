@@ -1,1 +1,316 @@
-"""\nGalaxy Vast AI Trading Platform\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nماژول: MT5Connector\n\nوظیفه:\n  اتصال async به MetaTrader 5 از طریق Bridge HTTP API.\n\nقابلیت‌ها:\n  • باز/بستن پوزیشن‌ها\n  • دریافت اطلاعات حساب و قیمت‌ها\n  • Demo mode\n\nاستفاده:\n  async with MT5Connector(demo_mode=True) as conn:\n      info = await conn.get_account_info()\n"""\n\nfrom __future__ import annotations\nimport logging\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, List, Optional\n\nlogger = logging.getLogger(__name__)\n\ntry:\n    import aiohttp\n    _AIOHTTP_AVAILABLE = True\nexcept ImportError:\n    _AIOHTTP_AVAILABLE = False\n    logger.warning(\"aiohttp نصب نیست — demo mode\")\n\n\n@dataclass\nclass AccountInfo:\n    login: int; server: str; balance: float; equity: float\n    margin: float; free_margin: float; profit: float\n    currency: str; leverage: int\n\n\n@dataclass\nclass TickData:\n    symbol: str; bid: float; ask: float; spread: float; time: str\n\n\n@dataclass\nclass TradeResult:\n    success: bool; ticket: Optional[int]; open_price: Optional[float]\n    error_code: Optional[int]; error_msg: Optional[str]\n\n\n@dataclass\nclass Position:\n    ticket: int; symbol: str; direction: str; lot_size: float\n    open_price: float; current_price: float; sl_price: float\n    tp_price: float; profit: float; swap: float; open_time: str\n\n\nclass MT5Connector:\n    \"\"\"\n    اتصال async به MetaTrader 5 Bridge.\n\n    مثال:\n        async with MT5Connector(demo_mode=True) as conn:\n            account = await conn.get_account_info()\n            result  = await conn.open_position(\"EURUSD\", \"BUY\", 0.01, 1.08, 1.09)\n    \"\"\"\n\n    def __init__(self, base_url: str = \"http://localhost:8181\",\n                 timeout: int = 10, demo_mode: bool = False,\n                 api_key: str = \"\") -> None:\n        self.base_url   = base_url.rstrip(\"/\")\n        self.timeout    = timeout\n        self.demo_mode  = demo_mode or not _AIOHTTP_AVAILABLE\n        self.api_key    = api_key\n        self._session: Optional[Any] = None\n        self._connected = False\n\n    async def connect(self) -> bool:\n        if self.demo_mode:\n            self._connected = True\n            return True\n        try:\n            self._session = aiohttp.ClientSession(\n                timeout=aiohttp.ClientTimeout(total=self.timeout),\n                headers={\"X-API-Key\": self.api_key} if self.api_key else {},\n            )\n            data = await self._get(\"/ping\")\n            self._connected = data.get(\"status\") == \"ok\"\n            return self._connected\n        except Exception as exc:\n            logger.error(\"MT5Connector.connect failed: %s\", exc)\n            return False\n\n    async def disconnect(self) -> None:\n        if self._session:\n            await self._session.close()\n            self._session = None\n        self._connected = False\n\n    @property\n    def is_connected(self) -> bool:\n        return self._connected\n\n    async def get_account_info(self) -> AccountInfo:\n        if self.demo_mode:\n            return AccountInfo(login=12345678, server=\"Demo\",\n                               balance=10000.0, equity=10000.0,\n                               margin=0.0, free_margin=10000.0,\n                               profit=0.0, currency=\"USD\", leverage=100)\n        data = await self._get(\"/account\")\n        return AccountInfo(**data)\n\n    async def get_tick(self, symbol: str) -> TickData:\n        if self.demo_mode:\n            return TickData(symbol=symbol, bid=1.0850, ask=1.0852, spread=2,\n                            time=\"2024-01-01T00:00:00Z\")\n        data = await self._get(f\"/tick/{symbol}\")\n        return TickData(**data)\n\n    async def get_ticks(self, symbols: List[str]) -> Dict[str, TickData]:\n        import asyncio\n        results = await asyncio.gather(*[self.get_tick(s) for s in symbols],\n                                      return_exceptions=True)\n        return {s: r for s, r in zip(symbols, results)\n                if not isinstance(r, Exception)}\n\n    async def open_position(self, symbol: str, direction: str, lot_size: float,\n                            sl_price: float, tp_price: float,\n                            comment: str = \"GalaxyVast\") -> TradeResult:\n        if direction.upper() not in (\"BUY\", \"SELL\"):\n            raise ValueError(f\"direction باید BUY یا SELL باشد، نه '{direction}'\")\n        if lot_size <= 0:\n            raise ValueError(f\"lot_size باید مثبت باشد: {lot_size}\")\n        if self.demo_mode:\n            import random\n            ticket = random.randint(100000, 999999)\n            logger.info(\"MT5.Demo: %s %s %s lot | ticket=%d\",\n                        direction, symbol, lot_size, ticket)\n            return TradeResult(success=True, ticket=ticket,\n                               open_price=1.0851, error_code=None, error_msg=None)\n        data = await self._post(\"/trade/open\", {\n            \"symbol\": symbol, \"direction\": direction.upper(),\n            \"lot_size\": lot_size, \"sl_price\": sl_price,\n            \"tp_price\": tp_price, \"comment\": comment,\n        })\n        return TradeResult(success=data.get(\"success\", False),\n                           ticket=data.get(\"ticket\"),\n                           open_price=data.get(\"open_price\"),\n                           error_code=data.get(\"error_code\"),\n                           error_msg=data.get(\"error_msg\"))\n\n    async def close_position(self, ticket: int,\n                             lot_size: Optional[float] = None) -> TradeResult:\n        if self.demo_mode:\n            return TradeResult(success=True, ticket=ticket,\n                               open_price=None, error_code=None, error_msg=None)\n        payload: dict = {\"ticket\": ticket}\n        if lot_size is not None: payload[\"lot_size\"] = lot_size\n        data = await self._post(\"/trade/close\", payload)\n        return TradeResult(success=data.get(\"success\", False),\n                           ticket=data.get(\"ticket\"),\n                           open_price=data.get(\"close_price\"),\n                           error_code=data.get(\"error_code\"),\n                           error_msg=data.get(\"error_msg\"))\n\n    async def modify_position(self, ticket: int,\n                              sl_price: Optional[float] = None,\n                              tp_price: Optional[float] = None) -> TradeResult:\n        if self.demo_mode:\n            return TradeResult(success=True, ticket=ticket,\n                               open_price=None, error_code=None, error_msg=None)\n        payload = {\"ticket\": ticket}\n        if sl_price is not None: payload[\"sl_price\"] = sl_price\n        if tp_price is not None: payload[\"tp_price\"] = tp_price\n        data = await self._post(\"/trade/modify\", payload)\n        return TradeResult(success=data.get(\"success\", False), ticket=ticket,\n                           open_price=None, error_code=data.get(\"error_code\"),\n                           error_msg=data.get(\"error_msg\"))\n\n    async def get_open_positions(self) -> List[Position]:\n        if self.demo_mode: return []\n        data = await self._get(\"/positions\")\n        return [Position(**p) for p in data.get(\"positions\", [])]\n\n    async def _get(self, path: str) -> dict:\n        if not self._session:\n            raise RuntimeError(\"متصل نیست — ابتدا connect() صدا بزنید\")\n        async with self._session.get(self.base_url + path) as r:\n            r.raise_for_status(); return await r.json()\n\n    async def _post(self, path: str, payload: dict) -> dict:\n        if not self._session:\n            raise RuntimeError(\"متصل نیست — ابتدا connect() صدا بزنید\")\n        async with self._session.post(self.base_url + path, json=payload) as r:\n            r.raise_for_status(); return await r.json()\n\n    async def __aenter__(self) -> \"MT5Connector\":\n        await self.connect(); return self\n\n    async def __aexit__(self, *args: Any) -> None:\n        await self.disconnect()\n
+"""
+backend/execution/mt5_connector.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Async HTTP bridge to the MetaTrader 5 REST gateway.
+
+Usage::
+
+    connector = MT5Connector(base_url="http://localhost:8080", demo=True)
+    await connector.connect()
+    ticket = await connector.place_order(
+        symbol="EURUSD", direction="BUY",
+        volume=0.01, sl=1.0800, tp=1.1050
+    )
+    await connector.close_position(ticket)
+    await connector.disconnect()
+
+Design notes:
+- All I/O is async (aiohttp).
+- demo=True replaces real calls with logged stubs (safe for CI).
+- Retries use exponential back-off (max 3 attempts).
+- Every public method raises MT5Error on unrecoverable failure.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+# ── Sentinel so callers can catch a single exception type ────────────────── #
+
+
+class MT5Error(RuntimeError):
+    """Raised when the MT5 gateway returns an error or is unreachable."""
+
+
+# ── Value objects ─────────────────────────────────────────────────────────── #
+
+
+@dataclass
+class OrderResult:
+    """Result returned by place_order()."""
+    ticket:      int
+    symbol:      str
+    direction:   str          # "BUY" | "SELL"
+    volume:      float
+    open_price:  float
+    sl:          Optional[float] = None
+    tp:          Optional[float] = None
+    raw:         Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class PositionInfo:
+    """Live position snapshot returned by get_position()."""
+    ticket:      int
+    symbol:      str
+    direction:   str
+    volume:      float
+    open_price:  float
+    current_price: float
+    profit:      float
+    sl:          Optional[float] = None
+    tp:          Optional[float] = None
+
+
+# ── Connector ─────────────────────────────────────────────────────────────── #
+
+
+class MT5Connector:
+    """
+    Async HTTP client for the MT5 REST gateway.
+
+    Parameters
+    ----------
+    base_url:
+        Root URL of the MT5 gateway, e.g. ``http://localhost:8080``.
+    timeout_s:
+        Per-request timeout in seconds.
+    max_retries:
+        How many times to retry a failed request before raising MT5Error.
+    demo:
+        When True every write operation is a no-op (returns realistic stubs).
+    """
+
+    def __init__(
+        self,
+        base_url:    str   = "http://localhost:8080",
+        timeout_s:   float = 10.0,
+        max_retries: int   = 3,
+        demo:        bool  = True,
+    ) -> None:
+        self.base_url    = base_url.rstrip("/")
+        self.timeout_s   = timeout_s
+        self.max_retries = max_retries
+        self.demo        = demo
+        self._session: Any = None   # aiohttp.ClientSession
+        self._connected  = False
+
+    # ── Lifecycle ────────────────────────────────────────────────────────── #
+
+    async def connect(self) -> None:
+        """Open the HTTP session and verify the gateway is reachable."""
+        if self._connected:
+            return
+        try:
+            import aiohttp  # type: ignore
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout_s)
+            )
+            if not self.demo:
+                await self._get("/ping")
+            self._connected = True
+            mode = "DEMO" if self.demo else "LIVE"
+            logger.info("[MT5Connector] connected (%s) → %s", mode, self.base_url)
+        except ImportError:
+            # aiohttp not installed: run in stub mode automatically
+            logger.warning("[MT5Connector] aiohttp missing — running in STUB mode")
+            self._connected = True
+            self.demo = True
+
+    async def disconnect(self) -> None:
+        """Close the underlying HTTP session gracefully."""
+        if self._session is not None:
+            await self._session.close()
+            self._session = None
+        self._connected = False
+        logger.info("[MT5Connector] disconnected")
+
+    # ── Trading operations ───────────────────────────────────────────────── #
+
+    async def place_order(
+        self,
+        symbol:    str,
+        direction: str,
+        volume:    float,
+        sl:        Optional[float] = None,
+        tp:        Optional[float] = None,
+        comment:   str = "GalaxyVast",
+    ) -> OrderResult:
+        """
+        Open a market order.
+
+        Parameters
+        ----------
+        symbol:    Instrument, e.g. ``"EURUSD"``.
+        direction: ``"BUY"`` or ``"SELL"``.
+        volume:    Lot size, e.g. ``0.01``.
+        sl:        Stop-loss price (optional).
+        tp:        Take-profit price (optional).
+        comment:   Order comment shown in MT5 terminal.
+
+        Returns
+        -------
+        OrderResult with the assigned ticket number.
+        """
+        self._require_connected()
+        payload = {
+            "symbol":    symbol,
+            "direction": direction.upper(),
+            "volume":    volume,
+            "sl":        sl,
+            "tp":        tp,
+            "comment":   comment,
+        }
+        if self.demo:
+            ticket = hash(f"{symbol}{direction}{volume}") % 1_000_000 + 100_000
+            logger.info("[MT5Connector][DEMO] place_order %s %s %.2f → ticket=%d",
+                        direction, symbol, volume, ticket)
+            return OrderResult(
+                ticket=ticket, symbol=symbol, direction=direction,
+                volume=volume, open_price=0.0, sl=sl, tp=tp,
+            )
+        data = await self._post("/order/open", payload)
+        return OrderResult(
+            ticket=int(data["ticket"]),
+            symbol=symbol,
+            direction=direction,
+            volume=volume,
+            open_price=float(data.get("price", 0.0)),
+            sl=sl,
+            tp=tp,
+            raw=data,
+        )
+
+    async def close_position(self, ticket: int) -> bool:
+        """
+        Close an open position by ticket number.
+
+        Returns True on success, False if the position no longer exists.
+        """
+        self._require_connected()
+        if self.demo:
+            logger.info("[MT5Connector][DEMO] close_position ticket=%d", ticket)
+            return True
+        try:
+            await self._post("/order/close", {"ticket": ticket})
+            return True
+        except MT5Error as exc:
+            if "not found" in str(exc).lower():
+                return False
+            raise
+
+    async def modify_order(
+        self,
+        ticket: int,
+        sl:     Optional[float] = None,
+        tp:     Optional[float] = None,
+    ) -> bool:
+        """Modify stop-loss / take-profit of an open position."""
+        self._require_connected()
+        if self.demo:
+            logger.info("[MT5Connector][DEMO] modify_order ticket=%d sl=%s tp=%s",
+                        ticket, sl, tp)
+            return True
+        payload = {"ticket": ticket, "sl": sl, "tp": tp}
+        await self._post("/order/modify", payload)
+        return True
+
+    async def get_position(self, ticket: int) -> Optional[PositionInfo]:
+        """Fetch live details for a single open position."""
+        self._require_connected()
+        if self.demo:
+            return PositionInfo(
+                ticket=ticket, symbol="EURUSD", direction="BUY",
+                volume=0.01, open_price=1.1000, current_price=1.1010,
+                profit=10.0,
+            )
+        try:
+            data = await self._get(f"/position/{ticket}")
+            return PositionInfo(
+                ticket=int(data["ticket"]),
+                symbol=data["symbol"],
+                direction=data["type"],
+                volume=float(data["volume"]),
+                open_price=float(data["price_open"]),
+                current_price=float(data["price_current"]),
+                profit=float(data["profit"]),
+                sl=data.get("sl"),
+                tp=data.get("tp"),
+            )
+        except MT5Error:
+            return None
+
+    async def get_all_positions(self) -> list[PositionInfo]:
+        """Return all currently open positions."""
+        self._require_connected()
+        if self.demo:
+            return []
+        data = await self._get("/positions")
+        results = []
+        for item in data.get("positions", []):
+            results.append(PositionInfo(
+                ticket=int(item["ticket"]),
+                symbol=item["symbol"],
+                direction=item["type"],
+                volume=float(item["volume"]),
+                open_price=float(item["price_open"]),
+                current_price=float(item["price_current"]),
+                profit=float(item["profit"]),
+                sl=item.get("sl"),
+                tp=item.get("tp"),
+            ))
+        return results
+
+    async def get_account_info(self) -> Dict[str, Any]:
+        """Return account balance, equity, margin, etc."""
+        self._require_connected()
+        if self.demo:
+            return {"balance": 10_000.0, "equity": 10_000.0,
+                    "margin": 0.0, "free_margin": 10_000.0, "leverage": 100}
+        return await self._get("/account")
+
+    # ── Internal HTTP helpers ────────────────────────────────────────────── #
+
+    def _require_connected(self) -> None:
+        if not self._connected:
+            raise MT5Error("MT5Connector.connect() must be called first")
+
+    async def _get(self, path: str) -> Dict[str, Any]:
+        return await self._request("GET", path)
+
+    async def _post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return await self._request("POST", path, json=payload)
+
+    async def _request(
+        self,
+        method: str,
+        path:   str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        url = self.base_url + path
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                async with self._session.request(method, url, **kwargs) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        raise MT5Error(f"HTTP {resp.status} from {url}: {body}")
+                    return await resp.json()
+            except MT5Error:
+                raise
+            except Exception as exc:
+                if attempt == self.max_retries:
+                    raise MT5Error(f"Request {method} {url} failed: {exc}") from exc
+                wait = 2 ** attempt
+                logger.warning("[MT5Connector] attempt %d/%d failed, retry in %ds: %s",
+                               attempt, self.max_retries, wait, exc)
+                await asyncio.sleep(wait)
+        raise MT5Error("unreachable")  # pragma: no cover
+
+
+# ── Module-level singleton (lazy-connected) ───────────────────────────────── #
+mt5_connector = MT5Connector()
