@@ -1,13 +1,9 @@
 """
 backend/core/cache.py
 Galaxy Vast AI -- Two-Level Cache (Local LRU + Redis)
-
-Level 1: In-process LRU dict (zero latency)
-Level 2: Redis (shared across workers, optional)
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from collections import OrderedDict
@@ -17,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 class LRUCache:
-    """Thread-unsafe in-process LRU cache."""
+    """In-process LRU cache with TTL."""
 
     def __init__(self, max_size: int = 1000, ttl: float = 300.0) -> None:
         self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
-        self._max   = max_size
-        self._ttl   = ttl
+        self._max = max_size
+        self._ttl = ttl
 
     def get(self, key: str) -> Optional[Any]:
         item = self._store.get(key)
@@ -36,8 +32,8 @@ class LRUCache:
         return value
 
     def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
-        ttl = ttl if ttl is not None else self._ttl
-        self._store[key] = (value, time.time() + ttl)
+        effective_ttl = ttl if ttl is not None else self._ttl
+        self._store[key] = (value, time.time() + effective_ttl)
         self._store.move_to_end(key)
         if len(self._store) > self._max:
             self._store.popitem(last=False)
@@ -53,25 +49,24 @@ class LRUCache:
 
 
 class TwoLevelCache:
-    """Two-level cache: LRU + optional Redis backend."""
+    """Two-level cache: local LRU + optional Redis."""
 
     def __init__(self, max_local: int = 1000, default_ttl: float = 300.0,
                  redis_url: Optional[str] = None) -> None:
-        self._local   = LRUCache(max_local, default_ttl)
-        self._redis   = None
-        self._ttl     = default_ttl
+        self._local     = LRUCache(max_local, default_ttl)
+        self._redis     = None
+        self._ttl       = default_ttl
         self._redis_url = redis_url
 
     async def connect_redis(self) -> None:
-        """Connect to Redis if url is provided."""
         if not self._redis_url:
             return
         try:
             import aioredis
             self._redis = await aioredis.from_url(self._redis_url)
-            logger.info("Redis cache connected: %s", self._redis_url)
+            logger.info("Redis connected: %s", self._redis_url)
         except ImportError:
-            logger.warning("aioredis not installed -- Redis cache disabled")
+            logger.warning("aioredis not installed")
         except Exception as exc:
             logger.warning("Redis connection failed: %s", exc)
 
@@ -92,12 +87,13 @@ class TwoLevelCache:
         return None
 
     async def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
-        ttl = ttl if ttl is not None else self._ttl
-        self._local.set(key, value, ttl)
+        effective_ttl = ttl if ttl is not None else self._ttl
+        self._local.set(key, value, effective_ttl)
         if self._redis:
             try:
                 import json
-                await self._redis.setex(key, int(ttl), json.dumps(value, default=str))
+                await self._redis.setex(key, int(effective_ttl),
+                                        json.dumps(value, default=str))
             except Exception as exc:
                 logger.debug("Redis set error: %s", exc)
 
