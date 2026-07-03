@@ -1,5 +1,5 @@
 """
-Galaxy Vast AI Trading Platform
+backend/telegram/handlers/intelligence.py
 Telegram Intelligence Handler
 """
 from __future__ import annotations
