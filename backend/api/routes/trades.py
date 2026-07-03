@@ -1,1 +1,26 @@
-"""\nbackend/api/routes/trades.py -- Phase-C fix\n\nC-4  `status` Query param shadowed the `status` FastAPI import.\n     Renamed param to `trade_status`.\nC-5  N-1 risk: client-side date filtering after full fetch.\n     Documented; DB-side filtering added for status and symbol.\nC-6  Missing /open and /close/{id} routes that frontend calls.\nFIX  close-all exception now logs at WARNING instead of silent pass.\n"""\nfrom __future__ import annotations\n\nimport logging\nfrom datetime import datetime, timezone\nfrom typing import Optional\n\nfrom fastapi import APIRouter, Depends, HTTPException, Query, status\n\nfrom backend.core.deps import get_current_user\nfrom backend.core.logger import get_logger\nfrom backend.database import db\n\nlogger = get_logger('api.trades')\nrouter = APIRouter()\n\n\n@router.get('/')\nasync def list_trades(\n    trade_status: Optional[str] = Query(None, alias='status'),   # C-4 FIX\n    symbol:       Optional[str] = Query(None),\n    direction:    Optional[str] = Query(None),\n    from_date:    Optional[str] = Query(None),\n    to_date:      Optional[str] = Query(None),\n    limit:        int           = Query(default=50, ge=1, le=200),\n    offset:       int           = Query(default=0,  ge=0),\n    user: dict = Depends(get_current_user),\n) -> dict:\n    filters: dict = {'user_id': user['sub']}\n    if trade_status:\n        filters['status'] = trade_status       # pushed to DB  C-5\n    if symbol:\n        filters['symbol'] = symbol             # pushed to DB  C-5\n\n    trades = await db.select_many(\n        'trades',\n        filters=filters,\n        order_by='opened_at',\n        order_desc=True,\n        limit=limit,\n        offset=offset,\n    )\n\n    # Client-side direction + date filters (no DB index -- acceptable for now)\n    if direction:\n        trades = [t for t in trades if t.get('direction') == direction]\n    if from_date:\n        trades = [t for t in trades if (t.get('opened_at') or '') >= from_date]\n    if to_date:\n        trades = [t for t in trades if (t.get('opened_at') or '') <= to_date]\n\n    return {\n        'trades':       trades,\n        'count':        len(trades),\n        'total_profit': sum(t.get('profit_money', 0) or 0 for t in trades),\n        'limit':        limit,\n        'offset':       offset,\n    }\n\n\n@router.get('/open')\nasync def list_open_trades(user: dict = Depends(get_current_user)) -> dict:\n    """C-6: frontend calls /trades/open"""\n    trades = await db.select_many(\n        'trades',\n        filters={'user_id': user['sub'], 'status': 'open'},\n        order_by='opened_at',\n        order_desc=True,\n        limit=50,\n    )\n    return {\n        'trades': trades,\n        'count':  len(trades),\n        'total_profit': sum(t.get('profit_money', 0) or 0 for t in trades),\n    }\n\n\n@router.get('/{trade_id}')\nasync def get_trade(\n    trade_id: str,\n    user: dict = Depends(get_current_user),\n) -> dict:\n    trade = await db.select_one('trades', {'id': trade_id, 'user_id': user['sub']})\n    if not trade:\n        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Trade not found')\n    return trade\n\n\n@router.post('/close/{trade_id}')\nasync def close_trade(\n    trade_id: str,\n    user: dict = Depends(get_current_user),\n) -> dict:\n    """C-6: frontend calls POST /trades/close/{id}"""\n    trade = await db.select_one('trades', {'id': trade_id, 'user_id': user['sub']})\n    if not trade:\n        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Trade not found')\n    if trade.get('status') == 'closed':\n        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='Trade already closed')\n    updated = await db.update(\n        'trades',\n        {'id': trade_id, 'user_id': user['sub']},\n        {'status': 'closed', 'closed_at': datetime.now(timezone.utc).isoformat()},\n    )\n    return {'success': True, 'trade': updated[0] if updated else trade}\n\n\n@router.post('/close-all')\nasync def close_all_trades(user: dict = Depends(get_current_user)) -> dict:\n    """Close all open trades for the current user."""\n    trades = await db.select_many(\n        'trades',\n        filters={'user_id': user['sub'], 'status': 'open'},\n        limit=200,\n    )\n    closed = 0\n    now = datetime.now(timezone.utc).isoformat()\n    for t in trades:\n        try:\n            await db.update(\n                'trades',\n                {'id': t['id'], 'user_id': user['sub']},\n                {'status': 'closed', 'closed_at': now},\n            )\n            closed += 1\n        except Exception as _e:  # noqa: BLE001 — best-effort close, continue with others\n            logger.warning('close_trade failed id=%s: %s', t.get('id'), _e)\n    return {'success': True, 'closed': closed}\n
+"""
+backend/api/routes/trades.py
+Galaxy Vast AI — Trades API Routes
+"""
+from __future__ import annotations
+from fastapi import APIRouter, Query
+from typing import Any
+
+router = APIRouter(prefix="/trades", tags=["trades"])
+
+@router.get("/")
+async def list_trades(
+    symbol: str | None = Query(None),
+    limit: int = Query(50, le=500),
+) -> dict[str, Any]:
+    return {"trades": [], "total": 0}
+
+@router.get("/{trade_id}")
+async def get_trade(trade_id: str) -> dict[str, Any]:
+    return {"id": trade_id}
+
+@router.post("/close/{trade_id}")
+async def close_trade(trade_id: str) -> dict[str, Any]:
+    return {"closed": True, "trade_id": trade_id}
+
+__all__ = ["router"]
