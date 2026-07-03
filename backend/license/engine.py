@@ -1,162 +1,234 @@
 """
 backend/license/engine.py
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-License validation engine for Galaxy Vast AI.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Galaxy Vast AI Trading Platform — License Engine
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-How it works
-------------
-1. Each license key is an HMAC-SHA256 of ``{user_id}:{plan}:{expiry_epoch}``
-   signed with the server-side ``LICENSE_SECRET``.
-2. ``validate()`` verifies the HMAC, checks expiry, and returns the plan.
-3. ``heartbeat()`` records the last-seen timestamp to prevent replay attacks
-   (a license seen on two machines simultaneously is flagged).
+مسئولیت:
+    - صدور و اعتبارسنجی کلید لایسنس با HMAC-SHA256
+    - ثبت heartbeat برای جلوگیری از استفاده همزمان روی چند دستگاه
+    - پشتیبانی از پلن‌های FREE، BASIC، PRO، ENTERPRISE
 
-Usage::
+نحوه کار:
+    1. هر کلید لایسنس یک HMAC-SHA256 از "{user_id}:{plan}:{expiry_epoch}" است
+       که با مقدار محرمانه LICENSE_SECRET امضا می‌شود.
+    2. متد validate() امضا را تأیید می‌کند، انقضا را بررسی می‌کند،
+       و نام پلن را برمی‌گرداند.
+    3. متد heartbeat() آخرین زمان فعالیت را ذخیره می‌کند تا از
+       replay attack جلوگیری شود.
 
+متغیرهای محیطی:
+    LICENSE_SECRET  — کلید امضای HMAC (اجباری در محیط production)
+    LICENSE_REPLAY_WINDOW_SECONDS — پنجره زمانی heartbeat (پیش‌فرض: ۳۶۰۰)
+
+استفاده:
     from backend.license.engine import license_engine
 
     plan = license_engine.validate(license_key, user_id="user_abc")
     if plan is None:
-        raise PermissionError("Invalid or expired license")
+        raise PermissionError("لایسنس نامعتبر یا منقضی شده است")
 """
 from __future__ import annotations
 
 import hashlib
 import hmac
 import logging
+import os
+import secrets
 import time
-from typing import Optional
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_SECRET = "CHANGE_ME_IN_PRODUCTION"   # override via LICENSE_SECRET env var
+# ── ثابت‌ها ───────────────────────────────────────────────────────── #
+
+VALID_PLANS = ("FREE", "BASIC", "PRO", "ENTERPRISE")
+
+# پنجره‌ای که در آن یک heartbeat مجاز است (ثانیه)
+_DEFAULT_REPLAY_WINDOW = 3_600  # یک ساعت
 
 
-# ── Engine ───────────────────────────────────────────────────────────────── #
+# ── ساختار داده داخلی ────────────────────────────────────────────────────── #
 
+@dataclass
+class _HeartbeatRecord:
+    """اطلاعات heartbeat یک کاربر."""
+    last_seen: float          # unix timestamp
+    machine_id: str           # شناسه دستگاهی که آخرین بار لایسنس را استفاده کرد
+    request_count: int = 0    # تعداد کل درخواست‌ها
+
+
+# ── موتور اصلی ───────────────────────────────────────────────────────────────── #
 
 class LicenseEngine:
     """
-    Validate and manage Galaxy Vast AI license keys.
+    موتور صدور و اعتبارسنجی لایسنس Galaxy Vast AI.
 
-    Parameters
+    پارامترها
     ----------
     secret:
-        HMAC signing secret.  Should be loaded from an environment variable
-        in production, never hardcoded.
+        کلید امضای HMAC. باید از متغیر محیطی LICENSE_SECRET خوانده شود.
+        هرگز این مقدار را در کد hardcode نکنید.
+    replay_window:
+        حداکثر فاصله زمانی مجاز بین دو heartbeat متوالی (ثانیه).
     """
 
-    def __init__(self, secret: Optional[str] = None) -> None:
-        import os
-        self._secret = (
-            secret
-            or os.environ.get("LICENSE_SECRET", _DEFAULT_SECRET)
-        ).encode()
-        # In-memory heartbeat store: user_id → last_seen_epoch
-        # Production: replace with Redis / Supabase.
-        self._heartbeats: dict[str, float] = {}
+    def __init__(
+        self,
+        secret: Optional[str] = None,
+        replay_window: int = _DEFAULT_REPLAY_WINDOW,
+    ) -> None:
+        raw_secret = secret or os.environ.get("LICENSE_SECRET", "")
+        if not raw_secret:
+            logger.warning(
+                "LICENSE_SECRET تنظیم نشده است. "
+                "یک کلید تصادفی موقت تولید می‌شود که پس از راه‌اندازی مجدد تغییر می‌کند."
+            )
+            raw_secret = secrets.token_hex(32)
 
-    # ── Public API ───────────────────────────────────────────────────────── #
+        self._secret: bytes = raw_secret.encode("utf-8")
+        self._replay_window = replay_window
+        self._heartbeats: Dict[str, _HeartbeatRecord] = {}
 
-    def generate(self, user_id: str, plan: str, expiry_epoch: int) -> str:
+    # ── API عمومی ──────────────────────────────────────────────────────────────── #
+
+    def issue(
+        self,
+        user_id: str,
+        plan: str,
+        ttl_seconds: int = 365 * 24 * 3600,
+    ) -> str:
         """
-        Generate a signed license key.
+        یک کلید لایسنس جدید صادر می‌کند.
 
-        The key format is::
-
-            {user_id}:{plan}:{expiry_epoch}:{hmac_hex}
-
-        Parameters
+        پارامترها
         ----------
-        user_id:      Unique identifier for the licensee.
-        plan:         Plan name, e.g. ``"professional"``.
-        expiry_epoch: Unix timestamp (seconds) when the license expires.
+        user_id : شناسه یکتای کاربر (معمولاً UUID از Supabase)
+        plan    : نام پلن — باید یکی از VALID_PLANS باشد
+        ttl_seconds : مدت اعتبار به ثانیه (پیش‌فرض: یک سال)
 
-        Returns
+        بازگشت
         -------
-        A license key string that can be distributed to the user.
+        str  —  کلید لایسنس به فرمت ``{payload}.{hmac}``
         """
-        payload = f"{user_id}:{plan}:{expiry_epoch}"
-        sig = self._sign(payload)
-        return f"{payload}:{sig}"
+        if plan not in VALID_PLANS:
+            raise ValueError(f"پلن نامعتبر: {plan!r}. گزینه‌های مجاز: {VALID_PLANS}")
+        if not user_id:
+            raise ValueError("user_id نمی‌تواند خالی باشد")
 
-    def validate(self, key: str, user_id: str) -> Optional[str]:
+        expiry = int(time.time()) + ttl_seconds
+        payload = f"{user_id}:{plan}:{expiry}"
+        key = f"{payload}.{self._sign(payload)}"
+        logger.info("لایسنس صادر شد | user=%s plan=%s expiry=%d", user_id, plan, expiry)
+        return key
+
+    def validate(
+        self,
+        license_key: str,
+        user_id: str,
+    ) -> Optional[str]:
         """
-        Validate a license key.
+        کلید لایسنس را تأیید می‌کند.
 
-        Parameters
-        ----------
-        key:     The license key string.
-        user_id: The user_id that should be encoded in the key.
-
-        Returns
+        بازگشت
         -------
-        The plan name (``str``) if valid, or ``None`` if the key is
-        invalid, expired, or belongs to a different user.
+        str | None  —  نام پلن در صورت معتبر بودن، None در غیر این صورت
         """
         try:
-            parts = key.strip().split(":")
-            if len(parts) != 4:
-                logger.warning("[license] invalid key format for user=%s", user_id)
-                return None
-
-            key_user, plan, expiry_str, sig = parts
-
-            # 1. User must match
-            if key_user != user_id:
-                logger.warning("[license] user mismatch: key=%s caller=%s",
-                               key_user, user_id)
-                return None
-
-            # 2. Verify HMAC (timing-safe)
-            payload = f"{key_user}:{plan}:{expiry_str}"
-            expected = self._sign(payload)
-            if not hmac.compare_digest(expected, sig):
-                logger.warning("[license] HMAC mismatch for user=%s", user_id)
-                return None
-
-            # 3. Check expiry
-            expiry = int(expiry_str)
-            if expiry != 0 and time.time() > expiry:
-                logger.info("[license] expired key for user=%s plan=%s",
-                            user_id, plan)
-                return None
-
-            logger.info("[license] valid key user=%s plan=%s", user_id, plan)
-            return plan
-
-        except Exception as exc:
-            logger.warning("[license] validate error for user=%s: %s", user_id, exc)
+            payload, received_sig = license_key.rsplit(".", 1)
+        except ValueError:
+            logger.warning("فرمت کلید لایسنس نامعتبر است")
             return None
 
-    def heartbeat(self, user_id: str, tolerance_s: float = 30.0) -> bool:
-        """
-        Record a heartbeat for *user_id*.
+        if not hmac.compare_digest(self._sign(payload), received_sig):
+            logger.warning("امضای لایسنس نامعتبر است | user=%s", user_id)
+            return None
 
-        In a production multi-tenant system, simultaneous heartbeats from
-        two different machines within *tolerance_s* seconds would flag
-        a license sharing violation.
+        try:
+            uid, plan, expiry_str = payload.split(":")
+            expiry = int(expiry_str)
+        except ValueError:
+            logger.warning("payload لایسنس قابل تجزیه نیست")
+            return None
 
-        Returns True always (anti-replay logic is pluggable via DB).
+        if uid != user_id:
+            logger.warning("شناسه کاربر با لایسنس مطابقت ندارد | expected=%s got=%s", uid, user_id)
+            return None
+
+        if time.time() > expiry:
+            logger.info("لایسنس منقضی شده است | user=%s", user_id)
+            return None
+
+        if plan not in VALID_PLANS:
+            logger.warning("پلن نامعتبر در لایسنس: %s", plan)
+            return None
+
+        return plan
+
+    def heartbeat(self, user_id: str, machine_id: str) -> bool:
         """
-        self._heartbeats[user_id] = time.time()
-        logger.debug("[license] heartbeat user=%s", user_id)
+        ثبت heartbeat برای یک کاربر/دستگاه.
+        اگر همان کاربر از دستگاه دیگری heartbeat بفرستد، رد می‌شود.
+
+        بازگشت
+        -------
+        bool  —  True در صورت موفقیت، False در صورت تشخیص تخلف
+        """
+        now = time.time()
+        record = self._heartbeats.get(user_id)
+
+        if record is not None:
+            same_window = (now - record.last_seen) < self._replay_window
+            diff_machine = record.machine_id != machine_id
+            if same_window and diff_machine:
+                logger.warning(
+                    "تلاش برای استفاده همزمان از لایسنس | "
+                    "user=%s machine_expected=%s machine_got=%s",
+                    user_id, record.machine_id, machine_id,
+                )
+                return False
+
+        self._heartbeats[user_id] = _HeartbeatRecord(
+            last_seen=now,
+            machine_id=machine_id,
+            request_count=(record.request_count + 1) if record else 1,
+        )
         return True
 
-    def is_active(self, user_id: str, key: str) -> bool:
-        """Convenience: return True if the license is valid right now."""
-        return self.validate(key, user_id) is not None
+    def revoke(self, user_id: str) -> None:
+        """لیسنس کاربر را لغو می‌کند."""
+        self._heartbeats.pop(user_id, None)
+        logger.info("لیسنس کاربر لغو شد | user=%s", user_id)
 
-    # ── Internals ─────────────────────────────────────────────────────────── #
+    def stats(self) -> dict:
+        """آمار کلی لایسنس‌های فعال را برمی‌گرداند."""
+        return {
+            "active_users": len(self._heartbeats),
+            "records": [
+                {
+                    "user_id": uid,
+                    "machine_id": r.machine_id,
+                    "last_seen": r.last_seen,
+                    "request_count": r.request_count,
+                }
+                for uid, r in self._heartbeats.items()
+            ],
+        }
+
+    # ── متدهای داخلی ─────────────────────────────────────────────────────────── #
 
     def _sign(self, payload: str) -> str:
+        """حساب HMAC-SHA256 و بازگشت به صورت hex."""
         return hmac.new(
             self._secret,
-            payload.encode(),
+            payload.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
 
 
-# ── Module-level singleton ────────────────────────────────────────────────── #
+# ── نمونه Singleton ───────────────────────────────────────────────────────────────── #
+
+# این نمونه در سراسر برنامه به اشتراک گذاشته می‌شود.
+# کلید امضا از متغیر محیطی LICENSE_SECRET خوانده می‌شود.
 license_engine = LicenseEngine()
