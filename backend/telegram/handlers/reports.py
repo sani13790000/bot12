@@ -1,115 +1,112 @@
 """
-========================================================
-Reports Handler - Galaxy Vast AI Trading Platform
-Trade performance reports via Telegram
-========================================================
+backend/telegram/handlers/reports.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Telegram handlers for performance reports.
+
+Commands
+--------
+/report daily    — today’s P&L summary
+/report weekly   — last 7 days
+/report monthly  — last 30 days
+/report all      — all-time stats
 """
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
-
-from aiogram import Router, types
-from aiogram.filters import Command
-from aiogram.utils.formatting import Bold as hbold
-
-from ...core.rbac import Permission, require_permission
 
 logger = logging.getLogger(__name__)
-router = Router()
 
-_API_BASE = "http://localhost:8000/api/v1"
-
-
-def _format_number(n: float, decimals: int = 2) -> str:
-    """Format a float with thousand separators."""
-    return f"{n:,.{decimals}f}"
+PERIOD_DAYS = {"daily": 1, "weekly": 7, "monthly": 30, "all": 0}
 
 
-def _format_pnl(pnl: float) -> str:
-    """Format P&L with sign and 2 decimals."""
-    sign = "+" if pnl >= 0 else ""
-    return f"{sign}{pnl:.2f}$"
+# ── Formatter ───────────────────────────────────────────────────────────── #
 
 
-def _format_trade_row(t: Dict[str, Any]) -> str:
-    """Format a single trade row for list display."""
-    symbol    = t.get("symbol", "?")
-    direction = t.get("direction", "?")
-    pnl       = t.get("pnl", 0.0) or 0.0
-    return f"  {symbol} {direction.upper()} {_format_pnl(pnl)}"
+def _format_report(stats: dict, period: str) -> str:
+    """
+    Render a performance stats dict as Telegram Markdown.
+
+    Expected keys (all optional, defaults to zero):
+        total_trades, win_rate, net_pnl, gross_pnl,
+        max_drawdown, avg_rr, best_trade, worst_trade
+    """
+    period_label = period.upper()
+    total  = stats.get("total_trades", 0)
+    wins   = stats.get("winning_trades", 0)
+    losses = stats.get("losing_trades", 0)
+    wr     = stats.get("win_rate", 0.0) * 100
+    net    = stats.get("net_pnl", 0.0)
+    gross  = stats.get("gross_pnl", 0.0)
+    dd     = stats.get("max_drawdown", 0.0) * 100
+    rr     = stats.get("avg_rr", 0.0)
+    best   = stats.get("best_trade", 0.0)
+    worst  = stats.get("worst_trade", 0.0)
+
+    sign = "⬆️" if net >= 0 else "⬇️"
+
+    return (
+        f"📊 *گزارش عملکرد — {period_label}*\n\n"
+        f"📆 تعداد معاملات:  `{total}` (برد: `{wins}` | باخت: `{losses}`)\n"
+        f"🎯 نرخ برد:        `{wr:.1f}%`\n"
+        f"{sign} سود/زیان خالص:  `{net:+.2f}` USD\n"
+        f"💰 سود ناخالص:      `{gross:+.2f}` USD\n"
+        f"📉 حداکثر Drawdown: `{dd:.1f}%`\n"
+        f"⚖️ میانگین R:R:      `{rr:.2f}`\n"
+        f"🔝 بهترین معامله:   `{best:+.2f}` USD\n"
+        f"🔻 بدترین معامله:  `{worst:+.2f}` USD"
+    )
 
 
-async def _api_get(path: str, user_id: int) -> Dict[str, Any]:
-    """GET from internal API."""
-    import aiohttp
-    headers = {"X-Telegram-User-Id": str(user_id)}
+# ── Command handlers ────────────────────────────────────────────────────── #
+
+
+async def cmd_report(update: object, context: object) -> None:
+    """
+    /report [daily|weekly|monthly|all]
+
+    Defaults to daily when no argument is given.
+    """
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{_API_BASE}{path}", headers=headers) as resp:
-                return await resp.json()
+        from telegram import Update
+        from telegram.ext import ContextTypes
+        upd: Update = update  # type: ignore
+        ctx: ContextTypes.DEFAULT_TYPE = context  # type: ignore
+
+        args = ctx.args or []
+        period = args[0].lower() if args else "daily"
+
+        if period not in PERIOD_DAYS:
+            await upd.message.reply_text(
+                "⚠️ دوره معتبر نیست.\n"
+                "*گزینه‌ها:* daily | weekly | monthly | all",
+                parse_mode="Markdown",
+            )
+            return
+
+        await upd.message.reply_text("⏳ در حال دریافت گزارش ...")  # type: ignore
+
+        days  = PERIOD_DAYS[period]
+        stats = await _fetch_stats(days)
+        text  = _format_report(stats, period)
+        await upd.message.reply_text(text, parse_mode="Markdown")
+
     except Exception as exc:
-        logger.error("[Reports] API error %s: %s", path, exc)
+        logger.exception("[reports] cmd_report: %s", exc)
+        try:
+            await update.message.reply_text(f"❌ خطا: {exc}")  # type: ignore
+        except Exception:
+            pass
+
+
+# ── Data access ───────────────────────────────────────────────────────────── #
+
+
+async def _fetch_stats(days: int) -> dict:
+    """Fetch aggregated performance stats from the analytics service."""
+    try:
+        from backend.analytics.analytics_service import analytics_service
+        return await analytics_service.get_performance_stats(days=days)
+    except Exception as exc:
+        logger.warning("[reports] _fetch_stats failed: %s", exc)
         return {}
-
-
-@router.message(Command("report"))
-@require_permission(Permission.USER)
-async def cmd_daily_report(message: types.Message) -> None:
-    """Show daily performance summary."""
-    data = await _api_get("/reports/daily", message.from_user.id)
-    if not data:
-        await message.answer("\u274c \u062f\u0627\u062f\u0647\u200c\u0627\u06cc \u06cc\u0627\u0641\u062a \u0646\u0634\u062f.")
-        return
-
-    pf_str  = f"{data.get('profit_factor', 0):.2f}" if data.get('profit_factor') else "N/A"
-    msg = "\n".join([
-        f"\U0001f4ca {hbold('\u06af\u0632\u0627\u0631\u0634 \u0631\u0648\u0632\u0627\u0646\u0647')}",
-        f"\u2500" * 30,
-        f"  \u0633\u0648\u062f/\u0636\u0631\u0631 \u062e\u0627\u0644\u0635: {_format_pnl(data.get('net_profit', 0))}",
-        f"  \u0648\u06cc\u0646\u200c\u0631\u06cc\u062a: {data.get('win_rate', 0):.1f}%",
-        f"  \u062a\u0639\u062f\u0627\u062f \u0645\u0639\u0627\u0645\u0644\u0627\u062a: {data.get('total_trades', 0)}",
-        f"  \u0645\u06cc\u0627\u0646\u06af\u06cc\u0646 \u0628\u0631\u062f:  +{_format_number(data.get('avg_win', 0))}",
-        f"  \u0645\u06cc\u0627\u0646\u06af\u06cc\u0646 \u0628\u0627\u062e\u062a: -{_format_number(data.get('avg_loss', 0))}",
-        f"  Profit Factor: {pf_str}",
-    ])
-    await message.answer(msg, parse_mode="HTML")
-
-
-@router.message(Command("winrate"))
-@require_permission(Permission.USER)
-async def cmd_winrate(message: types.Message) -> None:
-    """Show win rate breakdown by period."""
-    uid  = message.from_user.id
-    d_day   = await _api_get("/reports/stats?period=day",   uid)
-    d_week  = await _api_get("/reports/stats?period=week",  uid)
-    d_month = await _api_get("/reports/stats?period=month", uid)
-
-    lines = [
-        f"\U0001f3af {hbold('\u06af\u0632\u0627\u0631\u0634 \u0648\u06cc\u0646\u200c\u0631\u06cc\u062a')}",
-        "\u2500" * 30,
-        f"  \u0631\u0648\u0632: {d_day.get('win_rate', 0):.1f}% ({d_day.get('wins', 0)}/{d_day.get('total_trades', 0)})",
-        f"  \u0647\u0641\u062a\u0647: {d_week.get('win_rate', 0):.1f}% ({d_week.get('wins', 0)}/{d_week.get('total_trades', 0)})",
-        f"  \u0645\u0627\u0647: {d_month.get('win_rate', 0):.1f}% ({d_month.get('wins', 0)}/{d_month.get('total_trades', 0)})",
-        "\u2500" * 30,
-        f"\U0001f4b0 \u0633\u0648\u062f \u062e\u0627\u0644\u0635 \u0627\u06cc\u0646 \u0645\u0627\u0647: {_format_pnl(d_month.get('net_profit', 0))}",
-    ]
-    await message.answer("\n".join(lines), parse_mode="HTML")
-
-
-@router.message(Command("trades"))
-@require_permission(Permission.USER)
-async def cmd_recent_trades(message: types.Message) -> None:
-    """Show recent trades (last 24h)."""
-    data = await _api_get("/trades?limit=10", message.from_user.id)
-    trades = data if isinstance(data, list) else data.get("trades", [])
-    if not trades:
-        await message.answer("\u0645\u0639\u0627\u0645\u0644\u0647\u200c\u0627\u06cc \u06cc\u0627\u0641\u062a \u0646\u0634\u062f.")
-        return
-    lines = [
-        f"\U0001f4cb {hbold('\u0622\u062e\u0631\u06cc\u0646 \u0645\u0639\u0627\u0645\u0644\u0627\u062a')}",
-        "\u2500" * 30,
-    ]
-    for t in trades[:10]:
-        lines.append(_format_trade_row(t))
-    await message.answer("\n".join(lines), parse_mode="HTML")

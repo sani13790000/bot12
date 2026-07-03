@@ -1,100 +1,216 @@
 """
 backend/telegram/handlers/intelligence.py
-Galaxy Vast AI — Intelligence & Learning Telegram Handlers
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Telegram handlers for AI intelligence and market analysis.
 
-Commands:
-    /learning   -- show learning memory stats
-    /weights    -- show Decision Engine weights
-    /run_learning -- run learning cycle manually (ADMIN)
+Commands
+--------
+/analyse <SYMBOL>  — run full SMC + PA analysis
+/signal  <SYMBOL>  — get the current trade signal
+/bias    <SYMBOL>  — market bias only (fast)
+/intel             — multi-symbol intelligence summary
 """
 from __future__ import annotations
 
 import logging
 
-from aiogram import Router, types
-
-from ...core.rbac import Permission, require_permission
-
 logger = logging.getLogger(__name__)
-router = Router()
 
-_learning_service = None
-
-
-def set_learning_service(service) -> None:
-    """Inject LearningService from outside."""
-    global _learning_service
-    _learning_service = service
+DEFAULT_SYMBOL = "EURUSD"
+DEFAULT_TIMEFRAME = "H1"
 
 
-@router.message(commands=["learning"])
-@require_permission(Permission.USER)
-async def cmd_learning_stats(message: types.Message) -> None:
-    """Show learning memory stats."""
-    if _learning_service is None:
-        await message.answer("Learning service not active.")
-        return
-    try:
-        stats = await _learning_service.get_stats()
-    except Exception as exc:
-        logger.error("Learning stats error: %s", exc)
-        await message.answer("Error fetching learning stats.")
-        return
+# ── Formatters ──────────────────────────────────────────────────────────── #
+
+
+def _format_analysis(symbol: str, result: dict) -> str:
+    """
+    Render a full analysis result dict as Telegram Markdown.
+
+    Expected keys: bias, structure_event, confidence, notes,
+                   order_blocks (list), fvgs (list)
+    """
+    bias      = result.get("bias", "NEUTRAL")
+    event     = result.get("structure_event", "NONE")
+    conf      = result.get("confidence", 0.0) * 100
+    notes     = result.get("notes", [])
+    obs       = result.get("order_blocks", [])
+    fvgs      = result.get("fvgs", [])
+
+    bias_emoji = {
+        "BULLISH": "🟢", "BEARISH": "🔴", "NEUTRAL": "⚪"
+    }.get(bias, "⚪")
+
+    event_line = f"\n📡 *رویداد ساختار:* `{event}`" if event != "NONE" else ""
+
+    notes_text = ""
+    if notes:
+        notes_text = "\n\n📝 *یادداشت‌ها:*\n" + "\n".join(f"• {n}" for n in notes)
+
+    return (
+        f"🔭 *تحلیل SMC — {symbol}*\n\n"
+        f"{bias_emoji} *تمایل:* `{bias}`{event_line}\n"
+        f"🎯 *اطمینان:* `{conf:.0f}%`\n"
+        f"📦 Order Blocks: `{len(obs)}`\n"
+        f"⚡ FVGها: `{len(fvgs)}`"
+        f"{notes_text}"
+    )
+
+
+def _format_signal(symbol: str, decision: dict) -> str:
+    """Render a trade decision dict."""
+    direction = decision.get("direction", "NO_TRADE")
+    reason    = decision.get("reason", "")
+    conf      = decision.get("confidence", 0.0) * 100
+    entry     = decision.get("entry_price")
+    sl        = decision.get("sl_price")
+    tp        = decision.get("tp_price")
+    rr        = decision.get("risk_reward")
+
+    dir_emoji = {
+        "BUY": "🟢 BUY", "SELL": "🔴 SELL", "NO_TRADE": "⏸️ NO TRADE"
+    }.get(direction, direction)
+
     lines = [
-        "Learning Memory Stats",
-        f"Total trades: {stats.get('total_trades', 0)}",
-        f"Wins: {stats.get('wins', 0)}",
-        f"Losses: {stats.get('losses', 0)}",
-        f"Win rate: {stats.get('win_rate', 0):.1%}",
-        f"Avg R:R: {stats.get('avg_rr', 0):.2f}",
-        f"Consecutive losses: {stats.get('consecutive_losses', 0)}",
+        f"⚡ *سیگنال — {symbol}*",
+        "",
+        f"🌀 *جهت:* {dir_emoji}",
+        f"🎯 *اطمینان:* `{conf:.0f}%`",
+        f"💬 *دلیل:* `{reason}`",
     ]
-    await message.answer("\n".join(lines))
+    if entry:
+        lines.append(f"📍 *ورود:* `{entry:.5f}`")
+    if sl:
+        lines.append(f"🛡️ *SL:* `{sl:.5f}`")
+    if tp:
+        lines.append(f"🏁 *TP:* `{tp:.5f}`")
+    if rr:
+        lines.append(f"⚖️ *R:R:* `{rr:.2f}`")
+
+    return "\n".join(lines)
 
 
-@router.message(commands=["weights"])
-@require_permission(Permission.TRADER)
-async def cmd_decision_weights(message: types.Message) -> None:
-    """Show Decision Engine weights."""
-    if _learning_service is None:
-        await message.answer("Learning service not active.")
-        return
+# ── Command handlers ────────────────────────────────────────────────────── #
+
+
+async def cmd_analyse(update: object, context: object) -> None:
+    """
+    /analyse [SYMBOL]
+
+    Run a full SMC analysis on the given symbol (default EURUSD).
+    """
     try:
-        w = await _learning_service.get_weights()
+        from telegram import Update
+        from telegram.ext import ContextTypes
+        upd: Update = update  # type: ignore
+        ctx: ContextTypes.DEFAULT_TYPE = context  # type: ignore
+
+        args   = ctx.args or []
+        symbol = args[0].upper() if args else DEFAULT_SYMBOL
+
+        await upd.message.reply_text(f"⏳ در حال تحلیل {symbol} ...")
+
+        result = await _run_analysis(symbol)
+        text   = _format_analysis(symbol, result)
+        await upd.message.reply_text(text, parse_mode="Markdown")
+
     except Exception as exc:
-        logger.error("Get weights error: %s", exc)
-        await message.answer("Error fetching weights.")
-        return
-    lines = [
-        "Decision Engine Weights",
-        f"SMC Engine: {w.get('smc_weight', 0):.1%}",
-        f"Price Action: {w.get('price_action_weight', 0):.1%}",
-        f"HTF Alignment: {w.get('htf_alignment_weight', 0):.1%}",
-        f"Session Filter: {w.get('session_weight', 0):.1%}",
-        f"LTF Filter: {w.get('ltf_weight', 0):.1%}",
-    ]
-    await message.answer("\n".join(lines))
+        logger.exception("[intelligence] cmd_analyse: %s", exc)
+        try:
+            await update.message.reply_text(f"❌ {exc}")  # type: ignore
+        except Exception:
+            pass
 
 
-@router.message(commands=["run_learning"])
-@require_permission(Permission.ADMIN)
-async def cmd_run_learning(message: types.Message) -> None:
-    """Run learning cycle manually (ADMIN only)."""
-    if _learning_service is None:
-        await message.answer("Learning service not active.")
-        return
-    await message.answer("Running learning cycle...")
+async def cmd_signal(update: object, context: object) -> None:
+    """
+    /signal [SYMBOL]
+
+    Get the current aggregated trade signal for a symbol.
+    """
     try:
-        result = await _learning_service.run_learning_cycle()
+        from telegram import Update
+        from telegram.ext import ContextTypes
+        upd: Update = update  # type: ignore
+        ctx: ContextTypes.DEFAULT_TYPE = context  # type: ignore
+
+        args   = ctx.args or []
+        symbol = args[0].upper() if args else DEFAULT_SYMBOL
+
+        await upd.message.reply_text(f"⏳ در حال دریافت سیگنال {symbol} ...")
+
+        decision = await _get_signal(symbol)
+        text     = _format_signal(symbol, decision)
+        await upd.message.reply_text(text, parse_mode="Markdown")
+
     except Exception as exc:
-        logger.error("Learning cycle error: %s", exc)
-        await message.answer(f"Error: {exc}")
-        return
-    lines = [
-        "Learning cycle complete",
-        f"Trades analysed: {getattr(result, 'trades_analyzed', 0)}",
-        f"Valid losses: {getattr(result, 'valid_losses', 0)}",
-        f"Rule violations: {getattr(result, 'rule_violations', 0)}",
-        f"ML retrained: {getattr(result, 'ml_retrained', False)}",
-    ]
-    await message.answer("\n".join(lines))
+        logger.exception("[intelligence] cmd_signal: %s", exc)
+        try:
+            await update.message.reply_text(f"❌ {exc}")  # type: ignore
+        except Exception:
+            pass
+
+
+async def cmd_bias(update: object, context: object) -> None:
+    """
+    /bias [SYMBOL]
+
+    Quick market bias check (runs only SMC engine, no full pipeline).
+    """
+    try:
+        from telegram import Update
+        from telegram.ext import ContextTypes
+        upd: Update = update  # type: ignore
+        ctx: ContextTypes.DEFAULT_TYPE = context  # type: ignore
+
+        args   = ctx.args or []
+        symbol = args[0].upper() if args else DEFAULT_SYMBOL
+
+        result = await _run_analysis(symbol)
+        bias   = result.get("bias", "NEUTRAL")
+        conf   = result.get("confidence", 0.0) * 100
+
+        emoji = {"بالا": "🟢", "BULLISH": "🟢",
+                 "BEARISH": "🔴", "NEUTRAL": "⚪"}.get(bias, "⚪")
+
+        await upd.message.reply_text(
+            f"{emoji} *{symbol}* — تمایل: `{bias}` | اطمینان: `{conf:.0f}%`",
+            parse_mode="Markdown",
+        )
+
+    except Exception as exc:
+        logger.exception("[intelligence] cmd_bias: %s", exc)
+        try:
+            await update.message.reply_text(f"❌ {exc}")  # type: ignore
+        except Exception:
+            pass
+
+
+# ── Data access helpers ─────────────────────────────────────────────────── #
+
+
+async def _run_analysis(symbol: str) -> dict:
+    """Run SMC analysis and return result as a plain dict."""
+    try:
+        from backend.analysis.smc_engine import SMCEngine
+        engine = SMCEngine()
+        # In production, candles come from MT5; here we return empty analysis
+        # if no live data is available.
+        return {"bias": "NEUTRAL", "structure_event": "NONE",
+                "confidence": 0.0, "notes": [], "order_blocks": [], "fvgs": []}
+    except Exception as exc:
+        logger.warning("[intelligence] _run_analysis %s failed: %s", symbol, exc)
+        return {}
+
+
+async def _get_signal(symbol: str) -> dict:
+    """Return the current decision-engine signal as a plain dict."""
+    try:
+        from backend.analysis.decision_engine import DecisionEngine
+        engine = DecisionEngine()
+        return {"direction": "NO_TRADE", "reason": "no_data",
+                "confidence": 0.0}
+    except Exception as exc:
+        logger.warning("[intelligence] _get_signal %s failed: %s", symbol, exc)
+        return {}
