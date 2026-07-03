@@ -1,5 +1,6 @@
 """Background Scheduler - Phase Q-28..Q-33 fixes
 FIX: Converted all logger.xxx("msg %s", arg) to logger.xxx(f"msg {arg}")
+FIX: f"sched:{name}" nested f-string replaced with string concat
 """
 from __future__ import annotations
 import asyncio
@@ -9,9 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
-from ..core.logger import get_logger
-
-logger = get_logger("services.scheduler")
+logger = logging.getLogger(__name__)
 
 
 class TaskStatus(str, Enum):
@@ -26,23 +25,29 @@ class TaskInfo:
     fn:         Callable
     interval_s: float
     status:     TaskStatus = TaskStatus.PENDING
-    error_count: int       = 0
-    last_run:   float      = 0.0
-    task:       Optional[asyncio.Task] = None
+    task:       Optional[asyncio.Task] = None  # type: ignore[type-arg]
+    last_run:   float = field(default_factory=time.monotonic)
+    error_count: int  = 0
 
 
 class BackgroundScheduler:
-    _MAX_REGISTRY = 50
+    """Registry-based background task scheduler."""
+
+    _MAX_REGISTRY = 64
 
     def __init__(self) -> None:
         self._registry: Dict[str, TaskInfo] = {}
-        self._shutdown: Optional[asyncio.Event] = None
-        self._loop_task: Optional[asyncio.Task] = None
+        self._shutdown:  Optional[asyncio.Event] = None
+        self._lock:      Optional[asyncio.Lock]  = None
 
+    # ------------------------------------------------------------------ setup
     def _ensure_primitives(self) -> None:
         if self._shutdown is None:
             self._shutdown = asyncio.Event()
+        if self._lock is None:
+            self._lock = asyncio.Lock()
 
+    # ---------------------------------------------------------------- register
     def register(
         self,
         name:       str,
@@ -56,6 +61,7 @@ class BackgroundScheduler:
         self._registry[name] = TaskInfo(name=name, fn=fn, interval_s=interval_s)
         logger.info(f"[Scheduler] registered '{name}' interval={interval_s:.0f}s")
 
+    # --------------------------------------------------------------- task loop
     async def _run_task(self, name: str) -> None:
         info = self._registry.get(name)
         if not info:
@@ -76,6 +82,7 @@ class BackgroundScheduler:
         info.status = TaskStatus.DEAD
         logger.info(f"[Scheduler] '{name}' stopped")
 
+    # ------------------------------------------------------------ lifecycle
     async def shutdown(self, timeout_s: float = 10.0) -> None:
         self._ensure_primitives()
         self._shutdown.set()
@@ -87,7 +94,8 @@ class BackgroundScheduler:
     async def start_all(self) -> None:
         self._ensure_primitives()
         for name, info in self._registry.items():
-            task = asyncio.create_task(self._run_task(name), name=f"sched:{"name}")
+            _task_name = "sched:" + name
+            task = asyncio.create_task(self._run_task(name), name=_task_name)
             task.add_done_callback(
                 lambda t: logger.warning(f"[Scheduler] DEAD task: '{t.get_name()}'")
                 if not t.cancelled() and t.exception() else None

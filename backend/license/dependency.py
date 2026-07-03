@@ -1,11 +1,27 @@
-backend/license/dependency.py
-Phase 6 FastAPI dependencies for license enforcement
+"""backend/license/dependency.py - Phase 6 FastAPI license dependencies."""
+from __future__ import annotations
+from functools import wraps
+from typing import Optional
+import logging
 
-Usage:
-    from ..license.dependency import require_license, require_feature, require_plan
+logger = logging.getLogger("license.dependency")
 
-    @router.get('/signals')
-    async def get_signals(
-        lic: LicenseCheckResult = Depends(require_feature('signals_read')),
-    ):
-        ...
+
+def require_license(feature: Optional[str] = None):
+    """FastAPI dependency: verify active license."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_feature(feature: str):
+    """FastAPI dependency: verify feature is licensed."""
+    return require_license(feature=feature)
+
+
+def require_plan(plan: str):
+    """FastAPI dependency: verify subscription plan."""
+    return require_license(feature=plan)

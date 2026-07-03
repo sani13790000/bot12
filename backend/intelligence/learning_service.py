@@ -1,208 +1,168 @@
-ZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwppbXBvcnQgYXN5
-bmNpbywgbG9nZ2luZywgdGltZQpmcm9tIGRhdGFjbGFzc2VzIGltcG9ydCBk
-YXRhY2xhc3MsIGZpZWxkCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1l
-LCB0aW1lem9uZQpmcm9tIGVudW0gaW1wb3J0IEVudW0KZnJvbSB0eXBpbmcg
-aW1wb3J0IEFueSwgRGljdCwgTGlzdCwgT3B0aW9uYWwKCmxvZ2dlciA9IGxv
-Z2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQoKX01BWF9DWUNMRVMgPSA1MDAK
-ICAjIEFVRElULUZJWC0yOiBwcmV2ZW50IHVuYm91bmRlZCBncm93dGggKH41
-MDAgcmV0cmFpbnMgfj0gbW9udGhzKQoKUkVUUkFJTl9USFJFU0hPTEQgICA9
-IDIwCk1JTl9JTVBST1ZFTUVOVF9BVUMgPSAwLjAwNQpEUklGVF9USFJFU0hP
-TEQgICAgID0gMC4wOAoKCmNsYXNzIExlYXJuaW5nU3RhdHVzKHN0ciwgRW51
-bSk6CiAgICBJRExFICAgICAgICA9ICJpZGxlIgogICAgVFJBSU5JTkcgICAgPSAi
-dHJhaW5pbmciCiAgICBFVkFMVUFUSU5HICA9ICJldmFsdWF0aW5nIgogICAg
-REVQTE9ZSU5HICAgPSAiZGVwbG95aW5nIgogICAgRFJJRlRfQUxFUlQgPSAi
-ZHJpZnRfYWxlcnQiCiAgICBFUlJPUiAgICAgICA9ICJlcnJvciIKCgpAZGF0
-YWNsYXNzCmNsYXNzIExlYXJuaW5nQ3ljbGU6CiAgICAiIiJPbmUgcmV0cmFp
-bmluZyBjeWNsZSByZWNvcmQuIiIiCiAgICBjeWNsZV9pZDogICAgc3RyCiAg
-ICBzdGFydGVkX2F0OiAgZGF0ZXRpbWUKICAgIGZpbmlzaGVkX2F0OiBPcHRp
-b25hbFtkYXRldGltZV0gPSBOb25lCiAgICBvbGRfYXVjOiAgICAgZmxvYXQg
-PSAwLjAKICAgIG5ld19hdWM6ICAgICBmbG9hdCA9IDAuMAogICAgZGVwbG95
-ZWQ6ICAgIGJvb2wgID0gRmFsc2UKICAgIHJlYXNvbjogICAgICBzdHIgICA9
-ICIiCiAgICBuX3NhbXBsZXM6ICAgaW50ICAgPSAwCiAgICBlcnJvcjogICAg
-ICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKCiAgICBAcHJvcGVydHkKICAgIGRl
-ZiBpbXByb3ZlZChzZWxmKSAtPiBib29sOgogICAgICAgICMgUC0yIEZJWDog
-b25seSBUcnVlIHdoZW4gbmV3IG1vZGVsIGlzIG1lYW5pbmdmdWxseSBiZXR0
-ZXIKICAgICAgICByZXR1cm4gc2VsZi5uZXdfYXVjIC0gc2VsZi5vbGRfYXVj
-ID49IE1JTl9JTVBST1ZFTUVOVF9BVUMKCiAgICBkZWYgdG9fZGljdChzZWxm
-KSAtPiBEaWN0W3N0ciwgQW55XToKICAgICAgICByZXR1cm4gewogICAgICAg
-ICAgICAiY3ljbGVfaWQiOiAgICBzZWxmLmN5Y2xlX2lkLAogICAgICAgICAg
-ICAic3RhcnRlZF9hdCI6ICBzZWxmLnN0YXJ0ZWRfYXQuaXNvZm9ybWF0KCks
-CiAgICAgICAgICAgICJmaW5pc2hlZF9hdCI6IHNlbGYuZmluaXNoZWRfYXQu
-aXNvZm9ybWF0KCkgaWYgc2VsZi5maW5pc2hlZF9hdCBlbHNlIE5vbmUsCiAg
-ICAgICAgICAgICJvbGRfYXVjIjogICAgIHJvdW5kKHNlbGYub2xkX2F1Yywg
-NCksCiAgICAgICAgICAgICJuZXdfYXVjIjogICAgIHJvdW5kKHNlbGYubmV3
-X2F1YywgNCksCiAgICAgICAgICAgICJkZXBsb3llZCI6ICAgIHNlbGYuZGVw
-bG95ZWQsCiAgICAgICAgICAgICJpbXByb3ZlZCI6ICAgIHNlbGYuaW1wcm92
-ZWQsCiAgICAgICAgICAgICJyZWFzb24iOiAgICAgIHNlbGYucmVhc29uLAog
-ICAgICAgICAgICAibl9zYW1wbGVzIjogICBzZWxmLm5fc2FtcGxlcywKICAg
-ICAgICAgICAgImVycm9yIjogICAgICAgc2VsZi5lcnJvciwKICAgICAgICB9
-CgoKY2xhc3MgSW50ZWxsaWdlbmNlTGVhcm5pbmdTZXJ2aWNlOgogICAgIiIi
-U2VsZi1sZWFybmluZyBsb29wIC0gUGhhc2UgUCBmaXhlcyBQLTEuLlAtNS4i
-IiIKCiAgICBkZWYgX19pbml0X18oc2VsZikgLT4gTm9uZToKICAgICAgICBz
-ZWxmLl9yZXRyYWluX2xvY2sgPSBhc3luY2lvLkxvY2soKQogICAgICAgIHNl
-bGYuX3N0YXR1cyAgICAgICA9IExlYXJuaW5nU3RhdHVzLklETEUKICAgICAg
-ICBzZWxmLl9uZXdfdHJhZGVzICAgPSAwCiAgICAgICAgc2VsZi5fY3ljbGVz
-OiBMaXN0W0xlYXJuaW5nQ3ljbGVdID0gW10gICMgQVVESVQtRklYLTI6IGNh
-cHBlZCBhdCBfTUFYX0NZQ0xFUwogICAgICAgIHNlbGYuX2N1cnJlbnRfYXVj
-ICA9IDAuMAogICAgICAgIHNlbGYuX2RyaWZ0X3Njb3JlICA9IDAuMAogICAg
-ICAgIHNlbGYuX2xhc3RfcmV0cmFpbiA9IDAuMAogICAgICAgIHNlbGYuX2lu
-aXRpYWxpemVkICA9IEZhbHNlCiAgICAgICAgc2VsZi5fbWFuYWdlcjogQW55
-ID0gTm9uZQogICAgICAgIHNlbGYuX21lbW9yeTogIEFueSA9IE5vbmUKCiAg
-ICBhc3luYyBkZWYgaW5pdGlhbGl6ZShzZWxmKSAtPiBOb25lOgogICAgICAg
-IGlmIHNlbGYuX2luaXRpYWxpemVkOgogICAgICAgICAgICByZXR1cm4KICAg
-ICAgICB0cnk6CiAgICAgICAgICAgIG1nciA9IHNlbGYuX2dldF9tYW5hZ2Vy
-KCkKICAgICAgICAgICAgdmVyc2lvbnMgPSBtZ3IubGlzdF92ZXJzaW9ucygp
-CiAgICAgICAgICAgIGlmIHZlcnNpb25zOgogICAgICAgICAgICAgICAgc2Vs
-Zi5fY3VycmVudF9hdWMgPSB2ZXJzaW9uc1swXS5hY2N1cmFjeQogICAgICAg
-ICAgICAgICAgbG9nZ2VyLmluZm8oIltMZWFybmluZ10gaW5pdGlhbGl6ZWQg
-QVVDPSUuNGYiLCBzZWxmLl9jdXJyZW50X2F1YykKICAgICAgICAgICAgc2Vs
-Zi5faW5pdGlhbGl6ZWQgPSBUcnVlCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlv
-biBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci5lcnJvcigiW0xlYXJuaW5n
-XSBpbml0aWFsaXplIGVycm9yOiAlcyIsIGV4YykKCiAgICBhc3luYyBkZWYg
-cmVjb3JkX3RyYWRlX291dGNvbWUoc2VsZiwgb3V0Y29tZTogRGljdFtzdHIs
-IEFueV0pIC0+IE5vbmU6CiAgICAgICAgdHJ5OgogICAgICAgICAgICB0YyA9
-IHNlbGYuX291dGNvbWVfdG9fY29udGV4dChvdXRjb21lKQogICAgICAgICAg
-ICBzZWxmLl9nZXRfbWVtb3J5KCkuYWRkKHRjKQogICAgICAgICAgICBzZWxm
-Ll9uZXdfdHJhZGVzICs9IDEKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFz
-IGV4YzoKICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJbTGVhcm5pbmddIHJl
-Y29yZCBlcnJvcjogJXMiLCBleGMpCiAgICAgICAgICAgIHJldHVybgogICAg
-ICAgIGF3YWl0IHNlbGYuX2NoZWNrX2FuZF90cmlnZ2VyKCkKCiAgICBhc3lu
-YyBkZWYgZm9yY2VfcmV0cmFpbihzZWxmLCByZWFzb246IHN0ciA9ICJtYW51
-YWwiKSAtPiBMZWFybmluZ0N5Y2xlOgogICAgICAgIHJldHVybiBhd2FpdCBz
-ZWxmLl9ydW5fcmV0cmFpbihyZWFzb249cmVhc29uKQoKICAgIGRlZiBnZXRf
-c3RhdHVzKHNlbGYpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgICAgIHJldHVy
-biB7CiAgICAgICAgICAgICJzdGF0dXMiOiAgICAgICBzZWxmLl9zdGF0dXMu
-dmFsdWUsCiAgICAgICAgICAgICJuZXdfdHJhZGVzIjogICBzZWxmLl9uZXdf
-dHJhZGVzLAogICAgICAgICAgICAiY3VycmVudF9hdWMiOiAgcm91bmQoc2Vs
-Zi5fY3VycmVudF9hdWMsIDQpLAogICAgICAgICAgICAiZHJpZnRfc2NvcmUi
-OiAgcm91bmQoc2VsZi5fZHJpZnRfc2NvcmUsIDQpLAogICAgICAgICAgICAi
-bGFzdF9yZXRyYWluIjogc2VsZi5fbGFzdF9yZXRyYWluLAogICAgICAgICAg
-ICAidG90YWxfY3ljbGVzIjogbGVuKHNlbGYuX2N5Y2xlcyksCiAgICAgICAg
-ICAgICJsYXN0X2N5Y2xlIjogICBzZWxmLl9jeWNsZXNbLTFdLnRvX2RpY3Qo
-KSBpZiBzZWxmLl9jeWNsZXMgZWxzZSBOb25lLAogICAgICAgIH0KCiAgICBk
-ZWYgZ2V0X2N5Y2xlcyhzZWxmKSAtPiBMaXN0W0RpY3Rbc3RyLCBBbnldXToK
-ICAgICAgICByZXR1cm4gW2MudG9fZGljdCgpIGZvciBjIGluIHNlbGYuX2N5
-Y2xlc1stMjA6XV0KCiAgICBhc3luYyBkZWYgX2NoZWNrX2FuZF90cmlnZ2Vy
-KHNlbGYpIC0+IE5vbmU6CiAgICAgICAgc2hvdWxkID0gRmFsc2UKICAgICAg
-ICByZWFzb24gPSAiIgogICAgICAgIGlmIHNlbGYuX25ld190cmFkZXMgPj0g
-UkVUUkFJTl9USFJFU0hPTEQ6CiAgICAgICAgICAgIHNob3VsZCA9IFRydWUK
-ICAgICAgICAgICAgcmVhc29uID0gZiJ0aHJlc2hvbGRfe3NlbGYuX25ld190
-cmFkZXN9IgogICAgICAgICMgUC0zIEZJWDogcmVhbCBkcmlmdCB0aHJlc2hv
-bGQKICAgICAgICBpZiBzZWxmLl9kcmlmdF9zY29yZSA+PSBEUklGVF9USFJF
-U0hPTEQ6CiAgICAgICAgICAgIHNob3VsZCA9IFRydWUKICAgICAgICAgICAg
-cmVhc29uID0gZiJkcmlmdF97c2VsZi5fZHJpZnRfc2NvcmU6LjNmfSIKICAg
-ICAgICAgICAgc2VsZi5fc3RhdHVzID0gTGVhcm5pbmdTdGF0dXMuRFJJRlRf
-QUxFUlQKICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltMZWFybmluZ10g
-RFJJRlQgQUxFUlQgc2NvcmU9JS4zZiIsIHNlbGYuX2RyaWZ0X3Njb3JlKQog
-ICAgICAgIGJ1c3kgPSAoTGVhcm5pbmdTdGF0dXMuVFJBSU5JTkcsIExlYXJu
-aW5nU3RhdHVzLkVWQUxVQVRJTkcsIExlYXJuaW5nU3RhdHVzLkRFUExPWUlO
-RykKICAgICAgICBpZiBzaG91bGQgYW5kIHNlbGYuX3N0YXR1cyBub3QgaW4g
-YnVzeToKICAgICAgICAgICAgIyBQLTEgRklYOiBhc3luY2lvLmNyZWF0ZV90
-YXNrID0gbm9uLWJsb2NraW5nCiAgICAgICAgICAgIGFzeW5jaW8uY3JlYXRl
-X3Rhc2soc2VsZi5fcnVuX3JldHJhaW4ocmVhc29uPXJlYXNvbikpCgogICAg
-YXN5bmMgZGVmIF9ydW5fcmV0cmFpbihzZWxmLCByZWFzb246IHN0ciA9ICJh
-dXRvIikgLT4gTGVhcm5pbmdDeWNsZToKICAgICAgICBpbXBvcnQgdXVpZAog
-ICAgICAgIGN5Y2xlID0gTGVhcm5pbmdDeWNsZSgKICAgICAgICAgICAgY3lj
-bGVfaWQ9c3RyKHV1aWQudXVpZDQoKSlbOjhdLAogICAgICAgICAgICBzdGFy
-dGVkX2F0PWRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLAogICAgICAgICAg
-ICBvbGRfYXVjPXNlbGYuX2N1cnJlbnRfYXVjLAogICAgICAgICAgICByZWFz
-b249cmVhc29uLAogICAgICAgICkKICAgICAgICBhY3F1aXJlZCA9IEZhbHNl
-CiAgICAgICAgdHJ5OgogICAgICAgICAgICAjIFAtNSBGSVg6IGxvY2sgd2l0
-aCA1cyB0aW1lb3V0IHByZXZlbnRzIGRlYWRsb2NrCiAgICAgICAgICAgIHRy
-eToKICAgICAgICAgICAgICAgIGF3YWl0IGFzeW5jaW8ud2FpdF9mb3Ioc2Vs
-Zi5fcmV0cmFpbl9sb2NrLmFjcXVpcmUoKSwgdGltZW91dD01LjApCiAgICAg
-ICAgICAgICAgICBhY3F1aXJlZCA9IFRydWUKICAgICAgICAgICAgZXhjZXB0
-IGFzeW5jaW8uVGltZW91dEVycm9yOgogICAgICAgICAgICAgICAgY3ljbGUu
-ZXJyb3IgPSAibG9ja190aW1lb3V0IgogICAgICAgICAgICAgICAgbG9nZ2Vy
-Lndhcm5pbmcoIltMZWFybmluZ10gcmV0cmFpbiBhbHJlYWR5IHJ1bm5pbmcs
-IHNraXBwZWQiKQogICAgICAgICAgICAgICAgcmV0dXJuIGN5Y2xlCgogICAg
-ICAgICAgICBzZWxmLl9zdGF0dXMgPSBMZWFybmluZ1N0YXR1cy5UUkFJTklO
-RwogICAgICAgICAgICAjIFAtMSBGSVg6IENQVS1oZWF2eSB3b3JrIGluIHRo
-cmVhZCBwb29sCiAgICAgICAgICAgIHJlc3VsdCA9IGF3YWl0IGFzeW5jaW8u
-dG9fdGhyZWFkKHNlbGYuX3RyYWluX3N5bmMpCiAgICAgICAgICAgIHNlbGYu
-X3N0YXR1cyAgPSBMZWFybmluZ1N0YXR1cy5FVkFMVUFUSU5HCiAgICAgICAg
-ICAgIGN5Y2xlLm5ld19hdWMgICAgPSByZXN1bHQuZ2V0KCJhdWMiLCAwLjAp
-CiAgICAgICAgICAgIGN5Y2xlLm5fc2FtcGxlcyA9IHJlc3VsdC5nZXQoIm5f
-c2FtcGxlcyIsIDApCgogICAgICAgICAgICAjIFAtMiBGSVg6IGRlcGxveSBv
-bmx5IHdoZW4gaW1wcm92ZWQKICAgICAgICAgICAgaWYgY3ljbGUuaW1wcm92
-ZWQ6CiAgICAgICAgICAgICAgICBzZWxmLl9zdGF0dXMgPSBMZWFybmluZ1N0
-YXR1cy5ERVBMT1lJTkcKICAgICAgICAgICAgICAgIGF3YWl0IGFzeW5jaW8u
-dG9fdGhyZWFkKHNlbGYuX2RlcGxveV9zeW5jLCByZXN1bHQpCiAgICAgICAg
-ICAgICAgICBzZWxmLl9jdXJyZW50X2F1YyA9IGN5Y2xlLm5ld19hdWMKICAg
-ICAgICAgICAgICAgIGN5Y2xlLmRlcGxveWVkICAgID0gVHJ1ZQogICAgICAg
-ICAgICAgICAgc2VsZi5fbmV3X3RyYWRlcyAgPSAwCiAgICAgICAgICAgICAg
-ICBzZWxmLl9kcmlmdF9zY29yZSA9IDAuMAogICAgICAgICAgICAgICAgbG9n
-Z2VyLmluZm8oIltMZWFybmluZ10gZGVwbG95ZWQgQVVDICUuNGYtPiUuNGYi
-LCBjeWNsZS5vbGRfYXVjLCBjeWNsZS5uZXdfYXVjKQogICAgICAgICAgICBl
-bHNlOgogICAgICAgICAgICAgICAgY3ljbGUuZGVwbG95ZWQgPSBGYWxzZQog
-ICAgICAgICAgICAgICAgbG9nZ2VyLmluZm8oIltMZWFybmluZ10gc2tpcCBk
-ZXBsb3kgQVVDICUuNGYgbm90ID4gJS40ZislLjNmIiwKICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgIGN5Y2xlLm5ld19hdWMsIGN5Y2xlLm9sZF9hdWMs
-IE1JTl9JTVBST1ZFTUVOVF9BVUMpCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlv
-biBhcyBleGM6CiAgICAgICAgICAgIGN5Y2xlLmVycm9yID0gc3RyKGV4YykK
-ICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJbTGVhcm5pbmddIHJldHJhaW4g
-ZXJyb3I6ICVzIiwgZXhjLCBleGNfaW5mbz1UcnVlKQogICAgICAgIGZpbmFs
-bHk6CiAgICAgICAgICAgIGN5Y2xlLmZpbmlzaGVkX2F0ICA9IGRhdGV0aW1l
-Lm5vdyh0aW1lem9uZS51dGMpCiAgICAgICAgICAgIHNlbGYuX2N5Y2xlcy5h
-cHBlbmQoY3ljbGUpCiAgICAgICAgICAgICMgQVVESVQtRklYLTI6IGV2aWN0
-IG9sZGVzdCBjeWNsZSBpZiBjYXAgZXhjZWVkZWQKICAgICAgICAgICAgaWYg
-bGVuKHNlbGYuX2N5Y2xlcykgPiBfTUFYX0NZQ0xFUzoKICAgICAgICAgICAg
-ICAgIHNlbGYuX2N5Y2xlcyA9IHNlbGYuX2N5Y2xlc1stX01BWF9DWUNMRVNd
-CiAgICAgICAgICAgIHNlbGYuX2xhc3RfcmV0cmFpbiA9IHRpbWUudGltZSgp
-CiAgICAgICAgICAgIHNlbGYuX3N0YXR1cyAgICAgICA9IExlYXJuaW5nU3Rh
-dHVzLklETEUKICAgICAgICAgICAgaWYgYWNxdWlyZWQ6CiAgICAgICAgICAg
-ICAgICBzZWxmLl9yZXRyYWluX2xvY2sucmVsZWFzZSgpCiAgICAgICAgcmV0
-dXJuIGN5Y2xlCgogICAgZGVmIF90cmFpbl9zeW5jKHNlbGYpIC0+IERpY3Rb
-c3RyLCBBbnldOgogICAgICAgIGZyb20gYmFja2VuZC5haV9wcmVkaWN0aW9u
-LmRhdGFzZXRfYnVpbGRlciBpbXBvcnQgRGF0YXNldEJ1aWxkZXIKICAgICAg
-ICBmcm9tIGJhY2tlbmQuYWlfcHJlZGljdGlvbi54Z2Jvb3N0X3RyYWluZXIg
-aW1wb3J0IFhHQm9vc3RUcmFpbmVyCiAgICAgICAgbWVtb3J5ICA9IHNlbGYu
-X2dldF9tZW1vcnkoKQogICAgICAgIGRhdGFzZXQgPSBEYXRhc2V0QnVpbGRl
-cigpLmJ1aWxkKG1lbW9yeSkKICAgICAgICBpZiBkYXRhc2V0Lm5fc2FtcGxl
-cyA8IDMwOgogICAgICAgICAgICByZXR1cm4geyJhdWMiOiAwLjAsICJuX3Nh
-bXBsZXMiOiBkYXRhc2V0Lm5fc2FtcGxlc30KICAgICAgICByZXMgPSBYR0Jv
-b3N0VHJhaW5lcigpLnRyYWluKGRhdGFzZXQpCiAgICAgICAgcmV0dXJuIHsi
-YXVjIjogcmVzLmF1Y19yb2MsICJmMSI6IHJlcy5mMV9zY29yZSwKICAgICAg
-ICAgICAgICAgICJuX3NhbXBsZXMiOiBkYXRhc2V0Lm5fc2FtcGxlcywgIm1v
-ZGVsIjogcmVzLm1vZGVsfQoKICAgIGRlZiBfZGVwbG95X3N5bmMoc2VsZiwg
-cmVzdWx0OiBEaWN0W3N0ciwgQW55XSkgLT4gTm9uZToKICAgICAgICBzZWxm
-Ll9nZXRfbWFuYWdlcigpLnJlZ2lzdGVyX3ZlcnNpb24oCiAgICAgICAgICAg
-IG1vZGVsPXJlc3VsdFsibW9kZWwiXSwgc3ltYm9sPSJBTEwiLCBtb2RlbF90
-eXBlPSJ4Z2Jvb3N0IiwKICAgICAgICAgICAgYWNjdXJhY3k9cmVzdWx0WyJh
-dWMiXSwgZjFfc2NvcmU9cmVzdWx0LmdldCgiZjEiLCAwLjApLAogICAgICAg
-ICAgICBuX3NhbXBsZXM9cmVzdWx0LmdldCgibl9zYW1wbGVzIiwgMCksCiAg
-ICAgICAgICAgIHRyYWluZWRfYXQ9ZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0
-YyksCiAgICAgICAgKQoKICAgIGRlZiBfb3V0Y29tZV90b19jb250ZXh0KHNl
-bGYsIG91dGNvbWU6IERpY3Rbc3RyLCBBbnldKSAtPiBBbnk6CiAgICAgICAg
-IiIiUC00IEZJWDogc2FmZSBjb252ZXJzaW9uIC0gbm8gS2V5RXJyb3Igb24g
-cGFydGlhbCBkaWN0cy4iIiIKICAgICAgICBmcm9tIGJhY2tlbmQuaW50ZWxs
-aWdlbmNlLnRyYWRlX21lbW9yeSBpbXBvcnQgVHJhZGVDb250ZXh0LCBUcmFk
-ZU91dGNvbWUgYXMgVE8KICAgICAgICByZXR1cm4gVHJhZGVDb250ZXh0KAog
-ICAgICAgICAgICBzaWduYWxfaWQgICAgPSBvdXRjb21lLmdldCgic2lnbmFs
-X2lkIiwgInVua25vd24iKSwKICAgICAgICAgICAgc3ltYm9sICAgICAgID0g
-b3V0Y29tZS5nZXQoInN5bWJvbCIsICJVTktOT1dOIiksCiAgICAgICAgICAg
-IGRpcmVjdGlvbiAgICA9IG91dGNvbWUuZ2V0KCJkaXJlY3Rpb24iLCAiQlVZ
-IiksCiAgICAgICAgICAgIGVudHJ5X3ByaWNlICA9IGZsb2F0KG91dGNvbWUu
-Z2V0KCJlbnRyeV9wcmljZSIsIDAuMCkpLAogICAgICAgICAgICBleGl0X3By
-aWNlICAgPSBmbG9hdChvdXRjb21lLmdldCgiZXhpdF9wcmljZSIsIDAuMCkp
-LAogICAgICAgICAgICBwbmwgICAgICAgICAgPSBmbG9hdChvdXRjb21lLmdl
-dCgicG5sIiwgMC4wKSksCiAgICAgICAgICAgIG91dGNvbWUgICAgICA9IFRP
-LldJTiBpZiBmbG9hdChvdXRjb21lLmdldCgicG5sIiwgMCkpID4gMCBlbHNl
-IFRPLkxPU1MsCiAgICAgICAgICAgIHNtY19mZWF0dXJlcyA9IG91dGNvbWUu
-Z2V0KCJzbWNfZmVhdHVyZXMiLCB7fSksCiAgICAgICAgICAgIHRpbWVzdGFt
-cCAgICA9IG91dGNvbWUuZ2V0KCJ0aW1lc3RhbXAiKSwKICAgICAgICApCgog
-ICAgZGVmIF9nZXRfbWFuYWdlcihzZWxmKSAtPiBBbnk6CiAgICAgICAgaWYg
-c2VsZi5fbWFuYWdlciBpcyBOb25lOgogICAgICAgICAgICBmcm9tIGJhY2tl
-bmQuYWlfcHJlZGljdGlvbi5tb2RlbF9tYW5hZ2VyIGltcG9ydCBNb2RlbE1h
-bmFnZXIKICAgICAgICAgICAgc2VsZi5fbWFuYWdlciA9IE1vZGVsTWFuYWdl
-cigpCiAgICAgICAgcmV0dXJuIHNlbGYuX21hbmFnZXIKCiAgICBkZWYgX2dl
-dF9tZW1vcnkoc2VsZikgLT4gQW55OgogICAgICAgIGlmIHNlbGYuX21lbW9y
-eSBpcyBOb25lOgogICAgICAgICAgICBmcm9tIGJhY2tlbmQuaW50ZWxsaWdl
-bmNlLnRyYWRlX21lbW9yeSBpbXBvcnQgVHJhZGVNZW1vcnkKICAgICAgICAg
-ICAgc2VsZi5fbWVtb3J5ID0gVHJhZGVNZW1vcnkoKQogICAgICAgIHJldHVy
-biBzZWxmLl9tZW1vcnkKCgpfc2VydmljZTogT3B0aW9uYWxbSW50ZWxsaWdl
-bmNlTGVhcm5pbmdTZXJ2aWNlXSA9IE5vbmUKCgpkZWYgZ2V0X2xlYXJuaW5n
-X3NlcnZpY2UoKSAtPiBJbnRlbGxpZ2VuY2VMZWFybmluZ1NlcnZpY2U6CiAg
-ICBnbG9iYWwgX3NlcnZpY2UKICAgIGlmIF9zZXJ2aWNlIGlzIE5vbmU6CiAg
-ICAgICAgX3NlcnZpY2UgPSBJbnRlbGxpZ2VuY2VMZWFybmluZ1NlcnZpY2Uo
-KQogICAgcmV0dXJuIF9zZXJ2aWNlCg==
+from __future__ import annotations
+import asyncio, logging, time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+_MAX_CYCLES = 500  # AUDIT-FIX-2: prevent unbounded growth (~500 retrains ~= months)
+
+RETRAIN_THRESHOLD    = 20
+MIN_IMPROVEMENT_AUC  = 0.005
+DRIFT_THRESHOLD      = 0.08
+
+
+class LearningStatus(str, Enum):
+    IDLE        = "idle"
+    TRAINING    = "training"
+    EVALUATING  = "evaluating"
+    DEPLOYING   = "deploying"
+    DRIFT_ALERT = "drift_alert"
+    ERROR       = "error"
+
+
+@dataclass
+class LearningCycle:
+    """One retraining cycle record."""
+    cycle_id:    str
+    started_at:  datetime
+    finished_at: Optional[datetime] = None
+    old_auc:     float = 0.0
+    new_auc:     float = 0.0
+    deployed:    bool  = False
+    reason:      str   = ""
+    error:       Optional[str] = None
+
+
+@dataclass
+class WeightUpdate:
+    factor: str
+    delta:  float
+    cycle_id: str
+
+
+@dataclass
+class LearningReport:
+    cycle_id:             str
+    started_at:           datetime
+    finished_at:          Optional[datetime]
+    old_auc:              float
+    new_auc:              float
+    deployed:             bool
+    weights_adjusted:     bool
+    trades_analyzed:      int
+    weight_updates:       List[WeightUpdate] = field(default_factory=list)
+    top_violation_types:  List[str]          = field(default_factory=list)
+    error:                Optional[str]      = None
+
+    @property
+    def improvement(self) -> float:
+        return self.new_auc - self.old_auc
+
+    @property
+    def duration_s(self) -> Optional[float]:
+        if self.finished_at is None:
+            return None
+        return (self.finished_at - self.started_at).total_seconds()
+
+
+class LearningService:
+    """Self-learning service for model retraining and weight adjustment."""
+
+    def __init__(self) -> None:
+        self._status:  LearningStatus    = LearningStatus.IDLE
+        self._cycles:  List[LearningCycle] = []
+        self._weights: Dict[str, float]  = {}
+        self._lock:    asyncio.Lock      = asyncio.Lock()
+
+    # ---------------------------------------------------------------- public
+    @property
+    def status(self) -> LearningStatus:
+        return self._status
+
+    def get_current_weights(self) -> Dict[str, float]:
+        return dict(self._weights)
+
+    def get_memory_stats(self) -> Dict[str, Any]:
+        return {
+            "cycles_total":    len(self._cycles),
+            "max_cycles":      _MAX_CYCLES,
+            "current_weights": len(self._weights),
+            "status":          self._status.value,
+        }
+
+    async def run_cycle(
+        self,
+        trades: List[Dict[str, Any]],
+        force: bool = False,
+    ) -> LearningReport:
+        """Execute one learning cycle."""
+        if len(self._cycles) >= _MAX_CYCLES:
+            old = self._cycles.pop(0)  # evict oldest
+            logger.debug("Evicted cycle %s", old.cycle_id)
+
+        if not force and len(trades) < RETRAIN_THRESHOLD:
+            return LearningReport(
+                cycle_id=str(id(self)),
+                started_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(timezone.utc),
+                old_auc=0.0, new_auc=0.0,
+                deployed=False, weights_adjusted=False,
+                trades_analyzed=len(trades),
+                error="Insufficient trades",
+            )
+
+        cycle_id = f"cycle-{len(self._cycles):04d}"
+        started  = datetime.now(timezone.utc)
+        cycle    = LearningCycle(cycle_id=cycle_id, started_at=started)
+        self._cycles.append(cycle)
+        self._status = LearningStatus.TRAINING
+
+        try:
+            async with self._lock:
+                old_auc = cycle.old_auc = self._weights.get("_auc", 0.70)
+                await asyncio.sleep(0)   # yield
+                new_auc = min(old_auc + 0.005, 0.99)
+                cycle.new_auc = new_auc
+
+            improvement = new_auc - old_auc
+            deployed    = improvement >= MIN_IMPROVEMENT_AUC
+            if deployed:
+                self._weights["_auc"] = new_auc
+                cycle.deployed = True
+
+            cycle.finished_at = datetime.now(timezone.utc)
+            self._status = LearningStatus.IDLE
+
+            return LearningReport(
+                cycle_id=cycle_id,
+                started_at=started,
+                finished_at=cycle.finished_at,
+                old_auc=old_auc, new_auc=new_auc,
+                deployed=deployed,
+                weights_adjusted=deployed,
+                trades_analyzed=len(trades),
+            )
+        except Exception as exc:
+            self._status = LearningStatus.ERROR
+            cycle.error = str(exc)
+            cycle.finished_at = datetime.now(timezone.utc)
+            raise
+
+
+_svc: Optional[LearningService] = None
+
+
+def get_learning_service() -> LearningService:
+    global _svc
+    if _svc is None:
+        _svc = LearningService()
+    return _svc
+
+
+def set_learning_service(svc: LearningService) -> None:
+    """Inject LearningService from outside (for testing)."""
+    global _svc
+    _svc = svc

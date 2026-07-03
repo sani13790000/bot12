@@ -1,4 +1,4 @@
-"""backend/core/enums.py — Central enum definitions for Galaxy Vast AI.
+"""backend/core/enums.py -- Central enum definitions for Galaxy Vast AI.
 
 CONFLICT-FIX-2 (2026-06-25): TrendDirection.UNDEFINED added to match
   decision_engine.TrendDirection.UNDEFINED. Without this, cross-module
@@ -8,236 +8,141 @@ from __future__ import annotations
 from enum import Enum, IntEnum
 
 
-# ─── Access control ──────────────────────────────────────────
+# Access control
 class PermissionLevel(IntEnum):
+    """Access level (numeric)"""
     SUPER_ADMIN = 100
-    ADMIN = 80
-    TRADER = 60
-    USER = 40
-    GUEST = 20
-    BANNED = 0
-
-
-class UserStatus(str, Enum):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    BANNED = "banned"
-    DELETED = "deleted"
+    ADMIN       = 80
+    OPERATOR    = 60
+    ANALYST     = 40
+    VIEWER      = 20
+    GUEST       = 0
 
 
 class UserRole(str, Enum):
-    USER = "user"
-    TRADER = "trader"
-    ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
+    ADMIN       = "admin"
+    OPERATOR    = "operator"
+    ANALYST     = "analyst"
+    VIEWER      = "viewer"
+    GUEST       = "guest"
 
 
-# ─── License ─────────────────────────────────────────────────────────────────
-class LicenseType(str, Enum):
-    TRIAL = "trial"
-    BASIC = "basic"
-    PROFESSIONAL = "professional"
-    ENTERPRISE = "enterprise"
-    LIFETIME = "lifetime"
-    DEVELOPER = "developer"
-
-
-class LicenseStatus(str, Enum):
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-    EXPIRED = "expired"
-    REVOKED = "revoked"
-    SUSPENDED = "suspended"
-
-
-class LicenseFeature(str, Enum):
-    # Analysis
-    SMC_ENGINE = "smc_engine"
-    PRICE_ACTION_ENGINE = "price_action_engine"
-    DECISION_ENGINE = "decision_engine"
-
-    # Features
-    MULTI_TIMEFRAME = "multi_timeframe"
-    KILLZONE_ALERTS = "killzone_alerts"
-    LIQUIDITY_VIZ = "liquidity_visualization"
-    ORDERBLOCK_VIZ = "orderblock_visualization"
-    FVG_VIZ = "fvg_visualization"
-
-    # Risk
-    RISK_MANAGER = "risk_manager"
-    CUSTOM_STRATEGIES = "custom_strategies"
-
-    # Integrations
-    TELEGRAM_BOT = "telegram_bot"
-    DASHBOARD = "dashboard"
-
-    # API
-    API_ACCESS = "api_access"
-
-
-# ─── Trading ─────────────────────────────────────────────────────────────────
+# Market
 class TradeDirection(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
-    NEUTRAL = "neutral"
+    BUY  = "BUY"
+    SELL = "SELL"
+    HOLD = "HOLD"
 
 
-class TradeType(str, Enum):
-    MARKET = "market"
-    LIMIT = "limit"
-    STOP = "stop"
-    STOP_LIMIT = "stop_limit"
+class MarketSession(str, Enum):
+    LONDON   = "LONDON"
+    NEW_YORK = "NEW_YORK"
+    TOKYO    = "TOKYO"
+    SYDNEY   = "SYDNEY"
+    OVERLAP  = "OVERLAP"
+    CLOSED   = "CLOSED"
 
 
-class TradeStatus(str, Enum):
-    PENDING = "pending"
-    OPEN = "open"
-    CLOSED = "closed"
-    CANCELLED = "cancelled"
-    REJECTED = "rejected"
-    PARTIAL = "partial"
+# backward-compat alias
+TradingSession = MarketSession
 
 
-class SignalStatus(str, Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    EXECUTED = "executed"
-    CANCELLED = "cancelled"
-    EXPIRED = "expired"
+class TrendDirection(str, Enum):
+    UP        = "UP"
+    DOWN      = "DOWN"
+    SIDEWAYS  = "SIDEWAYS"
+    UNDEFINED = "UNDEFINED"
 
 
-class SignalDirection(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
-    NEUTRAL = "neutral"
+class TimeFrame(str, Enum):
+    M1  = "M1"
+    M5  = "M5"
+    M15 = "M15"
+    M30 = "M30"
+    H1  = "H1"
+    H4  = "H4"
+    D1  = "D1"
+    W1  = "W1"
+    MN1 = "MN1"
+
+
+class SignalType(str, Enum):
+    ENTRY  = "ENTRY"
+    EXIT   = "EXIT"
+    ALERT  = "ALERT"
+    INFO   = "INFO"
 
 
 class OrderType(str, Enum):
-    MARKET = "market"
-    LIMIT = "limit"
-    STOP = "stop"
-    STOP_LIMIT = "stop_limit"
+    MARKET     = "MARKET"
+    LIMIT      = "LIMIT"
+    STOP       = "STOP"
+    STOP_LIMIT = "STOP_LIMIT"
 
 
 class OrderStatus(str, Enum):
-    PENDING = "pending"
-    SUBMITTED = "submitted"
-    FILLED = "filled"
-    PARTIALLY_FILLED = "partially_filled"
-    CANCELLED = "cancelled"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
-
-
-class PositionSide(str, Enum):
-    LONG = "long"
-    SHORT = "short"
-    FLAT = "flat"
-
-
-# ─── Analysis ────────────────────────────────────────────────────────────────
-class MarketSession(str, Enum):
-    SYDNEY = "sydney"
-    TOKYO = "tokyo"
-    LONDON = "london"
-    NEW_YORK = "new_york"
-    OVERLAP_LONDON_NY = "overlap_london_ny"
-    OVERLAP_TOKYO_LONDON = "overlap_tokyo_london"
-    CLOSED = "closed"
-
-
-class TimeframeCategory(str, Enum):
-    SCALP = "scalp"
-    INTRADAY = "intraday"
-    SWING = "swing"
-    POSITION = "position"
-
-
-class MarketStructure(str, Enum):
-    BULLISH_BOS = "bullish_bos"
-    BEARISH_BOS = "bearish_bos"
-    BULLISH_CHOCH = "bullish_choch"
-    BEARISH_CHOCH = "bearish_choch"
-    RANGING = "ranging"
-    UNDEFINED = "undefined"
-
-
-class LiquidityType(str, Enum):
-    EQUAL_HIGHS = "equal_highs"
-    EQUAL_LOWS = "equal_lows"
-    BUY_SIDE = "buy_side"
-    SELL_SIDE = "sell_side"
-    STOP_HUNT = "stop_hunt"
-
-
-class FVGType(str, Enum):
-    BULLISH = "bullish_fvg"
-    BEARISH = "bearish_fvg"
-
-
-# ─── Trend / Direction ───────────────────────────────────────────────────────
-class TrendDirection(str, Enum):
-    BULLISH   = "bullish"
-    BEARISH   = "bearish"
-    NEUTRAL   = "neutral"
-    RANGING   = "ranging"
-    UNDEFINED = "undefined"  # CONFLICT-FIX-2: added for decision_engine compatibility
-
-
-class TradeQuality(str, Enum):
-    EXCELLENT = "excellent"
-    GOOD = "good"
-    MODERATE = "moderate"
-    LOW = "low"
-    POOR = "poor"
-
-
-class ConfidenceLevel(str, Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+    PENDING   = "PENDING"
+    SUBMITTED = "SUBMITTED"
+    FILLED    = "FILLED"
+    PARTIAL   = "PARTIAL"
+    CANCELLED = "CANCELLED"
+    REJECTED  = "REJECTED"
+    CLOSED    = "CLOSED"
+    ERROR     = "ERROR"
 
 
 class RiskLevel(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    EXTREME = "extreme"
+    MINIMAL      = "MINIMAL"
+    CONSERVATIVE = "CONSERVATIVE"
+    MODERATE     = "MODERATE"
+    AGGRESSIVE   = "AGGRESSIVE"
+    EXTREME      = "EXTREME"
 
 
-# ─── System ────────────────────────────────────────────────────────────────────
-class AlertSeverity(str, Enum):
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
+class AlertPriority(str, Enum):
+    LOW      = "LOW"
+    MEDIUM   = "MEDIUM"
+    HIGH     = "HIGH"
+    CRITICAL = "CRITICAL"
 
 
-class AlertCategory(str, Enum):
-    TRADING = "trading"
-    RISK = "risk"
-    SYSTEM = "system"
-    SECURITY = "security"
-    PERFORMANCE = "performance"
+class AnalysisType(str, Enum):
+    SMC          = "SMC"
+    PRICE_ACTION = "PRICE_ACTION"
+    TECHNICAL    = "TECHNICAL"
+    FUNDAMENTAL  = "FUNDAMENTAL"
+    SENTIMENT    = "SENTIMENT"
+
+
+class LicenseStatus(str, Enum):
+    ACTIVE    = "active"
+    EXPIRED   = "expired"
+    SUSPENDED = "suspended"
+    TRIAL     = "trial"
+    INVALID   = "invalid"
+
+
+class LicensePlan(str, Enum):
+    TRIAL      = "trial"
+    BASIC      = "basic"
+    STANDARD   = "standard"
+    ENTERPRISE = "enterprise"
+
+
+class AgentType(str, Enum):
+    SMC          = "smc"
+    PRICE_ACTION = "price_action"
+    RISK         = "risk"
+    ML           = "ml"
+    NEWS         = "news"
+    LIQUIDITY    = "liquidity"
+    SECURITY     = "security"
 
 
 class BacktestStatus(str, Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class HealthStatus(str, Enum):
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"
-
-
-# ───────────────────────────────────────────────────────────────────────────────
-# Backward-compatibility aliases
-# Many modules do: from backend.core.enums import TradingSession
-TradingSession = MarketSession
+    QUEUED     = "QUEUED"
+    RUNNING    = "RUNNING"
+    COMPLETED  = "COMPLETED"
+    FAILED     = "FAILED"
+    CANCELLED  = "CANCELLED"
