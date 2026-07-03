@@ -1,11 +1,13 @@
-backend/license/dependency.py
-Phase 6 FastAPI dependencies for license enforcement
+"""
+Module: dependency
+Path: backend/license/dependency.py
+Note: License dependency injection stub.
+"""
+from __future__ import annotations
+from typing import Optional
 
-Usage:
-    from ..license.dependency import require_license, require_feature, require_plan
 
-    @router.get('/signals')
-    async def get_signals(
-        lic: LicenseCheckResult = Depends(require_feature('signals_read')),
-    ):
-        ...
+def get_license_engine():
+    """Get the license engine instance."""
+    from backend.license.engine import LicenseEngine
+    return LicenseEngine()

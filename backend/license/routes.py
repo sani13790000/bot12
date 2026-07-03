@@ -1,19 +1,15 @@
-backend/license/routes.py
-Phase 6 License API routes
+"""
+Module: routes
+Path: backend/license/routes.py
+License API routes stub.
+"""
+from __future__ import annotations
+from fastapi import APIRouter
 
-Customer endpoints:
-  POST /license/heartbeat
-  POST /license/device/register
-  DELETE /license/device/{id}
-  GET  /license/my
-  GET  /license/features
+router = APIRouter(prefix="/license", tags=["license"])
 
-Admin endpoints:
-  POST /admin/license/create
-  POST /admin/license/activate
-  POST /admin/license/suspend
-  POST /admin/license/revoke
-  POST /admin/license/resume
-  GET  /admin/license/{hash}
-  GET  /admin/license/{hash}/audit
-  GET  /admin/license/stats
+
+@router.get("/status")
+async def license_status():
+    """Get license status."""
+    return {"status": "active", "valid": True}
