@@ -1,1 +1,262 @@
-IiIiCmJhY2tlbmQvZGF0YWJhc2UvY29ubmVjdGlvbi5weSAgLS0gdjMgKFBoYXNlLUMgYXVkaXQgZml4KQoKRml4ZWQgaXNzdWVzIGZvdW5kIGluIFBoYXNlLUM6CiAgQy0xICBnZXRfc3VwYWJhc2VfY2xpZW50IHdhcyBhbiBhbGlhcyBidXQgY2FsbGVycyBleHBlY3RlZCBzeW5jIENsaWVudC4KICAgICAgIHJiYWNfc2VydmljZS5fY2xpZW50IHByb3BlcnR5IGNhbGxzIGdldF9kYl9jbGllbnQoKSAoYSBjb3JvdXRpbmUpCiAgICAgICBkaXJlY3RseSBhcyBhIHN5bmMgcHJvcGVydHkgLT4gVHlwZUVycm9yIGF0IGV2ZXJ5IFJCQUNTY2FsbC4KICAgICAgIEZJWDogYWRkIGdldF9zdXBhYmFzZV9jbGllbnRfc3luYygpIGZvciBsZWdhY3kgc3luYyBjYWxsZXJzICsKICAgICAgICAgICAgIGtlZXAgYXN5bmMgdmVyc2lvbiBmb3IgbW9kZXJuIGNhbGxlcnMuCiAgQy0yICBfSEVBTFRIX1RUTCByZWR1Y2VkIDMwcyAtPiAxMHMgdG8gc3VyZmFjZSBEQiBmYWlsdXJlcyBmYXN0ZXIuCiAgQy0zICBjbG9zZV9kYl9jbGllbnQgYWRkZWQgdG8gX19hbGxfXyBmb3IgZ3JhY2VmdWwgc2h1dGRvd24gaW4gbWFpbi5weS4KIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBhc3luY2lvCmltcG9ydCBsb2dnaW5nCmltcG9ydCB0aW1lCmZyb20gdHlwaW5nIGltcG9ydCBPcHRpb25hbAoKZnJvbSBzdXBhYmFzZSBpbXBvcnQgQ2xpZW50LCBjcmVhdGVfY2xpZW50Cgpmcm9tIGJhY2tlbmQuY29yZS5jb25maWcgaW1wb3J0IHNldHRpbmdzCgpsb2dnZXIgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKCl9jbGllbnQ6IE9wdGlvbmFsW0NsaWVudF0gPSBOb25lCl9sb2NrID0gYXN5bmNpby5Mb2NrKCkKX2xhc3RfaGVhbHRoeTogZmxvYXQgPSAwLjAKX0hFQUxUSF9UVEwgPSAxMC4wICAgICAgICAgICMgQy0yOiB3YXMgMzBzCgoKZGVmIF9wcm9iZV9zeW5jKGNsaWVudDogQ2xpZW50KSAtPiBOb25lOgogICAgY2xpZW50LnRhYmxlKCJzaWduYWxzIikuc2VsZWN0KCJpZCIpLmxpbWl0KDEpLmV4ZWN1dGUoKQoKCmFzeW5jIGRlZiBfcHJvYmUoY2xpZW50OiBDbGllbnQpIC0+IE5vbmU6CiAgICBsb29wID0gYXN5bmNpby5nZXRfcnVubmluZ19sb29wKCkKICAgIGF3YWl0IGxvb3AucnVuX2luX2V4ZWN1dG9yKE5vbmUsIF9wcm9iZV9zeW5jLCBjbGllbnQpCgoKZGVmIF9jcmVhdGVfY2xpZW50X3N5bmMoKSAtPiBDbGllbnQ6CiAgICByZXR1cm4gY3JlYXRlX2NsaWVudChzZXR0aW5ncy5TVVBBQkFTRV9VUkwsIHNldHRpbmdzLlNVUEFCQVNFX1NFUlZJQ0VfUk9MRV9LRVkpCgoKYXN5bmMgZGVmIF9jcmVhdGVfY2xpZW50X3dpdGhfcmV0cnkoKSAtPiBDbGllbnQ6CiAgICBnbG9iYWwgX2xhc3RfaGVhbHRoeQogICAgZm9yIGF0dGVtcHQsIGRlbGF5IGluIGVudW1lcmF0ZShbMSwgMiwgNF0sIHN0YXJ0PTEpOgogICAgICAgIHRyeToKICAgICAgICAgICAgY2xpZW50ID0gYXdhaXQgYXN5bmNpby5nZXRfcnVubmluZ19sb29wKCkucnVuX2luX2V4ZWN1dG9yKAogICAgICAgICAgICAgICAgTm9uZSwgX2NyZWF0ZV9jbGllbnRfc3luYwogICAgICAgICAgICApCiAgICAgICAgICAgIGF3YWl0IGFzeW5jaW8ud2FpdF9mb3IoX3Byb2JlKGNsaWVudCksIHRpbWVvdXQ9NS4wKQogICAgICAgICAgICBfbGFzdF9oZWFsdGh5ID0gdGltZS5tb25vdG9uaWMoKQogICAgICAgICAgICBsb2dnZXIuaW5mbygiREIgY2xpZW50IGNvbm5lY3RlZCAoYXR0ZW1wdCAlZCkiLCBhdHRlbXB0KQogICAgICAgICAgICByZXR1cm4gY2xpZW50CiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJEQiBjb25uZWN0IGF0dGVtcHQgJWQgZmFpbGVkOiAlcyIsIGF0dGVtcHQsIGV4YykKICAgICAgICAgICAgaWYgYXR0ZW1wdCA8IDM6CiAgICAgICAgICAgICAgICBhd2FpdCBhc3luY2lvLnNsZWVwKGRlbGF5KQogICAgcmFpc2UgUnVudGltZUVycm9yKCJDb3VsZCBub3QgY29ubmVjdCB0byBTdXBhYmFzZSBhZnRlciAzIGF0dGVtcHRzIikKCgphc3luYyBkZWYgZ2V0X2RiX2NsaWVudCgpIC0+IENsaWVudDoKICAgICIiIlByaW1hcnkgYXN5bmMgZ2V0dGVyIC0tIHVzZSBpbiBhbGwgYXN5bmMgY29udGV4dHMuIiIiCiAgICBnbG9iYWwgX2NsaWVudCwgX2xhc3RfaGVhbHRoeQoKICAgIGlmIF9jbGllbnQgaXMgbm90IE5vbmUgYW5kICh0aW1lLm1vbm90b25pYygpIC0gX2xhc3RfaGVhbHRoeSkgPCBfSEVBTFRIX1RUTDoKICAgICAgICByZXR1cm4gX2NsaWVudAoKICAgIGFzeW5jIHdpdGggX2xvY2s6CiAgICAgICAgaWYgX2NsaWVudCBpcyBub3QgTm9uZSBhbmQgKHRpbWUubW9ub3RvbmljKCkgLSBfbGFzdF9oZWFsdGh5KSA8IF9IRUFMVEhfVFRMOgogICAgICAgICAgICByZXR1cm4gX2NsaWVudAoKICAgICAgICBpZiBfY2xpZW50IGlzIE5vbmU6CiAgICAgICAgICAgIF9jbGllbnQgPSBhd2FpdCBfY3JlYXRlX2NsaWVudF93aXRoX3JldHJ5KCkKICAgICAgICBlbHNlOgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBhd2FpdCBhc3luY2lvLndhaXRfZm9yKF9wcm9iZShfY2xpZW50KSwgdGltZW91dD01LjApCiAgICAgICAgICAgICAgICBfbGFzdF9oZWFsdGh5ID0gdGltZS5tb25vdG9uaWMoKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJEQiBoZWFsdGggcHJvYmUgZmFpbGVkLCByZWNvbm5lY3Rpbmc6ICVzIiwgZXhjKQogICAgICAgICAgICAgICAgX2NsaWVudCA9IGF3YWl0IF9jcmVhdGVfY2xpZW50X3dpdGhfcmV0cnkoKQoKICAgICAgICByZXR1cm4gX2NsaWVudAoKCiMgQy0xOiBhc3luYyBhbGlhcyAtLSBjb25zaXN0ZW50IG5hbWluZyBmb3IgbmV3IGNvZGUKZ2V0X3N1cGFiYXNlX2NsaWVudCA9IGdldF9kYl9jbGllbnQKCgpkZWYgZ2V0X3N1cGFiYXNlX2NsaWVudF9zeW5jKCkgLT4gT3B0aW9uYWxbQ2xpZW50XToKICAgICIiIgogICAgQy0xIEZJWCAtLSBzeW5jIGdldHRlciBmb3IgbGVnYWN5IGNhbGxlcnMgKHJiYWNfc2VydmljZS5fY2xpZW50IHByb3BlcnR5KS4KICAgIFJldHVybnMgdGhlIGNhY2hlZCBjbGllbnQgaWYgaGVhbHRoeSwgZWxzZSBOb25lLgogICAgRE8gTk9UIGNhbGwgaW4gYXN5bmMgY29udGV4dCB3aXRob3V0IHJ1bl9pbl9leGVjdXRvci4KICAgICIiIgogICAgcmV0dXJuIF9jbGllbnQKCgphc3luYyBkZWYgY2xvc2VfZGJfY2xpZW50KCkgLT4gTm9uZToKICAgIGdsb2JhbCBfY2xpZW50CiAgICBpZiBfY2xpZW50IGlzIG5vdCBOb25lOgogICAgICAgIGxvZ2dlci5pbmZvKCJEQiBjbGllbnQgY2xvc2VkLiIpCiAgICAgICAgX2NsaWVudCA9IE5vbmUK
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from typing import AsyncGenerator, Optional
+
+from supabase import Client, create_client
+
+from backend.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+_client: Optional[Client] = None
+_lock = asyncio.Lock()
+_last_healthy: float = 0.0
+_HEALTH_TTL = 10.0
+
+
+def _probe_sync(client: Client) -> None:
+    client.table("signals").select("id").limit(1).execute()
+
+
+async def _probe(client: Client) -> None:
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, _probe_sync, client)
+
+
+def _create_client_sync() -> Client:
+    return create_client(
+        settings.SUPABASE_URL,
+        settings.SUPABASE_SERVICE_ROLE_KEY,
+    )
+
+
+async def _create_client_with_retry() -> Client:
+    global _last_healthy
+    for attempt, delay in enumerate([1, 2, 4], start=1):
+        try:
+            client = await asyncio.get_running_loop().run_in_executor(
+                None, _create_client_sync
+            )
+            await asyncio.wait_for(_probe(client), timeout=5.0)
+            _last_healthy = time.monotonic()
+            logger.info("DB client connected (attempt %d)", attempt)
+            return client
+        except Exception as exc:
+            logger.warning("DB connect attempt %d failed: %s", attempt, exc)
+            if attempt < 3:
+                await asyncio.sleep(delay)
+    raise RuntimeError("Could not connect to Supabase after 3 attempts")
+
+
+async def get_db_client() -> Client:
+    """Primary async getter - use in all async contexts."""
+    global _client, _last_healthy
+
+    if _client is not None and (time.monotonic() - _last_healthy) < _HEALTH_TTL:
+        return _client
+
+    async with _lock:
+        if _client is not None and (time.monotonic() - _last_healthy) < _HEALTH_TTL:
+            return _client
+        if _client is None:
+            _client = await _create_client_with_retry()
+        else:
+            try:
+                await asyncio.wait_for(_probe(_client), timeout=5.0)
+                _last_healthy = time.monotonic()
+            except Exception as exc:
+                logger.warning("DB health probe failed, reconnecting: %s", exc)
+                _client = await _create_client_with_retry()
+        return _client
+
+
+get_supabase_client = get_db_client
+
+
+def get_supabase_client_sync() -> Optional[Client]:
+    """Sync getter for legacy callers. DO NOT use in async context."""
+    return _client
+
+
+async def close_db_client() -> None:
+    """Graceful shutdown - call from app lifespan."""
+    global _client, _last_healthy
+    if _client is not None:
+        logger.info("DB client closed.")
+        _client = None
+        _last_healthy = 0.0
+
+
+class DatabaseWrapper:
+    """Async wrapper around synchronous Supabase client."""
+
+    _TIMEOUT = 30.0
+
+    async def _raw(self) -> Client:
+        return await get_db_client()
+
+    async def _run(self, fn):
+        loop = asyncio.get_running_loop()
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, fn),
+                timeout=self._TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.error("DB call timed out after %.0fs", self._TIMEOUT)
+            raise
+
+    async def select_many(
+        self,
+        table: str,
+        filters: Optional[dict] = None,
+        order_by: Optional[str] = None,
+        order_desc: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+        columns: str = "*",
+    ) -> list:
+        client = await self._raw()
+
+        def _q():
+            q = client.table(table).select(columns)
+            for k, v in (filters or {}).items():
+                q = q.eq(k, v)
+            if order_by:
+                q = q.order(order_by, desc=order_desc)
+            q = q.range(offset, offset + limit - 1)
+            return q.execute()
+
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("select_many(%s) failed: %s", table, exc)
+            raise
+
+    async def select_one(
+        self,
+        table: str,
+        filters: Optional[dict] = None,
+        columns: str = "*",
+    ) -> Optional[dict]:
+        rows = await self.select_many(table, filters, limit=1, columns=columns)
+        return rows[0] if rows else None
+
+    async def select(
+        self,
+        table: str,
+        filters: Optional[dict] = None,
+        order_by: Optional[str] = None,
+        order_desc: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+        columns: str = "*",
+    ) -> list:
+        """Alias for select_many() - backward compatibility."""
+        return await self.select_many(
+            table, filters, order_by, order_desc, limit, offset, columns
+        )
+
+    async def insert(self, table: str, data: dict, use_admin: bool = False) -> Optional[dict]:
+        client = await self._raw()
+
+        def _q():
+            return client.table(table).insert(data).execute()
+
+        try:
+            result = await self._run(_q)
+            rows = result.data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            logger.error("insert(%s) failed: %s", table, exc)
+            raise
+
+    async def update(self, table: str, filters: dict, data: dict) -> list:
+        if not filters:
+            raise ValueError("update() requires at least one filter")
+        client = await self._raw()
+
+        def _q():
+            q = client.table(table).update(data)
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("update(%s) failed: %s", table, exc)
+            raise
+
+    async def upsert(self, table: str, data: dict, on_conflict: str = "id") -> Optional[dict]:
+        client = await self._raw()
+
+        def _q():
+            return client.table(table).upsert(data, on_conflict=on_conflict).execute()
+
+        try:
+            result = await self._run(_q)
+            rows = result.data or []
+            return rows[0] if rows else None
+        except Exception as exc:
+            logger.error("upsert(%s) failed: %s", table, exc)
+            raise
+
+    async def delete(self, table: str, filters: dict) -> list:
+        if not filters:
+            raise ValueError("delete() requires at least one filter")
+        client = await self._raw()
+
+        def _q():
+            q = client.table(table).delete()
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+
+        try:
+            result = await self._run(_q)
+            return result.data or []
+        except Exception as exc:
+            logger.error("delete(%s) failed: %s", table, exc)
+            raise
+
+    async def health_check(self) -> dict:
+        try:
+            client = await asyncio.wait_for(get_db_client(), timeout=5.0)
+            await asyncio.wait_for(_probe(client), timeout=5.0)
+            return {"status": "ok"}
+        except Exception as exc:
+            return {"status": "error", "detail": str(exc)}
+
+
+db = DatabaseWrapper()
+
+
+async def get_db() -> AsyncGenerator:
+    """
+    FastAPI dependency injection helper - THIS WAS THE MISSING PIECE (E-1).
+
+    Usage in routes:
+        from backend.database.connection import get_db
+
+        @router.get("/")
+        async def handler(db = Depends(get_db)):
+            rows = await db.select("table", {"key": "value"})
+    """
+    yield db
+
+
+__all__ = [
+    "get_db_client",
+    "get_supabase_client",
+    "get_supabase_client_sync",
+    "close_db_client",
+    "DatabaseWrapper",
+    "db",
+    "get_db",
+]
