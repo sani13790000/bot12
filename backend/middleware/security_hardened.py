@@ -5,9 +5,10 @@ P12-FIX-CORS-3: wildcard forbidden in production
 P12-FIX-TRUST-1: TrustedHostMiddleware
 P12-FIX-EXC-1,2: standardized exception handlers
 P12-FIX-IP-1: X-Forwarded-For only from trusted proxies
+J-FIX-1: HardenedSecurityMiddleware reads ADMIN_IP_ALLOWLIST from env
 """
 from __future__ import annotations
-import ipaddress, logging, re, time, uuid
+import ipaddress, logging, os, re, time, uuid
 from typing import Any, Callable, Dict, List, Optional, Set
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,8 +25,8 @@ _ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
 _ALLOWED_HEADERS = ["Authorization", "Content-Type", "X-Request-ID", "X-License-Key", "Accept", "Accept-Language", "Cache-Control"]
 _EXPOSE_HEADERS  = ["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
 
-_RE_SQL = re.compile(r"(?i)(\bUNION\b.{0,30}\bSELECT\b|\bDROP\b.{0,20}\bTABLE\b|'\s*OR\s*'1'\s*=\s*'1|--\s*(?:$|\n)|;\s*DROP|\bEXEC\s*\(|\bSLEEP\s*\(\s*\d)")
-_RE_XSS = re.compile(r"(?i)(<script[^>]{0,200}>|javascript\s*:|on\w{1,30}\s*=|<iframe[^>]{0,200}>)")
+_RE_SQL = re.compile(r"(?i)(\bUNION\b.{0,30}\bSELECT\b|\bDROP\b.{0,20}\bTABLE\b|'\s*OR\s*'or'1'\s*=\s*'1|--\s*(?:(|\n)|;\s*DROP|\bEXEC\s*\(|\bSLEEP\s*\(\s*\d)")
+_RE_XSS = re.compile(r"(?i)(.script[^>]{0,200}>|javascript\s*:|on\w{1,30}\s*=|.iframe[^>]{0,200}>)")
 _RE_CMD = re.compile(r"(?i)(`[^`]{0,200}`|\$\([^)]{0,200}\)|\|\s*(?:sh|bash|cmd)\b|&&\s*(?:rm|curl|wget)\b)")
 _RE_PATH_TRAVERSAL = re.compile(r"(?:%2e%2e|%252e%252e|\.\.[/\\]|[/\\]\.\.)" , re.IGNORECASE)
 _RE_LOG_CLEAN = re.compile(r"[\r\n\t]")
@@ -112,7 +113,15 @@ def get_real_ip(request: Request) -> str:
 class HardenedSecurityMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, internal_ip_allowlist: Optional[Set[str]] = None):
         super().__init__(app)
-        self._internal_ips: Set[str] = internal_ip_allowlist or {"127.0.0.1", "::1"}
+        # J-FIX-1: Read ADMIN_IP_ALLOWLIST from env so ops can configure without code change
+        env_ips = os.environ.get("ADMIN_IP_ALLOWLIST", "")
+        env_set: Set[str] = {ip.strip() for ip in env_ips.split(",") if ip.strip()} if env_ips else set()
+        default_ips: Set[str] = {"127.0.0.1", "::1"}
+        self._internal_ips: Set[str] = internal_ip_allowlist or env_set or default_ips
+        if env_set:
+            log.info("HardenedSecurityMiddleware: admin IPs from env ADMIN_IP_ALLOWLIST: %s", env_set)
+        else:
+            log.debug("HardenedSecurityMiddleware: using default internal IPs: %s", self._internal_ips)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start      = time.monotonic()
