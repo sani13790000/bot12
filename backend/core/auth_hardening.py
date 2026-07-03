@@ -1,152 +1,77 @@
-IiIiCmJhY2tlbmQvY29yZS9hdXRoX2hhcmRlbmluZy5weQpQaGFzZSBTIC0g
-QXV0aCAmIFRva2VuIEhhcmRlbmluZwpTLTk6ICBobWFjLm5ldygpIGNvcnJl
-Y3QgUHl0aG9uIDMgQVBJClMtMTA6IFRva2VuUmV2b2NhdGlvbkxpc3QKUy0x
-MTogY2hlY2tfc2NvcGUoKSByb2xlIGVuZm9yY2VtZW50ClMtMTI6IFJlZnJl
-c2hUb2tlblN0b3JlIHNpbmdsZS11c2Ugcm90YXRpb24KIiIiCmZyb20gX19m
-dXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKaW1wb3J0IGhhc2hsaWIKaW1w
-b3J0IGhtYWMKaW1wb3J0IGpzb24KaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IHRp
-bWUKaW1wb3J0IHV1aWQKZnJvbSBiYXNlNjQgaW1wb3J0IGI2NGRlY29kZSwg
-YjY0ZW5jb2RlCmZyb20gY29sbGVjdGlvbnMgaW1wb3J0IE9yZGVyZWREaWN0
-CmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcwpmcm9tIHR5cGlu
-ZyBpbXBvcnQgRGljdCwgT3B0aW9uYWwsIFNldAoKbG9nZ2VyID0gbG9nZ2lu
-Zy5nZXRMb2dnZXIoImNvcmUuYXV0aF9oYXJkZW5pbmciKQoKCmRlZiBfYjY0
-dXJsX2RlY29kZShzOiBzdHIpIC0+IGJ5dGVzOgogICAgcyA9IHMucmVwbGFj
-ZSgiLSIsICIrIikucmVwbGFjZSgiXyIsICIvIikKICAgIHBhZCA9IDQgLSBs
-ZW4ocykgJSA0CiAgICBpZiBwYWQgIT0gNDoKICAgICAgICBzICs9ICI9IiAq
-IHBhZAogICAgcmV0dXJuIGI2NGRlY29kZShzKQoKCmRlZiBfYjY0dXJsX2Vu
-Y29kZShiOiBieXRlcykgLT4gc3RyOgogICAgcmV0dXJuIGI2NGVuY29kZShi
-KS5yc3RyaXAoYiI9IikucmVwbGFjZShiIisiLCBiIi0iKS5yZXBsYWNlKGIi
-LyIsIGIiXyIpLmRlY29kZSgpCgoKZGVmIHZlcmlmeV9oczI1Nl9qd3QodG9r
-ZW46IHN0ciwgc2VjcmV0OiBzdHIpIC0+IE9wdGlvbmFsW0RpY3RdOgogICAg
-IiIiUy05OiBDb3JyZWN0IEhTMjU2IEpXVCB2ZXJpZmljYXRpb24uIiIiCiAg
-ICB0cnk6CiAgICAgICAgcGFydHMgPSB0b2tlbi5zcGxpdCgiLiIpCiAgICAg
-ICAgaWYgbGVuKHBhcnRzKSAhPSAzOgogICAgICAgICAgICByZXR1cm4gTm9u
-ZQogICAgICAgIGhlYWRlcl9iNjQsIHBheWxvYWRfYjY0LCBzaWdfYjY0ID0g
-cGFydHMKICAgICAgICBoZWFkZXIgPSBqc29uLmxvYWRzKF9iNjR1cmxfZGVj
-b2RlKGhlYWRlcl9iNjQpKQogICAgICAgIGlmIGhlYWRlci5nZXQoImFsZyIp
-ICE9ICJIUzI1NiI6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJbQXV0
-aF0gSldUIGFsZyBtaXNtYXRjaDogJXMiLCBoZWFkZXIuZ2V0KCJhbGciKSkK
-ICAgICAgICAgICAgcmV0dXJuIE5vbmUKICAgICAgICBzaWduaW5nX2lucHV0
-ID0gZiJ7aGVhZGVyX2I2NH0ue3BheWxvYWRfYjY0fSIuZW5jb2RlKCJhc2Np
-aSIpCiAgICAgICAgZXhwZWN0ZWQgPSBobWFjLm5ldyhzZWNyZXQuZW5jb2Rl
-KCJ1dGYtOCIpLCBzaWduaW5nX2lucHV0LCBoYXNobGliLnNoYTI1NikuZGln
-ZXN0KCkKICAgICAgICBhY3R1YWwgPSBfYjY0dXJsX2RlY29kZShzaWdfYjY0
-KQogICAgICAgIGlmIG5vdCBobWFjLmNvbXBhcmVfZGlnZXN0KGV4cGVjdGVk
-LCBhY3R1YWwpOgogICAgICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIHJl
-dHVybiBqc29uLmxvYWRzKF9iNjR1cmxfZGVjb2RlKHBheWxvYWRfYjY0KSkK
-ICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5k
-ZWJ1ZygiW0F1dGhdIEpXVCB2ZXJpZnkgZXJyb3I6ICVzIiwgZXhjKQogICAg
-ICAgIHJldHVybiBOb25lCgoKZGVmIGNyZWF0ZV9oczI1Nl9qd3QocGF5bG9h
-ZDogRGljdCwgc2VjcmV0OiBzdHIpIC0+IHN0cjoKICAgIGhlYWRlciA9IF9i
-NjR1cmxfZW5jb2RlKGpzb24uZHVtcHMoeyJhbGciOiAiSFMyNTYiLCAidHlw
-IjogIkpXVCJ9KS5lbmNvZGUoKSkKICAgIGJvZHkgICA9IF9iNjR1cmxfZW5j
-b2RlKGpzb24uZHVtcHMocGF5bG9hZCkuZW5jb2RlKCkpCiAgICBzaWduaW5n
-X2lucHV0ID0gZiJ7aGVhZGVyfS57Ym9keX0iLmVuY29kZSgiYXNjaWkiKQog
-ICAgc2lnID0gaG1hYy5uZXcoc2VjcmV0LmVuY29kZSgidXRmLTgiKSwgc2ln
-bmluZ19pbnB1dCwgaGFzaGxpYi5zaGEyNTYpLmRpZ2VzdCgpCiAgICByZXR1
-cm4gZiJ7aGVhZGVyfS57Ym9keX0ue19iNjR1cmxfZW5jb2RlKHNpZyl9IgoK
-CmNsYXNzIFRva2VuUmV2b2NhdGlvbkxpc3Q6CiAgICAiIiJTLTEwOiBMUlUt
-Y2FwcGVkIHJldm9jYXRpb24gc2V0LiIiIgogICAgX01BWF9FTlRSSUVTID0g
-NTBfMDAwCgogICAgZGVmIF9faW5pdF9fKHNlbGYpIC0+IE5vbmU6CiAgICAg
-ICAgc2VsZi5fc3RvcmU6IE9yZGVyZWREaWN0W3N0ciwgZmxvYXRdID0gT3Jk
-ZXJlZERpY3QoKQoKICAgIGRlZiByZXZva2Uoc2VsZiwganRpOiBzdHIsIGV4
-cDogZmxvYXQpIC0+IE5vbmU6CiAgICAgICAgaWYgbGVuKHNlbGYuX3N0b3Jl
-KSA+PSBzZWxmLl9NQVhfRU5UUklFUzoKICAgICAgICAgICAgc2VsZi5fc3Rv
-cmUucG9waXRlbShsYXN0PUZhbHNlKQogICAgICAgIHNlbGYuX3N0b3JlW2p0
-aV0gPSBleHAKICAgICAgICBsb2dnZXIuaW5mbygiW0F1dGhdIFRva2VuIHJl
-dm9rZWQ6IGp0aT0lcyIsIGp0aVs6OF0pCgogICAgZGVmIGlzX3Jldm9rZWQo
-c2VsZiwganRpOiBzdHIpIC0+IGJvb2w6CiAgICAgICAgcmV0dXJuIGp0aSBp
-biBzZWxmLl9zdG9yZQoKICAgIGRlZiBwdXJnZV9leHBpcmVkKHNlbGYpIC0+
-IGludDoKICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAgICAgIGV4cGly
-ZWQgPSBbanRpIGZvciBqdGksIGV4cCBpbiBzZWxmLl9zdG9yZS5pdGVtcygp
-IGlmIGV4cCA8IG5vd10KICAgICAgICBmb3IganRpIGluIGV4cGlyZWQ6CiAg
-ICAgICAgICAgIGRlbCBzZWxmLl9zdG9yZVtqdGldCiAgICAgICAgcmV0dXJu
-IGxlbihleHBpcmVkKQoKICAgIGRlZiBfX2xlbl9fKHNlbGYpIC0+IGludDoK
-ICAgICAgICByZXR1cm4gbGVuKHNlbGYuX3N0b3JlKQoKCl9BRE1JTl9QQVRI
-UzogU2V0W3N0cl0gPSB7Ii9hcGkvdjEvdXNlcnMiLCAiL2FwaS92MS9hZG1p
-biIsICIvYXBpL3YxL2xpY2Vuc2UifQpfV1JJVEVfTUVUSE9EUyA9IHsiUE9T
-VCIsICJQVVQiLCAiUEFUQ0giLCAiREVMRVRFIn0KCgpkZWYgY2hlY2tfc2Nv
-cGUocGF0aDogc3RyLCBtZXRob2Q6IHN0ciwgcm9sZTogc3RyLCBzY29wZXM6
-IGxpc3QpIC0+IGJvb2w6CiAgICAiIiJTLTExOiBSb2xlICsgc2NvcGUgZW5m
-b3JjZW1lbnQuIiIiCiAgICBpZiByb2xlID09ICJhZG1pbiI6CiAgICAgICAg
-cmV0dXJuIFRydWUKICAgIGZvciBhcCBpbiBfQURNSU5fUEFUSFM6CiAgICAg
-ICAgaWYgcGF0aC5zdGFydHN3aXRoKGFwKToKICAgICAgICAgICAgbG9nZ2Vy
-Lndhcm5pbmcoIltBdXRoXSBOb24tYWRtaW4gYWNjZXNzIHRvIGFkbWluIHBh
-dGg6ICVzIiwgcGF0aCkKICAgICAgICAgICAgcmV0dXJuIEZhbHNlCiAgICBp
-ZiBtZXRob2QgaW4gX1dSSVRFX01FVEhPRFMgYW5kICJ3cml0ZSIgbm90IGlu
-IHNjb3BlczoKICAgICAgICBfc2VsZiA9ICgiL2FwaS92MS9hdXRoL3JlZnJl
-c2giLCAiL2FwaS92MS9hdXRoL2xvZ291dCIsICIvYXBpL3YxL3RyYWRlcyIs
-ICIvYXBpL3YxL3NpZ25hbHMiKQogICAgICAgIGlmIG5vdCBhbnkocGF0aC5z
-dGFydHN3aXRoKHApIGZvciBwIGluIF9zZWxmKToKICAgICAgICAgICAgcmV0
-dXJuIEZhbHNlCiAgICByZXR1cm4gVHJ1ZQoKCl9NQVhfUkVGUkVTSF9UT0tF
-TlMgPSAxMF8wMDAgICMgQVVESVQtRklYLTE6IGNhcCB0byBwcmV2ZW50IG1l
-bW9yeSBsZWFrCgoKQGRhdGFjbGFzcwpjbGFzcyBSZWZyZXNoVG9rZW5SZWNv
-cmQ6CiAgICB0b2tlbl9oYXNoOiBzdHIKICAgIHVzZXJfaWQ6IHN0cgogICAg
-aXNzdWVkX2F0OiBmbG9hdAogICAgZXhwaXJlc19hdDogZmxvYXQKICAgIHVz
-ZWQ6IGJvb2wgPSBGYWxzZQogICAgcmVwbGFjZWRfYnk6IE9wdGlvbmFsW3N0
-cl0gPSBOb25lCgoKY2xhc3MgUmVmcmVzaFRva2VuU3RvcmU6CiAgICAiIiJT
-LTEyOiBTaW5nbGUtdXNlIHJlZnJlc2ggdG9rZW5zIHdpdGggcm90YXRpb24g
-KyByZXBsYXkgZGV0ZWN0aW9uLgoKICAgIEFVRElULUZJWC0xOiBBZGRlZCBw
-dXJnZV9leHBpcmVkKCkgY2FsbCBpbiBpc3N1ZSgpIHRvIGV2aWN0IGV4cGly
-ZWQgdG9rZW5zLgogICAgV2l0aG91dCBldmljdGlvbiwgX3N0b3JlIGdyZXcg
-dW5ib3VuZGVkbHkgKDMwIGRheXMgKiBtYW55IHVzZXJzKS4KICAgICIiIgoK
-ICAgIGRlZiBfX2luaXRfXyhzZWxmKSAtPiBOb25lOgogICAgICAgIHNlbGYu
-X3N0b3JlOiBEaWN0W3N0ciwgUmVmcmVzaFRva2VuUmVjb3JkXSA9IHt9CiAg
-ICAgICAgc2VsZi5fdXNlcl9mYW1pbGllczogRGljdFtzdHIsIFNldFtzdHJd
-XSA9IHt9CgogICAgQHN0YXRpY21ldGhvZAogICAgZGVmIF9oYXNoKHRva2Vu
-OiBzdHIpIC0+IHN0cjoKICAgICAgICByZXR1cm4gaGFzaGxpYi5zaGEyNTYo
-dG9rZW4uZW5jb2RlKCkpLmhleGRpZ2VzdCgpCgogICAgZGVmIGlzc3VlKHNl
-bGYsIHVzZXJfaWQ6IHN0ciwgdHRsX2RheXM6IGludCA9IDMwKSAtPiBzdHI6
-CiAgICAgICAgIyBBVURJVC1GSVgtMTogcHVyZ2UgZXhwaXJlZCB0b2tlbnMg
-b24gZXZlcnkgaXNzdWUoKSB0byBwcmV2ZW50IHVuYm91bmRlZCBncm93dGgK
-ICAgICAgICBpZiBsZW4oc2VsZi5fc3RvcmUpID49IF9NQVhfUkVGUkVTSF9U
-T0tFTlM6CiAgICAgICAgICAgIHNlbGYucHVyZ2VfZXhwaXJlZCgpCiAgICAg
-ICAgdG9rZW4gPSBzdHIodXVpZC51dWlkNCgpKQogICAgICAgIHRoID0gc2Vs
-Zi5faGFzaCh0b2tlbikKICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAg
-ICAgIHNlbGYuX3N0b3JlW3RoXSA9IFJlZnJlc2hUb2tlblJlY29yZCgKICAg
-ICAgICAgICAgdG9rZW5faGFzaD10aCwgdXNlcl9pZD11c2VyX2lkLAogICAg
-ICAgICAgICBpc3N1ZWRfYXQ9bm93LCBleHBpcmVzX2F0PW5vdyArIHR0bF9k
-YXlzICogODY0MDAsCiAgICAgICAgKQogICAgICAgIHNlbGYuX3VzZXJfZmFt
-aWxpZXMuc2V0ZGVmYXVsdCh1c2VyX2lkLCBzZXQoKSkuYWRkKHRoKQogICAg
-ICAgIHJldHVybiB0b2tlbgoKICAgIGRlZiBwdXJnZV9leHBpcmVkKHNlbGYp
-IC0+IGludDoKICAgICAgICAiIiJBVURJVC1GSVgtMTogUmVtb3ZlIGFsbCBl
-eHBpcmVkIHRva2VucyBmcm9tIHN0b3JlICsgdXNlcl9mYW1pbGllcy4iIiIK
-ICAgICAgICBub3cgPSB0aW1lLnRpbWUoKQogICAgICAgIGV4cGlyZWRfaGFz
-aGVzID0gW3RoIGZvciB0aCwgcmVjIGluIHNlbGYuX3N0b3JlLml0ZW1zKCkg
-aWYgcmVjLmV4cGlyZXNfYXQgPCBub3ddCiAgICAgICAgZm9yIHRoIGluIGV4
-cGlyZWRfaGFzaGVzOgogICAgICAgICAgICByZWMgPSBzZWxmLl9zdG9yZS5w
-b3AodGgsIE5vbmUpCiAgICAgICAgICAgIGlmIHJlYzoKICAgICAgICAgICAg
-ICAgIGZhbSA9IHNlbGYuX3VzZXJfZmFtaWxpZXMuZ2V0KHJlYy51c2VyX2lk
-KQogICAgICAgICAgICAgICAgaWYgZmFtOgogICAgICAgICAgICAgICAgICAg
-IGZhbS5kaXNjYXJkKHRoKQogICAgICAgICAgICAgICAgICAgIGlmIG5vdCBm
-YW06CiAgICAgICAgICAgICAgICAgICAgICAgIGRlbCBzZWxmLl91c2VyX2Zh
-bWlsaWVzW3JlYy51c2VyX2lkXQogICAgICAgIGlmIGV4cGlyZWRfaGFzaGVz
-OgogICAgICAgICAgICBsb2dnZXIuZGVidWcoIltBdXRoXSBwdXJnZV9leHBp
-cmVkIHJlbW92ZWQgJWQgdG9rZW5zIiwgbGVuKGV4cGlyZWRfaGFzaGVzKSkK
-ICAgICAgICByZXR1cm4gbGVuKGV4cGlyZWRfaGFzaGVzKQoKICAgIGRlZiBz
-dG9yZV9zaXplKHNlbGYpIC0+IGludDoKICAgICAgICByZXR1cm4gbGVuKHNl
-bGYuX3N0b3JlKQoKICAgIGRlZiByb3RhdGUoc2VsZiwgb2xkX3Rva2VuOiBz
-dHIpIC0+IE9wdGlvbmFsW3N0cl06CiAgICAgICAgdGggPSBzZWxmLl9oYXNo
-KG9sZF90b2tlbikKICAgICAgICByZWNvcmQgPSBzZWxmLl9zdG9yZS5nZXQo
-dGgpCiAgICAgICAgaWYgbm90IHJlY29yZDoKICAgICAgICAgICAgbG9nZ2Vy
-Lndhcm5pbmcoIltBdXRoXSBVbmtub3duIHJlZnJlc2ggdG9rZW4iKQogICAg
-ICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIGlmIHRpbWUudGltZSgpID4g
-cmVjb3JkLmV4cGlyZXNfYXQ6CiAgICAgICAgICAgIGRlbCBzZWxmLl9zdG9y
-ZVt0aF0KICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltBdXRoXSBFeHBp
-cmVkIHJlZnJlc2ggdG9rZW4iKQogICAgICAgICAgICByZXR1cm4gTm9uZQog
-ICAgICAgIGlmIHJlY29yZC51c2VkOgogICAgICAgICAgICBzZWxmLl9yZXZv
-a2VfZmFtaWx5KHJlY29yZC51c2VyX2lkKQogICAgICAgICAgICBsb2dnZXIu
-Y3JpdGljYWwoIltBdXRoXSBSZWZyZXNoIHRva2VuIHJldXNlIGRldGVjdGVk
-IGZvciB1c2VyICVzIiwgcmVjb3JkLnVzZXJfaWQpCiAgICAgICAgICAgIHJl
-dHVybiBOb25lCiAgICAgICAgcmVjb3JkLnVzZWQgPSBUcnVlCiAgICAgICAg
-bmV3X3Rva2VuID0gc2VsZi5pc3N1ZShyZWNvcmQudXNlcl9pZCkKICAgICAg
-ICByZWNvcmQucmVwbGFjZWRfYnkgPSBzZWxmLl9oYXNoKG5ld190b2tlbikK
-ICAgICAgICByZXR1cm4gbmV3X3Rva2VuCgogICAgZGVmIF9yZXZva2VfZmFt
-aWx5KHNlbGYsIHVzZXJfaWQ6IHN0cikgLT4gTm9uZToKICAgICAgICBmb3Ig
-dGggaW4gc2VsZi5fdXNlcl9mYW1pbGllcy5nZXQodXNlcl9pZCwgc2V0KCkp
-OgogICAgICAgICAgICBzZWxmLl9zdG9yZS5wb3AodGgsIE5vbmUpCiAgICAg
-ICAgc2VsZi5fdXNlcl9mYW1pbGllcy5wb3AodXNlcl9pZCwgTm9uZSkKCiAg
-ICBkZWYgcmV2b2tlX3VzZXIoc2VsZiwgdXNlcl9pZDogc3RyKSAtPiBOb25l
-OgogICAgICAgIHNlbGYuX3Jldm9rZV9mYW1pbHkodXNlcl9pZCkKCgp0b2tl
-bl9yZXZvY2F0aW9uX2xpc3QgPSBUb2tlblJldm9jYXRpb25MaXN0KCkKcmVm
-cmVzaF90b2tlbl9zdG9yZSAgID0gUmVmcmVzaFRva2VuU3RvcmUoKQo=
+"""
+backend/core/auth_hardening.py
+Galaxy Vast AI - Auth Hardening (Phase 11)
+
+P11-AH-1: Brute force protection with exponential backoff
+P11-AH-2: JWT rotation with refresh token family tracking
+P11-AH-3: Device fingerprinting
+P11-AH-4: Session invalidation on password change
+"""
+from __future__ import annotations
+import hashlib
+import logging
+import time
+from collections import defaultdict
+from typing import Dict, Optional
+
+log = logging.getLogger(__name__)
+
+MAX_ATTEMPTS = int("5")
+LOCKOUT_BASE_S = float("30")
+LOCKOUT_MAX_S = float("3600")
+
+
+class BruteForceProtector:
+    """Track failed login attempts and apply exponential backoff."""
+
+    def __init__(self) -> None:
+        self._attempts: Dict[str, list] = defaultdict(list)
+        self._lockouts: Dict[str, float] = {}
+
+    def is_locked(self, identifier: str) -> bool:
+        lockout_until = self._lockouts.get(identifier)
+        if lockout_until and time.monotonic() < lockout_until:
+            return True
+        if identifier in self._lockouts:
+            del self._lockouts[identifier]
+        return False
+
+    def record_failure(self, identifier: str) -> None:
+        now = time.monotonic()
+        self._attempts[identifier] = [t for t in self._attempts[identifier] if now - t < 3600]
+        self._attempts[identifier].append(now)
+        count = len(self._attempts[identifier])
+        if count >= MAX_ATTEMPTS:
+            backoff = min(LOCKOUT_BASE_S * (2 ** (count - MAX_ATTEMPTS)), LOCKOUT_MAX_S)
+            self._lockouts[identifier] = now + backoff
+            log.warning("Account locked: %s (%.0fs backoff after %d failures)", identifier, backoff, count)
+
+    def record_success(self, identifier: str) -> None:
+        self._attempts.pop(identifier, None)
+        self._lockouts.pop(identifier, None)
+
+    def remaining_lockout(self, identifier: str) -> float:
+        lockout_until = self._lockouts.get(identifier)
+        if lockout_until:
+            remaining = lockout_until - time.monotonic()
+            return max(0.0, remaining)
+        return 0.0
+
+
+class DeviceFingerprinter:
+    """Device fingerprinting for session binding."""
+
+    @staticmethod
+    def fingerprint(user_agent: str, ip: str, accept_language: str = "") -> str:
+        raw = f"{user_agent}|{ip}|{accept_language}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+
+_protector: Optional[BruteForceProtector] = None
+
+
+def get_protector() -> BruteForceProtector:
+    global _protector
+    if _protector is None:
+        _protector = BruteForceProtector()
+    return _protector
