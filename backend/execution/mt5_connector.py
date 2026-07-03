@@ -1,1 +1,279 @@
-IiIiCmJhY2tlbmQvZXhlY3V0aW9uL210NV9jb25uZWN0b3IucHkKR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybQrilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEKQXN5bmMgSFRUUCBicmlkZ2UgdG8gdGhlIE1ldGFUcmFkZXIgNSBSRVNUIGdhdGV3YXkuCgrZgdin2LIgRyDigJQg2KrYutuM24zYsdin2Ko6Ci0gZGVtbyDZvtuM2LTigIzZgdix2LYg2KfYsiBlbnYgdmFyINiu2YjYp9mG2K/ZhyDZhduM4oCM2LTZiNivIChNVDVfREVNT19NT0RFKQotIGdldF9jYW5kbGVzKCkg2KfYttin2YHZhyDYtNivCi0gZ2V0X3N5bWJvbF9pbmZvKCkg2KfYttin2YHZhyDYtNivCi0gc2luZ2xldG9uINio2Kcg2KrZhti424zZhdin2KogZW52INiz2KfYrtiq2Ycg2YXbjOKAjNi02YjYrwotIGhlYWx0aF9jaGVjaygpINin2LbYp9mB2Ycg2LTZiwoKVXNhZ2U6OgoKICAgIGNvbm5lY3RvciA9IE1UNUNvbm5lY3RvcihiYXNlX3VybD0iaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwgZGVtbz1GYWxzZSkKICAgIGF3YWl0IGNvbm5lY3Rvci5jb25uZWN0KCkKICAgIHRpY2tldCA9IGF3YWl0IGNvbm5lY3Rvci5wbGFjZV9vcmRlcigKICAgICAgICBzeW1ib2w9IkVVUlVTRCIsIGRpcmVjdGlvbj0iQlVZIiwKICAgICAgICB2b2x1bWU9MC4wMSwgc2w9MS4wODAwLCB0cD0xLjEwNTAKICAgICkKICAgIGNhbmRsZXMgPSBhd2FpdCBjb25uZWN0b3IuZ2V0X2NhbmRsZXMoIkVVUlVTRCIsICJIMSIsIDEwMCkKICAgIGF3YWl0IGNvbm5lY3Rvci5jbG9zZV9wb3NpdGlvbih0aWNrZXQpCiAgICBhd2FpdCBjb25uZWN0b3IuZGlzY29ubmVjdCgpCgpEZXNpZ24gbm90ZXM6Ci0gQWxsIEkvTyBpcyBhc3luYyAoYWlvaHR0cCkuCi0gZGVtbz1GYWxzZSDihpIgcmVhbCBNVDUgUkVTVCBnYXRld2F5IGNhbGxzLgotIGRlbW89VHJ1ZSAg4oaSIGxvZ2dlZCBzdHVicyAoc2FmZSBmb3IgQ0kvdGVzdGluZykuCi0gUmV0cmllcyB1c2UgZXhwb25lbnRpYWwgYmFjay1vZmYgKG1heCAzIGF0dGVtcHRzKS4KLSBFdmVyeSBwdWJsaWMgbWV0aG9kIHJhaXNlcyBNVDVFcnJvciBvbiB1bnJlY292ZXJhYmxlIGZhaWx1cmUuCi0gTVQ1X0RFTU9fTU9ERSBlbnYgdmFyIGNvbnRyb2xzIGRlZmF1bHQ6ICJmYWxzZSIgPSBMSVZFLCAidHJ1ZSIgPSBERU1PCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgYXN5bmNpbwppbXBvcnQgbG9nZ2luZwppbXBvcnQgb3MKZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzLCBmaWVsZApmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZXpvbmUKZnJvbSB0eXBpbmcgaW1wb3J0IEFueSwgRGljdCwgTGlzdCwgT3B0aW9uYWwKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQoKCmNsYXNzIE1UNUVycm9yKFJ1bnRpbWVFcnJvcik6CiAgICAiIiJSYWlzZWQgd2hlbiB0aGUgTVQ1IGdhdGV3YXkgcmV0dXJucyBhbiBlcnJvciBvciBpcyB1bnJlYWNoYWJsZS4iIiIKCgpAZGF0YWNsYXNzCmNsYXNzIE9yZGVyUmVzdWx0OgogICAgdGlja2V0OiBpbnQKICAgIHN5bWJvbDogc3RyCiAgICBkaXJlY3Rpb246IHN0cgogICAgdm9sdW1lOiBmbG9hdAogICAgb3Blbl9wcmljZTogZmxvYXQKICAgIHNsOiBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICB0cDogT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgcmF3OiBEaWN0W3N0ciwgQW55XSA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1kaWN0KQoKCkBkYXRhY2xhc3MKY2xhc3MgUG9zaXRpb25JbmZvOgogICAgdGlja2V0OiBpbnQKICAgIHN5bWJvbDogc3RyCiAgICBkaXJlY3Rpb246IHN0cgogICAgdm9sdW1lOiBmbG9hdAogICAgb3Blbl9wcmljZTogZmxvYXQKICAgIGN1cnJlbnRfcHJpY2U6IGZsb2F0CiAgICBwcm9maXQ6IGZsb2F0CiAgICBzbDogT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgdHA6IE9wdGlvbmFsW2Zsb2F0XSA9IE5vbmUKCgpAZGF0YWNsYXNzCmNsYXNzIENhbmRsZURhdGE6CiAgICB0aW1lOiBkYXRldGltZQogICAgb3BlbjogZmxvYXQKICAgIGhpZ2g6IGZsb2F0CiAgICBsb3c6IGZsb2F0CiAgICBjbG9zZTogZmxvYXQKICAgIHZvbHVtZTogaW50CiAgICBzcHJlYWQ6IGludCA9IDAKCgpAZGF0YWNsYXNzCmNsYXNzIFN5bWJvbEluZm86CiAgICBuYW1lOiBzdHIKICAgIGRpZ2l0czogaW50CiAgICBwb2ludDogZmxvYXQKICAgIHRyYWRlX2NvbnRyYWN0X3NpemU6IGZsb2F0CiAgICB2b2x1bWVfbWluOiBmbG9hdAogICAgdm9sdW1lX21heDogZmxvYXQKICAgIHZvbHVtZV9zdGVwOiBmbG9hdAogICAgc3ByZWFkOiBpbnQKICAgIGJpZDogZmxvYXQKICAgIGFzazogZmxvYXQKCgpjbGFzcyBNVDVDb25uZWN0b3I6CiAgICBkZWYgX19pbml0X18oc2VsZiwgYmFzZV91cmw9IiIsIHRpbWVvdXRfcz0xMC4wLCBtYXhfcmV0cmllcz0zLCBkZW1vPU5vbmUpOgogICAgICAgIGlmIGRlbW8gaXMgTm9uZToKICAgICAgICAgICAgZW52X2RlbW8gPSBvcy5lbnZpcm9uLmdldCgiTVQ1X0RFTU9fTU9ERSIsICJ0cnVlIikubG93ZXIoKQogICAgICAgICAgICBkZW1vID0gZW52X2RlbW8gbm90IGluICgiZmFsc2UiLCAiMCIsICJubyIsICJvZmYiKQogICAgICAgIHNlbGYuYmFzZV91cmwgPSAoYmFzZV91cmwgb3Igb3MuZW52aXJvbi5nZXQoIk1UNV9HQVRFV0FZX1VSTCIsICJodHRwOi8vbG9jYWxob3N0OjgwODAiKSkucnN0cmlwKCIvIikKICAgICAgICBzZWxmLnRpbWVvdXRfcyA9IGZsb2F0KG9zLmVudmlyb24uZ2V0KCJNVDVFVEVST1VUX1MiLCBzdHIodGltZW91dF9zKSkpCiAgICAgICAgc2VsZi5tYXhfcmV0cmllcyA9IGludChvcy5lbnZpcm9uLmdldCgiTVQ1X01BWF9SRVRSSUVTIiwgc3RyKG1heF9yZXRyaWVzKSkpCiAgICAgICAgc2VsZi5kZW1vID0gZGVtbwogICAgICAgIHNlbGYuX3Nlc3Npb24gPSBOb25lCiAgICAgICAgc2VsZi5fY29ubmVjdGVkID0gRmFsc2UKCiAgICBhc3luYyBkZWYgY29ubmVjdChzZWxmKToKICAgICAgICBpZiBzZWxmLl9jb25uZWN0ZWQ6CiAgICAgICAgICAgIHJldHVybgogICAgICAgIHRyeToKICAgICAgICAgICAgaW1wb3J0IGFpb2h0dHAKICAgICAgICAgICAgc2VsZi5fc2Vzc2lvbiA9IGFpb2h0dHAuQ2xpZW50U2Vzc2lvbih0aW1lb3V0PWFpb2h0dHAuQ2xpZW50VGltZW91dCh0b3RhbD1zZWxmLnRpbWVvdXRfcykpCiAgICAgICAgICAgIGlmIG5vdCBzZWxmLmRlbW86CiAgICAgICAgICAgICAgICBhd2FpdCBzZWxmLl9nZXQoIi9waW5nIikKICAgICAgICAgICAgc2VsZi5fY29ubmVjdGVkID0gVHJ1ZQogICAgICAgICAgICBsb2dnZXIuaW5mbygiW01UNUNvbm5lY3Rvcl0gY29ubmVjdGVkICglcykiLCAiREVNTyIgaWYgc2VsZi5kZW1vIGVsc2UgIkxJVkUiKQogICAgICAgIGV4Y2VwdCBJbXBvcnRFcnJvcjoKICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltNVDVDb25uZWN0b3JdIGFpb2h0dHAgbWlzc2luZyAtIFNUVUIgbW9kZSIpCiAgICAgICAgICAgIHNlbGYuX2Nvbm5lY3RlZCA9IFRydWUKICAgICAgICAgICAgc2VsZi5kZW1vID0gVHJ1ZQogICAgICAgIGV4Y2VwdCBNVDVFcnJvciBhcyBleGM6CiAgICAgICAgICAgIHJhaXNlIE1UNUVycm9yKGYiQ2Fubm90IGNvbm5lY3QgdG8gTVQ1IGdhdGV3YXk6IHtleGN9IikgZnJvbSBleGMKCiAgICBhc3luYyBkZWYgZGlzY29ubmVjdChzZWxmKToKICAgICAgICBpZiBzZWxmLl9zZXNzaW9uOgogICAgICAgICAgICBhd2FpdCBzZWxmLl9zZXNzaW9uLmNsb3NlKCkKICAgICAgICAgICAgc2VsZi5fc2Vzc2lvbiA9IE5vbmUKICAgICAgICBzZWxmLl9jb25uZWN0ZWQgPSBGYWxzZQoKICAgIGFzeW5jIGRlZiBoZWFsdGhfY2hlY2soc2VsZik6CiAgICAgICAgaWYgc2VsZi5kZW1vOgogICAgICAgICAgICByZXR1cm4geyJvayI6IFRydWUsICJtb2RlIjogIkRFTU8iLCAicGluZ19tcyI6IDAuMCwgImFjY291bnQiOiAiZGVtbyJ9CiAgICAgICAgdHJ5OgogICAgICAgICAgICBpbXBvcnQgdGltZQogICAgICAgICAgICB0MCA9IHRpbWUubW9ub3RvbmljKCkKICAgICAgICAgICAgZGF0YSA9IGF3YWl0IHNlbGYuX2dldCgiL3BpbmciKQogICAgICAgICAgICBwaW5nX21zID0gKHRpbWUubW9ub3RvbmljKCkgLSB0MCkgKiAxMDAwCiAgICAgICAgICAgIHJldHVybiB7Im9rIjogVHJ1ZSwgIm1vZGUiOiAiTElWRSIsICJwaW5nX21zIjogcm91bmQocGluZ19tcywgMSksICoqZGF0YX0KICAgICAgICBleGNlcHQgTVQ1RXJyb3IgYXMgZXhjOgogICAgICAgICAgICByZXR1cm4geyJvayI6IEZhbHNlLCAibW9kZSI6ICJMSVZFIiwgImVycm9yIjogc3RyKGV4Yyl9CgogICAgYXN5bmMgZGVmIGdldF9jYW5kbGVzKHNlbGYsIHN5bWJvbCwgdGltZWZyYW1lLCBjb3VudD0xMDAsIGZyb21fZGF0ZT1Ob25lKToKICAgICAgICBzZWxmLl9yZXF1aXJlX2Nvbm5lY3RlZCgpCiAgICAgICAgaWYgc2VsZi5kZW1vOgogICAgICAgICAgICBpbXBvcnQgcmFuZG9tCiAgICAgICAgICAgIHJuZyA9IHJhbmRvbS5SYW5kb20oNDIpCiAgICAgICAgICAgIGNhbmRsZXMgPSBbXQogICAgICAgICAgICBwcmljZSA9IDEuMTAwMAogICAgICAgICAgICBub3cgPSBkYXRldGltZS5ub3codGltZXpvbmUudXRjKQogICAgICAgICAgICB0Zl9zZWNvbmRzID0gc2VsZi5fdGltZWZyYW1lX3RvX3NlY29uZHModGltZWZyYW1lKQogICAgICAgICAgICBmb3IgaSBpbiByYW5nZShjb3VudCk6CiAgICAgICAgICAgICAgICB0cyA9IGRhdGV0aW1lLmZyb210aW1lc3RhbXAobm93LnRpbWVzdGFtcCgpIC0gKGNvdW50IC0gaSkgKiB0Zl9zZWNvbmRzLCB0ej10aW1lem9uZS51dGMpCiAgICAgICAgICAgICAgICBvID0gcHJpY2UKICAgICAgICAgICAgICAgIGggPSBvICsgcm5nLnVuaWZvcm0oMC4wMDAxLCAwLjAwMjApCiAgICAgICAgICAgICAgICBsID0gbyAtIHJuZy51bmlmb3JtKDAuMDAwMSwgMC4wMDIwKQogICAgICAgICAgICAgICAgYyA9IHJuZy51bmlmb3JtKGwsIGgpCiAgICAgICAgICAgICAgICBwcmljZSA9IGMKICAgICAgICAgICAgICAgIGNhbmRsZXMuYXBwZW5kKENhbmRsZURhdGEodGltZT10cywgb3Blbj1yb3VuZChvLCA1KSwgaGlnaD1yb3VuZChoLCA1KSwgbG93PXJvdW5kKGwsIDUpLCBjbG9zZT1yb3VuZChjLCA1KSwgdm9sdW1lPXJuZy5yYW5kaW50KDEwMCwgNTAwMCksIHNwcmVhZD1ybmcucmFuZGludCgxLCAzKSkpCiAgICAgICAgICAgIHJldHVybiBjYW5kbGVzCiAgICAgICAgcGFyYW1zID0geyJzeW1ib2wiOiBzeW1ib2wsICJ0aW1lZnJhbWUiOiB0aW1lZnJhbWUsICJjb3VudCI6IG1pbihjb3VudCwgNTAwMCl9CiAgICAgICAgaWYgZnJvbV9kYXRlOgogICAgICAgICAgICBwYXJhbXNbImZyb20iXSA9IGZyb21fZGF0ZS5pc29mb3JtYXQoKQogICAgICAgIGRhdGEgPSBhd2FpdCBzZWxmLl9nZXQoIi9jYW5kbGVzIiwgcGFyYW1zPXBhcmFtcykKICAgICAgICByZXR1cm4gW0NhbmRsZURhdGEodGltZT1kYXRldGltZS5mcm9taXNvZm9ybWF0KGJbInRpbWUiXSksIG9wZW49ZmxvYXQoYlsib3BlbiJdKSwgaGlnaD1mbG9hdChiWyJoaWdoIl0pLCBsb3c9ZmxvYXQoYlsibG93Il0pLCBjbG9zZT1mbG9hdChiWyJjbG9zZSJdKSwgdm9sdW1lPWludChiWyJ2b2x1bWUiXSksIHNwcmVhZD1pbnQoYi5nZXQoInNwcmVhZCIsIDApKSkgZm9yIGIgaW4gZGF0YS5nZXQoImNhbmRsZXMiLCBbXSldCgogICAgYXN5bmMgZGVmIGdldF9zeW1ib2xfaW5mbyhzZWxmLCBzeW1ib2wpOgogICAgICAgIHNlbGYuX3JlcXVpcmVfY29ubmVjdGVkKCkKICAgICAgICBpZiBzZWxmLmRlbW86CiAgICAgICAgICAgIHJldHVybiBTeW1ib2xJbmZvKG5hbWU9c3ltYm9sLCBkaWdpdHM9NSwgcG9pbnQ9MC4wMDAwMSwgdHJhZGVfY29udHJhY3Rfc2l6ZT0xMDAwMDAuMCwgdm9sdW1lX21pbj0wLjAxLCB2b2x1bWVfbWF4PTUwMC4wLCB2b2x1bWVfc3RlcD0wLjAxLCBzcHJlYWQ9MSwgYmlkPTEuMDk5OTksIGFzaz0xLjEwMDAxKQogICAgICAgIGRhdGEgPSBhd2FpdCBzZWxmLl9nZXQoZiIvc3ltYm9sL3tzeW1ib2x9IikKICAgICAgICByZXR1cm4gU3ltYm9sSW5mbyhuYW1lPWRhdGFbIm5hbWUiXSwgZGlnaXRzPWludChkYXRhWyJkaWdpdHMiXSksIHBvaW50PWZsb2F0KGRhdGFbInBvaW50Il0pLCB0cmFkZV9jb250cmFjdF9zaXplPWZsb2F0KGRhdGFbInRyYWRlX2NvbnRyYWN0X3NpemUiXSksIHZvbHVtZV9taW49ZmxvYXQoZGF0YVsidm9sdW1lX21pbiJdKSwgdm9sdW1lX21heD1mbG9hdChkYXRhWyJ2b2x1bWVfbWF4Il0pLCB2b2x1bWVfc3RlcD1mbG9hdChkYXRhWyJ2b2x1bWVfc3RlcCJdKSwgc3ByZWFkPWludChkYXRhLmdldCgic3ByZWFkIiwgMCkpLCBiaWQ9ZmxvYXQoZGF0YS5nZXQoImJpZCIsIDAuMCkpLCBhc2s9ZmxvYXQoZGF0YS5nZXQoImFzayIsIDAuMCkpKQoKICAgIGFzeW5jIGRlZiBnZXRfdGljayhzZWxmLCBzeW1ib2wpOgogICAgICAgIHNlbGYuX3JlcXVpcmVfY29ubmVjdGVkKCkKICAgICAgICBpZiBzZWxmLmRlbW86CiAgICAgICAgICAgIHJldHVybiB7ImJpZCI6IDEuMDk5OTksICJhc2siOiAxLjEwMDAxLCAidGltZSI6IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLnRpbWVzdGFtcCgpfQogICAgICAgIHJldHVybiBhd2FpdCBzZWxmLl9nZXQoZiIvdGljay97c3ltYm9sfSIpCgogICAgYXN5bmMgZGVmIHBsYWNlX29yZGVyKHNlbGYsIHN5bWJvbCwgZGlyZWN0aW9uLCB2b2x1bWUsIHNsPU5vbmUsIHRwPU5vbmUsIGNvbW1lbnQ9IkdhbGF4eVZhc3QiKToKICAgICAgICBzZWxmLl9yZXF1aXJlX2Nvbm5lY3RlZCgpCiAgICAgICAgcGF5bG9hZCA9IHsic3ltYm9sIjogc3ltYm9sLCAiZGlyZWN0aW9uIjogZGlyZWN0aW9uLnVwcGVyKCksICJ2b2x1bWUiOiB2b2x1bWUsICJzbCI6IHNsLCAidHAiOiB0cCwgImNvbW1lbnQiOiBjb21tZW50fQogICAgICAgIGlmIHNlbGYuZGVtbzoKICAgICAgICAgICAgdGlja2V0ID0gYWJzKGhhc2goZiJ7c3ltYm9sfXtkaXJlY3Rpb259e3ZvbHVtZX0iKSkgJSAxXzAwMF8wMDAgKyAxMDBfMDAwCiAgICAgICAgICAgIGxvZ2dlci5pbmZvKCJbTVQ1Q29ubmVjdG9yXVtERU1PXSBwbGFjZV9vcmRlciAlcyAlcyAlLjJmIC0+IHRpY2tldD0lZCIsIGRpcmVjdGlvbiwgc3ltYm9sLCB2b2x1bWUsIHRpY2tldCkKICAgICAgICAgICAgcmV0dXJuIE9yZGVyUmVzdWx0KHRpY2tldD10aWNrZXQsIHN5bWJvbD1zeW1ib2wsIGRpcmVjdGlvbj1kaXJlY3Rpb24sIHZvbHVtZT12b2x1bWUsIG9wZW5fcHJpY2U9MC4wLCBzbD1zbCwgdHA9dHApCiAgICAgICAgZGF0YSA9IGF3YWl0IHNlbGYuX3Bvc3QoIi9vcmRlci9vcGVuIiwgcGF5bG9hZCkKICAgICAgICBpZiBub3QgZGF0YS5nZXQoInRpY2tldCIpOgogICAgICAgICAgICByYWlzZSBNVDVFcnJvcihmIk1UNSBnYXRld2F5IHJldHVybmVkIG5vIHRpY2tldDoge2RhdGF9IikKICAgICAgICByZXR1cm4gT3JkZXJSZXN1bHQodGlja2V0PWludChkYXRhWyJ0aWNrZXQiXSksIHN5bWJvbD1zeW1ib2wsIGRpcmVjdGlvbj1kaXJlY3Rpb24sIHZvbHVtZT12b2x1bWUsIG9wZW5fcHJpY2U9ZmxvYXQoZGF0YS5nZXQoInByaWNlIiwgMC4wKSksIHNsPXNsLCB0cD10cCwgcmF3PWRhdGEpCgogICAgYXN5bmMgZGVmIGNsb3NlX3Bvc2l0aW9uKHNlbGYsIHRpY2tldCk6CiAgICAgICAgc2VsZi5fcmVxdWlyZV9jb25uZWN0ZWQoKQogICAgICAgIGlmIHNlbGYuZGVtbzoKICAgICAgICAgICAgbG9nZ2VyLmluZm8oIltNVDVDb25uZWN0b3JdW0RFTU9dIGNsb3NlX3Bvc2l0aW9uIHRpY2tldD0lZCIsIHRpY2tldCkKICAgICAgICAgICAgcmV0dXJuIFRydWUKICAgICAgICB0cnk6CiAgICAgICAgICAgIGF3YWl0IHNlbGYuX3Bvc3QoIi9vcmRlci9jbG9zZSIsIHsidGlja2V0IjogdGlja2V0fSkKICAgICAgICAgICAgcmV0dXJuIFRydWUKICAgICAgICBleGNlcHQgTVQ1RXJyb3IgYXMgZXhjOgogICAgICAgICAgICBpZiAibm90IGZvdW5kIiBpbiBzdHIoZXhjKS5sb3dlcigpIG9yICI0MDQiIGluIHN0cihleGMpOgogICAgICAgICAgICAgICAgcmV0dXJuIEZhbHNlCiAgICAgICAgICAgIHJhaXNlCgogICAgYXN5bmMgZGVmIG1vZGlmeV9vcmRlcihzZWxmLCB0aWNrZXQsIHNsPU5vbmUsIHRwPU5vbmUpOgogICAgICAgIHNlbGYuX3JlcXVpcmVfY29ubmVjdGVkKCkKICAgICAgICBpZiBzZWxmLmRlbW86CiAgICAgICAgICAgIHJldHVybiBUcnVlCiAgICAgICAgYXdhaXQgc2VsZi5fcG9zdCgiL29yZGVyL21vZGlmeSIsIHsidGlja2V0IjogdGlja2V0LCAic2wiOiBzbCwgInRwIjogdHB9KQogICAgICAgIHJldHVybiBUcnVlCgogICAgYXN5bmMgZGVmIGdldF9wb3NpdGlvbihzZWxmLCB0aWNrZXQpOgogICAgICAgIHNlbGYuX3JlcXVpcmVfY29ubmVjdGVkKCkKICAgICAgICBpZiBzZWxmLmRlbW86CiAgICAgICAgICAgIHJldHVybiBQb3NpdGlvbkluZm8odGlja2V0PXRpY2tldCwgc3ltYm9sPSJFVVJVU0QiLCBkaXJlY3Rpb249IkJVWSIsIHZvbHVtZT0wLjAxLCBvcGVuX3ByaWNlPTEuMTAwMCwgY3VycmVudF9wcmljZT0xLjEwMTAsIHByb2ZpdD0xMC4wKQogICAgICAgIHRyeToKICAgICAgICAgICAgZGF0YSA9IGF3YWl0IHNlbGYuX2dldChmIi9wb3NpdGlvbi97dGlja2V0fSIpCiAgICAgICAgICAgIHJldHVybiBQb3NpdGlvbkluZm8odGlja2V0PWludChkYXRhWyJ0aWNrZXQiXSksIHN5bWJvbD1kYXRhWyJzeW1ib2wiXSwgZGlyZWN0aW9uPWRhdGFbInR5cGUiXSwgdm9sdW1lPWZsb2F0KGRhdGFbInZvbHVtZSJdKSwgb3Blbl9wcmljZT1mbG9hdChkYXRhWyJwcmljZV9vcGVuIl0pLCBjdXJyZW50X3ByaWNlPWZsb2F0KGRhdGFbInByaWNlX2N1cnJlbnQiXSksIHByb2ZpdD1mbG9hdChkYXRhWyJwcm9maXQiXSksIHNsPWRhdGEuZ2V0KCJzbCIpLCB0cD1kYXRhLmdldCgidHAiKSkKICAgICAgICBleGNlcHQgTVQ1RXJyb3I6CiAgICAgICAgICAgIHJldHVybiBOb25lCgogICAgYXN5bmMgZGVmIGdldF9hbGxfcG9zaXRpb25zKHNlbGYpOgogICAgICAgIHNlbGYuX3JlcXVpcmVfY29ubmVjdGVkKCkKICAgICAgICBpZiBzZWxmLmRlbW86CiAgICAgICAgICAgIHJldHVybiBbXQogICAgICAgIGRhdGEgPSBhd2FpdCBzZWxmLl9nZXQoIi9wb3NpdGlvbnMiKQogICAgICAgIHJldHVybiBbUG9zaXRpb25JbmZvKHRpY2tldD1pbnQoaVsidGlja2V0Il0pLCBzeW1ib2w9aVsic3ltYm9sIl0sIGRpcmVjdGlvbj1pWyJ0eXBlIl0sIHZvbHVtZT1mbG9hdChpWyJ2b2x1bWUiXSksIG9wZW5fcHJpY2U9ZmxvYXQoaVsicHJpY2Vfb3BlbiJdKSwgY3VycmVudF9wcmljZT1mbG9hdChpWyJwcmljZV9jdXJyZW50Il0pLCBwcm9maXQ9ZmxvYXQoaVsicHJvZml0Il0pLCBzbD1pLmdldCgic2wiKSwgdHA9aS5nZXQoInRwIikpIGZvciBpIGluIGRhdGEuZ2V0KCJwb3NpdGlvbnMiLCBbXSldCgogICAgYXN5bmMgZGVmIGdldF9hY2NvdW50X2luZm8oc2VsZik6CiAgICAgICAgc2VsZi5fcmVxdWlyZV9jb25uZWN0ZWQoKQogICAgICAgIGlmIHNlbGYuZGVtbzoKICAgICAgICAgICAgcmV0dXJuIHsiYmFsYW5jZSI6IDEwMDAwLjAsICJlcXVpdHkiOiAxMDAwMC4wLCAibWFyZ2luIjogMC4wLCAiZnJlZV9tYXJnaW4iOiAxMDAwMC4wLCAibGV2ZXJhZ2UiOiAxMDAsICJjdXJyZW5jeSI6ICJVU0QiLCAic2VydmVyIjogImRlbW8ifQogICAgICAgIHJldHVybiBhd2FpdCBzZWxmLl9nZXQoIi9hY2NvdW50IikKCiAgICBkZWYgX3JlcXVpcmVfY29ubmVjdGVkKHNlbGYpOgogICAgICAgIGlmIG5vdCBzZWxmLl9jb25uZWN0ZWQ6CiAgICAgICAgICAgIHJhaXNlIE1UNUVycm9yKCJNVDVDb25uZWN0b3IuY29ubmVjdCgpIG11c3QgYmUgY2FsbGVkIGZpcnN0IikKCiAgICBAc3RhdGljbWV0aG9kCiAgICBkZWYgX3RpbWVmcmFtZV90b19zZWNvbmRzKHRmKToKICAgICAgICByZXR1cm4geyJNMSI6IDYwLCAiTTUiOiAzMDAsICJNMTUiOiA5MDAsICJNMzAiOiAxODAwLCAiSDEiOiAzNjAwLCAiSDQiOiAxNDQwMCwgIkQxIjogODY0MDAsICJXMSI6IDYwNDgwMCwgIk1OMSI6IDI1OTIwMDB9LmdldCh0Zi51cHBlcigpLCAzNjAwKQoKICAgIGFzeW5jIGRlZiBfZ2V0KHNlbGYsIHBhdGgsIHBhcmFtcz1Ob25lKToKICAgICAgICByZXR1cm4gYXdhaXQgc2VsZi5fcmVxdWVzdCgiR0VUIiwgcGF0aCwgcGFyYW1zPXBhcmFtcykKCiAgICBhc3luYyBkZWYgX3Bvc3Qoc2VsZiwgcGF0aCwgcGF5bG9hZCk6CiAgICAgICAgcmV0dXJuIGF3YWl0IHNlbGYuX3JlcXVlc3QoIlBPU1QiLCBwYXRoLCBqc29uPXBheWxvYWQpCgogICAgYXN5bmMgZGVmIF9yZXF1ZXN0KHNlbGYsIG1ldGhvZCwgcGF0aCwgKiprd2FyZ3MpOgogICAgICAgIHVybCA9IHNlbGYuYmFzZV91cmwgKyBwYXRoCiAgICAgICAgZm9yIGF0dGVtcHQgaW4gcmFuZ2UoMSwgc2VsZi5tYXhfcmV0cmllcyArIDEpOgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBhc3luYyB3aXRoIHNlbGYuX3Nlc3Npb24ucmVxdWVzdChtZXRob2QsIHVybCwgKiprd2FyZ3MpIGFzIHJlc3A6CiAgICAgICAgICAgICAgICAgICAgaWYgcmVzcC5zdGF0dXMgPj0gNDAwOgogICAgICAgICAgICAgICAgICAgICAgICBib2R5ID0gYXdhaXQgcmVzcC50ZXh0KCkKICAgICAgICAgICAgICAgICAgICAgICAgcmFpc2UgTVQ1RXJyb3IoZiJIVFRQIHtyZXNwLnN0YXR1c30gZnJvbSB7dXJsfToge2JvZHl9IikKICAgICAgICAgICAgICAgICAgICByZXR1cm4gYXdhaXQgcmVzcC5qc29uKCkKICAgICAgICAgICAgZXhjZXB0IE1UNUVycm9yOgogICAgICAgICAgICAgICAgcmFpc2UKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgICAgICBpZiBhdHRlbXB0ID09IHNlbGYubWF4X3JldHJpZXM6CiAgICAgICAgICAgICAgICAgICAgcmFpc2UgTVQ1RXJyb3IoZiJSZXF1ZXN0IHttZXRob2R9IHt1cmx9IGZhaWxlZDoge2V4Y30iKSBmcm9tIGV4YwogICAgICAgICAgICAgICAgYXdhaXQgYXN5bmNpby5zbGVlcCgyICoqIGF0dGVtcHQpCiAgICAgICAgcmFpc2UgTVQ1RXJyb3IoInVucmVhY2hhYmxlIikKCgptdDVfY29ubmVjdG9yID0gTVQ1Q29ubmVjdG9yKCkK
+"""
+backend/execution/mt5_connector.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Async HTTP bridge to the MetaTrader 5 REST gateway.
+
+فاز G — تغییرات:
+- demo پیش‌فرض از env var خوانده می‌شود (MT5_DEMO_MODE)
+- get_candles() اضافه شد
+- get_symbol_info() اضافه شد
+- singleton با تنظیمات env ساخته می‌شود
+- health_check() اضافه شً
+
+Usage::
+
+    connector = MT5Connector(base_url="http://localhost:8080", demo=False)
+    await connector.connect()
+    ticket = await connector.place_order(
+        symbol="EURUSD", direction="BUY",
+        volume=0.01, sl=1.0800, tp=1.1050
+    )
+    candles = await connector.get_candles("EURUSD", "H1", 100)
+    await connector.close_position(ticket)
+    await connector.disconnect()
+
+Design notes:
+- All I/O is async (aiohttp).
+- demo=False → real MT5 REST gateway calls.
+- demo=True  → logged stubs (safe for CI/testing).
+- Retries use exponential back-off (max 3 attempts).
+- Every public method raises MT5Error on unrecoverable failure.
+- MT5_DEMO_MODE env var controls default: "false" = LIVE, "true" = DEMO
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class MT5Error(RuntimeError):
+    """Raised when the MT5 gateway returns an error or is unreachable."""
+
+
+@dataclass
+class OrderResult:
+    ticket: int
+    symbol: str
+    direction: str
+    volume: float
+    open_price: float
+    sl: Optional[float] = None
+    tp: Optional[float] = None
+    raw: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class PositionInfo:
+    ticket: int
+    symbol: str
+    direction: str
+    volume: float
+    open_price: float
+    current_price: float
+    profit: float
+    sl: Optional[float] = None
+    tp: Optional[float] = None
+
+
+@dataclass
+class CandleData:
+    time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    spread: int = 0
+
+
+@dataclass
+class SymbolInfo:
+    name: str
+    digits: int
+    point: float
+    trade_contract_size: float
+    volume_min: float
+    volume_max: float
+    volume_step: float
+    spread: int
+    bid: float
+    ask: float
+
+
+class MT5Connector:
+    def __init__(self, base_url="", timeout_s=10.0, max_retries=3, demo=None):
+        if demo is None:
+            env_demo = os.environ.get("MT5_DEMO_MODE", "true").lower()
+            demo = env_demo not in ("false", "0", "no", "off")
+        self.base_url = (base_url or os.environ.get("MT5_GATEWAY_URL", "http://localhost:8080")).rstrip("/")
+        self.timeout_s = float(os.environ.get("MT5TIMEOUT_S", str(timeout_s)))
+        self.max_retries = int(os.environ.get("MT5_MAX_RETRIES", str(max_retries)))
+        self.demo = demo
+        self._session = None
+        self._connected = False
+
+    async def connect(self):
+        if self._connected:
+            return
+        try:
+            import aiohttp
+            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout_s))
+            if not self.demo:
+                await self._get("/ping")
+            self._connected = True
+            logger.info("[MT5Connector] connected (%s)", "DEMO" if self.demo else "LIVE")
+        except ImportError:
+            logger.warning("[MT5Connector] aiohttp missing - STUB mode")
+            self._connected = True
+            self.demo = True
+        except MT5Error as exc:
+            raise MT5Error(f"Cannot connect to MT5 gateway: {exc}") from exc
+
+    async def disconnect(self):
+        if self._session:
+            await self._session.close()
+            self._session = None
+        self._connected = False
+
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *args):
+        await self.disconnect()
+
+    async def health_check(self):
+        if self.demo:
+            return {"ok": True, "mode": "DEMO", "ping_ms": 0.0, "account": "demo"}
+        try:
+            import time
+            t0 = time.monotonic()
+            data = await self._get("/ping")
+            ping_ms = (time.monotonic() - t0) * 1000
+            return {"ok": True, "mode": "LIVE", "ping_ms": round(ping_ms, 1), **data}
+        except MT5Error as exc:
+            return {"ok": False, "mode": "LIVE", "error": str(exc)}
+
+    async def get_candles(self, symbol, timeframe, count=100, from_date=None):
+        self._require_connected()
+        if self.demo:
+            import random
+            rng = random.Random(42)
+            candles = []
+            price = 1.1000
+            now = datetime.now(timezone.utc)
+            tf_seconds = self._timeframe_to_seconds(timeframe)
+            for i in range(count):
+                ts = datetime.fromtimestamp(now.timestamp() - (count - i) * tf_seconds, tz=timezone.utc)
+                o = price
+                h = o + rng.uniform(0.0001, 0.0020)
+                l = o - rng.uniform(0.0001, 0.0020)
+                c = rng.uniform(l, h)
+                price = c
+                candles.append(CandleData(time=ts, open=round(o, 5), high=round(h, 5), low=round(l, 5), close=round(c, 5), volume=rng.randint(100, 5000), spread=rng.randint(1, 3)))
+            return candles
+        params = {"symbol": symbol, "timeframe": timeframe, "count": min(count, 5000)}
+        if from_date:
+            params["from"] = from_date.isoformat()
+        data = await self._get("/candles", params=params)
+        return [CandleData(time=datetime.fromisoformat(b["time"]), open=float(b["open"]), high=float(b["high"]), low=float(b["low"]), close=float(b["close"]), volume=int(b["volume"]), spread=int(b.get("spread", 0))) for b in data.get("candles", [])]
+
+    async def get_symbol_info(self, symbol):
+        self._require_connected()
+        if self.demo:
+            return SymbolInfo(name=symbol, digits=5, point=0.00001, trade_contract_size=100000.0, volume_min=0.01, volume_max=500.0, volume_step=0.01, spread=1, bid=1.09999, ask=1.10001)
+        data = await self._get(f"/symbol/{symbol}")
+        return SymbolInfo(name=data["name"], digits=int(data["digits"]), point=float(data["point"]), trade_contract_size=float(data["trade_contract_size"]), volume_min=float(data["volume_min"]), volume_max=float(data["volume_max"]), volume_step=float(data["volume_step"]), spread=int(data.get("spread", 0)), bid=float(data.get("bid", 0.0)), ask=float(data.get("ask", 0.0)))
+
+    async def get_tick(self, symbol):
+        self._require_connected()
+        if self.demo:
+            return {"bid": 1.09999, "ask": 1.10001, "time": datetime.now(timezone.utc).timestamp()}
+        return await self._get(f"/tick/{symbol}")
+
+    async def place_order(self, symbol, direction, volume, sl=None, tp=None, comment="GalaxyVast"):
+        self._require_connected()
+        payload = {"symbol": symbol, "direction": direction.upper(), "volume": volume, "sl": sl, "tp": tp, "comment": comment}
+        if self.demo:
+            ticket = abs(hash(f"{symbol}{direction}{volume}")) % 1_000_000 + 100_000
+            logger.info("[MT5Connector][DEMO] place_order %s %s %.2f -> ticket=%d", direction, symbol, volume, ticket)
+            return OrderResult(ticket=ticket, symbol=symbol, direction=direction, volume=volume, open_price=0.0, sl=sl, tp=tp)
+        data = await self._post("/order/open", payload)
+        if not data.get("ticket"):
+            raise MT5Error(f"No ticket in response: {data}")
+        return OrderResult(ticket=int(data["ticket"]), symbol=symbol, direction=direction, volume=volume, open_price=float(data.get("open_price", 0.0)), sl=sl, tp=tp, raw=data)
+
+    async def close_position(self, ticket: int) -> bool:
+        self._require_connected()
+        if self.demo:
+            logger.info("[MT5Connector][DEMO] close_position ticket=%d", ticket)
+            return True
+        data = await self._post("/order/close", {"ticket": ticket})
+        return bool(data.get("closed"))
+
+    async def modify_position(self, ticket: int, sl: Optional[float] = None, tp: Optional[float] = None) -> bool:
+        self._require_connected()
+        if self.demo:
+            return True
+        payload = {"ticket": ticket}
+        if sl is not None:
+            payload["sl"] = sl
+        if tp is not None:
+            payload["tp"] = tp
+        data = await self._post("/order/modify", payload)
+        return bool(data.get("modified"))
+
+    async def get_open_positions(self) -> List[PositionInfo]:
+        self._require_connected()
+        if self.demo:
+            return []
+        data = await self._get("/positions")
+        return [PositionInfo(ticket=int(p["ticket"]), symbol=p["symbol"], direction=p["direction"], volume=float(p["volume"]), open_price=float(p["open_price"]), current_price=float(p["current_price"]), profit=float(p["profit"]), sl=p.get("sl"), tp=p.get("tp")) for p in data.get("positions", [])]
+
+    async def get_account_info(self) -> Dict[str, Any]:
+        self._require_connected()
+        if self.demo:
+            return {"balance": 10000.0, "equity": 10000.0, "margin": 0.0, "free_margin": 10000.0, "profit": 0.0, "leverage": 100, "currency": "USD"}
+        return await self._get("/account")
+
+    # ── Internals ────────────────────────────────────────────────────────────
+
+    def _require_connected(self):
+        if not self._connected:
+            raise MT5Error("Not connected — call connect() first")
+
+    def _timeframe_to_seconds(self, tf: str) -> int:
+        mapping = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800, "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800, "MN1": 2592000}
+        return mapping.get(tf.upper(), 3600)
+
+    async def _get(self, path: str, params=None):
+        for attempt in range(self.max_retries + 1):
+            try:
+                async with self._session.get(self.base_url + path, params=params) as r:
+                    if r.status >= 400:
+                        text = await r.text()
+                        raise MT5Error(f"GET {path} → {r.status}: {text}")
+                    return await r.json()
+            except MT5Error:
+                raise
+            except Exception as exc:
+                if attempt == self.max_retries:
+                    raise MT5Error(f"Request GET {path} failed: {exc}") from exc
+                await asyncio.sleep(2 ** attempt)
+        raise MT5Error("unreachable")
+
+    async def _post(self, path: str, payload):
+        for attempt in range(self.max_retries + 1):
+            try:
+                async with self._session.post(self.base_url + path, json=payload) as r:
+                    if r.status >= 400:
+                        text = await r.text()
+                        raise MT5Error(f"POST {path} → {r.status}: {text}")
+                    return await r.json()
+            except MT5Error:
+                raise
+            except Exception as exc:
+                if attempt == self.max_retries:
+                    raise MT5Error(f"Request POST {path} failed: {exc}") from exc
+                await asyncio.sleep(2 ** attempt)
+        raise MT5Error("unreachable")
+
+
+mt5_connector = MT5Connector()
