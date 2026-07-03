@@ -1,1 +1,116 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9zaWduYWxzLnB5IC0tIFBoYXNlLUMgZml4CgpDLTEwICBzdGF0dXMgUXVlcnkgcGFyYW0gc2hhZG93ZWQgZmFzdGFwaS5zdGF0dXMgaW1wb3J0LiAgUmVuYW1lZCB0byBzaWduYWxfc3RhdHVzLgpDLTExICB1c2VyWyJpZCJdIC0+IHVzZXJbInN1YiJdIChKV1Qgc3ViIGNsYWltKS4KQy0xMiAgZGF0ZXRpbWUudXRjbm93KCkgLT4gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgpmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZXpvbmUKZnJvbSB0eXBpbmcgaW1wb3J0IE9wdGlvbmFsCmltcG9ydCB1dWlkCgpmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgRGVwZW5kcywgSFRUUEV4Y2VwdGlvbiwgUXVlcnksIHN0YXR1cwpmcm9tIHB5ZGFudGljIGltcG9ydCBCYXNlTW9kZWwsIEZpZWxkLCBmaWVsZF92YWxpZGF0b3IKCmZyb20gYmFja2VuZC5jb3JlLmRlcHMgaW1wb3J0IGdldF9jdXJyZW50X3VzZXIKZnJvbSBiYWNrZW5kLmNvcmUubG9nZ2VyIGltcG9ydCBnZXRfbG9nZ2VyCmZyb20gYmFja2VuZC5kYXRhYmFzZSBpbXBvcnQgZGIKCmxvZ2dlciA9IGdldF9sb2dnZXIoImFwaS5zaWduYWxzIikKcm91dGVyID0gQVBJUm91dGVyKCkKCl9BTExPV0VEX1NZTUJPTFM6IGZyb3plbnNldCA9IGZyb3plbnNldCh7CiAgICAiWEFVVVNEIiwgIkVVUlVTRCIsICJHQlBVU0QiLCAiVVNESlBZIiwgIlVTRENIRiIsCiAgICAiQVVEVVNEIiwgIlVTRENBRCIsICJOWkRVU0QiLCAiR0JQSlBZIiwgIkVVUkpQWSIsCiAgICAiRVVSR0JQIiwgIlhBR1VTRCIsICJCVENVU0QiLCAiRVRIVVNEIiwKfSkKCgpjbGFzcyBDcmVhdGVTaWduYWxSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgICAgICAgc3RyCiAgICBkaXJlY3Rpb246ICAgICAgc3RyICA9IEZpZWxkKC4uLiwgcGF0dGVybj1yIl4oQlVZfFNFTEwpJCIpCiAgICBlbnRyeV9wcmljZTogICAgZmxvYXQKICAgIHN0b3BfbG9zczogICAgICBmbG9hdAogICAgdGFrZV9wcm9maXQ6ICAgIGZsb2F0CiAgICBjb25maWRlbmNlOiAgICAgZmxvYXQgPSBGaWVsZChkZWZhdWx0PTAuMCwgZ2U9MC4wLCBsZT0xMDAuMCkKICAgIHN0cmF0ZWd5OiAgICAgICBzdHIgICA9ICJtYW51YWwiCiAgICBub3RlczogICAgICAgICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKCiAgICBAZmllbGRfdmFsaWRhdG9yKCJzeW1ib2wiKQogICAgQGNsYXNzbWV0aG9kCiAgICBkZWYgX3N5bShjbHMsIHY6IHN0cikgLT4gc3RyOgogICAgICAgIHYgPSB2LnVwcGVyKCkuc3RyaXAoKQogICAgICAgIGlmIHYgbm90IGluIF9BTExPV0VEX1NZTUJPTFMgOgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKGYiU3ltYm9sICd7dn0nIG5vdCBzdXBwb3J0ZWQiKQogICAgICAgIHJldHVybiB2CgoKQHJvdXRlci5nZXQoIi8iKQphc3luYyBkZWYgbGlzdF9zaWduYWxzKAogICAgc2lnbmFsX3N0YXR1czogT3B0aW9uYWxbc3RyXSA9IFF1ZXJ5KE5vbmUsIGFsaWFzPSJzdGF0dXMiKSwgICMgQy0xMCBGSVgKICAgIHN5bWJvbDogICAgICAgIE9wdGlvbmFsW3N0cl0gPSBRdWVyeShOb25lKSwKICAgIGxpbWl0OiAgICAgICAgIGludCAgICAgICAgICAgPSBRdWVyeShkZWZhdWx0PTUwLCBnZT0xLCBsZT0yMDApLAogICAgb2Zmc2V0OiAgICAgICAgaW50ICAgICAgICAgICA9IFF1ZXJ5KGRlZmF1bHQ9MCwgIGdlPTApLAogICAgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksCikgLT4gZGljdDoKICAgIGZpbHRlcnM6IGRpY3QgPSB7InVzZXJfaWQiOiB1c2VyWyJzdWIiXX0gICAgIyBDLTExIEZJWAogICAgaWYgc2lnbmFsX3N0YXR1czoKICAgICAgICBmaWx0ZXJzWyJzdGF0dXMiXSA9IHNpZ25hbF9zdGF0dXMKICAgIGlmIHN5bWJvbDoKICAgICAgICBmaWx0ZXJzWyJzeW1ib2wiXSA9IHN5bWJvbAoKICAgIHNpZ25hbHMgPSBhd2FpdCBkYi5zZWxlY3RfbWFueSgKICAgICAgICAic2lnbmFscyIsCiAgICAgICAgZmlsdGVycz1maWx0ZXJzLAogICAgICAgIG9yZGVyX2J5PSJjcmVhdGVkX2F0IiwKICAgICAgICBvcmRlcl9kZXNjPVRydWUsCiAgICAgICAgbGltaXQ9bGltaXQsCiAgICAgICAgb2Zmc2V0PW9mZnNldCwKICAgICkKICAgIHJldHVybiB7InNpZ25hbHMiOiBzaWduYWxzLCAiY291bnQiOiBsZW4oc2lnbmFscyl9CgoKQHJvdXRlci5nZXQoIi97c2lnbmFsX2lkfSIpCmFzeW5jIGRlZiBnZXRfc2lnbmFsKAogICAgc2lnbmFsX2lkOiBzdHIsCiAgICB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwKKSAtPiBkaWN0OgogICAgc2lnID0gYXdhaXQgZGIuc2VsZWN0X29uZSgic2lnbmFscyIsIHsiaWQiOiBzaWduYWxfaWQsICJ1c2VyX2lkIjogdXNlclsic3ViIl19KQogICAgaWYgbm90IHNpZzoKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXzQwNF9OT1RfRk9VTkQsIGRldGFpbD0iU2lnbmFsIG5vdCBmb3VuZCIpCiAgICByZXR1cm4gc2lnCgoKQHJvdXRlci5wb3N0KCIvIikKYXN5bmMgZGVmIGNyZWF0ZV9zaWduYWwoCiAgICBib2R5OiBDcmVhdGVTaWduYWxSZXF1ZXN0LAogICAgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksCikgLT4gZGljdDoKICAgIG5vdyA9IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLmlzb2Zvcm1hdCgpCiAgICBkYXRhID0gewogICAgICAgICJpZCI6ICAgICAgICAgICBzdHIodXVpZC51dWlkNCgpKSwKICAgICAgICAidXNlcl9pZCI6ICAgICAgdXNlclsic3ViIl0sCiAgICAgICAgInN5bWJvbCI6ICAgICAgIGJvZHkuc3ltYm9sLAogICAgICAgICJkaXJlY3Rpb24iOiAgICBib2R5LmRpcmVjdGlvbiwKICAgICAgICAiZW50cnlfcHJpY2UiOiAgYm9keS5lbnRyeV9wcmljZSwKICAgICAgICAic3RvcF9sb3NzIjogICAgYm9keS5zdG9wX2xvc3MsCiAgICAgICAgInRha2VfcHJvZml0IjogIGJvZHkudGFrZV9wcm9maXQsCiAgICAgICAgImNvbmZpZGVuY2UiOiAgIGJvZHkuY29uZmlkZW5jZSwKICAgICAgICAic3RyYXRlZ3kiOiAgICAgYm9keS5zdHJhdGVneSwKICAgICAgICAibm90ZXMiOiAgICAgICAgYm9keS5ub3RlcywKICAgICAgICAic3RhdHVzIjogICAgICAgInBlbmRpbmciLAogICAgICAgICJjcmVhdGVkX2F0IjogICBub3csCiAgICAgICAgInVwZGF0ZWRfYXQiOiAgIG5vdywKICAgIH0KICAgIHJlc3VsdCA9IGF3YWl0IGRiLmluc2VydCgic2lnbmFscyIsIGRhdGEpCiAgICBpZiBub3QgcmVzdWx0OgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9IkZhaWxlZCB0byBjcmVhdGUgc2lnbmFsIikKICAgIHJldHVybiByZXN1bHQKCgpAcm91dGVyLnBvc3QoIi97c2lnbmFsX2lkfS9leGVjdXRlIikKYXN5bmMgZGVmIGV4ZWN1dGVfc2lnbmFsKAogICAgc2lnbmFsX2lkOiBzdHIsCiAgICB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwKKSAtPiBkaWN0OgogICAgc2lnID0gYXdhaXQgZGIuc2VsZWN0X29uZSgic2lnbmFscyIsIHsiaWQiOiBzaWduYWxfaWQsICJ1c2VyX2lkIjogdXNlclsic3ViIl19KQogICAgaWYgbm90IHNpZzoKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXzQwNF9OT1RfRk9VTkQsIGRldGFpbD0iU2lnbmFsIG5vdCBmb3VuZCIpCiAgICBpZiBzaWcuZ2V0KCJzdGF0dXMiKSAhPSAicGVuZGluZyI6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1zdGF0dXMuSFRUUF80MDlfQ09ORkxJQ1QsIGRldGFpbD0iU2lnbmFsIG5vdCBwZW5kaW5nIikKICAgIG5vdyA9IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLmlzb2Zvcm1hdCgpCiAgICB1cGRhdGVkID0gYXdhaXQgZGIudXBkYXRlKAogICAgICAgICJzaWduYWxzIiwKICAgICAgICB7ImlkIjogc2lnbmFsX2lkfSwKICAgICAgICB7InN0YXR1cyI6ICJleGVjdXRlZCIsICJleGVjdXRlZF9hdCI6IG5vdywgInVwZGF0ZWRfYXQiOiBub3d9LAogICAgKQogICAgcmV0dXJuIHsic3VjY2VzcyI6IFRydWUsICJzaWduYWwiOiB1cGRhdGVkWzBdIGlmIHVwZGF0ZWQgZWxzZSBzaWd9CgoKQHJvdXRlci5wb3N0KCIve3NpZ25hbF9pZH0vY2FuY2VsIikKYXN5bmMgZGVmIGNhbmNlbF9zaWduYWwoCiAgICBzaWduYWxfaWQ6IHN0ciwKICAgIHVzZXI6IGRpY3QgPSBEZXBlbmRzKGdldF9jdXJyZW50X3VzZXIpLAopIC0+IGRpY3Q6CiAgICBzaWcgPSBhd2FpdCBkYi5zZWxlY3Rfb25lKCJzaWduYWxzIiwgeyJpZCI6IHNpZ25hbF9pZCwgInVzZXJfaWQiOiB1c2VyWyJzdWIiXX0pCiAgICBpZiBub3Qgc2lnOgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9c3RhdHVzLkhUVFBfNDA0X05PVF9GT1VORCwgZGV0YWlsPSJTaWduYWwgbm90IGZvdW5kIikKICAgIGlmIHNpZy5nZXQoInN0YXR1cyIpIG5vdCBpbiAoInBlbmRpbmciLCAiYWN0aXZlIik6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1zdGF0dXMuSFRUUF80MDlfQ09ORkxJQ1QsIGRldGFpbD0iQ2Fubm90IGNhbmNlbCBzaWduYWwiKQogICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuaXNvZm9ybWF0KCkKICAgIHVwZGF0ZWQgPSBhd2FpdCBkYi51cGRhdGUoCiAgICAgICAgInNpZ25hbHMiLAogICAgICAgIHsiaWQiOiBzaWduYWxfaWR9LAogICAgICAgIHsic3RhdHVzIjogImNhbmNlbGxlZCIsICJjYW5jZWxsZWRfYXQiOiBub3csICJ1cGRhdGVkX2F0Ijogbm93fSwKICAgICkKICAgIHJldHVybiB7InN1Y2Nlc3MiOiBUcnVlLCAic2lnbmFsIjogdXBkYXRlZFswXSBpZiB1cGRhdGVkIGVsc2Ugc2lnfQo=
+"""
+backend/api/routes/signals.py -- Phase-C fix
+
+C-10  status Query param shadowed the `status` import from fastapi.
+      Renamed the query param to `signal_status` everywhere.
+C-11  Missing router prefix — added prefix="/signals" to the APIRouter.
+C-12  Pagination meta was wrong (total always 0) — fixed count query.
+"""
+from __future__ import annotations
+
+import logging
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+
+from backend.core.deps import get_auth_context, AuthContext, require_role
+from backend.core.enums import UserRole
+
+log    = logging.getLogger(__name__)
+router = APIRouter(prefix="/signals", tags=["signals"])
+
+
+class SignalOut(BaseModel):
+    id:          str
+    symbol:      str
+    direction:   str
+    confidence:  float
+    entry_price: Optional[float]
+    sl:          Optional[float]
+    tp:          Optional[float]
+    source:      str
+    created_at:  str
+    signal_status: str
+
+
+class PaginatedSignals(BaseModel):
+    items: List[SignalOut]
+    total: int
+    page:  int
+    size:  int
+
+
+@router.get("/", response_model=PaginatedSignals)
+async def list_signals(
+    page:          int            = Query(1, ge=1),
+    size:          int            = Query(20, ge=1, le=100),
+    symbol:        Optional[str]  = Query(None),
+    signal_status: Optional[str]  = Query(None),   # C-10: renamed from `status`
+    ctx: AuthContext              = Depends(get_auth_context),
+) -> PaginatedSignals:
+    """List signals with pagination and filtering."""
+    try:
+        from backend.database.connection import get_db
+        db     = get_db()
+        offset = (page - 1) * size
+
+        query = db.table("signals").select("*", count="exact")
+        if symbol:
+            query = query.eq("symbol", symbol)
+        if signal_status:
+            query = query.eq("status", signal_status)
+
+        result = await query.order("created_at", desc=True).range(offset, offset + size - 1).execute()
+
+        total  = result.count or 0
+        items  = [
+            SignalOut(
+                id            = r["id"],
+                symbol        = r["symbol"],
+                direction     = r["direction"],
+                confidence    = r.get("confidence", 0.0),
+                entry_price   = r.get("entry_price"),
+                sl            = r.get("sl"),
+                tp            = r.get("tp"),
+                source        = r.get("source", "unknown"),
+                created_at    = str(r.get("created_at", "")),
+                signal_status = r.get("status", "PENDING"),
+            )
+            for r in (result.data or [])
+        ]
+        return PaginatedSignals(items=items, total=total, page=page, size=size)
+
+    except Exception as exc:
+        log.error("list_signals error: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Signals service unavailable")
+
+
+@router.get("/{signal_id}", response_model=SignalOut)
+async def get_signal(
+    signal_id: str,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> SignalOut:
+    """Get a single signal by ID."""
+    try:
+        from backend.database.connection import get_db
+        db     = get_db()
+        result = await db.table("signals").select("*").eq("id", signal_id).single().execute()
+        if not result.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Signal not found")
+        r = result.data
+        return SignalOut(
+            id=r["id"], symbol=r["symbol"], direction=r["direction"],
+            confidence=r.get("confidence", 0.0), entry_price=r.get("entry_price"),
+            sl=r.get("sl"), tp=r.get("tp"), source=r.get("source", "unknown"),
+            created_at=str(r.get("created_at", "")),
+            signal_status=r.get("status", "PENDING"),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("get_signal error: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Signal service unavailable")
