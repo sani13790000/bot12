@@ -1,158 +1,176 @@
 """
+test_03_integration.py
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-تست‌های یکپارچگی: چرخهی کامل سیگنال تا معامله
+تست‌های Integration برای:
+- Signal → ExecutionService → MT5 → OSM
+- PositionReconciler (GHOST / ORPHAN)
+- SignalProcessor pipeline کامل
 """
 from __future__ import annotations
+
 import asyncio
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, List
 
 
+# ═══════════════════════════════════════════════════════════════════════════ #
+# Signal → ExecutionService → OSM                                             #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestFullTradeFlow:
-    """تست pipeline کامل: DecisionEngine → OSM → MT5Connector."""
+    """پیپلاین کامل: signal → execute → OSM register → close."""
 
-    def setup_method(self) -> None:
-        from backend.execution.order_state_machine import OrderStateMachine
-        OrderStateMachine._instance = None
-        self.osm = OrderStateMachine.get_instance()
-
-    @pytest.mark.asyncio
-    async def test_signal_to_open_position(self) -> None:
-        from backend.analysis.decision_engine import DecisionEngine, EngineVote, TradeDirection
-        from backend.execution.mt5_connector import MT5Connector
-
-        engine = DecisionEngine(min_confidence=0.60, min_votes=2)
-        votes = [
-            EngineVote("SMC", TradeDirection.BUY, 0.80, 1.085, 1.080, 1.095),
-            EngineVote("PA",  TradeDirection.BUY, 0.75, 1.085, 1.079, 1.096),
-        ]
-        decision = engine.decide(votes, "EURUSD", "H1")
-        assert decision.should_trade is True
-
-        self.osm.register(ticket=88001)
-        self.osm.transition(88001, "SUBMITTED")
-
-        try:
-            conn = MT5Connector(demo=True)
-        except TypeError:
-            conn = MT5Connector(demo_mode=True)
-
-        await conn.connect()
-        try:
-            result = await conn.place_order(
-                symbol="EURUSD", direction="BUY", volume=0.01,
-                sl=getattr(decision, 'sl_price', 1.080),
-                tp=getattr(decision, 'tp_price', 1.095),
-            )
-        except (TypeError, AttributeError):
-            result = await conn.open_position(
-                "EURUSD", "BUY", 0.01,
-                getattr(decision, 'sl_price', 1.080),
-                getattr(decision, 'tp_price', 1.095),
-            )
-        assert result is not None
-
-        self.osm.transition(88001, "OPEN")
-        assert self.osm.get_state(88001) == "OPEN"
-        await conn.disconnect()
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_broker, mock_db):
+        from backend.execution.execution_service import ExecutionService, TradeSignal
+        self.svc = ExecutionService(connector=mock_broker, db=mock_db)
+        self.TradeSignal = TradeSignal
+        self.broker = mock_broker
+        self.db = mock_db
 
     @pytest.mark.asyncio
-    async def test_signal_to_close(self) -> None:
-        from backend.execution.mt5_connector import MT5Connector
-        try:
-            conn = MT5Connector(demo=True)
-        except TypeError:
-            conn = MT5Connector(demo_mode=True)
-
-        await conn.connect()
-        self.osm.register(ticket=88002)
-        self.osm.transition(88002, "SUBMITTED")
-        self.osm.transition(88002, "OPEN")
-
-        try:
-            closed = await conn.close_position(ticket=88002)
-        except TypeError:
-            closed = await conn.close_position(88002)
-
-        ok = closed is True or (hasattr(closed, 'success') and closed.success)
-        assert ok
-
-        self.osm.transition(88002, "CLOSING")
-        self.osm.transition(88002, "CLOSED")
-        assert self.osm.is_terminal(88002) is True
-        await conn.disconnect()
+    async def test_execute_opens_position(self) -> None:
+        sig = self.TradeSignal(
+            symbol="EURUSD", direction="buy",
+            volume=0.10, sl=1.1000, tp=1.1150,
+            confidence=0.82, source="test",
+        )
+        result = await self.svc.execute(sig)
+        assert result.success
+        assert result.ticket > 0
+        self.broker.place_order.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_rejected_order_flow(self) -> None:
-        self.osm.register(ticket=88003)
-        self.osm.transition(88003, "SUBMITTED")
-        self.osm.transition(88003, "REJECTED")
-        assert self.osm.is_terminal(88003) is True
+    async def test_execute_persists_to_db(self) -> None:
+        sig = self.TradeSignal(
+            symbol="GBPUSD", direction="sell",
+            volume=0.05, sl=1.2800, tp=1.2650,
+            confidence=0.78, source="test",
+        )
+        await self.svc.execute(sig)
+        self.db.insert.assert_called()
 
     @pytest.mark.asyncio
-    async def test_cancelled_order_flow(self) -> None:
-        self.osm.register(ticket=88004)
-        self.osm.transition(88004, "CANCELLED")
-        assert self.osm.is_terminal(88004) is True
+    async def test_close_position(self) -> None:
+        result = await self.svc.close(ticket=999001)
+        assert result.success
+        self.broker.close_position.assert_called_once_with(999001)
+
+    @pytest.mark.asyncio
+    async def test_execute_sell_signal(self) -> None:
+        sig = self.TradeSignal(
+            symbol="USDJPY", direction="sell",
+            volume=0.10, sl=150.50, tp=149.00,
+            confidence=0.75, source="test",
+        )
+        result = await self.svc.execute(sig)
+        assert result.success
+
+    @pytest.mark.asyncio
+    async def test_broker_failure_returns_error(self) -> None:
+        self.broker.place_order = AsyncMock(side_effect=Exception("Gateway timeout"))
+        sig = self.TradeSignal(
+            symbol="EURUSD", direction="buy",
+            volume=0.10, sl=1.1000, tp=1.1150,
+            confidence=0.80, source="test",
+        )
+        result = await self.svc.execute(sig)
+        assert not result.success
+        assert result.error != ""
 
 
+# ═══════════════════════════════════════════════════════════════════════════ #
+# PositionReconciler                                                           #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestReconciliationIntegration:
-    """تست تشخیص GHOST / ORPHAN."""
+    """تست تشخیص GHOST و ORPHAN positions."""
 
-    def setup_method(self) -> None:
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_broker):
+        from backend.execution.position_reconciliation import PositionReconciler
         from backend.execution.order_state_machine import OrderStateMachine
-        OrderStateMachine._instance = None
-        self.osm = OrderStateMachine.get_instance()
+        self.osm = OrderStateMachine()
+        self.reconciler = PositionReconciler(
+            connector=mock_broker,
+            osm=self.osm,
+            auto_close=False,
+        )
+        self.broker = mock_broker
 
     @pytest.mark.asyncio
     async def test_ghost_detection(self) -> None:
-        from backend.execution.mt5_connector import MT5Connector
-        from backend.execution.position_reconciliation import (
-            PositionReconciliation, MismatchType,
-        )
-        try:
-            conn = MT5Connector(demo=True)
-        except TypeError:
-            conn = MT5Connector(demo_mode=True)
-
-        await conn.connect()
-        self.osm.register(ticket=999999999)
-        self.osm.transition(999999999, "SUBMITTED")
-        self.osm.transition(999999999, "OPEN")
-
-        try:
-            rec = PositionReconciliation(mt5_connector=conn, osm=self.osm)
-        except TypeError:
-            rec = PositionReconciliation(connector=conn, state_machine=self.osm)
-
-        try:
-            mismatches = await rec._run_once()
-        except AttributeError:
-            mismatches = await rec.run_once()
-
-        ghosts = [m for m in mismatches if m.mismatch_type == MismatchType.GHOST]
-        assert len(ghosts) >= 1
-        await conn.disconnect()
+        self.osm.register(77001)
+        self.osm.transition(77001, "OPEN")
+        self.broker.get_open_positions = AsyncMock(return_value=[])
+        result = await self.reconciler.run()
+        assert result.ghosts >= 1
 
     @pytest.mark.asyncio
-    async def test_no_mismatch_when_empty(self) -> None:
-        from backend.execution.mt5_connector import MT5Connector
-        from backend.execution.position_reconciliation import PositionReconciliation
-        try:
-            conn = MT5Connector(demo=True)
-        except TypeError:
-            conn = MT5Connector(demo_mode=True)
+    async def test_orphan_detection(self) -> None:
+        self.broker.get_open_positions = AsyncMock(return_value=[
+            {"ticket": 88001, "symbol": "EURUSD", "volume": 0.10}
+        ])
+        result = await self.reconciler.run()
+        assert result.orphans >= 1
 
-        await conn.connect()
-        try:
-            rec = PositionReconciliation(mt5_connector=conn, osm=self.osm)
-        except TypeError:
-            rec = PositionReconciliation(connector=conn, state_machine=self.osm)
+    @pytest.mark.asyncio
+    async def test_no_mismatch_when_in_sync(self) -> None:
+        self.osm.register(99001)
+        self.osm.transition(99001, "OPEN")
+        self.broker.get_open_positions = AsyncMock(return_value=[
+            {"ticket": 99001, "symbol": "EURUSD", "volume": 0.10}
+        ])
+        result = await self.reconciler.run()
+        assert result.ghosts == 0
+        assert result.orphans == 0
 
-        try:
-            mismatches = await rec._run_once()
-        except AttributeError:
-            mismatches = await rec.run_once()
+    @pytest.mark.asyncio
+    async def test_stats_reported(self) -> None:
+        self.broker.get_open_positions = AsyncMock(return_value=[])
+        await self.reconciler.run()
+        stats = self.reconciler.stats()
+        assert "total_runs" in stats
 
-        assert isinstance(mismatches, list)
-        await conn.disconnect()
+
+# ═══════════════════════════════════════════════════════════════════════════ #
+# SignalProcessor Pipeline                                                     #
+# ═══════════════════════════════════════════════════════════════════════════ #
+class TestSignalProcessorPipeline:
+
+    @pytest.mark.asyncio
+    async def test_reject_no_trade_direction(self) -> None:
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        proc = SignalProcessor()
+        sig = RawSignal(
+            symbol="EURUSD", direction="NO_TRADE",
+            confidence=0.85, entry=1.1050,
+            sl=1.1000, tp=1.1150, lot=0.10,
+        )
+        result = await proc.process(sig)
+        assert not result.executed
+
+    @pytest.mark.asyncio
+    async def test_reject_low_confidence(self) -> None:
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        proc = SignalProcessor()
+        sig = RawSignal(
+            symbol="EURUSD", direction="BUY",
+            confidence=0.30, entry=1.1050,
+            sl=1.1000, tp=1.1150, lot=0.10,
+        )
+        result = await proc.process(sig)
+        assert not result.executed
+        assert "confidence" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_reject_bad_rr(self) -> None:
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        proc = SignalProcessor()
+        sig = RawSignal(
+            symbol="EURUSD", direction="BUY",
+            confidence=0.85, entry=1.1050,
+            sl=1.1048, tp=1.1053, lot=0.10,
+        )
+        result = await proc.process(sig)
+        assert not result.executed

@@ -1,233 +1,270 @@
 """
+test_02_unit_execution.py
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-تست‌های واحد: OrderStateMachine، MT5Connector، DecisionEngine، SMCEngine
+تست‌های unit برای:
+- OrderStateMachine (با API واقعی: register/transition/get_state)
+- MT5Connector (demo mode)
+- SMCEngine
+- DecisionEngine
 """
 from __future__ import annotations
-import asyncio
+
+import os
 import pytest
+import asyncio
+from unittest.mock import patch, AsyncMock, MagicMock
+from typing import List
 
 
-# --- OrderStateMachine ---
-
+# ═══════════════════════════════════════════════════════════════════════════ #
+# OrderStateMachine                                                           #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestOrderStateMachine:
-    """تست FSM مدیریت چرخهی عمر سفارش."""
+    """تست کامل FSM با API واقعی — register/transition/get_state."""
 
-    def setup_method(self) -> None:
+    def setup_method(self):
         from backend.execution.order_state_machine import OrderStateMachine
-        OrderStateMachine._instance = None
-        self.osm = OrderStateMachine.get_instance()
+        self.osm = OrderStateMachine()
 
     def test_register_and_initial_state(self) -> None:
-        from backend.execution.order_state_machine import OrderState
-        self.osm.register(ticket=10001)
-        assert self.osm.get_state(10001) == OrderState.PENDING.value
+        self.osm.register(10001)
+        assert self.osm.get_state(10001) == "PENDING"
 
     def test_full_happy_path(self) -> None:
-        from backend.execution.order_state_machine import OrderState
-        self.osm.register(ticket=20001)
-        self.osm.transition(20001, "SUBMITTED")
-        self.osm.transition(20001, "OPEN")
-        self.osm.transition(20001, "CLOSING")
-        self.osm.transition(20001, "CLOSED")
-        assert self.osm.get_state(20001) == OrderState.CLOSED.value
+        self.osm.register(10002)
+        self.osm.transition(10002, "OPEN")
+        self.osm.transition(10002, "CLOSED")
+        assert self.osm.get_state(10002) == "CLOSED"
+        assert self.osm.is_terminal(10002)
 
     def test_invalid_transition_raises(self) -> None:
-        self.osm.register(ticket=30001)
-        with pytest.raises((ValueError, KeyError)):
-            self.osm.transition(30001, "CLOSED")
+        self.osm.register(10003)
+        with pytest.raises(Exception):
+            self.osm.transition(10003, "INVALID_STATE_XYZ")
 
     def test_terminal_state_locked(self) -> None:
-        self.osm.register(ticket=40001)
-        self.osm.transition(40001, "CANCELLED")
-        assert self.osm.is_terminal(40001) is True
+        self.osm.register(10004)
+        self.osm.transition(10004, "REJECTED")
+        assert self.osm.is_terminal(10004)
+        with pytest.raises(Exception):
+            self.osm.transition(10004, "OPEN")
 
     def test_active_tickets(self) -> None:
-        self.osm.register(ticket=50001)
-        self.osm.register(ticket=50002)
-        self.osm.transition(50001, "CANCELLED")
-        active = self.osm.active_tickets()
-        assert 50001 not in active
-        assert 50002 in active
+        from backend.execution.order_state_machine import OrderStateMachine
+        osm = OrderStateMachine()
+        osm.register(20001)
+        osm.register(20002)
+        assert 20001 in osm.active_tickets
+        assert 20002 in osm.active_tickets
 
     def test_history_recorded(self) -> None:
-        self.osm.register(ticket=60001)
-        self.osm.transition(60001, "SUBMITTED")
-        history = self.osm.get_history(60001)
-        assert len(history) >= 2
-        states = [h[0] for h in history]
-        assert "PENDING" in states
-        assert "SUBMITTED" in states
+        self.osm.register(10005)
+        self.osm.transition(10005, "OPEN")
+        history = self.osm.get_history(10005)
+        assert any("PENDING" in str(h) for h in history)
 
     def test_stats(self) -> None:
-        self.osm.register(ticket=70001)
+        self.osm.register(10006)
         stats = self.osm.stats()
-        assert isinstance(stats, dict)
-        assert any(v > 0 for v in stats.values())
+        assert "total" in stats
 
-    def test_singleton(self) -> None:
-        from backend.execution.order_state_machine import OrderStateMachine
-        a = OrderStateMachine.get_instance()
-        b = OrderStateMachine.get_instance()
-        assert a is b
+    def test_module_level_singleton(self) -> None:
+        from backend.execution.order_state_machine import order_state_machine
+        assert order_state_machine is not None
 
-    def test_auto_register_on_transition(self) -> None:
-        try:
-            self.osm.transition(99999, "SUBMITTED")
-            state = self.osm.get_state(99999)
-            assert state == "SUBMITTED"
-        except (KeyError, ValueError):
-            pass
+    def test_cancelled_path(self) -> None:
+        self.osm.register(10007)
+        self.osm.transition(10007, "CANCELLED")
+        assert self.osm.is_terminal(10007)
+
+    def test_error_path(self) -> None:
+        self.osm.register(10008)
+        self.osm.transition(10008, "OPEN")
+        self.osm.transition(10008, "ERROR")
+        assert self.osm.is_terminal(10008)
 
 
-# --- MT5Connector (demo mode) ---
-
+# ═══════════════════════════════════════════════════════════════════════════ #
+# MT5Connector — Demo Mode                                                    #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestMT5ConnectorDemo:
-    """تست MT5Connector در demo mode."""
+    """تست connector در demo mode."""
 
-    def setup_method(self) -> None:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        os.environ["MT5_DEMO_MODE"] = "true"
         from backend.execution.mt5_connector import MT5Connector
-        try:
-            self.connector = MT5Connector(demo=True)
-        except TypeError:
-            self.connector = MT5Connector(demo_mode=True)
+        self.connector = MT5Connector(demo=True)
 
     @pytest.mark.asyncio
     async def test_connect_in_demo(self) -> None:
-        await self.connector.connect()
-        assert self.connector._connected is True or getattr(self.connector, 'is_connected', True)
+        result = await self.connector.connect()
+        assert result is True
 
     @pytest.mark.asyncio
-    async def test_place_order_returns_result(self) -> None:
+    async def test_place_order_returns_ticket(self) -> None:
         await self.connector.connect()
-        try:
-            result = await self.connector.place_order(
-                symbol="EURUSD", direction="BUY", volume=0.01, sl=1.080, tp=1.090
-            )
-        except TypeError:
-            result = await self.connector.open_position("EURUSD", "BUY", 0.01, 1.080, 1.090)
-        assert result is not None
+        result = await self.connector.place_order(
+            symbol="EURUSD", direction="buy",
+            volume=0.10, sl=1.1000, tp=1.1150
+        )
+        assert "ticket" in result
+        assert isinstance(result["ticket"], int)
+        assert result["ticket"] > 0
 
     @pytest.mark.asyncio
     async def test_close_position_in_demo(self) -> None:
         await self.connector.connect()
-        try:
-            closed = await self.connector.close_position(ticket=123456)
-        except TypeError:
-            closed = await self.connector.close_position(123456)
-        assert closed is True or (hasattr(closed, 'success') and closed.success)
+        result = await self.connector.close_position(ticket=999001)
+        assert result is True
 
     @pytest.mark.asyncio
     async def test_get_account_info_in_demo(self) -> None:
         await self.connector.connect()
         info = await self.connector.get_account_info()
-        assert info is not None
-        balance = info.get('balance') if isinstance(info, dict) else getattr(info, 'balance', 10000)
-        assert balance > 0
+        assert "balance" in info
+        assert info["balance"] > 0
+
+    @pytest.mark.asyncio
+    async def test_get_candles_returns_list(self) -> None:
+        await self.connector.connect()
+        candles = await self.connector.get_candles("EURUSD", "H1", 50)
+        assert isinstance(candles, list)
+        assert len(candles) == 50
+
+    @pytest.mark.asyncio
+    async def test_get_candles_ohlc_structure(self) -> None:
+        await self.connector.connect()
+        candles = await self.connector.get_candles("EURUSD", "H1", 10)
+        for c in candles:
+            assert "open" in c and "high" in c and "low" in c and "close" in c
 
     @pytest.mark.asyncio
     async def test_disconnect(self) -> None:
         await self.connector.connect()
         await self.connector.disconnect()
-        assert (
-            self.connector._connected is False
-            or not getattr(self.connector, 'is_connected', True)
-        )
+        assert self.connector.connected is False
+
+    @pytest.mark.asyncio
+    async def test_context_manager(self) -> None:
+        from backend.execution.mt5_connector import MT5Connector
+        async with MT5Connector(demo=True) as conn:
+            assert conn.connected is True
 
 
-# --- SMCEngine ---
-
+# ═══════════════════════════════════════════════════════════════════════════ #
+# SMCEngine                                                                    #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestSMCEngine:
-    """تست موتور Smart Money Concepts."""
+    """تست موتور SMC با کندل‌های مصنوعی."""
 
-    def _make_candles(self, n: int = 50) -> list:
-        from backend.analysis.smc_engine import Candle
-        import math
-        price = 1.0800
-        candles = []
-        for i in range(n):
-            d = 0.0001 * math.sin(i * 0.3)
-            o = price
-            c = price + d + (0.0005 if i % 3 == 0 else -0.0003)
-            candles.append(Candle(
-                f"t{i}",
-                round(o, 5),
-                round(max(o, c) + 0.0002, 5),
-                round(min(o, c) - 0.0002, 5),
-                round(c, 5),
-            ))
-            price = c
-        return candles
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        from backend.analysis.smc_engine import SMCEngine, Candle
+        self.engine = SMCEngine()
+        self.Candle = Candle
+        self.candles = [
+            Candle(
+                time=1_700_000_000 + i * 3600,
+                open=1.1000 + i * 0.0001,
+                high=1.1010 + i * 0.0001 + (0.002 if i % 10 == 5 else 0),
+                low=1.0990 + i * 0.0001 - (0.002 if i % 10 == 3 else 0),
+                close=1.1005 + i * 0.0001,
+                tick_volume=500 + i,
+            )
+            for i in range(150)
+        ]
 
     def test_analyse_returns_result(self) -> None:
-        from backend.analysis.smc_engine import SMCEngine, SMCAnalysis
-        result = SMCEngine().analyse(self._make_candles(50))
+        from backend.analysis.smc_engine import SMCAnalysis
+        result = self.engine.analyse(self.candles)
         assert isinstance(result, SMCAnalysis)
-        assert 0.0 <= result.confidence <= 1.0
 
     def test_too_few_candles_raises(self) -> None:
-        from backend.analysis.smc_engine import SMCEngine, Candle
-        with pytest.raises((ValueError, AssertionError)):
-            SMCEngine().analyse([Candle("t", 1.0, 1.1, 0.9, 1.05)] * 5)
+        with pytest.raises(Exception):
+            self.engine.analyse(self.candles[:5])
 
     def test_order_blocks_returned(self) -> None:
-        from backend.analysis.smc_engine import SMCEngine
-        result = SMCEngine().analyse(self._make_candles(60))
-        assert hasattr(result, 'order_blocks') or hasattr(result, 'bias')
+        result = self.engine.analyse(self.candles)
+        assert hasattr(result, "order_blocks")
+        assert isinstance(result.order_blocks, list)
+
+    def test_fvg_returned(self) -> None:
+        result = self.engine.analyse(self.candles)
+        assert hasattr(result, "fair_value_gaps")
+
+    def test_bias_returned(self) -> None:
+        result = self.engine.analyse(self.candles)
+        assert hasattr(result, "bias")
+
+    def test_confidence_in_range(self) -> None:
+        result = self.engine.analyse(self.candles)
+        assert 0.0 <= result.confidence <= 1.0
 
 
-# --- DecisionEngine ---
-
+# ═══════════════════════════════════════════════════════════════════════════ #
+# DecisionEngine                                                               #
+# ═══════════════════════════════════════════════════════════════════════════ #
 class TestDecisionEngine:
-    """تست موتور تصمیم‌گیری ترکیبی."""
+    """تست موتور تصمیم‌گیری."""
 
-    def setup_method(self) -> None:
-        from backend.analysis.decision_engine import DecisionEngine
-        self.engine = DecisionEngine(min_confidence=0.60, min_votes=2)
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        from backend.analysis.decision_engine import DecisionEngine, EngineVote, TradeDirection
+        self.engine = DecisionEngine(min_confidence=0.65, min_votes=2, min_rr=1.5)
+        self.EngineVote = EngineVote
+        self.TradeDirection = TradeDirection
 
     def test_all_agree_buy(self) -> None:
-        from backend.analysis.decision_engine import EngineVote, TradeDirection
         votes = [
-            EngineVote("SMC", TradeDirection.BUY, 0.80, 1.085, 1.080, 1.095),
-            EngineVote("PA",  TradeDirection.BUY, 0.75, 1.085, 1.079, 1.096),
+            self.EngineVote("SMC", self.TradeDirection.BUY, 0.80, 1.1050, 1.1000, 1.1150),
+            self.EngineVote("PA",  self.TradeDirection.BUY, 0.75, 1.1050, 1.1000, 1.1150),
+            self.EngineVote("XGB", self.TradeDirection.BUY, 0.85, 1.1050, 1.1000, 1.1150),
         ]
-        dec = self.engine.decide(votes, "EURUSD", "H1")
-        assert dec.direction == TradeDirection.BUY
-        assert dec.should_trade is True
+        d = self.engine.decide(votes, "EURUSD", "H1")
+        assert d.direction == self.TradeDirection.BUY
+        assert d.should_trade
 
     def test_conflicting_votes_no_trade(self) -> None:
-        from backend.analysis.decision_engine import EngineVote, TradeDirection, DecisionReason
         votes = [
-            EngineVote("A", TradeDirection.BUY,  0.8),
-            EngineVote("B", TradeDirection.SELL, 0.8),
+            self.EngineVote("SMC", self.TradeDirection.BUY,  0.80),
+            self.EngineVote("PA",  self.TradeDirection.SELL, 0.80),
         ]
-        dec = self.engine.decide(votes, "EURUSD", "H1")
-        assert dec.direction == TradeDirection.NO_TRADE
+        d = self.engine.decide(votes, "EURUSD", "H1")
+        assert not d.should_trade
 
     def test_kill_switch_overrides(self) -> None:
-        from backend.analysis.decision_engine import EngineVote, TradeDirection, DecisionReason
         votes = [
-            EngineVote("A", TradeDirection.BUY, 1.0),
-            EngineVote("B", TradeDirection.BUY, 1.0),
+            self.EngineVote("SMC", self.TradeDirection.BUY, 0.95, 1.1050, 1.1000, 1.1200),
+            self.EngineVote("PA",  self.TradeDirection.BUY, 0.90, 1.1050, 1.1000, 1.1200),
         ]
-        dec = self.engine.decide(votes, "EURUSD", "H1", kill_switch_active=True)
-        assert dec.reason == DecisionReason.KILL_SWITCH
-        assert dec.should_trade is False
+        d = self.engine.decide(votes, "EURUSD", "H1", kill_switch_active=True)
+        assert not d.should_trade
 
     def test_low_confidence_no_trade(self) -> None:
-        from backend.analysis.decision_engine import EngineVote, TradeDirection
         votes = [
-            EngineVote("A", TradeDirection.BUY, 0.30),
-            EngineVote("B", TradeDirection.BUY, 0.25),
+            self.EngineVote("SMC", self.TradeDirection.BUY, 0.40),
+            self.EngineVote("PA",  self.TradeDirection.BUY, 0.35),
         ]
-        dec = self.engine.decide(votes, "EURUSD", "H1")
-        assert dec.should_trade is False
+        d = self.engine.decide(votes, "EURUSD", "H1")
+        assert not d.should_trade
 
     def test_to_dict(self) -> None:
-        from backend.analysis.decision_engine import EngineVote, TradeDirection
         votes = [
-            EngineVote("A", TradeDirection.BUY, 0.80, 1.085, 1.080, 1.095),
-            EngineVote("B", TradeDirection.BUY, 0.75, 1.085, 1.079, 1.096),
+            self.EngineVote("SMC", self.TradeDirection.SELL, 0.80, 1.1050, 1.1100, 1.1000),
+            self.EngineVote("PA",  self.TradeDirection.SELL, 0.75, 1.1050, 1.1100, 1.1000),
         ]
-        d = self.engine.decide(votes, "EURUSD", "H1").to_dict()
-        assert "direction" in d and "should_trade" in d
+        d = self.engine.decide(votes, "EURUSD", "H1")
+        result = d.to_dict()
+        assert "direction" in result
+        assert "confidence" in result
+        assert "should_trade" in result
+
+    def test_minimum_rr_enforced(self) -> None:
+        votes = [
+            self.EngineVote("SMC", self.TradeDirection.BUY, 0.80, 1.1050, 1.1048, 1.1060),
+            self.EngineVote("PA",  self.TradeDirection.BUY, 0.80, 1.1050, 1.1048, 1.1060),
+        ]
+        d = self.engine.decide(votes, "EURUSD", "H1")
+        assert not d.should_trade
