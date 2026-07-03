@@ -1,141 +1,77 @@
-/**
- * frontend/src/contexts/WebSocketContext.tsx
- *
- * FIX-E2: WebSocketContext وجود نداشت — App.tsx آن را import می‌کرد → build fail
- */
-import React, {
-  createContext, useContext, useEffect, useRef,
-  useState, useCallback, type ReactNode,
-} from "react";
+// frontend/src/contexts/WebSocketContext.tsx
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import { tokenStorage } from "@/utils/api";
+import type { WSMessage, WSEventType } from "@/types";
 
-interface PriceData {
-  symbol: string;
-  bid: number;
-  ask: number;
-  timestamp: string;
-}
+type Listener = (data: unknown) => void;
 
-interface SignalData {
-  id: string;
-  symbol: string;
-  direction: "BUY" | "SELL" | "NEUTRAL";
-  confidence: number;
-  created_at: string;
-}
-
-type WSMessage =
-  | { type: "price"; symbol: string; data: PriceData }
-  | { type: "signal"; data: SignalData }
-  | { type: "heartbeat"; ts: number }
-  | { type: "ping" }
-  | { type: "error"; message: string };
-
-interface WebSocketContextValue {
+interface WSContextValue {
   isConnected: boolean;
-  lastPrice: Record<string, PriceData>;
-  lastSignal: SignalData | null;
-  subscribePrice: (symbol: string) => void;
-  unsubscribePrice: (symbol: string) => void;
+  subscribe:   (event: WSEventType, fn: Listener) => () => void;
+  send:        (msg: object) => void;
 }
 
-const ALLOWED_SYMBOLS = new Set([
-  "XAUUSD","EURUSD","GBPUSD","USDJPY","USDCHF",
-  "AUDUSD","USDCAD","NZDUSD","GBPJPY","EURJPY",
-  "EURGBP","XAGUSD","BTCUSD","ETHUSD",
-]);
+const WS_URL = (import.meta.env.VITE_WS_URL ?? "ws://localhost:8000") + "/ws";
+const RECONNECT_DELAY_MS = 3000;
+const MAX_RECONNECT = 10;
 
-const BASE_URL = (import.meta.env?.VITE_API_URL as string | undefined) || "http://localhost:8000";
-const WS_BASE  = BASE_URL.replace(/^http/, "ws");
+const WebSocketContext = createContext<WSContextValue | null>(null);
 
-const WebSocketContext = createContext<WebSocketContextValue>({
-  isConnected: false, lastPrice: {}, lastSignal: null,
-  subscribePrice: () => undefined, unsubscribePrice: () => undefined,
-});
-
-export function useWebSocket(): WebSocketContextValue {
-  return useContext(WebSocketContext);
-}
-
-export function WebSocketProvider({ children }: { children: ReactNode }) {
+export function WebSocketProvider({ children }: { children: React.ReactNode }) {
+  const wsRef        = useRef<WebSocket | null>(null);
+  const listenersRef = useRef<Map<WSEventType, Set<Listener>>>(new Map());
+  const retryRef     = useRef(0);
+  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [lastPrice,   setLastPrice]   = useState<Record<string, PriceData>>({});
-  const [lastSignal,  setLastSignal]  = useState<SignalData | null>(null);
 
-  const priceWsRef    = useRef<WebSocket | null>(null);
-  const signalWsRef   = useRef<WebSocket | null>(null);
-  const reconnectRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backoffRef    = useRef(1_000);
-  const mountedRef    = useRef(true);
-
-  const getToken = (): string | null => localStorage.getItem("gv_token");
-
-  const connectPrice = useCallback((symbol: string) => {
-    const token = getToken();
-    if (!token || !ALLOWED_SYMBOLS.has(symbol.toUpperCase())) return;
-    priceWsRef.current?.close();
-    const url = `${WS_BASE}/ws/prices?token=${encodeURIComponent(token)}&symbol=${encodeURIComponent(symbol)}`;
+  const connect = useCallback(() => {
+    const token = tokenStorage.getAccess();
+    if (!token) return;
+    const url = `${WS_URL}?token=${encodeURIComponent(token)}`;
     const ws  = new WebSocket(url);
-    priceWsRef.current = ws;
-    ws.onopen    = () => { if (mountedRef.current) { setIsConnected(true); backoffRef.current = 1_000; } };
-    ws.onmessage = (evt) => {
-      if (!mountedRef.current) return;
+    wsRef.current = ws;
+    ws.onopen    = () => { setIsConnected(true); retryRef.current = 0; };
+    ws.onmessage = (e) => {
       try {
-        const msg: WSMessage = JSON.parse(evt.data as string);
-        if (msg.type === "price") setLastPrice(p => ({ ...p, [msg.symbol]: msg.data }));
-        else if (msg.type === "ping") ws.send(JSON.stringify({ type: "pong" }));
+        const msg: WSMessage = JSON.parse(e.data);
+        listenersRef.current.get(msg.event)?.forEach(fn => fn(msg.data));
       } catch { /* ignore */ }
     };
     ws.onclose = () => {
-      if (!mountedRef.current) return;
       setIsConnected(false);
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-      reconnectRef.current = setTimeout(() => {
-        if (mountedRef.current) { connectPrice(symbol); backoffRef.current = Math.min(backoffRef.current * 2, 30_000); }
-      }, backoffRef.current);
+      wsRef.current = null;
+      if (retryRef.current < MAX_RECONNECT) {
+        retryRef.current++;
+        timerRef.current = setTimeout(connect, RECONNECT_DELAY_MS);
+      }
     };
     ws.onerror = () => ws.close();
   }, []);
 
-  const connectSignals = useCallback(() => {
-    const token = getToken();
-    if (!token) return;
-    signalWsRef.current?.close();
-    const ws = new WebSocket(`${WS_BASE}/ws/signals?token=${encodeURIComponent(token)}`);
-    signalWsRef.current = ws;
-    ws.onmessage = (evt) => {
-      if (!mountedRef.current) return;
-      try {
-        const msg: WSMessage = JSON.parse(evt.data as string);
-        if (msg.type === "signal") setLastSignal(msg.data);
-      } catch { /* ignore */ }
-    };
-    ws.onclose = () => { if (mountedRef.current) setTimeout(connectSignals, backoffRef.current); };
-  }, []);
-
-  const subscribePrice   = useCallback((symbol: string) => {
-    if (ALLOWED_SYMBOLS.has(symbol.toUpperCase())) connectPrice(symbol.toUpperCase());
-  }, [connectPrice]);
-
-  const unsubscribePrice = useCallback((_symbol: string) => {
-    priceWsRef.current?.close();
-    priceWsRef.current = null;
-  }, []);
-
   useEffect(() => {
-    mountedRef.current = true;
-    const token = getToken();
-    if (token) { connectSignals(); connectPrice("XAUUSD"); }
-    return () => {
-      mountedRef.current = false;
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
-      priceWsRef.current?.close();
-      signalWsRef.current?.close();
-    };
-  }, [connectPrice, connectSignals]);
+    connect();
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); wsRef.current?.close(); };
+  }, [connect]);
+
+  const subscribe = useCallback((event: WSEventType, fn: Listener) => {
+    if (!listenersRef.current.has(event)) listenersRef.current.set(event, new Set());
+    listenersRef.current.get(event)!.add(fn);
+    return () => listenersRef.current.get(event)?.delete(fn);
+  }, []);
+
+  const send = useCallback((msg: object) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
+  }, []);
 
   return (
-    <WebSocketContext.Provider value={{ isConnected, lastPrice, lastSignal, subscribePrice, unsubscribePrice }}>
+    <WebSocketContext.Provider value={{ isConnected, subscribe, send }}>
       {children}
     </WebSocketContext.Provider>
   );
+}
+
+export function useWebSocket(): WSContextValue {
+  const ctx = useContext(WebSocketContext);
+  if (!ctx) throw new Error("useWebSocket باید داخل WebSocketProvider استفاده شود");
+  return ctx;
 }

@@ -1,274 +1,101 @@
-/**
- * frontend/src/utils/api.ts
- * ──────────────────────────────────────────────────────────────
- * Galaxy Vast AI Trading Platform — HTTP API Client
- *
- * ویژگی‌ها:
- *   • refresh خودکار token در خطای 401
- *   • هیچ جزئیات داخلی (stack-trace) به کاربر نشان داده نمی‌شود
- *   • تمام endpoint‌ها زیر /api/v1/ هستند
- *   • adminApi — endpoints مخصوص ADMIN
- *   • licenseApi — مدیریت لایسنس
- */
-
-import { API_BASE_URL } from "./config";
-import type {
-  ApiResponse,
-  Trade,
-  Signal,
-  DashboardStats,
-  EquityPoint,
-  PortfolioRisk,
-  RiskStatus,
-  AnalyticsMetrics,
-  AIprediction,
-  ModelVersion,
-  BacktestResult,
-  SecurityMetrics,
-  SystemSettings,
-  MLWeights,
-  User,
-  UserSettings,
-} from "@/types";
-
-// ── ثابت‌ها ──────────────────────────────────────────────────────────────────
-const BASE = `${API_BASE_URL}/api/v1`;
-const TOKEN_KEY   = "gv_token";
+// frontend/src/utils/api.ts
+const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const TOKEN_KEY = "gv_access";
 const REFRESH_KEY = "gv_refresh";
 
-// ── ابزارهای داخلی ───────────────────────────────────────────────────────────
+export const tokenStorage = {
+  getAccess:   () => localStorage.getItem(TOKEN_KEY),
+  getRefresh:  () => localStorage.getItem(REFRESH_KEY),
+  setTokens:   (t: { access_token: string; refresh_token: string }) => {
+    localStorage.setItem(TOKEN_KEY, t.access_token);
+    localStorage.setItem(REFRESH_KEY, t.refresh_token);
+  },
+  clearTokens: () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
+};
 
-/** هدر Authorization استاندارد */
-function authHeader(): Record<string, string> {
-  const token = localStorage.getItem(TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-/** تلاش برای refresh کردن access token با refresh token */
+let _refreshing: Promise<boolean> | null = null;
 async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return false;
-
-  try {
-    const res = await fetch(`${BASE}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-
-    if (!res.ok) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(REFRESH_KEY);
-      return false;
-    }
-
-    const data = await res.json();
-    if (data.access_token) {
-      localStorage.setItem(TOKEN_KEY, data.access_token);
+  if (_refreshing) return _refreshing;
+  _refreshing = (async () => {
+    try {
+      const refresh = tokenStorage.getRefresh();
+      if (!refresh) return false;
+      const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refresh }),
+      });
+      if (!res.ok) { tokenStorage.clearTokens(); return false; }
+      tokenStorage.setTokens(await res.json());
       return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+    } catch { tokenStorage.clearTokens(); return false; }
+    finally { _refreshing = null; }
+  })();
+  return _refreshing;
 }
 
-/**
- * درخواست HTTP با refresh خودکار در خطای 401
- * هرگز جزئیات داخلی را نشان نمی‌دهد
- */
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
-  const url = `${BASE}${path}`;
-
-  const makeRequest = async (): Promise<Response> => {
-    return fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeader(),
-        ...(options.headers as Record<string, string> | undefined),
-      },
-    });
-  };
-
-  try {
-    let res = await makeRequest();
-
-    // اگر 401 بود، یک بار refresh و retry
-    if (res.status === 401) {
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        res = await makeRequest();
-      } else {
-        window.dispatchEvent(new CustomEvent("auth:logout"));
-        return { success: false, data: null as unknown as T, error: "نشست منقضی شده است" };
-      }
-    }
-
-    const json = await res.json();
-
-    if (!res.ok) {
-      const safeError =
-        res.status >= 500
-          ? "خطای سرور — لطفاً دوباره تلاش کنید"
-          : json.detail || json.error || json.message || "خطای ناشناخته";
-      return { success: false, data: null as unknown as T, error: safeError };
-    }
-
-    return { success: true, data: json.data ?? json, ...json };
-  } catch (err) {
-    const msg = err instanceof TypeError
-      ? "خطای شبکه — اتصال اینترنت را بررسی کنید"
-      : "خطای ناشناخته";
-    return { success: false, data: null as unknown as T, error: msg };
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...(init.headers as Record<string, string>) };
+  const token = tokenStorage.getAccess();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  let res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
+  if (res.status === 401) {
+    const ok = await tryRefreshToken();
+    if (ok) { headers["Authorization"] = `Bearer ${tokenStorage.getAccess()}`; res = await fetch(`${BASE_URL}${path}`, { ...init, headers }); }
   }
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const body = await res.json(); msg = body?.detail ?? body?.message ?? msg; } catch { /* ignore */ }
+    throw new Error(msg);
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  return res.json() as Promise<T>;
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login: (email: string, password: string) =>
-    request<{ access_token: string; refresh_token: string; user: User }>(
-      "/auth/login",
-      { method: "POST", body: JSON.stringify({ email, password }) }
-    ),
-
-  register: (email: string, password: string, full_name?: string) =>
-    request<{ access_token: string; refresh_token: string; user: User }>(
-      "/auth/register",
-      { method: "POST", body: JSON.stringify({ email, password, full_name: full_name ?? "" }) }
-    ),
-
-  me: () => request<User>("/auth/me"),
-
-  refresh: (refresh_token: string) =>
-    request<{ access_token: string }>("/auth/refresh", {
-      method: "POST",
-      body: JSON.stringify({ refresh_token }),
-    }),
-
-  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  login:    (p: { email: string; password: string }) => request<{ access_token: string; refresh_token: string; token_type: string }>("/api/v1/auth/login", { method: "POST", body: JSON.stringify(p) }),
+  register: (p: { email: string; password: string; full_name: string }) => request<{ id: string }>("/api/v1/auth/register", { method: "POST", body: JSON.stringify(p) }),
+  me:       () => request<{ id: string; email: string; full_name: string; role: string; is_active: boolean; created_at: string }>("/api/v1/auth/me"),
+  logout:   () => { tokenStorage.clearTokens(); },
 };
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboardApi = {
-  getStats:  ()           => request<DashboardStats>("/dashboard/stats"),
-  getEquity: (days = 30)  => request<EquityPoint[]>(`/dashboard/equity?days=${days}`),
+  getStats:  () => request<{ total_trades: number; open_trades: number; win_rate: number; total_pnl: number; daily_pnl: number; equity: number; balance: number; drawdown: number; profit_factor: number; sharpe_ratio: number }>("/api/v1/dashboard/stats"),
+  getEquity: (days = 30) => request<Array<{ timestamp: string; equity: number; balance: number }>>(`/api/v1/dashboard/equity?days=${days}`),
 };
 
-// ── Trades ────────────────────────────────────────────────────────────────────
 export const tradesApi = {
-  listOpen:   ()               => request<Trade[]>("/trades?status=OPEN"),
-  listClosed: (limit = 50)     => request<Trade[]>(`/trades?status=CLOSED&limit=${limit}`),
-  list:       (params = "")    => request<Trade[]>(`/trades${params ? "?" + params : ""}`),
-  get:        (id: string)     => request<Trade>(`/trades/${id}`),
-  close:      (id: string)     => request<Trade>(`/trades/${id}/close`, { method: "POST" }),
-  closeAll:   ()               => request<void>("/trades/close-all",    { method: "POST" }),
+  listOpen:   () => request<Array<{ id: string; symbol: string; direction: string; lot_size: number; entry_price: number; stop_loss: number; take_profit: number; pnl?: number; status: string; opened_at: string }>>("/api/v1/trades/open"),
+  listClosed: (page = 1, per_page = 20) => request<{ items: Array<{ id: string; symbol: string; direction: string; lot_size: number; entry_price: number; stop_loss: number; take_profit: number; pnl?: number; status: string; opened_at: string; closed_at?: string; close_price?: number }>; total: number; page: number; per_page: number; pages: number }>(`/api/v1/trades/closed?page=${page}&per_page=${per_page}`),
+  get:        (id: string) => request<{ id: string; symbol: string }>(`/api/v1/trades/${id}`),
+  open:       (p: { symbol: string; direction: string; lot_size: number; stop_loss: number; take_profit: number }) => request<{ id: string }>("/api/v1/trades", { method: "POST", body: JSON.stringify(p) }),
+  close:      (id: string) => request<{ id: string }>(`/api/v1/trades/${id}/close`, { method: "POST" }),
+  closeAll:   () => request<{ closed: number }>("/api/v1/trades/close-all", { method: "POST" }),
 };
 
-// ── Signals ───────────────────────────────────────────────────────────────────
 export const signalsApi = {
-  list:    (status?: string) => request<Signal[]>(`/signals${status ? `?status=${status}` : ""}`),
-  get:     (id: string)      => request<Signal>(`/signals/${id}`),
-  approve: (id: string)      => request<Signal>(`/signals/${id}/approve`, { method: "POST" }),
-  reject:  (id: string)      => request<Signal>(`/signals/${id}/reject`,  { method: "POST" }),
+  list:    (status?: string) => request<Array<{ id: string; symbol: string; direction: string; confidence: number; entry_price: number; stop_loss: number; take_profit: number; lot_size: number; status: string; source: string; reasoning?: string; created_at: string }>>(`/api/v1/signals${status ? `?status=${status}` : ""}`),
+  get:     (id: string) => request<{ id: string }>(`/api/v1/signals/${id}`),
+  approve: (id: string) => request<{ id: string }>(`/api/v1/signals/${id}/approve`, { method: "POST" }),
+  reject:  (id: string) => request<{ id: string }>(`/api/v1/signals/${id}/reject",  { method: "POST" }),
 };
 
-// ── Portfolio & Risk ──────────────────────────────────────────────────────────
-export const portfolioApi = {
-  getRisk:   () => request<PortfolioRisk>("/portfolio/risk"),
-  getStatus: () => request<RiskStatus>("/risk/status"),
-};
-
-// ── Analytics ─────────────────────────────────────────────────────────────────
-export const analyticsApi = {
-  getMetrics: (period = "month") =>
-    request<AnalyticsMetrics>(`/analytics/metrics?period=${period}`),
-};
-
-// ── AI & Predictions ─────────────────────────────────────────────────────────
-export const aiApi = {
-  getPredictions: (symbol?: string) =>
-    request<AIprediction[]>(`/ai/predictions${symbol ? `?symbol=${symbol}` : ""}`),
-  getModels: () => request<ModelVersion[]>("/ai/models"),
-};
-
-// ── Backtest ──────────────────────────────────────────────────────────────────
-export const backtestApi = {
-  list:  ()                 => request<BacktestResult[]>("/backtest"),
-  get:   (id: string)       => request<BacktestResult>(`/backtest/${id}`),
-  start: (params: {
-    symbol: string;
-    start_date: string;
-    end_date: string;
-    timeframe?: string;
-  }) => request<BacktestResult>("/backtest", { method: "POST", body: JSON.stringify(params) }),
-};
-
-// ── Users (تنظیمات کاربر) ────────────────────────────────────────────────────
-export const usersApi = {
-  getSettings:    ()                         => request<UserSettings>("/users/settings"),
-  updateSettings: (s: Partial<UserSettings>) =>
-    request<UserSettings>("/users/settings", { method: "PATCH", body: JSON.stringify(s) }),
-  getProfile:     ()                         => request<User>("/users/profile"),
-};
-
-// ── Admin ─────────────────────────────────────────────────────────────────────
-export const adminApi = {
-  listUsers:   (page = 1, limit = 50) =>
-    request<{ users: User[]; total: number }>(`/admin/users?page=${page}&limit=${limit}`),
-  getUser:     (id: string)           => request<User>(`/admin/users/${id}`),
-  updateUser:  (id: string, data: Partial<User>) =>
-    request<User>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteUser:  (id: string)           =>
-    request<void>(`/admin/users/${id}`, { method: "DELETE" }),
-  toggleUser:  (id: string, active: boolean) =>
-    request<User>(`/admin/users/${id}/toggle`, {
-      method: "POST",
-      body: JSON.stringify({ is_active: active }),
-    }),
-  getSettings:    ()                             => request<SystemSettings>("/admin/settings"),
-  updateSettings: (s: Partial<SystemSettings>)   =>
-    request<SystemSettings>("/admin/settings", { method: "PATCH", body: JSON.stringify(s) }),
-  getMLWeights:    ()                            => request<MLWeights>("/admin/ml-weights"),
-  updateMLWeights: (w: Partial<MLWeights>)       =>
-    request<MLWeights>("/admin/ml-weights", { method: "PATCH", body: JSON.stringify(w) }),
-  getSecurityMetrics: ()  => request<SecurityMetrics>("/admin/security/metrics"),
-  listSecurityEvents: (limit = 50) =>
-    request<SecurityMetrics["recent_events"]>(`/admin/security/events?limit=${limit}`),
-  killSwitchToggle: (active: boolean, reason?: string) =>
-    request<void>("/admin/kill-switch", {
-      method: "POST",
-      body: JSON.stringify({ active, reason: reason ?? "" }),
-    }),
-};
-
-// ── License ───────────────────────────────────────────────────────────────────
-export const licenseApi = {
-  getStatus: () =>
-    request<{ status: string; expires_at?: string }>("/license/status"),
-  activate: (key: string, device: string) =>
-    request<{ ok: boolean }>("/license/activate", {
-      method: "POST",
-      body: JSON.stringify({ license_key: key, device_id: device }),
-    }),
-  heartbeat: () =>
-    request<{ ok: boolean }>("/license/heartbeat", { method: "POST" }),
-  revoke: (key: string) =>
-    request<void>("/license/revoke", {
-      method: "POST",
-      body: JSON.stringify({ license_key: key }),
-    }),
-};
-
-// ── Analysis ──────────────────────────────────────────────────────────────────
 export const analysisApi = {
-  getSMC: (symbol: string, timeframe: string) =>
-    request<Record<string, unknown>>(`/analysis/smc?symbol=${symbol}&timeframe=${timeframe}`),
-  getPriceAction: (symbol: string, timeframe: string) =>
-    request<Record<string, unknown>>(`/analysis/price-action?symbol=${symbol}&timeframe=${timeframe}`),
-  getDecision: (symbol: string, timeframe: string) =>
-    request<Record<string, unknown>>(`/analysis/decision?symbol=${symbol}&timeframe=${timeframe}`),
+  getSMC:         (symbol: string, tf = "H1") => request<{ symbol: string; bias: string; order_blocks: unknown[]; fvg_zones: unknown[]; liquidity_levels: unknown[]; bos_points: unknown[]; confidence: number; updated_at: string }>(`/api/v1/analysis/smc?symbol=${symbol}&timeframe=${tf}`),
+  getPriceAction: (symbol: string, tf = "H1") => request<{ symbol: string; trend: string; patterns: unknown[]; rsi: number; macd: { value: number; signal: number; histogram: number }; updated_at: string }>(`/api/v1/analysis/price-action?symbol=${symbol}&timeframe=${tf}`),
+  getDecision:    (symbol: string) => request<{ symbol: string; action: string; confidence: number; risk_reward: number; lot_size: number; entry_price: number; stop_loss: number; take_profit: number; reasoning: string; votes: Array<{ agent: string; vote: string; weight: number }>; updated_at: string }>(`/api/v1/analysis/decision?symbol=${symbol}`),
+};
+
+export const adminApi = {
+  getStats:            () => request<{ total_users: number; active_users: number; total_trades_today: number; system_health: string; kill_switch_active: boolean }>("/api/v1/admin/stats"),
+  getSecurityMetrics:  () => request<{ failed_logins_24h: number; blocked_ips: number; active_sessions: number; license_violations: number }>("/api/v1/admin/security"),
+  listUsers:           (page = 1) => request<{ items: Array<{ id: string; email: string; full_name: string; role: string; is_active: boolean; created_at: string }>; total: number; page: number; per_page: number; pages: number }>(`/api/v1/admin/users?page=${page}`),
+  updateUser:          (id: string, data: Record<string, unknown>) => request<{ id: string }>(`/api/v1/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  activateKillSwitch:  () => request<{ status: string }>("/api/v1/admin/kill-switch/activate",   { method: "POST" }),
+  deactivateKillSwitch:() => request<{ status: string }>("/api/v1/admin/kill-switch/deactivate", { method: "POST" }),
+};
+
+export const licenseApi = {
+  getStatus: () => request<{ is_valid: boolean; license_key: string; expires_at: string; max_accounts: number; active_accounts: number; plan: string }>("/api/v1/license/status"),
+  activate:  (key: string) => request<{ is_valid: boolean }>("/api/v1/license/activate", { method: "POST", body: JSON.stringify({ license_key: key }) }),
+  heartbeat: () => request<{ ok: boolean }>("/api/v1/license/heartbeat", { method: "POST" }),
 };
