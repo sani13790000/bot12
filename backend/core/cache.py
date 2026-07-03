@@ -1,1 +1,113 @@
-"""\nbackend/core/cache.py\nGalaxy Vast AI — Two-Level Cache (Local LRU + Redis)\n\nAll Redis operations are optional and fail gracefully.\nFailures are logged at DEBUG to avoid log spam.\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nimport time\nfrom dataclasses import dataclass, field\nfrom typing import Any, Dict, Optional, Tuple\n\n_LOG = logging.getLogger(__name__)\n\n_MISSING = object()\n\n\n@dataclass\nclass _Entry:\n    value: Any\n    expires_at: float  # monotonic\n\n    def is_expired(self) -> bool:\n        return time.monotonic() >= self.expires_at\n\n\nclass _LocalCache:\n    """Simple in-process LRU cache with TTL."""\n\n    def __init__(self, maxsize: int = 1024) -> None:\n        self._store:   Dict[str, _Entry] = {}\n        self._maxsize  = maxsize\n        self._lock     = asyncio.Lock()\n\n    async def get(self, key: str) -> Any:\n        async with self._lock:\n            entry = self._store.get(key)\n            if entry is None or entry.is_expired():\n                if entry:\n                    del self._store[key]\n                return _MISSING\n            return entry.value\n\n    async def set(self, key: str, value: Any, ttl: float) -> None:\n        async with self._lock:\n            if len(self._store) >= self._maxsize:\n                oldest = next(iter(self._store))\n                del self._store[oldest]\n            self._store[key] = _Entry(value=value, expires_at=time.monotonic() + ttl)\n\n    async def delete(self, key: str) -> None:\n        async with self._lock:\n            self._store.pop(key, None)\n\n\nclass TwoLevelCache:\n    """\n    Two-level cache: local LRU (always) + Redis (optional).\n    Redis failures log at DEBUG and never break application flow.\n    """\n\n    def __init__(self, redis_url: Optional[str] = None, local_maxsize: int = 1024) -> None:\n        self._local      = _LocalCache(maxsize=local_maxsize)\n        self._redis_url  = redis_url\n        self._redis: Any = None\n        self._redis_ok   = False\n        self._init_lock  = asyncio.Lock()\n\n    async def _ensure_redis(self) -> bool:\n        if self._redis_ok:\n            return True\n        if not self._redis_url:\n            return False\n        async with self._init_lock:\n            if self._redis_ok:\n                return True\n            try:\n                import aioredis\n                self._redis    = await aioredis.from_url(self._redis_url, decode_responses=True)\n                self._redis_ok = True\n                _LOG.info('Redis connected: %s', self._redis_url)\n            except Exception as exc:\n                _LOG.warning('Redis unavailable, using local cache only: %s', exc)\n        return self._redis_ok\n\n    async def get(self, key: str) -> Optional[Any]:\n        local_val = await self._local.get(key)\n        if local_val is not _MISSING:\n            return local_val\n        if not await self._ensure_redis():\n            return None\n        try:\n            import json\n            raw = await self._redis.get(key)\n            if raw is None:\n                return None\n            val = json.loads(raw)\n            await self._local.set(key, val, ttl=60.0)\n            return val\n        except Exception as _e:  # noqa: BLE001 — Redis is optional\n            _LOG.debug('redis.get failed key=%s: %s', key, type(_e).__name__)\n            return None\n\n    async def set(self, key: str, value: Any, ttl: float = 60.0) -> None:\n        await self._local.set(key, value, ttl=ttl)\n        if not await self._ensure_redis():\n            return\n        try:\n            import json\n            await self._redis.set(key, json.dumps(value), ex=int(ttl))\n        except Exception as _e:  # noqa: BLE001 — Redis is optional\n            _LOG.debug('redis.set failed key=%s: %s', key, type(_e).__name__)\n\n    async def delete(self, key: str) -> None:\n        await self._local.delete(key)\n        if await self._ensure_redis():\n            try:\n                await self._redis.delete(key)\n            except Exception as _e:  # noqa: BLE001 — Redis is optional\n                _LOG.debug('redis.delete failed: %s', type(_e).__name__)\n\n    async def clear_prefix(self, prefix: str) -> None:\n        """Delete all keys starting with prefix (local + Redis)."""\n        async with self._local._lock:\n            to_del = [k for k in self._local._store if k.startswith(prefix)]\n            for k in to_del:\n                del self._local._store[k]\n        if await self._ensure_redis():\n            try:\n                cursor = 0\n                while True:\n                    cursor, keys = await self._redis.scan(\n                        cursor, match=f'{prefix}*', count=200\n                    )\n                    if keys:\n                        await self._redis.delete(*keys)\n                    if cursor == 0:\n                        break\n            except Exception as _e:  # noqa: BLE001 — Redis is optional\n                _LOG.debug('redis.scan/delete failed: %s', type(_e).__name__)\n\n    def cached(\n        self,\n        ttl: float = 60.0,\n        key_prefix: str = '',\n    ):\n        """Async decorator: cache the result of an async function."""\n        def decorator(fn):\n            async def wrapper(*args, **kwargs):\n                cache_key = f'{key_prefix}{fn.__name__}:{args}:{sorted(kwargs.items())}'\n                cached_val = await self.get(cache_key)\n                if cached_val is not None:\n                    return cached_val\n                result = await fn(*args, **kwargs)\n                await self.set(cache_key, result, ttl=ttl)\n                return result\n            return wrapper\n        return decorator\n\n\ncache = TwoLevelCache()\n
+"""
+backend/core/cache.py
+Galaxy Vast AI -- Two-Level Cache (Local LRU + Redis)
+
+Level 1: In-process LRU dict (zero latency)
+Level 2: Redis (shared across workers, optional)
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from collections import OrderedDict
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class LRUCache:
+    """Thread-unsafe in-process LRU cache."""
+
+    def __init__(self, max_size: int = 1000, ttl: float = 300.0) -> None:
+        self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+        self._max   = max_size
+        self._ttl   = ttl
+
+    def get(self, key: str) -> Optional[Any]:
+        item = self._store.get(key)
+        if item is None:
+            return None
+        value, expires_at = item
+        if time.time() > expires_at:
+            del self._store[key]
+            return None
+        self._store.move_to_end(key)
+        return value
+
+    def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+        ttl = ttl if ttl is not None else self._ttl
+        self._store[key] = (value, time.time() + ttl)
+        self._store.move_to_end(key)
+        if len(self._store) > self._max:
+            self._store.popitem(last=False)
+
+    def delete(self, key: str) -> None:
+        self._store.pop(key, None)
+
+    def clear(self) -> None:
+        self._store.clear()
+
+    def size(self) -> int:
+        return len(self._store)
+
+
+class TwoLevelCache:
+    """Two-level cache: LRU + optional Redis backend."""
+
+    def __init__(self, max_local: int = 1000, default_ttl: float = 300.0,
+                 redis_url: Optional[str] = None) -> None:
+        self._local   = LRUCache(max_local, default_ttl)
+        self._redis   = None
+        self._ttl     = default_ttl
+        self._redis_url = redis_url
+
+    async def connect_redis(self) -> None:
+        """Connect to Redis if url is provided."""
+        if not self._redis_url:
+            return
+        try:
+            import aioredis
+            self._redis = await aioredis.from_url(self._redis_url)
+            logger.info("Redis cache connected: %s", self._redis_url)
+        except ImportError:
+            logger.warning("aioredis not installed -- Redis cache disabled")
+        except Exception as exc:
+            logger.warning("Redis connection failed: %s", exc)
+
+    async def get(self, key: str) -> Optional[Any]:
+        val = self._local.get(key)
+        if val is not None:
+            return val
+        if self._redis:
+            try:
+                import json
+                raw = await self._redis.get(key)
+                if raw:
+                    val = json.loads(raw)
+                    self._local.set(key, val)
+                    return val
+            except Exception as exc:
+                logger.debug("Redis get error: %s", exc)
+        return None
+
+    async def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
+        ttl = ttl if ttl is not None else self._ttl
+        self._local.set(key, value, ttl)
+        if self._redis:
+            try:
+                import json
+                await self._redis.setex(key, int(ttl), json.dumps(value, default=str))
+            except Exception as exc:
+                logger.debug("Redis set error: %s", exc)
+
+    async def delete(self, key: str) -> None:
+        self._local.delete(key)
+        if self._redis:
+            try:
+                await self._redis.delete(key)
+            except Exception as exc:
+                logger.debug("Redis delete error: %s", exc)
+
+
+cache = TwoLevelCache()
