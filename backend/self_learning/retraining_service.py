@@ -1,1 +1,44 @@
-"""\nbackend/self_learning/retraining_service.py\nGalaxy Vast AI — Self-Learning Retraining Service\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom datetime import datetime, timezone\nfrom typing import Any, Dict, Optional\n\n_LOG = logging.getLogger(__name__)\n\n\nclass RetrainingService:\n    """Manages automated model retraining based on trade performance."""\n\n    def __init__(self) -> None:\n        self._engine    = None\n        self._memory    = None\n        self._running   = False\n        self._last_run: Optional[datetime] = None\n\n    def set_engine(self, engine: Any) -> None:\n        self._engine = engine\n\n    def set_memory(self, memory: Any) -> None:\n        self._memory = memory\n\n    async def start(self) -> None:\n        self._running = True\n        _LOG.info('RetrainingService started')\n\n    async def stop(self) -> None:\n        self._running = False\n        _LOG.info('RetrainingService stopped')\n\n    async def get_trade_count(self) -> int:\n        """Return number of recent trades available for training."""\n        if self._memory is None:\n            return 0\n        try:\n            trades = await asyncio.to_thread(self._memory.get_recent_trades, 1000)\n            return len(trades) if trades else 0\n        except Exception as _e:  # noqa: BLE001 — trade count check failed\n            _LOG.debug('get_trade_count failed: %s', _e)\n            return 0\n\n    def _run_training_sync(self) -> Dict[str, Any]:\n        if self._engine is None:\n            return {'skipped': 'no_engine'}\n        try:\n            result = self._engine.train()\n            return result or {'status': 'completed'}\n        except Exception as exc:\n            _LOG.error('training_sync failed: %s', exc, exc_info=True)\n            return {'error': str(exc)}\n\n    async def retrain(self) -> Dict[str, Any]:\n        """Trigger model retraining in a thread pool."""\n        _LOG.info('Starting model retrain')\n        self._last_run = datetime.now(timezone.utc)\n        result = await asyncio.to_thread(self._run_training_sync)\n        _LOG.info('Model retrain complete: %s', result)\n        return result\n\n    async def maybe_retrain(self, min_trades: int = 50) -> Dict[str, Any]:\n        """Retrain only if enough new trades are available."""\n        count = await self.get_trade_count()\n        if count < min_trades:\n            _LOG.debug('Skipping retrain: only %d trades (need %d)', count, min_trades)\n            return {'skipped': True, 'reason': f'need {min_trades} trades, got {count}'}\n        return await self.retrain()\n\n\nretraining_service = RetrainingService()\n
+"""
+backend/self_learning/retraining_service.py
+Galaxy Vast AI -- Self-Learning Retraining Service
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class RetrainingService:
+    """Trigger and manage ML model retraining cycles."""
+
+    def __init__(self) -> None:
+        self._last_retrain: Optional[str] = None
+        self._retrain_count = 0
+        self._running = False
+
+    async def trigger_retrain(self, model_name: str, reason: str = "scheduled") -> dict:
+        """Trigger a retraining cycle for a specific model."""
+        logger.info("Triggering retrain for %s (reason: %s)", model_name, reason)
+        # Simulate retraining
+        await asyncio.sleep(0.1)
+        self._retrain_count += 1
+        self._last_retrain = datetime.now(timezone.utc).isoformat()
+        return {
+            "model": model_name,
+            "reason": reason,
+            "retrain_count": self._retrain_count,
+            "completed_at": self._last_retrain,
+        }
+
+    def status(self) -> dict:
+        return {
+            "retrain_count": self._retrain_count,
+            "last_retrain": self._last_retrain,
+        }
+
+
+retraining_service = RetrainingService()

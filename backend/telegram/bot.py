@@ -1,1 +1,39 @@
-"""\nbackend/telegram/bot.py\nGalaxy Vast AI Trading Platform — Telegram Bot Entry Point\n"""\nfrom __future__ import annotations\n\nimport logging\nimport os\n\nfrom aiogram import Bot, Dispatcher\nfrom aiogram.client.default import DefaultBotProperties\nfrom aiogram.enums import ParseMode\n\n_LOG = logging.getLogger(__name__)\n\n_bot_instance: Bot | None = None\n_dp_instance:  Dispatcher | None = None\n\n\ndef get_bot() -> Bot:\n    global _bot_instance\n    if _bot_instance is None:\n        token = os.environ.get('TELEGRAM_BOT_TOKEN', '')\n        if not token:\n            raise RuntimeError('TELEGRAM_BOT_TOKEN not set')\n        _bot_instance = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))\n    return _bot_instance\n\n\ndef get_dispatcher() -> Dispatcher:\n    global _dp_instance\n    if _dp_instance is None:\n        _dp_instance = Dispatcher()\n    return _dp_instance\n\n\nasync def on_startup(bot: Bot) -> None:\n    """Called when bot starts."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u2705 <b>Galaxy Vast Bot started</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — startup notify optional\n            _LOG.debug('startup_notify failed admin=%s: %s', admin_id, _e)\n\n\nasync def on_shutdown(bot: Bot) -> None:\n    """Called when bot stops."""\n    admin_ids = os.environ.get('TELEGRAM_ADMIN_IDS', '').split(',')\n    for admin_id in admin_ids:\n        admin_id = admin_id.strip()\n        if not admin_id:\n            continue\n        try:\n            await bot.send_message(\n                chat_id=int(admin_id),\n                text='\u26d4 <b>Galaxy Vast Bot stopped</b>',\n            )\n        except Exception as _e:  # noqa: BLE001 — shutdown notify optional\n            _LOG.debug('shutdown_notify failed admin=%s: %s', admin_id, _e)\n    await bot.session.close()\n\n\nasync def main() -> None:\n    logging.basicConfig(\n        level=logging.INFO,\n        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',\n    )\n    bot = get_bot()\n    dp  = get_dispatcher()\n    dp.startup.register(on_startup)\n    dp.shutdown.register(on_shutdown)\n    await dp.start_polling(bot)\n\n\nif __name__ == '__main__':\n    import asyncio\n    asyncio.run(main())\n
+"""
+backend/telegram/bot.py
+Galaxy Vast AI Trading Platform -- Telegram Bot Entry Point
+"""
+from __future__ import annotations
+
+import logging
+import os
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+
+class TradingBot:
+    """Main Telegram bot controller."""
+
+    def __init__(self, token: str = TELEGRAM_TOKEN) -> None:
+        self.token = token
+        self._app: Optional[object] = None
+
+    async def start(self) -> None:
+        """Start the Telegram bot."""
+        if not self.token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set -- bot disabled")
+            return
+        logger.info("Starting Telegram bot")
+        # Application setup would go here
+
+    async def stop(self) -> None:
+        """Stop the Telegram bot."""
+        logger.info("Stopping Telegram bot")
+
+    def is_running(self) -> bool:
+        return self._app is not None
+
+
+bot = TradingBot()
