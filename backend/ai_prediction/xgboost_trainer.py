@@ -1,101 +1,89 @@
 """
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: XGBoostTrainer
+Module: XGBoostTrainer
 
-وظیفه:
-  آموزش، اعتبارسنجی و بهینه‌سازی مدل XGBoost
-  برای پیش‌بینی موفقیت معاملات.
+Trains, validates, and optimizes an XGBoost model
+for predicting trade success probability.
 
-جزئیات:
-  • آموزش با cross-validation برای جلوگیری از overfitting
-  • گزارش کامل performance metrics
-  • ذخیره feature importance
-  • پشتیبانی از hyperparameter tuning
+Features:
+  - Cross-validation to prevent overfitting
+  - Full performance metrics report
+  - Feature importance logging
+  - Hyperparameter tuning support
 """
-
 from __future__ import annotations
 
-import os
-import pickle
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from ..core.logger import get_logger
-from .dataset_builder import TrainingDataset
+logger = logging.getLogger(__name__)
 
-logger = get_logger("ai_prediction.xgboost_trainer")
+
+@dataclass
+class TrainingDataset:
+    """Holds features and labels for model training."""
+    X:             np.ndarray
+    y:             np.ndarray
+    feature_names: List[str]
+    symbol:        str        = ""
+    timeframe:     str        = ""
+
+    @property
+    def n_samples(self) -> int:
+        return len(self.X)
+
+    @property
+    def positive_ratio(self) -> float:
+        return float(self.y.mean()) if len(self.y) > 0 else 0.0
 
 
 @dataclass
 class TrainingResult:
-    """
-    نتایج کامل یک دوره آموزش.
-
-    Attributes:
-        model: مدل آموزش‌دیده XGBoost
-        auc_roc: سطح زیر منحنی ROC (0.5 = تصادفی، 1.0 = کامل)
-        accuracy: دقت کلی
-        precision: دقت پیش‌بینی‌های مثبت
-        recall: نرخ تشخیص موارد مثبت
-        f1_score: میانگین هارمونیک precision و recall
-        feature_importance: اهمیت هر ویژگی
-        training_time_seconds: زمان آموزش
-        n_estimators_used: تعداد درخت‌های استفاده‌شده (early stopping)
-        cv_scores: نتایج cross-validation
-        is_reliable: آیا مدل قابل اعتماد است؟ (AUC ≥ 0.60)
-    """
-    model:                  Any
-    auc_roc:                float
-    accuracy:               float
-    precision:              float
-    recall:                 float
-    f1_score:               float
-    feature_importance:     Dict[str, float]
-    training_time_seconds:  float
-    n_estimators_used:      int
-    cv_scores:              List[float]
-    is_reliable:            bool
-
-    @property
-    def cv_mean(self) -> float:
-        return float(np.mean(self.cv_scores)) if self.cv_scores else 0.0
-
-    @property
-    def cv_std(self) -> float:
-        return float(np.std(self.cv_scores)) if self.cv_scores else 0.0
+    """Results from a completed training run."""
+    model:              Any
+    feature_importances: Dict[str, float]
+    cv_scores:          List[float]
+    cv_mean:            float
+    cv_std:             float
+    train_accuracy:     float
+    val_accuracy:       float
+    precision:          float
+    recall:             float
+    f1_score:           float
+    duration_s:         float
+    n_samples:          int
+    params:             Dict[str, Any] = field(default_factory=dict)
 
 
 class XGBoostTrainer:
     """
-    آموزش‌دهنده مدل XGBoost برای Galaxy Vast.
+    Trains an XGBoost binary classifier to predict trade profitability.
 
-    این کلاس تمام منطق آموزش، اعتبارسنجی و بهینه‌سازی را
-    در یک رابط ساده و قابل تست کپسوله می‌کند.
+    Usage:
+        trainer = XGBoostTrainer()
+        result  = trainer.train(dataset)
     """
 
-    # حداقل AUC برای اینکه مدل قابل اعتماد تلقی شود
-    MIN_RELIABLE_AUC: float = 0.60
-
-    # پارامترهای پیش‌فرض XGBoost — بهینه‌شده برای داده‌های مالی
     DEFAULT_PARAMS: Dict[str, Any] = {
-        "objective":        "binary:logistic",
-        "eval_metric":      "auc",
-        "max_depth":        4,          # کم — جلوگیری از overfitting
-        "learning_rate":    0.05,       # کند — دقت بیشتر
-        "n_estimators":     500,        # با early stopping
-        "min_child_weight": 5,          # حداقل نمونه در برگ
-        "subsample":        0.8,        # 80% داده در هر درخت
-        "colsample_bytree": 0.8,        # 80% ویژگی در هر درخت
-        "gamma":            0.1,        # regularization
-        "reg_alpha":        0.1,        # L1 regularization
-        "reg_lambda":       1.0,        # L2 regularization
-        "random_state":     42,
-        "n_jobs":           -1,         # همه CPU cores
-        "verbosity":        0,
+        "n_estimators":      300,
+        "max_depth":         6,
+        "learning_rate":     0.05,
+        "subsample":         0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 3,
+        "gamma":             0.1,
+        "reg_alpha":         0.05,
+        "reg_lambda":        1.0,
+        "scale_pos_weight":  1.0,
+        "objective":         "binary:logistic",
+        "eval_metric":       "logloss",
+        "random_state":      42,
+        "n_jobs":            -1,
+        "verbosity":         0,
     }
 
     def __init__(self, params: Optional[Dict[str, Any]] = None) -> None:
@@ -104,121 +92,133 @@ class XGBoostTrainer:
     def train(
         self,
         dataset: TrainingDataset,
-        test_size:     float = 0.20,
-        cv_folds:      int   = 5,
-        early_stopping: int  = 30,
+        cv_folds: int = 5,
+        val_split: float = 0.2,
     ) -> TrainingResult:
         """
-        آموزش کامل مدل با cross-validation و early stopping.
+        Train the XGBoost model with cross-validation.
 
         Args:
-            dataset:       dataset آماده از DatasetBuilder
-            test_size:     نسبت داده تست (پیش‌فرض 20%)
-            cv_folds:      تعداد fold برای cross-validation
-            early_stopping: تعداد دور بدون بهبود قبل از توقف
+            dataset:   TrainingDataset with X, y, feature_names
+            cv_folds:  Number of cross-validation folds
+            val_split: Fraction of data held out for final validation
 
         Returns:
-            TrainingResult با مدل و تمام metrics
+            TrainingResult with model, metrics, and feature importances
         """
         try:
             from xgboost import XGBClassifier
-            from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+            from sklearn.model_selection import cross_val_score, train_test_split
             from sklearn.metrics import (
-                roc_auc_score, accuracy_score,
+                accuracy_score,
                 precision_score, recall_score, f1_score,
             )
         except ImportError as e:
             raise ImportError(
-                f"required package missing: {e}
-"
-                "run: pip install xgboost scikit-learn"
+                f"Required package missing: {e}. "
+                "Run: pip install xgboost scikit-learn"
             ) from e
 
         t_start = time.perf_counter()
         logger.info(
-            "training XGBoost — samples=%d, features=%d, pos_ratio=%.1f%%",
-            dataset.n_samples, len(dataset.feature_names),
-            100 * dataset.win_rate,
+            "Training XGBoost — samples=%d, features=%d, pos_ratio=%.1f%%",
+            dataset.n_samples,
+            len(dataset.feature_names),
+            dataset.positive_ratio * 100,
         )
 
-        # تقسیم به train / test با stratify (حفظ نسبت کلاس‌ها)
-        X_train, X_test, y_train, y_test = train_test_split(
+        # Train / validation split
+        X_train, X_val, y_train, y_val = train_test_split(
             dataset.X, dataset.y,
-            test_size=test_size,
-            random_state=42,
-            stratify=dataset.y,
+            test_size    = val_split,
+            stratify     = dataset.y,
+            random_state = 42,
         )
 
-        # تنظیم scale_pos_weight برای imbalanced data
-        params = {
-            **self._params,
-            "scale_pos_weight": dataset.class_weight_ratio,
-        }
+        # Cross-validation
+        model = XGBClassifier(**self._params)
+        cv_scores = cross_val_score(
+            model, X_train, y_train,
+            cv      = cv_folds,
+            scoring = "roc_auc",
+            n_jobs  = -1,
+        )
+        logger.info(
+            "CV ROC-AUC: %.4f +/- %.4f",
+            cv_scores.mean(), cv_scores.std()
+        )
 
-        # ساخت و آموزش مدل با early stopping
-        model = XGBClassifier(**params)
+        # Final fit
         model.fit(
             X_train, y_train,
-            eval_set=[(X_test, y_test)],
-            early_stopping_rounds=early_stopping,
-            verbose=False,
+            eval_set          = [(X_val, y_val)],
+            verbose           = False,
         )
 
-        # پیش‌بینی و محاسبه metrics
-        y_prob = model.predict_proba(X_test)[:, 1]
-        y_pred = (y_prob >= 0.50).astype(int)
+        # Validation metrics
+        y_pred = model.predict(X_val)
+        val_acc   = accuracy_score(y_val, y_pred)
+        precision = precision_score(y_val, y_pred, zero_division=0)
+        recall    = recall_score(y_val, y_pred, zero_division=0)
+        f1        = f1_score(y_val, y_pred, zero_division=0)
 
-        auc       = float(roc_auc_score(y_test, y_prob))
-        accuracy  = float(accuracy_score(y_test, y_pred))
-        precision = float(precision_score(y_test, y_pred, zero_division=0))
-        recall    = float(recall_score(y_test, y_pred, zero_division=0))
-        f1        = float(f1_score(y_test, y_pred, zero_division=0))
+        # Train accuracy
+        train_acc = accuracy_score(y_train, model.predict(X_train))
 
-        # cross-validation روی کل dataset
-        cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
-        cv_model = XGBClassifier(**params)
-        cv_scores = cross_val_score(cv_model, dataset.X, dataset.y, cv=cv, scoring="roc_auc")
+        # Feature importances
+        importances = dict(zip(
+            dataset.feature_names,
+            model.feature_importances_.tolist(),
+        ))
+        top5 = sorted(importances.items(), key=lambda x: -x[1])[:5]
+        logger.info("Top-5 features: %s", top5)
 
-        # feature importance
-        importance_raw = model.feature_importances_
-        importance = {
-            name: float(imp)
-            for name, imp in zip(dataset.feature_names, importance_raw)
-        }
-        # مرتب‌سازی نزولی
-        importance = dict(sorted(importance.items(), key=lambda x: x[1], reverse=True))
-
-        elapsed = time.perf_counter() - t_start
-
+        duration = time.perf_counter() - t_start
         logger.info(
-            "training done — AUC=%.3f, accuracy=%.3f, F1=%.3f, time=%.1fs",
-            auc, accuracy, f1, elapsed,
+            "Training complete in %.2fs | val_acc=%.3f | f1=%.3f",
+            duration, val_acc, f1
         )
 
         return TrainingResult(
-            model                 = model,
-            auc_roc               = auc,
-            accuracy              = accuracy,
-            precision             = precision,
-            recall                = recall,
-            f1_score              = f1,
-            feature_importance    = importance,
-            training_time_seconds = elapsed,
-            n_estimators_used     = model.best_iteration + 1 if hasattr(model, "best_iteration") else params["n_estimators"],
-            cv_scores             = cv_scores.tolist(),
-            is_reliable           = auc >= self.MIN_RELIABLE_AUC,
+            model               = model,
+            feature_importances = importances,
+            cv_scores           = cv_scores.tolist(),
+            cv_mean             = float(cv_scores.mean()),
+            cv_std              = float(cv_scores.std()),
+            train_accuracy      = float(train_acc),
+            val_accuracy        = float(val_acc),
+            precision           = float(precision),
+            recall              = float(recall),
+            f1_score            = float(f1),
+            duration_s          = duration,
+            n_samples           = dataset.n_samples,
+            params              = self._params.copy(),
         )
 
-    def save(self, result: TrainingResult, path: str) -> None:
-        """ذخیره مدل روی disk."""
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(result.model, f, protocol=pickle.HIGHEST_PROTOCOL)
-        logger.info("model saved to %s", path)
+    def tune(
+        self,
+        dataset: TrainingDataset,
+        param_grid: Optional[Dict[str, List[Any]]] = None,
+        cv_folds: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Simple grid search over param_grid.
+        Returns the best params found.
+        """
+        try:
+            from sklearn.model_selection import GridSearchCV
+            from xgboost import XGBClassifier
+        except ImportError as e:
+            raise ImportError(f"sklearn/xgboost required: {e}") from e
 
-    def load(self, path: str) -> Any:
-        """بارگذاری مدل از disk."""
-        with open(path, "rb") as f:
-            model = pickle.load(f)
-        logger.info("model loaded from %s", path)
-        return model
+        grid = param_grid or {
+            "max_depth":     [4, 6, 8],
+            "learning_rate": [0.01, 0.05, 0.1],
+            "n_estimators":  [100, 200, 300],
+        }
+        model  = XGBClassifier(**{k: v for k, v in self._params.items() if k not in grid})
+        search = GridSearchCV(model, grid, cv=cv_folds, scoring="roc_auc", n_jobs=-1, verbose=0)
+        search.fit(dataset.X, dataset.y)
+        logger.info("Best params: %s (score=%.4f)", search.best_params_, search.best_score_)
+        self._params.update(search.best_params_)
+        return search.best_params_
