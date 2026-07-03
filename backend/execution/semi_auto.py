@@ -1,89 +1,119 @@
 """
 backend/execution/semi_auto.py
-Galaxy Vast AI -- Semi-Auto Trading Mode
+Galaxy Vast AI — Semi-Automatic Trade Execution Handler
 
-Allows the operator to approve/reject signals before execution.
+Receives confirmed signals from the Telegram bot and executes them
+through the MT5 connector with full risk checks.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import Enum, auto
-from typing import Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class ApprovalStatus(Enum):
-    PENDING  = auto()
-    APPROVED = auto()
-    REJECTED = auto()
-    EXPIRED  = auto()
-
-
 @dataclass
-class PendingSignal:
-    signal_id:  str
-    symbol:     str
-    direction:  str
-    volume:     float
-    sl:         float
-    tp:         float
-    status:     ApprovalStatus = ApprovalStatus.PENDING
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    expires_in: float = 300.0   # seconds
+class SemiAutoSignal:
+    """Signal approved by the trader for semi-auto execution."""
+    signal_id:        str
+    symbol:           str
+    action:           str          # "buy" | "sell"
+    entry_price:      float
+    stop_loss:        float
+    take_profit_1:    float
+    take_profit_2:    float
+    lot_size:         float
+    risk_percent:     float
+    rr_ratio:         float
+    confidence_score: float
+    market_context:   str          = ""
+    remaining_seconds: int         = 60
+    approved_by:      Optional[str] = None
+    approved_at:      Optional[str] = None
 
 
-class SemiAutoManager:
-    """Manages pending signals awaiting operator approval."""
+class SemiAutoHandler:
+    """
+    Handles the lifecycle of semi-automatic trades:
+    1. Receive approved signal from Telegram callback.
+    2. Run risk pre-flight.
+    3. Execute via MT5Connector.
+    4. Track state via OrderStateMachine.
+    """
 
-    def __init__(self, timeout: float = 300.0) -> None:
-        self._pending: dict[str, PendingSignal] = {}
-        self._timeout = timeout
+    def __init__(
+        self,
+        connector:     Any = None,
+        risk_manager:  Any = None,
+        state_machine: Any = None,
+    ) -> None:
+        self._connector    = connector
+        self._risk         = risk_manager
+        self._sm           = state_machine
 
-    def enqueue(self, signal_id: str, symbol: str, direction: str,
-                volume: float, sl: float = 0.0, tp: float = 0.0) -> PendingSignal:
-        sig = PendingSignal(
-            signal_id=signal_id, symbol=symbol, direction=direction,
-            volume=volume, sl=sl, tp=tp, expires_in=self._timeout,
+    # ------------------------------------------------------------------ #
+    # Public
+    # ------------------------------------------------------------------ #
+
+    async def execute(self, signal: SemiAutoSignal) -> Dict[str, Any]:
+        """
+        Execute an approved semi-auto signal.
+        Returns a result dict with keys: success, ticket, error.
+        """
+        logger.info(
+            "[SemiAuto] executing signal %s %s %s lot=%.2f",
+            signal.signal_id, signal.symbol, signal.action, signal.lot_size,
         )
-        self._pending[signal_id] = sig
-        logger.info("Enqueued signal %s for approval (%s %s)", signal_id, direction, symbol)
-        return sig
 
-    def approve(self, signal_id: str) -> Optional[PendingSignal]:
-        sig = self._pending.get(signal_id)
-        if sig and sig.status == ApprovalStatus.PENDING:
-            sig.status = ApprovalStatus.APPROVED
-            logger.info("Signal %s approved", signal_id)
-            return sig
-        return None
+        # 1. Risk pre-flight
+        if self._risk:
+            risk_result = await self._risk.check({
+                "symbol":       signal.symbol,
+                "direction":    signal.action,
+                "lot_size":     signal.lot_size,
+                "risk_percent": signal.risk_percent,
+            }, {})
+            if not risk_result.get("approved"):
+                reason = risk_result.get("reason", "risk check failed")
+                logger.warning("[SemiAuto] risk blocked %s: %s", signal.signal_id, reason)
+                return {"success": False, "ticket": None, "error": reason}
 
-    def reject(self, signal_id: str) -> Optional[PendingSignal]:
-        sig = self._pending.get(signal_id)
-        if sig and sig.status == ApprovalStatus.PENDING:
-            sig.status = ApprovalStatus.REJECTED
-            logger.info("Signal %s rejected", signal_id)
-            return sig
-        return None
+        # 2. Execute
+        if self._connector is None:
+            return {"success": False, "ticket": None, "error": "no MT5 connector"}
 
-    def list_pending(self) -> list[dict]:
-        return [
-            {
-                "signal_id": s.signal_id,
-                "symbol":    s.symbol,
-                "direction": s.direction,
-                "volume":    s.volume,
-                "status":    s.status.name,
-                "created_at": s.created_at,
-            }
-            for s in self._pending.values()
-            if s.status == ApprovalStatus.PENDING
-        ]
+        try:
+            order_type = "ORDER_TYPE_BUY" if signal.action == "buy" else "ORDER_TYPE_SELL"
+            result = await self._connector.place_order(
+                symbol     = signal.symbol,
+                order_type = order_type,
+                volume     = signal.lot_size,
+                price      = signal.entry_price,
+                sl         = signal.stop_loss,
+                tp         = signal.take_profit_1,
+                comment    = f"semi_auto:{signal.signal_id[:8]}",
+            )
+            ticket = result.get("ticket")
+            logger.info("[SemiAuto] placed ticket=%s for %s", ticket, signal.signal_id)
+
+            # 3. State machine tracking
+            if self._sm and ticket:
+                await self._sm.transition(str(ticket), "submit")
+
+            return {"success": True, "ticket": ticket, "error": None}
+
+        except Exception as exc:
+            logger.error("[SemiAuto] execution error for %s: %s", signal.signal_id, exc)
+            return {"success": False, "ticket": None, "error": str(exc)}
+
+    async def reject(self, signal_id: str, reason: str = "") -> None:
+        """Mark a signal as rejected (no execution)."""
+        logger.info("[SemiAuto] signal rejected: %s reason=%s", signal_id, reason)
 
 
-semi_auto_manager = SemiAutoManager()
+# Module-level singleton
+semi_auto_handler = SemiAutoHandler()
