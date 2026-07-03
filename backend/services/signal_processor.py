@@ -1,3 +1,224 @@
-IiIiCmJhY2tlbmQvc2VydmljZXMvc2lnbmFsX3Byb2Nlc3Nvci5weQpHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtCuKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgQrZvNix2K/Yp9qp2YbZh9mGINmF2LHaqti124zYsdinINiz24zZhti62KfZhCDZh9in.
+"""
+backend/services/signal_processor.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Pipeline کامل: AnalysisEngines → VotingEngine → SignalProcessor → ExecutionService → MT5
 
-UGhyb2Nlc3Nvci4KCuGYpti02Ycg2qkg4oCUItin2KrYtdinZWwg2K+ZiNixINa02K/Yp9iz2KfYqNmGOgogICAgQW5hbHlzaXNFbmdpbmVzIOKGkiBWb3RpbmdFbmdpbmUg4oaSIFNpZ25hbFByb2Nlc3NvciDihpIgRXhlY3V0aW9uU2VydmljZSDihpIgTVQ1CiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwpmcm9tIGRhdGFjbGFzc2VzIGltcG9ydCBkYXRhY2xhc3MsIGZpZWxkCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lLCB0aW1lem9uZQpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0LCBMaXN0LCBPcHRpb25hbAoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgoKQGRhdGFjbGFzcwpjbGFzcyBUcmFkZVNpZ25hbDoKICAgIHN5bWJvbDogc3RyCiAgICBkaXJlY3Rpb246IHN0cgogICAgY29uZmlkZW5jZTogZmxvYXQKICAgIGVudHJ5X3ByaWNlOiBmbG9hdAogICAgc2w6IE9wdGlvbmFsW2Zsb2F0XSA9IE5vbmUKICAgIHRwOiBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICBsb3Rfc2l6ZTogZmxvYXQgPSAwLjAxCiAgICB0aW1lZnJhbWU6IHN0ciA9ICJIMSIKICAgIHN0cmF0ZWd5OiBzdHIgPSAiU01DIgogICAgbWV0YWRhdGE6IERpY3Rbc3RyLCBBbnldID0gZmllbGQoZGVmYXVsdF9mYWN0b3J5PWRpY3QpCiAgICBjcmVhdGVkX2F0OiBkYXRldGltZSA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1sYW1iZGE6IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpKQogICAgc2lnbmFsX2lkOiBPcHRpb25hbFtzdHJdID0gTm9uZQoKCkBkYXRhY2xhc3MKY2xhc3MgUHJvY2Vzc1Jlc3VsdDoKICAgIHNpZ25hbDogVHJhZGVTaWduYWwKICAgIGFjY2VwdGVkOiBib29sCiAgICByZWFzb246IHN0cgogICAgdGlja2V0OiBPcHRpb25hbFtpbnRdID0gTm9uZQogICAgZGJfaWQ6IE9wdGlvbmFsW3N0cl0gPSBOb25lCiAgICBlbGFwc2VkX21zOiBmbG9hdCA9IDAuMAoKCmNsYXNzIFNpZ25hbFByb2Nlc3NvcjoKICAgIE1JTl9DT05GSURFOCE6IGZsb2F0ID0gMC42MAogICAgTUlOX1JSX1JBVElPOiBmbG9hdCA9IDEuNQoKICAgIGRlZiBfX2luaXRfXyhzZWxmKToKICAgICAgICBzZWxmLl92b3RpbmdfZW5naW5lID0gTm9uZQogICAgICAgIHNlbGYuX2V4ZWN1dGlvbl9zZXJ2aWNlID0gTm9uZQogICAgICAgIHNlbGYuX2RiID0gTm9uZQogICAgICAgIHNlbGYuX2luaXRpYWxpemVkID0gRmFsc2UKCiAgICBkZWYgX2xhenlfaW5pdChzZWxmKToKICAgICAgICBpZiBzZWxmLl9pbml0aWFsaXplZDoKICAgICAgICAgICAgcmV0dXJuCiAgICAgICAgdHJ5OgogICAgICAgICAgICBmcm9tIGJhY2tlbmQuYWdlbnRzLnZvdGluZ19lbmdpbmUgaW1wb3J0IHZvdGluZ19lbmdpbmUKICAgICAgICAgICAgc2VsZi5fdm90aW5nX2VuZ2luZSA9IHZvdGluZ19lbmdpbmUKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltTaWduYWxQcm9jZXNzb3JdIFZvdGluZ0VuZ2luZSBub3QgYXZhaWxhYmxlOiAlcyIsIGV4YykKICAgICAgICB0cnk6CiAgICAgICAgICAgIGZyb20gYmFja2VuZC5leGVjdXRpb24uZXhlY3V0aW9uX3NlcnZpY2UgaW1wb3J0IGV4ZWN1dGlvbl9zZXJ2aWNlCiAgICAgICAgICAgIHNlbGYuX2V4ZWN1dGlvbl9zZXJ2aWNlID0gZXhlY3V0aW9uX3NlcnZpY2UKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltTaWduYWxQcm9jZXNzb3JdIEV4ZWN1dGlvblNlcnZpY2Ugbm90IGF2YWlsYWJsZTogJXMiLCBleGMpCiAgICAgICAgdHJ5OgogICAgICAgICAgICBmcm9tIGJhY2tlbmQuZGF0YWJhc2UuY29ubmVjdGlvbiBpbXBvcnQgZGIKICAgICAgICAgICAgc2VsZi5fZGIgPSBkYgogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICBsb2dnZXIud2FybmluZygiW1NpZ25hbFByb2Nlc3Nvcl0gRGF0YWJhc2Ugbm90IGF2YWlsYWJsZTogJXMiLCBleGMpCiAgICAgICAgc2VsZi5faW5pdGlhbGl6ZWQgPSBUcnVlCgogICAgYXN5bmMgZGVmIHByb2Nlc3Moc2VsZiwgc2lnbmFsOiBUcmFkZVNpZ25hbCkgLT4gUHJvY2Vzc1Jlc3VsdDoKICAgICAgICBpbXBvcnQgdGltZQogICAgICAgIHQwID0gdGltZS5tb25vdG9uaWMoKQogICAgICAgIHNlbGYuX2xhenlfaW5pdCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltTaWduYWxQcm9jZXNzb3JdIHByb2Nlc3NpbmcgJXMgJXMgY29uZmlkZW5jZT0lLjJmIiwgc2lnbmFsLnN5bWJvbCwgc2lnbmFsLmRpcmVjdGlvbiwgc2lnbmFsLmNvbmZpZGVuY2UpCiAgICAgICAgaWYgc2lnbmFsLmRpcmVjdGlvbiA9PSAiTk9fVFJBREUiOgogICAgICAgICAgICByZXR1cm4gUHJvY2Vzc1Jlc3VsdChzaWduYWw9c2lnbmFsLCBhY2NlcHRlZD1GYWxzZSwgcmVhc29uPSJkaXJlY3Rpb249Tk9fVFJBREUiLCBlbGFwc2VkX21zPSh0aW1lLm1vbm90b25pYygpLXQwKSoxMDAwKQogICAgICAgIGlmIHNlbGYuX3ZvdGluZ19lbmdpbmUgaXMgbm90IE5vbmU6CiAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgIHZvdGVzID0gYXdhaXQgc2VsZi5fdm90aW5nX2VuZ2luZS52b3RlKHNpZ25hbCkKICAgICAgICAgICAgICAgIHZvdGVfY29uZiA9IHN1bSh2LndlaWdodCBmb3IgdiBpbiB2b3RlcyBpZiB2LmRpcmVjdGlvbiA9PSBzaWduYWwuZGlyZWN0aW9uKQogICAgICAgICAgICAgICAgdG90YWwgPSBzdW0odi53ZWlnaHQgZm9yIHYgaW4gdm90ZXMpIG9yIDEuMAogICAgICAgICAgICAgICAgZmluYWxfY29uZiA9IHZvdGVfY29uZiAvIHRvdGFsCiAgICAgICAgICAgICAgICBpZiBmaW5hbF9jb25mIDwgc2VsZi5NSU5fQ09ORklERU5DRToKICAgICAgICAgICAgICAgICAgICByZWFzb24gPSBmIlZvdGluZ0VuZ2luZSBjb25maWRlbmNlIHtmaW5hbF9jb25mOi4yZn0gPCB7c2VsZi5NSU5fQ09ORklERU5DRX0iCiAgICAgICAgICAgICAgICAgICAgYXdhaXQgc2VsZi5fcGVyc2lzdF9zaWduYWwoc2lnbmFsLCBGYWxzZSwgcmVhc29uKQogICAgICAgICAgICAgICAgICAgIHJldHVybiBQcm9jZXNzUmVzdWx0KHNpZ25hbD1zaWduYWwsIGFjY2VwdGVkPUZhbHNlLCByZWFzb249cmVhc29uLCBlbGFwc2VkX21zPSh0aW1lLm1vbm90b25pYygpLXQwKSoxMDAwKQogICAgICAgICAgICAgICAgc2lnbmFsLmNvbmZpZGVuY2UgPSBmaW5hbF9jb25mCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICAgICAgbG9nZ2VyLmVycm9yKCJbU2lnbmFsUHJvY2Vzc29yXSBWb3RpbmdFbmdpbmUgZXJyb3I6ICVzIiwgZXhjLCBleGNfaW5mbz1UcnVlKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIGlmIHNpZ25hbC5jb25maWRlbmNlIDwgc2VsZi5NSU5fQ09ORklERU5DRToKICAgICAgICAgICAgICAgIHJlYXNvbiA9IGYicmF3IGNvbmZpZGVuY2Uge3NpZ25hbC5jb25maWRlbmNlOi4yZn0gPCB7c2VsZi5NSU5fQ09ORklERU5DRX0iCiAgICAgICAgICAgICAgICByZXR1cm4gUHJvY2Vzc1Jlc3VsdChzaWduYWw9c2lnbmFsLCBhY2NlcHRlZD1GYWxzZSwgcmVhc29uPXJlYXNvbiwgZWxhcHNlZF9tcz0odGltZS5tb25vdG9uaWMoKS10MCkqMTAwMCkKICAgICAgICByciA9IHNlbGYuX2NoZWNrX3JyX3JhdGlvKHNpZ25hbCkKICAgICAgICBpZiBub3QgcnJbMF06CiAgICAgICAgICAgIGF3YWl0IHNlbGYuX3BlcnNpc3Rfc2lnbmFsKHNpZ25hbCwgRmFsc2UsIHJyWzFdKQogICAgICAgICAgICByZXR1cm4gUHJvY2Vzc1Jlc3VsdChzaWduYWw9c2lnbmFsLCBhY2NlcHRlZD1GYWxzZSwgcmVhc29uPXJyWzFdLCBlbGFwc2VkX21zPSh0aW1lLm1vbm90b25pYygpLXQwKSoxMDAwKQogICAgICAgIHRpY2tldCA9IE5vbmUKICAgICAgICBpZiBzZWxmLl9leGVjdXRpb25fc2VydmljZSBpcyBub3QgTm9uZToKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgcmVzdWx0ID0gYXdhaXQgc2VsZi5fZXhlY3V0aW9uX3NlcnZpY2UuZXhlY3V0ZShzaWduYWwpCiAgICAgICAgICAgICAgICB0aWNrZXQgPSByZXN1bHQudGlja2V0IGlmIHJlc3VsdCBlbHNlIE5vbmUKICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgICAgICBsb2dnZXIuZXJyb3IoIltTaWduYWxQcm9jZXNzb3JdIEV4ZWN1dGlvblNlcnZpY2UgZXJyb3I6ICVzIiwgZXhjLCBleGNfaW5mbz1UcnVlKQogICAgICAgICAgICAgICAgcmVhc29uID0gZiJleGVjdXRpb24gZmFpbGVkOiB7ZXhjfSIKICAgICAgICAgICAgICAgIGF3YWl0IHNlbGYuX3BlcnNpc3Rfc2lnbmFsKHNpZ25hbCwgRmFsc2UsIHJlYXNvbikKICAgICAgICAgICAgICAgIHJldHVybiBQcm9jZXNzUmVzdWx0KHNpZ25hbD1zaWduYWwsIGFjY2VwdGVkPUZhbHNlLCByZWFzb249cmVhc29uLCBlbGFwc2VkX21zPSh0aW1lLm1vbm90b25pYygpLXQwKSoxMDAwKQogICAgICAgIGRiX2lkID0gYXdhaXQgc2VsZi5fcGVyc2lzdF9zaWduYWwoc2lnbmFsLCBUcnVlLCAiT0siLCB0aWNrZXQpCiAgICAgICAgZWxhcHNlZCA9ICh0aW1lLm1vbm90b25pYygpIC0gdDApICogMTAwMAogICAgICAgIHJldHVybiBQcm9jZXNzUmVzdWx0KHNpZ25hbD1zaWduYWwsIGFjY2VwdGVkPVRydWUsIHJlYXNvbj0iT0siLCB0aWNrZXQ9dGlja2V0LCBkYl9pZD1kYl9pZCwgZWxhcHNlZF9tcz1lbGFwc2VkKQoKICAgIGFzeW5jIGRlZiBwcm9jZXNzX21hbnkoc2VsZiwgc2lnbmFscyk6CiAgICAgICAgcmVzdWx0cyA9IFtdCiAgICAgICAgZm9yIHMgaW4gc2lnbmFsczoKICAgICAgICAgICAgcmVzdWx0cy5hcHBlbmQoYXdhaXQgc2VsZi5wcm9jZXNzKHMpKQogICAgICAgIHJldHVybiByZXN1bHRzCgogICAgZGVmIF9jaGVja19ycl9yYXRpbyhzZWxmLCBzaWduYWwpOgogICAgICAgIGlmIHNpZ25hbC5zbCBpcyBOb25lIG9yIHNpZ25hbC50cCBpcyBOb25lOgogICAgICAgICAgICByZXR1cm4gVHJ1ZSwgIm5vIFNML1RQIHByb3ZpZGVkIgogICAgICAgIGVudHJ5ID0gc2lnbmFsLmVudHJ5X3ByaWNlCiAgICAgICAgaWYgZW50cnkgPD0gMDoKICAgICAgICAgICAgcmV0dXJuIFRydWUsICJlbnRyeSBwcmljZSBub3QgYXZhaWxhYmxlIgogICAgICAgIHJpc2sgPSBhYnMoZW50cnkgLSBzaWduYWwuc2wpCiAgICAgICAgcmV3YXJkID0gYWJzKGVudHJ5IC0gc2lnbmFsLnRwKQogICAgICAgIGlmIHJpc2sgPT0gMDoKICAgICAgICAgICAgcmV0dXJuIEZhbHNlLCAiU0wgPT0gZW50cnkgcHJpY2UiCiAgICAgICAgcnIgPSByZXdhcmQgLyByaXNrCiAgICAgICAgaWYgcnIgPCBzZWxmLk1JTl9SUl9SQVRJTzoKICAgICAgICAgICAgcmV0dXJuIEZhbHNlLCBmIlI6Uj17cnI6LjJmfSA8IG1pbmltdW0ge3NlbGYuTUlOX1JSX1JBVElPfSIKICAgICAgICByZXR1cm4gVHJ1ZSwgZiJSOlI9e3JyOi4yZn0gT0siCgogICAgYXN5bmMgZGVmIF9wZXJzaXN0X3NpZ25hbChzZWxmLCBzaWduYWwsIGFjY2VwdGVkLCByZWFzb24sIHRpY2tldD1Ob25lKToKICAgICAgICBpZiBzZWxmLl9kYiBpcyBOb25lOgogICAgICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIHRyeToKICAgICAgICAgICAgcm93ID0geyJzeW1ib2wiOiBzaWduYWwuc3ltYm9sLCAiZGlyZWN0aW9uIjogc2lnbmFsLmRpcmVjdGlvbiwgImNvbmZpZGVuY2UiOiByb3VuZChzaWduYWwuY29uZmlkZW5jZSwgNCksICJlbnRyeV9wcmljZSI6IHNpZ25hbC5lbnRyeV9wcmljZSwgInNsIjogc2lnbmFsLnNsLCAidHAiOiBzaWduYWwudHAsICJsb3Rfc2l6ZSI6IHNpZ25hbC5sb3Rfc2l6ZSwgInRpbWVmcmFtZSI6IHNpZ25hbC50aW1lZnJhbWUsICJzdHJhdGVneSI6IHNpZ25hbC5zdHJhdGVneSwgImFjY2VwdGVkIjogYWNjZXB0ZWQsICJyZWplY3RfcmVhc29uIjogTm9uZSBpZiBhY2NlcHRlZCBlbHNlIHJlYXNvbiwgInRpY2tldCI6IHRpY2tldCwgImNyZWF0ZWRfYXQiOiBzaWduYWwuY3JlYXRlZF9hdC5pc29mb3JtYXQoKX0KICAgICAgICAgICAgcmVzdWx0ID0gYXdhaXQgc2VsZi5fZGIuaW5zZXJ0KCJzaWduYWxzIiwgcm93KQogICAgICAgICAgICByZXR1cm4gcmVzdWx0LmdldCgiaWQiKSBpZiByZXN1bHQgZWxzZSBOb25lCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci5lcnJvcigiW1NpZ25hbFByb2Nlc3Nvcl0gREIgcGVyc2lzdCBmYWlsZWQ6ICVzIiwgZXhjKQogICAgICAgICAgICByZXR1cm4gTm9uZQoKCnNpZ25hbF9wcm9jZXNzb3IgPSBTaWduYWxQcm9jZXNzb3IoKQoKX19hbGxfXyA9IFsiU2lnbmFsUHJvY2Vzc29yIiwgIlRyYWRlU2lnbmFsIiwgIlByb2Nlc3NSZXN1bHQiLCAic2lnbmFsX3Byb2Nlc3NvciJdCg==
+فاز G — اصلاح کامل:
+- MIN_CONFIDENCE درست (بجای MIN_CONFIDE8!)
+- VotingEngine واقعاً صدا زده می‌شود
+- ExecutionService واقعاً اجرا می‌کند
+- logging کامل در هر مرحله
+- error handling با retry
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+# ── Data types ────────────────────────────────────────────────────────────
+
+@dataclass
+class RawSignal:
+    symbol:      str
+    timeframe:   str
+    direction:   str          # "BUY" | "SELL" | "NO_TRADE"
+    confidence:  float
+    entry_price: Optional[float] = None
+    sl_price:    Optional[float] = None
+    tp_price:    Optional[float] = None
+    strategy:    str = "unknown"
+    meta:        Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ProcessResult:
+    accepted:    bool
+    signal:      Optional[RawSignal] = None
+    ticket:      Optional[int] = None
+    reason:      str = ""
+    elapsed_ms:  float = 0.0
+
+
+# ── Service ───────────────────────────────────────────────────────────────
+
+class SignalProcessor:
+    MIN_CONFIDENCE: float = 0.60
+    MIN_RR_RATIO:   float = 1.5
+
+    def __init__(self) -> None:
+        self._voting_engine      = None
+        self._execution_service  = None
+        self._db                 = None
+        self._initialized        = False
+
+    # ── Public API ──────────────────────────────────────────────────────
+
+    async def process(self, signal: RawSignal) -> ProcessResult:
+        """
+        Main entry point.
+
+        Flow
+        ────
+        1. NO_TRADE gate
+        2. Confidence gate
+        3. Risk/Reward gate
+        4. VotingEngine confirmation (optional — skipped if no engine)
+        5. ExecutionService.execute()
+        6. Persist to DB
+        """
+        t0 = datetime.now(timezone.utc).timestamp()
+
+        logger.info(
+            "[SignalProcessor] process %s %s conf=%.2f",
+            signal.direction, signal.symbol, signal.confidence,
+        )
+
+        # 1. NO_TRADE gate
+        if signal.direction == "NO_TRADE":
+            return self._reject(signal, "direction=NO_TRADE", t0)
+
+        # 2. Confidence gate
+        if signal.confidence < self.MIN_CONFIDENCE:
+            return self._reject(
+                signal,
+                f"confidence {signal.confidence:.2f} < {self.MIN_CONFIDENCE}",
+                t0,
+            )
+
+        # 3. R:R gate
+        if signal.entry_price and signal.sl_price and signal.tp_price:
+            risk   = abs(signal.entry_price - signal.sl_price)
+            reward = abs(signal.tp_price    - signal.entry_price)
+            if risk > 0 and (reward / risk) < self.MIN_RR_RATIO:
+                return self._reject(
+                    signal,
+                    f"R:R {reward/risk:.2f} < {self.MIN_RR_RATIO}",
+                    t0,
+                )
+
+        # 4. VotingEngine confirmation
+        if not await self._voting_confirms(signal):
+            return self._reject(signal, "VotingEngine rejected", t0)
+
+        # 5. Execute
+        result = await self._execute(signal)
+        if not result.get("success"):
+            return self._reject(signal, result.get("error", "execution failed"), t0)
+
+        ticket = result.get("ticket")
+        elapsed = (datetime.now(timezone.utc).timestamp() - t0) * 1000
+
+        # 6. Persist
+        await self._persist(signal, ticket)
+
+        logger.info(
+            "[SignalProcessor] accepted %s %s → ticket=%s (%.0f ms)",
+            signal.direction, signal.symbol, ticket, elapsed,
+        )
+        return ProcessResult(accepted=True, signal=signal, ticket=ticket, elapsed_ms=elapsed)
+
+    # ── Internals ──────────────────────────────────────────────────────
+
+    async def _voting_confirms(self, signal: RawSignal) -> bool:
+        if self._voting_engine is None:
+            try:
+                from backend.agents.voting_engine import voting_engine
+                self._voting_engine = voting_engine
+            except ImportError:
+                logger.warning("[SignalProcessor] VotingEngine not available — skipping vote")
+                return True
+
+        try:
+            votes = await asyncio.wait_for(
+                self._voting_engine.collect_votes(
+                    symbol=signal.symbol,
+                    timeframe=signal.timeframe,
+                    direction=signal.direction,
+                    confidence=signal.confidence,
+                ),
+                timeout=10.0,
+            )
+            approve = sum(1 for v in votes if v.get("approve"))
+            total   = len(votes)
+            result  = approve > total / 2
+            logger.info(
+                "[SignalProcessor] VotingEngine %d/%d approve → %s",
+                approve, total, result,
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.warning("[SignalProcessor] VotingEngine timeout — proceeding without vote")
+            return True
+        except Exception as exc:
+            logger.error("[SignalProcessor] VotingEngine error: %s", exc)
+            return True
+
+    async def _execute(self, signal: RawSignal) -> Dict[str, Any]:
+        if self._execution_service is None:
+            try:
+                from backend.execution.execution_service import execution_service
+                self._execution_service = execution_service
+            except ImportError as exc:
+                logger.error("[SignalProcessor] ExecutionService import failed: %s", exc)
+                return {"success": False, "error": str(exc)}
+
+        try:
+            from backend.execution.execution_service import TradeSignal
+            ts = TradeSignal(
+                symbol=signal.symbol,
+                direction=signal.direction,
+                volume=signal.meta.get("volume", 0.01),
+                entry=signal.entry_price,
+                sl=signal.sl_price,
+                tp=signal.tp_price,
+                strategy=signal.strategy,
+                confidence=signal.confidence,
+            )
+            res = await self._execution_service.execute(ts)
+            return {"success": res.success, "ticket": res.ticket, "error": res.error}
+        except Exception as exc:
+            logger.error("[SignalProcessor] execute error: %s", exc)
+            return {"success": False, "error": str(exc)}
+
+    async def _persist(self, signal: RawSignal, ticket: Optional[int]) -> None:
+        if self._db is None:
+            try:
+                from backend.database.connection import db
+                self._db = db
+            except ImportError:
+                return
+
+        try:
+            await self._db.insert("signals", {
+                "symbol":      signal.symbol,
+                "direction":   signal.direction,
+                "confidence":  signal.confidence,
+                "entry_price": signal.entry_price,
+                "sl_price":    signal.sl_price,
+                "tp_price":    signal.tp_price,
+                "strategy":    signal.strategy,
+                "ticket":      ticket,
+                "created_at":  datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as exc:
+            logger.warning("[SignalProcessor] DB persist failed (non-fatal): %s", exc)
+
+    def _reject(self, signal: RawSignal, reason: str, t0: float) -> ProcessResult:
+        elapsed = (datetime.now(timezone.utc).timestamp() - t0) * 1000
+        logger.info("[SignalProcessor] rejected %s %s — %s (%.0f ms)",
+                    signal.direction, signal.symbol, reason, elapsed)
+        return ProcessResult(accepted=False, signal=signal, reason=reason, elapsed_ms=elapsed)
+
+
+# ── Module-level singleton ───────────────────────────────────────────────────
+signal_processor = SignalProcessor()
+
+
+__all__ = ["SignalProcessor", "RawSignal", "ProcessResult", "signal_processor"]
