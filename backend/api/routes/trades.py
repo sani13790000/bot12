@@ -1,8 +1,10 @@
 """
-backend/api/routes/trades.py -- Phase-C fix
+backend/api/routes/trades.py -- Phase-E fix
 
-C-4  `status` Query param shadowed the `status` FastAPI module import.
-     Renamed param to `trade_status` and aliased with Query(alias="status").
+E-7: open_trade() now calls ExecutionService.open_position() after DB insert.
+     On MT5 failure: DB record rolled back to status='failed'.
+E-8: close_trade() now calls ExecutionService.close_position(ticket).
+E-9: Added GET /{trade_id} single-trade endpoint.
 """
 from __future__ import annotations
 
@@ -21,13 +23,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trades", tags=["trades"])
 
 
-# --------------------------------------------------------------------------- #
-# Schemas
-# --------------------------------------------------------------------------- #
-
 class TradeCreate(BaseModel):
     symbol:      str
-    direction:   str            # "buy" | "sell"
+    direction:   str
     lot_size:    float = Field(gt=0, le=100)
     entry_price: float
     stop_loss:   float
@@ -37,25 +35,27 @@ class TradeCreate(BaseModel):
 
 
 class TradeResponse(BaseModel):
-    id:          str
-    user_id:     str
-    symbol:      str
-    direction:   str
-    lot_size:    float
-    entry_price: float
-    stop_loss:   float
-    take_profit: float
-    status:      str
-    strategy:    Optional[str]
-    comment:     Optional[str]
-    opened_at:   str
-    closed_at:   Optional[str]
-    pnl:         Optional[float]
+    id:           str
+    user_id:      str
+    symbol:       str
+    direction:    str
+    lot_size:     float
+    entry_price:  float
+    stop_loss:    float
+    take_profit:  float
+    status:       str
+    strategy:     Optional[str] = None
+    comment:      Optional[str] = None
+    opened_at:    str
+    closed_at:    Optional[str] = None
+    pnl:          Optional[float] = None
+    mt5_ticket:   Optional[int] = None
 
 
-# --------------------------------------------------------------------------- #
-# Endpoints
-# --------------------------------------------------------------------------- #
+def _get_execution_service():
+    from backend.execution.execution_service import execution_service
+    return execution_service
+
 
 @router.get("/", response_model=List[TradeResponse])
 async def list_trades(
@@ -65,12 +65,29 @@ async def list_trades(
     user:         dict          = Depends(get_current_user),
     db                          = Depends(get_db),
 ) -> List[TradeResponse]:
-    """List trades for the authenticated user."""
+    """List trades for the authenticated user, newest first."""
     filters: dict = {"user_id": user["sub"]}
     if trade_status:
         filters["status"] = trade_status
-    rows = await db.select("trades", filters, limit=limit, offset=offset)
+    rows = await db.select(
+        "trades", filters,
+        order_by="opened_at", order_desc=True,
+        limit=limit, offset=offset,
+    )
     return [TradeResponse(**r) for r in (rows or [])]
+
+
+@router.get("/{trade_id}", response_model=TradeResponse)
+async def get_trade(
+    trade_id: str,
+    user:     dict = Depends(get_current_user),
+    db              = Depends(get_db),
+) -> TradeResponse:
+    """Get a single trade by ID."""
+    trade = await db.select_one("trades", {"id": trade_id, "user_id": user["sub"]})
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    return TradeResponse(**trade)
 
 
 @router.post("/", response_model=TradeResponse, status_code=201)
@@ -78,11 +95,26 @@ async def open_trade(
     body: TradeCreate,
     user: dict = Depends(get_current_user),
     db         = Depends(get_db),
-) -> dict:
-    """Open a new trade."""
+) -> TradeResponse:
+    """
+    Open a new trade.
+    1. Validate direction
+    2. Insert DB record with status='pending'
+    3. Call ExecutionService -> MT5 place_order()
+    4a. Success: update DB with mt5_ticket + status='open'
+    4b. MT5 failure: update DB status='failed', raise 502
+    """
+    if body.direction not in ("buy", "sell"):
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"direction must be 'buy' or 'sell', got '{body.direction}'",
+        )
+
     now = datetime.now(timezone.utc).isoformat()
-    data = {
-        "id":          str(uuid.uuid4()),
+    trade_id = str(uuid.uuid4())
+
+    db_data = {
+        "id":          trade_id,
         "user_id":     user["sub"],
         "symbol":      body.symbol,
         "direction":   body.direction,
@@ -90,17 +122,48 @@ async def open_trade(
         "entry_price": body.entry_price,
         "stop_loss":   body.stop_loss,
         "take_profit": body.take_profit,
-        "status":      "open",
+        "status":      "pending",
         "strategy":    body.strategy,
         "comment":     body.comment,
         "opened_at":   now,
         "closed_at":   None,
         "pnl":         None,
+        "mt5_ticket":  None,
     }
-    result = await db.insert("trades", data)
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to open trade")
-    return result
+    record = await db.insert("trades", db_data)
+    if not record:
+        raise HTTPException(status_code=500, detail="Failed to create trade record")
+
+    try:
+        svc = _get_execution_service()
+        result = await svc.open_position(
+            symbol=body.symbol,
+            direction=body.direction,
+            lot_size=body.lot_size,
+            entry_price=body.entry_price,
+            stop_loss=body.stop_loss,
+            take_profit=body.take_profit,
+            comment=body.comment or "",
+        )
+        ticket = result.get("ticket")
+        actual_price = result.get("price", body.entry_price)
+
+        updated = await db.update(
+            "trades",
+            {"id": trade_id},
+            {"status": "open", "mt5_ticket": ticket, "entry_price": actual_price},
+        )
+        final = updated[0] if updated else {**db_data, "status": "open", "mt5_ticket": ticket}
+        logger.info("Trade opened: id=%s ticket=%s symbol=%s", trade_id, ticket, body.symbol)
+        return TradeResponse(**final)
+
+    except Exception as exc:
+        logger.error("MT5 open_position failed for trade %s: %s", trade_id, exc)
+        await db.update("trades", {"id": trade_id}, {"status": "failed"})
+        raise HTTPException(
+            status_code=http_status.HTTP_502_BAD_GATEWAY,
+            detail=f"MT5 execution failed: {exc}",
+        )
 
 
 @router.post("/{trade_id}/close")
@@ -109,16 +172,51 @@ async def close_trade(
     user:     dict = Depends(get_current_user),
     db              = Depends(get_db),
 ) -> dict:
-    """Close an open trade."""
+    """
+    Close an open trade.
+    1. Fetch trade - must be 'open' and belong to user
+    2. Call ExecutionService -> MT5 close_position(ticket)
+    3a. Success: update DB status='closed', pnl, closed_at
+    3b. MT5 failure: leave DB unchanged, return 502
+    """
     trade = await db.select_one("trades", {"id": trade_id, "user_id": user["sub"]})
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     if trade.get("status") != "open":
-        raise HTTPException(status_code=409, detail="Trade is not open")
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"Trade is not open (status: {trade.get('status')})",
+        )
+
+    ticket = trade.get("mt5_ticket")
+    if not ticket:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="Trade has no MT5 ticket - cannot close via MT5",
+        )
+
+    try:
+        svc = _get_execution_service()
+        result = await svc.close_position(ticket=ticket, symbol=trade["symbol"])
+        pnl = result.get("pnl", 0.0)
+    except Exception as exc:
+        logger.error("MT5 close_position failed for ticket %s: %s", ticket, exc)
+        raise HTTPException(
+            status_code=http_status.HTTP_502_BAD_GATEWAY,
+            detail=f"MT5 close failed: {exc}",
+        )
+
     now = datetime.now(timezone.utc).isoformat()
     updated = await db.update(
         "trades",
         {"id": trade_id},
-        {"status": "closed", "closed_at": now},
+        {"status": "closed", "closed_at": now, "pnl": pnl},
     )
-    return {"success": True, "trade": updated[0] if updated else trade}
+    logger.info("Trade closed: id=%s ticket=%s pnl=%.2f", trade_id, ticket, pnl)
+    return {
+        "success":  True,
+        "trade_id": trade_id,
+        "ticket":   ticket,
+        "pnl":      pnl,
+        "trade":    updated[0] if updated else trade,
+    }
