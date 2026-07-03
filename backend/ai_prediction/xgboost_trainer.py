@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 try:
     import xgboost as xgb
-    import numpy as np
     HAS_XGBOOST = True
 except ImportError:
     HAS_XGBOOST = False
@@ -59,43 +58,29 @@ class XGBoostTrainer:
         """Train the XGBoost model."""
         if not HAS_XGBOOST:
             raise RuntimeError("xgboost is not installed")
-
         self._feature_names = feature_names or [f"f{i}" for i in range(X_train.shape[1])]
-
         params = {
-            "n_estimators":        self.config.n_estimators,
-            "max_depth":           self.config.max_depth,
-            "learning_rate":       self.config.learning_rate,
-            "subsample":           self.config.subsample,
-            "colsample_bytree":    self.config.colsample,
-            "eval_metric":         self.config.eval_metric,
-            "use_label_encoder":   False,
+            "n_estimators":          self.config.n_estimators,
+            "max_depth":             self.config.max_depth,
+            "learning_rate":         self.config.learning_rate,
+            "subsample":             self.config.subsample,
+            "colsample_bytree":      self.config.colsample,
+            "eval_metric":           self.config.eval_metric,
+            "use_label_encoder":     False,
             "early_stopping_rounds": self.config.early_stopping,
         }
-
         model = xgb.XGBClassifier(**params)
-        model.fit(
-            X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            verbose=False,
-        )
-
+        model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
         self._model = model
         train_score = float(model.score(X_train, y_train))
         val_score   = float(model.score(X_val, y_val))
-        best_iter   = model.best_iteration if hasattr(model, "best_iteration") else -1
-
-        logger.info(
-            "XGBoost trained: train=%.4f val=%.4f best_iter=%d",
-            train_score, val_score, best_iter,
-        )
+        best_iter   = getattr(model, "best_iteration", -1)
+        logger.info("XGBoost trained: train=%.4f val=%.4f best_iter=%d",
+                    train_score, val_score, best_iter)
         return TrainingResult(
-            model          = model,
-            feature_names  = self._feature_names,
-            train_score    = train_score,
-            val_score      = val_score,
-            n_estimators   = self.config.n_estimators,
-            best_iteration = best_iter,
+            model=model, feature_names=self._feature_names,
+            train_score=train_score, val_score=val_score,
+            n_estimators=self.config.n_estimators, best_iteration=best_iter,
         )
 
     def predict(self, X: Any) -> Any:
@@ -106,5 +91,4 @@ class XGBoostTrainer:
     def feature_importance(self) -> dict[str, float]:
         if self._model is None:
             return {}
-        imp = self._model.feature_importances_
-        return dict(zip(self._feature_names, imp.tolist()))
+        return dict(zip(self._feature_names, self._model.feature_importances_.tolist()))
