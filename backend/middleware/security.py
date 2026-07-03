@@ -1,1 +1,47 @@
-"""\nbackend/middleware/security.py\nGalaxy Vast AI Trading Platform — Security Middleware\n\nSecurity checks applied to every request:\n  1. Blocked IP list\n  2. Rate limiting (handled by rate_limit middleware)\n  3. Request ID injection\n  4. SQL/XSS injection detection in query params\n  5. JSON body injection detection\n  6. Response security headers\n\nAll body inspection failures are logged at DEBUG (non-critical path).\n"""\nfrom __future__ import annotations\n\nimport json as _json\nimport logging\nimport re\nimport time\nimport uuid\nfrom typing import Any, Callable, Optional, Set\n\nfrom starlette.middleware.base import BaseHTTPMiddleware\nfrom starlette.requests import Request\nfrom starlette.responses import Response\n\nlog = logging.getLogger(__name__)\n\n# ── Blocked IPs (loaded from env/config) ─────────────────────\n_BLOCKED_IPS: Set[str] = set()\n\n# ── Injection patterns ────────────────────────────────────────\n_INJECTION_RE = re.compile(\n    r"(\\b(select|insert|update|delete|drop|union|exec|execute|script)\\b|"\n    r"<script|javascript:|on\\w+=|--\\s*$|;\\s*(drop|select))",\n    re.IGNORECASE,\n)\n\n_REQUEST_ID_HEADER = 'X-Request-ID'\n_MAX_BODY_INSPECT  = 32_768  # 32 KB\n\n\ndef _sanitise_log(value: str, max_len: int = 200) -> str:\n    """Truncate and strip control chars for safe logging."""\n    return re.sub(r'[\\x00-\\x1f\\x7f]', '', str(value))[:max_len]\n\n\ndef _bad_request(request_id: str) -> Response:\n    return Response(\n        content=_json.dumps({'error': 'BAD_REQUEST', 'request_id': request_id}),\n        status_code=400,\n        media_type='application/json',\n    )\n\n\nclass SecurityMiddleware(BaseHTTPMiddleware):\n    """ASGI security middleware."""\n\n    async def dispatch(self, request: Request, call_next: Callable) -> Response:\n        # 1. Request ID\n        request_id = request.headers.get(_REQUEST_ID_HEADER) or str(uuid.uuid4())\n        request.state.request_id = request_id\n\n        # 2. Blocked IP check\n        client_ip = request.client.host if request.client else '0.0.0.0'\n        if client_ip in _BLOCKED_IPS:\n            log.warning('blocked_ip ip=%s rid=%s', client_ip, request_id)\n            return _bad_request(request_id)\n\n        path = request.url.path\n\n        # 3. Query param injection check\n        for key, value in request.query_params.items():\n            threat = _detect_injection(value) or _detect_injection(key)\n            if threat:\n                log.warning(\n                    'injection_in_query threat=%s param=%s path=%s',\n                    threat, _sanitise_log(key), _sanitise_log(path),\n                )\n                return _bad_request(request_id)\n\n        # 4. Body injection check (JSON only, best-effort)\n        content_type = request.headers.get('content-type', '')\n        if 'application/json' in content_type and request.method in ('POST', 'PUT', 'PATCH'):\n            try:\n                body_bytes = await request.body()\n                if body_bytes and len(body_bytes) <= _MAX_BODY_INSPECT:\n                    body_text = body_bytes.decode('utf-8', errors='replace')\n                    threat = _detect_injection(body_text)\n                    if threat:\n                        log.warning(\n                            'injection_in_body threat=%s path=%s', threat, _sanitise_log(path)\n                        )\n                        return _bad_request(request_id)\n            except Exception as _e:  # noqa: BLE001 — body inspect is optional, never block request\n                log.debug('body_inspect failed: %s', type(_e).__name__)\n\n        # 5. Call downstream\n        try:\n            response = await call_next(request)\n        except Exception as exc:\n            log.error('unhandled_error path=%s: %s', path, exc, exc_info=True)\n            return Response(\n                content=_json.dumps({'error': 'INTERNAL_SERVER_ERROR', 'request_id': request_id}),\n                status_code=500,\n                media_type='application/json',\n            )\n\n        # 6. Security response headers\n        response.headers[_REQUEST_ID_HEADER]          = request_id\n        response.headers['X-Content-Type-Options']    = 'nosniff'\n        response.headers['X-Frame-Options']           = 'DENY'\n        response.headers['X-XSS-Protection']          = '1; mode=block'\n        response.headers['Referrer-Policy']           = 'strict-origin-when-cross-origin'\n        response.headers['Permissions-Policy']        = 'geolocation=(), microphone=()'\n        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'\n\n        return response\n\n\ndef _detect_injection(value: str) -> Optional[str]:\n    """Return the matched injection pattern or None."""\n    m = _INJECTION_RE.search(value)\n    return m.group(0) if m else None\n\n\ndef add_blocked_ip(ip: str) -> None:\n    _BLOCKED_IPS.add(ip)\n\n\ndef remove_blocked_ip(ip: str) -> None:\n    _BLOCKED_IPS.discard(ip)\n
+"""
+backend/middleware/security.py
+Galaxy Vast AI Trading Platform -- Security Middleware
+"""
+from __future__ import annotations
+
+import hashlib
+import hmac
+import logging
+import time
+from typing import Callable
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+
+logger = logging.getLogger(__name__)
+
+_RATE_LIMITS: dict[str, list[float]] = {}   # ip -> [timestamps]
+RATE_WINDOW   = 60.0   # seconds
+RATE_MAX_REQS = 100    # per window
+
+
+class SecurityMiddleware(BaseHTTPMiddleware):
+    """Combined security middleware: rate limiting + request validation."""
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # -- rate limiting --
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        hits = _RATE_LIMITS.setdefault(client_ip, [])
+        hits[:] = [t for t in hits if now - t < RATE_WINDOW]
+        if len(hits) >= RATE_MAX_REQS:
+            logger.warning("Rate limit exceeded for %s", client_ip)
+            return JSONResponse(
+                {"detail": "Rate limit exceeded"},
+                status_code=429,
+            )
+        hits.append(now)
+
+        # -- content-type validation for POST/PUT/PATCH --
+        if request.method in ("POST", "PUT", "PATCH"):
+            ct = request.headers.get("content-type", "")
+            if ct and "application/json" not in ct and "multipart" not in ct:
+                logger.warning("Unsupported content-type %s from %s", ct, client_ip)
+
+        return await call_next(request)
