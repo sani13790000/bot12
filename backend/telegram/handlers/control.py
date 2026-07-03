@@ -1,8 +1,6 @@
 """
-================================================================
 backend/telegram/handlers/control.py
 Telegram control handler -- start/stop/status commands.
-================================================================
 """
 from __future__ import annotations
 
