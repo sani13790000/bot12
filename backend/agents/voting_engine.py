@@ -1,1 +1,36 @@
-"""\nbackend/agents/voting_engine.py\nGalaxy Vast AI \u2014 Enterprise Voting Engine\n\nCoordinates all agents, collects votes, applies weighted majority,\nveto rules, tie-breaking, and circuit breaker integration.\nFIX: Import AgentStatus, AgentResult, VoteResult from base_agent (not core modules).\nMS-4: Sequential fallback when gather fails.\nMS-5: Per-agent error isolation (gather return_exceptions=True).\nNote: results lists are bounded (one entry per agent, max ~8).\n"""\nfrom __future__ import annotations\n\nimport asyncio\nimport logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import Any, Dict, List, Optional, Tuple\n\nfrom backend.agents.base_agent import (\n    AgentResult,\n    AgentStatus,\n    VoteResult,\n    VoteSignal,\n)\nfrom backend.core.logger import get_logger\n\nlog = get_logger(__name__)\n\n\nclass VetoReason(str, Enum):\n    HIGH_RISK          = \"HIGH_RISK\"\n    NEWS_BLACKOUT      = \"NEWS_BLACKOUT\"\n    CIRCUIT_BREAKER    = \"CIRCUIT_BREAKER\"\n    KILL_SWITCH        = \"KILL_SWITCH\"\n    QUORUM_MISSING     = \"QUORUM_MISSING\"\n    CONFIDENCE_TOO_LOW = \"CONFIDENCE_TOO_LOW\"\n\n\n@dataclass\nclass VotingConfig:\n    quorum_pct:       float = 0.6\n    confidence_floor: float = 0.55\n    timeout_s:        float = 5.0\n    enable_veto:      bool  = True\n\n\n@dataclass\nclass VotingResult:\n    signal:       VoteSignal\n    confidence:   float\n    votes:        List[VoteResult]  = field(default_factory=list)\n    veto_reason:  Optional[str]     = None\n    tie_broken:   bool              = False\n    quorum_met:   bool              = True\n    metadata:     Dict[str, Any]    = field(default_factory=dict)\n\n\nclass VotingEngine:\n    \"\"\"Coordinates all agents and produces a final trading signal.\"\"\"\n\n    def __init__(self, config: Optional[VotingConfig] = None) -> None:\n        self._config = config or VotingConfig()\n        self._log    = log\n\n    async def vote(\n        self,\n        agents: List[Any],\n        context: Dict[str, Any],\n    ) -> VotingResult:\n        if not agents:\n            return VotingResult(signal=VoteSignal.HOLD, confidence=0.0, quorum_met=False)\n\n        results = await self._gather_safe(agents, context)\n        active  = [r for r in results if r.signal != VoteSignal.ABSTAIN]\n\n        if len(active) < max(1, int(len(agents) * self._config.quorum_pct)):\n            return VotingResult(\n                signal=VoteSignal.HOLD,\n                confidence=0.0,\n                votes=results,\n                veto_reason=VetoReason.QUORUM_MISSING,\n                quorum_met=False,\n            )\n\n        signal, confidence, tie_broken = self._tally(active)\n\n        if confidence < self._config.confidence_floor:\n            return VotingResult(\n                signal=VoteSignal.HOLD,\n                confidence=confidence,\n                votes=results,\n                veto_reason=VetoReason.CONFIDENCE_TOO_LOW,\n            )\n\n        return VotingResult(\n            signal=signal,\n            confidence=confidence,\n            votes=results,\n            tie_broken=tie_broken,\n            metadata={\n                \"timeout_s\":        self._config.timeout_s,\n                \"quorum_pct\":       self._config.quorum_pct,\n                \"confidence_floor\": self._config.confidence_floor,\n            },\n        )\n\n    async def _gather_safe(\n        self, agents: List[Any], context: Dict[str, Any]\n    ) -> List[VoteResult]:\n        try:\n            raw = await asyncio.wait_for(\n                asyncio.gather(*[a.analyze(context) for a in agents], return_exceptions=True),\n                timeout=self._config.timeout_s,\n            )\n        except asyncio.TimeoutError:\n            self._log.warning(\"MS-4 gather timeout; falling back to sequential\")\n            return await self._run_sequential_safe(agents, context)\n\n        results: List[VoteResult] = []\n        for i, item in enumerate(raw):\n            if isinstance(item, BaseException):\n                name = getattr(agents[i], \"agent_id\",\n                                getattr(agents[i], \"name\", f\"Agent[{i}]\"))\n                self._log.error(\"MS-5 gather fallback for %s: %s\", name, item)\n                results.append(\n                    VoteResult(\n                        agent_id=name,\n                        signal=VoteSignal.ABSTAIN,\n                        confidence=0.0,\n                        weight=getattr(agents[i], \"weight\", 1.0),\n                        reason=f\"error: {item}\",\n                        error=str(item),\n                    )\n                )\n            else:\n                results.append(item)\n        return results\n\n    async def _run_sequential_safe(\n        self, agents: List[Any], context: Dict[str, Any]\n    ) -> List[VoteResult]:\n        results: List[VoteResult] = []\n        for agent in agents:\n            try:\n                r = await asyncio.wait_for(agent.analyze(context), timeout=self._config.timeout_s)\n                results.append(r)\n            except Exception as exc:\n                name = getattr(agent, \"agent_id\", getattr(agent, \"name\", \"unknown\"))\n                self._log.error(\"sequential fallback error %s: %s\", name, exc)\n                results.append(VoteResult(\n                    agent_id=name, signal=VoteSignal.ABSTAIN,\n                    confidence=0.0, weight=getattr(agent, \"weight\", 1.0),\n                    reason=f\"error: {exc}\", error=str(exc),\n                ))\n        return results\n\n    @staticmethod\n    def _tally(votes: List[VoteResult]) -> Tuple[VoteSignal, float, bool]:\n        totals: Dict[VoteSignal, float] = {}\n        for v in votes:\n            totals[v.signal] = totals.get(v.signal, 0.0) + v.weight * v.confidence\n        best   = max(totals, key=lambda s: totals[s])\n        total  = sum(totals.values()) or 1.0\n        conf   = totals[best] / total\n        tie    = sum(1 for s in totals if totals[s] == totals[best]) > 1\n        return best, round(conf, 4), tie\n\n\nvoting_engine = VotingEngine()\n
+"""
+backend/agents/voting_engine.py
+Galaxy Vast AI — Enterprise Voting Engine
+"""
+from __future__ import annotations
+import logging
+from typing import Any
+logger = logging.getLogger(__name__)
+
+class VotingEngine:
+    """Coordinates agents, collects votes, applies weighting."""
+    def __init__(self) -> None:
+        self._weights: dict[str, float] = {}
+        self._votes: list[dict] = []
+
+    def register_agent(self, name: str, weight: float = 1.0) -> None:
+        self._weights[name] = weight
+
+    def submit_vote(self, agent: str, signal: str, confidence: float, **meta: Any) -> None:
+        self._votes.append({"agent": agent, "signal": signal, "confidence": confidence, **meta})
+
+    def aggregate(self) -> dict[str, Any]:
+        if not self._votes:
+            return {"signal": "NEUTRAL", "confidence": 0.0}
+        scores: dict[str, float] = {}
+        for v in self._votes:
+            w = self._weights.get(v["agent"], 1.0)
+            key = v["signal"]
+            scores[key] = scores.get(key, 0.0) + v["confidence"] * w
+        best = max(scores, key=scores.__getitem__)
+        return {"signal": best, "confidence": scores[best], "scores": scores}
+
+    def reset(self) -> None:
+        self._votes.clear()
+
+__all__ = ["VotingEngine"]

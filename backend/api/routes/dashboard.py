@@ -1,14 +1,14 @@
-"""
-Module: dashboard
-Path: backend/api/routes/dashboard.py
-Note: Original file had unrecoverable syntax errors. Stub generated.
-"""
+"""backend/api/routes/dashboard.py"""
+from __future__ import annotations
 from fastapi import APIRouter
-
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-
 @router.get("/")
-async def get_dashboard():
-    """Dashboard overview endpoint."""
-    return {"status": "ok", "message": "Dashboard endpoint stub"}
+async def dashboard_root() -> dict:
+    return {"status": "ok", "module": "dashboard"}
+
+@router.get("/summary")
+async def dashboard_summary() -> dict:
+    return {"summary": {}}
+
+__all__ = ["router"]

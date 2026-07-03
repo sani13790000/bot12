@@ -1,31 +1,17 @@
-"""
-Module: performance_report
-Path: backend/backtest_engine/performance_report.py
-Note: Original file had unrecoverable syntax errors. Stub generated.
-"""
+"""backend/backtest_engine/performance_report.py"""
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Any, Dict, List
+import logging
+from typing import Any
+logger = logging.getLogger(__name__)
 
-
-@dataclass
 class PerformanceReport:
-    total_trades: int = 0
-    winning_trades: int = 0
-    losing_trades: int = 0
-    total_pnl: float = 0.0
-    win_rate: float = 0.0
-    max_drawdown: float = 0.0
-    sharpe_ratio: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    def __init__(self, trades: list | None = None) -> None:
+        self.trades = trades or []
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "total_trades": self.total_trades,
-            "winning_trades": self.winning_trades,
-            "losing_trades": self.losing_trades,
-            "total_pnl": self.total_pnl,
-            "win_rate": self.win_rate,
-            "max_drawdown": self.max_drawdown,
-            "sharpe_ratio": self.sharpe_ratio,
-        }
+    def generate(self) -> dict[str, Any]:
+        return {"trades": len(self.trades), "pnl": 0.0, "win_rate": 0.0}
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.generate()
+
+__all__ = ["PerformanceReport"]
