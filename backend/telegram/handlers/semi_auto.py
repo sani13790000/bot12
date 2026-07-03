@@ -1,7 +1,7 @@
 """
 backend/telegram/handlers/semi_auto.py
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Semi-automatic trading handlers.
 
 In semi-auto mode the bot surfaces a trade signal to the operator who
@@ -16,26 +16,29 @@ Flow
 
 Commands
 --------
-/semiauto on|off   — enable / disable semi-auto mode
-/pending           — list pending approval signals
+/semiauto on|off   – enable / disable semi-auto mode
+/pending           – list pending approval signals
 """
 from __future__ import annotations
 
 import logging
-from typing import Optional
+
+from aiogram import F, Router, types
+from aiogram.filters import Command
 
 logger = logging.getLogger(__name__)
+router = Router()
 
-# In-memory store: signal_id → signal dict (production: use Redis/DB)
+# In-memory store: signal_id → signal dict
+# Production: replace with Redis or DB-backed store
 _pending_signals: dict[str, dict] = {}
-
-
-# ── Semi-auto mode toggle ─────────────────────────────────────────────── #
-
 _semi_auto_enabled: bool = False
 
 
-async def cmd_semiauto(update: object, context: object) -> None:
+# ── Semi-auto mode toggle ───────────────────────────────────────────── #
+
+@router.message(Command("semiauto"))
+async def cmd_semiauto(message: types.Message) -> None:
     """
     /semiauto [on|off]
 
@@ -43,40 +46,35 @@ async def cmd_semiauto(update: object, context: object) -> None:
     """
     global _semi_auto_enabled  # noqa: PLW0603
     try:
-        from telegram import Update
-        from telegram.ext import ContextTypes
-        upd: Update = update  # type: ignore
-        ctx: ContextTypes.DEFAULT_TYPE = context  # type: ignore
-
-        args = ctx.args or []
+        args = (message.text or "").split()[1:]
         arg  = args[0].lower() if args else ""
 
         if arg == "on":
             _semi_auto_enabled = True
-            await upd.message.reply_text(
+            await message.answer(
                 "✅ حالت نیمه‌خودکار *فعال* شد.\n"
-                "سیگنال‌ها برای تأیید ارسال خواهند شد.",
+                "سیگنال‌ها برای تأیید ارسال می‌شوند.",
                 parse_mode="Markdown",
             )
         elif arg == "off":
             _semi_auto_enabled = False
-            await upd.message.reply_text(
+            await message.answer(
                 "❌ حالت نیمه‌خودکار *غیرفعال* شد.",
                 parse_mode="Markdown",
             )
         else:
             state = "✅ فعال" if _semi_auto_enabled else "❌ غیرفعال"
-            await upd.message.reply_text(
-                f"🤖 نیمه‌خودکار: {state}\n"
+            await message.answer(
+                f"🤖 حالت نیمه‌خودکار: {state}\n"
                 "*استفاده:* `/semiauto on` | `/semiauto off`",
                 parse_mode="Markdown",
             )
-
     except Exception as exc:
         logger.exception("[semi_auto] cmd_semiauto: %s", exc)
 
 
-async def cmd_pending(update: object, context: object) -> None:
+@router.message(Command("pending"))
+async def cmd_pending(message: types.Message) -> None:
     """
     /pending
 
@@ -84,10 +82,13 @@ async def cmd_pending(update: object, context: object) -> None:
     """
     try:
         if not _pending_signals:
-            await update.message.reply_text("✅ هیچ سیگنالی در انتظار تأیید نیست.")  # type: ignore
+            await message.answer("✅ هیچ سیگنالی در انتظار تأیید نیست.")
             return
 
-        lines = [f"⏳ *سیگنال‌های منتظر* ({len(_pending_signals)})", ""]
+        lines = [
+            f"⏳ *سیگنال‌های منتظر تأیید* ({len(_pending_signals)})",
+            "",
+        ]
         for sig_id, sig in list(_pending_signals.items())[:10]:
             symbol    = sig.get("symbol", "?")
             direction = sig.get("direction", "?")
@@ -96,16 +97,13 @@ async def cmd_pending(update: object, context: object) -> None:
                 f"• `{sig_id[:8]}` — *{symbol}* {direction} `{conf:.0f}%`"
             )
 
-        await update.message.reply_text(  # type: ignore
-            "\n".join(lines), parse_mode="Markdown"
-        )
+        await message.answer("\n".join(lines), parse_mode="Markdown")
 
     except Exception as exc:
         logger.exception("[semi_auto] cmd_pending: %s", exc)
 
 
-# ── Signal push (called by the signal dispatcher) ─────────────────────── #
-
+# ── Signal push (called by the signal dispatcher) ───────────────── #
 
 async def push_signal_for_approval(
     bot: object,
@@ -121,7 +119,7 @@ async def push_signal_for_approval(
         sl_price (optional), tp_price (optional)
     """
     try:
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
         _pending_signals[signal_id] = signal
 
@@ -138,18 +136,18 @@ async def push_signal_for_approval(
             f"🎯 اطمینان: `{conf:.0f}%`",
         ]
         if entry:
-            lines.append(f"📍 ورود: `{entry:.5f}`")
+            lines.append(f"🔑 ورودی: `{entry:.5f}`")
         if sl:
-            lines.append(f"🛡️ SL: `{sl:.5f}`")
+            lines.append(f"🛑️ SL: `{sl:.5f}`")
         if tp:
             lines.append(f"🏁 TP: `{tp:.5f}`")
 
-        keyboard = InlineKeyboardMarkup([[
+        keyboard = InlineKeyboardMarkup([[  # type: ignore[call-arg]
             InlineKeyboardButton("✅ تأیید", callback_data=f"approve:{signal_id}"),
-            InlineKeyboardButton("❌ رد", callback_data=f"reject:{signal_id}"),
+            InlineKeyboardButton("❌ رد",   callback_data=f"reject:{signal_id}"),
         ]])
 
-        await bot.send_message(  # type: ignore
+        await bot.send_message(  # type: ignore[attr-defined]
             chat_id=chat_id,
             text="\n".join(lines),
             parse_mode="Markdown",
@@ -160,19 +158,16 @@ async def push_signal_for_approval(
         logger.warning("[semi_auto] push_signal_for_approval failed: %s", exc)
 
 
-# ── Inline keyboard callback ─────────────────────────────────────────────── #
+# ── Inline keyboard callback ──────────────────────────────────────────────── #
 
-
-async def callback_signal_decision(update: object, context: object) -> None:
+@router.callback_query(F.data.startswith("approve:") | F.data.startswith("reject:"))
+async def callback_signal_decision(query: types.CallbackQuery) -> None:
     """
     Handle [Approve] / [Reject] button presses.
 
     Callback data format: ``approve:<signal_id>`` or ``reject:<signal_id>``.
     """
     try:
-        from telegram import Update
-        upd: Update = update  # type: ignore
-        query = upd.callback_query
         await query.answer()
 
         data = (query.data or "").strip()
@@ -183,7 +178,9 @@ async def callback_signal_decision(update: object, context: object) -> None:
         signal = _pending_signals.pop(signal_id, None)
 
         if signal is None:
-            await query.edit_message_text("⚠️ سیگنال یافت نشد (شاید منقضی شده).")
+            await query.edit_message_text(
+                "⚠️ سیگنال یافت نشد (شاید منقضی شده)."
+            )
             return
 
         if action == "approve":
@@ -193,6 +190,7 @@ async def callback_signal_decision(update: object, context: object) -> None:
                 parse_mode="Markdown",
             )
         else:
+            logger.info("[semi_auto] signal %s rejected by operator", signal_id)
             await query.edit_message_text(
                 f"❌ سیگنال `{signal.get('symbol')}` رد شد.",
                 parse_mode="Markdown",
@@ -207,14 +205,14 @@ async def _execute_signal(signal: dict) -> None:
     try:
         from backend.execution.execution_service import TradeSignal, execution_service
         ts = TradeSignal(
-            symbol=signal.get("symbol", "EURUSD"),
-            direction=signal.get("direction", "BUY"),
-            volume=signal.get("volume", 0.01),
-            entry=signal.get("entry_price"),
-            sl=signal.get("sl_price"),
-            tp=signal.get("tp_price"),
-            confidence=signal.get("confidence", 0.0),
-            strategy="semi_auto",
+            symbol     = signal.get("symbol", "EURUSD"),
+            direction  = signal.get("direction", "BUY"),
+            volume     = signal.get("volume", 0.01),
+            entry      = signal.get("entry_price"),
+            sl         = signal.get("sl_price"),
+            tp         = signal.get("tp_price"),
+            confidence = signal.get("confidence", 0.0),
+            strategy   = "semi_auto",
         )
         result = await execution_service.execute(ts)
         if not result.success:
