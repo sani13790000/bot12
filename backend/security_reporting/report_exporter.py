@@ -1,57 +1,117 @@
 """
 backend/security_reporting/report_exporter.py
-Phase-6 -- Security Report Exporter
+Galaxy Vast AI — Security Report Exporter
+
+Exports security reports in multiple formats:
+- JSON (raw)
+- CSV (summary)
+- PDF (via reportlab if available, else text fallback)
 """
 from __future__ import annotations
 
 import csv
 import io
 import json
+import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
-class ReportExporter:
-    """Export security reports to JSON, CSV, and HTML formats."""
+class SecurityReportExporter:
+    """
+    Exports security reports in JSON, CSV, or PDF format.
+    """
 
-    @staticmethod
-    def to_json(report: dict) -> str:
-        """Serialize report to JSON string."""
-        return json.dumps(report, indent=2, ensure_ascii=False, default=str)
+    # ------------------------------------------------------------------ #
+    # JSON
+    # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def to_csv(report: dict) -> str:
-        """Serialize report findings to CSV."""
-        findings = report.get("findings", [])
-        if not findings:
-            return "severity,title,description\n"
-        output = io.StringIO()
+    def to_json(
+        self,
+        report:  Dict[str, Any],
+        indent:  int  = 2,
+        pretty:  bool = True,
+    ) -> str:
+        """Serialise report to JSON string."""
+        return json.dumps(report, indent=indent if pretty else None, default=str)
+
+    # ------------------------------------------------------------------ #
+    # CSV
+    # ------------------------------------------------------------------ #
+
+    def to_csv(
+        self,
+        events:  List[Dict[str, Any]],
+        fields:  Optional[List[str]] = None,
+    ) -> str:
+        """
+        Export a list of security events to CSV.
+
+        Args:
+            events: List of event dicts.
+            fields: Column names to include; auto-detected if None.
+        """
+        if not events:
+            return ""
+
+        columns = fields or sorted(
+            {k for event in events for k in event}
+        )
+
+        buf = io.StringIO()
         writer = csv.DictWriter(
-            output,
-            fieldnames=["severity", "title", "description"],
+            buf,
+            fieldnames=columns,
             extrasaction="ignore",
+            lineterminator="\n",
         )
         writer.writeheader()
-        writer.writerows(findings)
-        return output.getvalue()
+        for event in events:
+            writer.writerow({k: event.get(k, "") for k in columns})
+        return buf.getvalue()
 
-    @staticmethod
-    def to_html(report: dict) -> str:
-        """Serialize report to a minimal HTML page."""
-        timestamp = report.get("timestamp", datetime.now(timezone.utc).isoformat())
-        findings  = report.get("findings", [])
-        rows = "".join(
-            f"<tr><td>{f.get('severity','')}</td>"
-            f"<td>{f.get('title','')}</td>"
-            f"<td>{f.get('description','')}</td></tr>"
-            for f in findings
-        )
-        return (
-            "<!DOCTYPE html><html><head><title>Security Report</title></head><body>"
-            f"<h1>Security Report</h1><p>Generated: {timestamp}</p>"
-            "<table border='1'><tr><th>Severity</th><th>Title</th><th>Description</th></tr>"
-            f"{rows}</table></body></html>"
-        )
+    # ------------------------------------------------------------------ #
+    # PDF (reportlab) with text fallback
+    # ------------------------------------------------------------------ #
+
+    def to_pdf(self, report: Dict[str, Any], title: str = "Security Report") -> bytes:
+        """
+        Export report as PDF.
+        Falls back to UTF-8 text if reportlab is not installed.
+        """
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+
+            buf     = io.BytesIO()
+            doc     = SimpleDocTemplate(buf, pagesize=A4)
+            styles  = getSampleStyleSheet()
+            story   = [
+                Paragraph(title, styles["Title"]),
+                Spacer(1, 12),
+                Paragraph(
+                    f"Generated: {datetime.now(timezone.utc).isoformat()}",
+                    styles["Normal"],
+                ),
+                Spacer(1, 12),
+                Paragraph(
+                    json.dumps(report, indent=2, default=str).replace("\n", "<br/>"),
+                    styles["Code"],
+                ),
+            ]
+            doc.build(story)
+            return buf.getvalue()
+
+        except ImportError:
+            logger.warning("[ReportExporter] reportlab not installed; falling back to text PDF")
+            text = f"{title}\n{'=' * len(title)}\n"
+            text += f"Generated: {datetime.now(timezone.utc).isoformat()}\n\n"
+            text += json.dumps(report, indent=2, default=str)
+            return text.encode("utf-8")
 
 
-report_exporter = ReportExporter()
+# Module-level singleton
+report_exporter = SecurityReportExporter()

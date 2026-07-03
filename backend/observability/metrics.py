@@ -1,158 +1,155 @@
 """
 backend/observability/metrics.py
-Galaxy Vast AI Trading Platform — Enterprise Metrics Registry
+Galaxy Vast AI — Business & Technical Metrics
 
-All metrics are stored in-memory (always) and optionally pushed to Prometheus.
-Prometheus is optional — all prometheus failures are logged once at DEBUG.
+P13-OBS-1: Prometheus counters/gauges/histograms for SaaS KPIs
+P13-OBS-2: Trade execution metrics
+P13-OBS-3: System health metrics
+P13-OBS-4: Lazy initialisation — no crash if prometheus_client not installed
 """
 from __future__ import annotations
 
 import logging
-import time
-from collections import deque
-from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, Optional
+from typing import Optional
 
-_LOG = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-
-@dataclass
-class _HistogramData:
-    """Rolling histogram (last 1000 observations)."""
-    _window: Deque[float] = field(default_factory=lambda: deque(maxlen=1000))
-
-    def observe(self, value: float) -> None:
-        self._window.append(value)
-
-    def snapshot(self) -> Dict[str, Any]:
-        if not self._window:
-            return {'count': 0, 'min': 0.0, 'max': 0.0, 'mean': 0.0, 'p95': 0.0, 'p99': 0.0}
-        w = sorted(self._window)
-        n = len(w)
-        return {
-            'count': n,
-            'min':   round(w[0], 6),
-            'max':   round(w[-1], 6),
-            'mean':  round(sum(w) / n, 6),
-            'p95':   round(w[int(n * 0.95)], 6),
-            'p99':   round(w[int(n * 0.99)], 6),
-        }
+# Try to import Prometheus; degrade gracefully if not installed
+try:
+    from prometheus_client import Counter, Gauge, Histogram, Summary
+    _PROM_AVAILABLE = True
+except ImportError:
+    _PROM_AVAILABLE = False
+    logger.warning("[Metrics] prometheus_client not installed — metrics disabled")
 
 
-class MetricsRegistry:
-    """Thread-safe in-memory metrics registry with optional Prometheus export."""
+# --------------------------------------------------------------------------- #
+# Metric definitions (lazy: only created if Prometheus is available)
+# --------------------------------------------------------------------------- #
 
-    def __init__(self) -> None:
-        self._counters:   Dict[str, float] = {}
-        self._gauges:     Dict[str, float] = {}
-        self._histograms: Dict[str, _HistogramData] = {}
-        self._started_at: float = time.time()
-        self._prom:        bool  = False
-        self._prom_warned: bool = False  # log Prometheus failures only once
-        self._pc_trades_submitted = self._pc_trades_filled = None
-        self._pc_trades_rejected  = self._pc_retries = None
-        self._pc_dead_letter      = self._pc_risk_blocks = None
-        self._ph_fill_latency     = self._ph_risk_latency = None
-        self._pg_lot_size         = self._pg_open_positions = self._pg_equity = None
-        try:
-            from prometheus_client import Counter, Gauge, Histogram
-            self._pc_trades_submitted = Counter('trades_submitted_total',  'Trades submitted',  ['symbol', 'direction'])
-            self._pc_trades_filled    = Counter('trades_filled_total',      'Trades filled',     ['symbol', 'direction'])
-            self._pc_trades_rejected  = Counter('trades_rejected_total',   'Trades rejected',   ['symbol', 'reason'])
-            self._pc_retries          = Counter('order_retries_total',     'Order retries',     ['symbol'])
-            self._pc_dead_letter      = Counter('dead_letter_total',       'Dead-letter orders',['symbol'])
-            self._pc_risk_blocks      = Counter('risk_blocks_total',       'Risk gate blocks',  ['gate', 'reason'])
-            self._ph_fill_latency     = Histogram('fill_latency_seconds',  'Fill latency',      ['symbol', 'direction'], buckets=[.01,.05,.1,.25,.5,1,2,5])
-            self._ph_risk_latency     = Histogram('risk_latency_seconds',  'Risk gate latency', ['gate'],                buckets=[.001,.005,.01,.05,.1,.25,.5])
-            self._pg_lot_size         = Gauge('lot_size',                  'Current lot size',  ['symbol'])
-            self._pg_open_positions   = Gauge('open_positions',            'Open positions count')
-            self._pg_equity           = Gauge('account_equity',            'Account equity USD')
-            self._prom = True
-        except Exception as _e:  # noqa: BLE001 — prometheus_client optional
-            _LOG.debug('Prometheus not available: %s', _e)
+if _PROM_AVAILABLE:
+    # --- Trades ---
+    TRADE_EXECUTED = Counter(
+        "galaxy_trades_executed_total",
+        "Total trades executed",
+        ["symbol", "direction", "strategy"],
+    )
+    TRADE_PNL = Histogram(
+        "galaxy_trade_pnl_usd",
+        "Trade P&L in USD",
+        ["symbol", "direction"],
+        buckets=[-500, -100, -50, -10, 0, 10, 50, 100, 500, 1000],
+    )
+    TRADE_DURATION = Histogram(
+        "galaxy_trade_duration_seconds",
+        "Trade open duration in seconds",
+        ["symbol"],
+        buckets=[60, 300, 900, 3600, 14400, 86400],
+    )
+    OPEN_POSITIONS = Gauge(
+        "galaxy_open_positions",
+        "Number of currently open positions",
+        ["symbol"],
+    )
 
-    def _prom_log_once(self, exc: Exception) -> None:
-        """Log Prometheus metric failure once at DEBUG to avoid log spam."""
-        if not self._prom_warned:
-            _LOG.debug('prometheus metric update failed (will silence further): %s', exc)
-            self._prom_warned = True
+    # --- Signals ---
+    SIGNAL_GENERATED = Counter(
+        "galaxy_signals_generated_total",
+        "Total trading signals generated",
+        ["symbol", "signal_type"],
+    )
+    SIGNAL_APPROVED = Counter(
+        "galaxy_signals_approved_total",
+        "Signals approved by voting engine",
+        ["symbol"],
+    )
+    SIGNAL_REJECTED = Counter(
+        "galaxy_signals_rejected_total",
+        "Signals rejected by voting engine or risk manager",
+        ["symbol", "reason"],
+    )
 
-    def increment(self, name: str, value: float = 1.0) -> None:
-        self._counters[name] = self._counters.get(name, 0.0) + value
+    # --- Risk ---
+    DAILY_DRAWDOWN = Gauge(
+        "galaxy_daily_drawdown_pct",
+        "Current daily drawdown percentage",
+        ["account"],
+    )
+    KILL_SWITCH_ACTIVE = Gauge(
+        "galaxy_kill_switch_active",
+        "1 if kill switch is active, 0 otherwise",
+    )
 
-    def gauge(self, name: str, value: float) -> None:
-        self._gauges[name] = value
+    # --- API ---
+    HTTP_REQUEST_DURATION = Histogram(
+        "galaxy_http_request_duration_seconds",
+        "HTTP request processing time",
+        ["method", "endpoint", "status"],
+        buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+    )
+    HTTP_REQUESTS_TOTAL = Counter(
+        "galaxy_http_requests_total",
+        "Total HTTP requests",
+        ["method", "endpoint", "status"],
+    )
 
-    def histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
-        if name not in self._histograms: self._histograms[name] = _HistogramData()
-        self._histograms[name].observe(value)
+    # --- System ---
+    ACTIVE_USERS = Gauge("galaxy_active_users", "Currently active users")
+    LICENSE_VALID = Gauge(
+        "galaxy_license_valid",
+        "1 if license is valid, 0 otherwise",
+        ["user_id"],
+    )
 
-    def trade_submitted(self, symbol: str, direction: str) -> None:
-        self.increment('trades_submitted')
-        if self._prom:
-            try: self._pc_trades_submitted.labels(symbol=symbol, direction=direction).inc()
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
+else:
+    # Dummy objects so callers don't need try/except
+    class _Noop:
+        def labels(self, **_): return self
+        def inc(self, *a, **k): pass
+        def dec(self, *a, **k): pass
+        def set(self, *a, **k): pass
+        def observe(self, *a, **k): pass
+        def time(self):          return self
+        def __enter__(self):     return self
+        def __exit__(self, *a):  pass
 
-    def trade_filled(self, symbol: str, direction: str, fill_latency_s: float) -> None:
-        self.increment('trades_filled'); self.histogram('fill_latency_s', fill_latency_s)
-        if self._prom:
-            try: self._pc_trades_filled.labels(symbol=symbol, direction=direction).inc(); self._ph_fill_latency.observe(fill_latency_s)
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def trade_rejected(self, symbol: str, reason: str) -> None:
-        self.increment('trades_rejected')
-        if self._prom:
-            try: self._pc_trades_rejected.labels(symbol=symbol, reason=reason).inc()
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def order_retry(self, symbol: str) -> None:
-        self.increment('order_retries')
-        if self._prom:
-            try: self._pc_retries.labels(symbol=symbol).inc()
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def dead_letter(self, symbol: str) -> None:
-        self.increment('dead_letter')
-        if self._prom:
-            try: self._pc_dead_letter.labels(symbol=symbol).inc()
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def risk_block(self, gate: str, reason: str) -> None:
-        self.increment(f'risk_blocks.{gate}')
-        if self._prom:
-            try: self._pc_risk_blocks.labels(gate=gate, reason=reason).inc()
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def risk_latency(self, gate: str, latency_s: float) -> None:
-        self.histogram(f'risk_latency_s.{gate}', latency_s)
-        if self._prom:
-            try: self._ph_risk_latency.labels(gate=gate).observe(latency_s)
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def set_lot_size(self, symbol: str, lot_size: float) -> None:
-        self.gauge(f'lot_size.{symbol}', lot_size)
-        if self._prom:
-            try: self._pg_lot_size.labels(symbol=symbol).set(lot_size)
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def set_open_positions(self, count: int) -> None:
-        self.gauge('open_positions', float(count))
-        if self._prom:
-            try: self._pg_open_positions.set(count)
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def set_equity(self, equity: float) -> None:
-        self.gauge('account_equity', equity)
-        if self._prom:
-            try: self._pg_equity.set(equity)
-            except Exception as _pe: self._prom_log_once(_pe)  # noqa: BLE001
-
-    def snapshot(self) -> Dict[str, Any]:
-        return {'uptime_s': round(time.time() - self._started_at, 1), 'counters': dict(self._counters), 'gauges': dict(self._gauges), 'histograms': {k: v.snapshot() for k, v in self._histograms.items()}, 'prometheus': self._prom}
-
-    async def health(self) -> Dict[str, Any]:
-        snap = self.snapshot()
-        return {'status': 'ok', 'uptime_s': snap['uptime_s'], 'trades_submitted': self._counters.get('trades_submitted', 0), 'trades_filled': self._counters.get('trades_filled', 0), 'trades_rejected': self._counters.get('trades_rejected', 0), 'order_retries': self._counters.get('order_retries', 0), 'dead_letter': self._counters.get('dead_letter', 0), 'prometheus': self._prom}
+    _noop = _Noop()
+    TRADE_EXECUTED     = _noop
+    TRADE_PNL          = _noop
+    TRADE_DURATION     = _noop
+    OPEN_POSITIONS     = _noop
+    SIGNAL_GENERATED   = _noop
+    SIGNAL_APPROVED    = _noop
+    SIGNAL_REJECTED    = _noop
+    DAILY_DRAWDOWN     = _noop
+    KILL_SWITCH_ACTIVE = _noop
+    HTTP_REQUEST_DURATION = _noop
+    HTTP_REQUESTS_TOTAL   = _noop
+    ACTIVE_USERS       = _noop
+    LICENSE_VALID      = _noop
 
 
-metrics_registry = MetricsRegistry()
+# --------------------------------------------------------------------------- #
+# Helper functions
+# --------------------------------------------------------------------------- #
+
+def record_trade(
+    symbol:    str,
+    direction: str,
+    strategy:  str,
+    pnl_usd:   float,
+    duration_s: float,
+) -> None:
+    """Record a completed trade in all relevant metrics."""
+    TRADE_EXECUTED.labels(symbol=symbol, direction=direction, strategy=strategy).inc()
+    TRADE_PNL.labels(symbol=symbol, direction=direction).observe(pnl_usd)
+    TRADE_DURATION.labels(symbol=symbol).observe(duration_s)
+
+
+def record_signal(symbol: str, signal_type: str, approved: bool, reason: str = "") -> None:
+    """Record a generated signal outcome."""
+    SIGNAL_GENERATED.labels(symbol=symbol, signal_type=signal_type).inc()
+    if approved:
+        SIGNAL_APPROVED.labels(symbol=symbol).inc()
+    else:
+        SIGNAL_REJECTED.labels(symbol=symbol, reason=reason[:32]).inc()
