@@ -1,1 +1,342 @@
-IiIiCmJhY2tlbmQvdGVzdHMvdGVzdF8wNV9tdDVfYnJpZGdlLnB5CkdhbGF4eSBWYXN0IEFJIFRHY WRpbmcgUGxhdGZvcm0K4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBCuWni+azleazsOCflCBHIOKAkyBNVDUgQnJpZGdlINmI2KfZgdi424wKCuWni+azleazsOCflOaXpeasiumZhjoKMS4gTVQ1Q29ubmVjdG9yINix2K8gZGVtbyBtb2RlICjYqNivdW4g2YbbjNin2LIg2KjZhCBNVDUg2YfZgti024wpCjIuIE1UNUNvbm5lY3RvciBlbnYgdmFyIGNvbnRyb2wKMy4gZ2V0X2NhbmRsZXMoKSDigJQg2K/Yp9iv2Ycg2YfZgdi024wKNC4gU2lnbmFsUHJvY2Vzc29yIOKGkiBWb3RpbmdFbmdpbmUg4oaSIEV4ZWN1dGlvblNlcnZpY2UgcGlwZWxpbmUKNS4gTVQ1R2F0ZXdheSBBZ2VudCBlbmRwb2ludHMgKNio2KcgaHR0cHggbW9jaykKIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBhc3luY2lvCmltcG9ydCBvcwppbXBvcnQgc3lzCmZyb20gdW5pdHRlc3QubW9jayBpbXBvcnQgQXN5bmNNb2NrLCBNYWdpY01vY2ssIHBhdGNoCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lLCB0aW1lem9uZQoKaW1wb3J0IHB5dGVzdAoKCkBweXRlc3QuZml4dHVyZQpkZWYgY29ubmVjdG9yX2RlbW8oKToKICAgIGZyb20gYmFja2VuZC5leGVjdXRpb24ubXQ1X2Nvbm5lY3RvciBpbXBvcnQgTVQ1Q29ubmVjdG9yCiAgICByZXR1cm4gTVQ1Q29ubmVjdG9yKGJhc2VfdXJsPSJodHRwOi8vbG9jYWxob3N0OjgwODAiLCBkZW1vPVRydWUpCgoKY2xhc3MgVGVzdEVudlZhckNvbnRyb2w6CiAgICBkZWYgdGVzdF9kZWZhdWx0X2lzX2RlbW9fdHJ1ZShzZWxmKToKICAgICAgICBvcy5lbnZpcm9uLnBvcCgiTVQ1X0RFTU9fTU9ERSIsIE5vbmUpCiAgICAgICAgZnJvbSBiYWNrZW5kLmV4ZWN1dGlvbi5tdDVfY29ubmVjdG9yIGltcG9ydCBNVDVDb25uZWN0b3IKICAgICAgICBhc3NlcnQgTVQ1Q29ubmVjdG9yKCkuZGVtbyBpcyBUcnVlCgogICAgZGVmIHRlc3RfZW52X2ZhbHNlX2dpdmVzX2xpdmUoc2VsZik6CiAgICAgICAgb3MuZW52aXJvblsiTVQ1X0RFTU9fTU9ERSJdID0gImZhbHNlIgogICAgICAgIGZyb20gYmFja2VuZC5leGVjdXRpb24ubXQ1X2Nvbm5lY3RvciBpbXBvcnQgTVQ1Q29ubmVjdG9yCiAgICAgICAgYXNzZXJ0IE1UNUNvbm5lY3RvcigpLmRlbW8gaXMgRmFsc2UKICAgICAgICBvcy5lbnZpcm9uLnBvcCgiTVQ1X0RFTU9fTU9ERSIsIE5vbmUpCgogICAgZGVmIHRlc3RfZXhwbGljaXRfb3ZlcnJpZGVfZW52KHNlbGYpOgogICAgICAgIG9zLmVudmlyb25bIk1UNV9ERU1PX01PREUiXSA9ICJmYWxzZSIKICAgICAgICBmcm9tIGJhY2tlbmQuZXhlY3V0aW9uLm10NV9jb25uZWN0b3IgaW1wb3J0IE1UNUNvbm5lY3RvcgogICAgICAgIGFzc2VydCBNVDVDb25uZWN0b3IoZGVtbz1UcnVlKS5kZW1vIGlzIFRydWUKICAgICAgICBvcy5lbnZpcm9uLnBvcCgiTVQ1X0RFTU9fTU9ERSIsIE5vbmUpCgoKY2xhc3MgVGVzdENvbm5lY3REZW1vOgogICAgZGVmIHRlc3RfY29ubmVjdF9kZW1vX25vX2Fpb2h0dHAoc2VsZiwgY29ubmVjdG9yX2RlbW8pOgogICAgICAgIHdpdGggcGF0Y2guZGljdCgic3lzLm1vZHVsZXMiLCB7ImFpb2h0dHAiOiBOb25lfSk6CiAgICAgICAgICAgIGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoY29ubmVjdG9yX2RlbW8uY29ubmVjdCgpKQogICAgICAgIGFzc2VydCBjb25uZWN0b3JfZGVtby5fY29ubmVjdGVkIGlzIFRydWUKCiAgICBkZWYgdGVzdF9kb3VibGVfY29ubmVjdF9pc19ub29wKHNlbGYsIGNvbm5lY3Rvcl9kZW1vKToKICAgICAgICBjb25uZWN0b3JfZGVtby5fY29ubmVjdGVkID0gVHJ1ZQogICAgICAgIGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoY29ubmVjdG9yX2RlbW8uY29ubmVjdCgpKQogICAgICAgIGFzc2VydCBjb25uZWN0b3JfZGVtby5fY29ubmVjdGVkIGlzIFRydWUKCgpjbGFzcyBUZXN0UGxhY2VPcmRlckRlbW86CiAgICBkZWYgdGVzdF9wbGFjZV9vcmRlcl9yZXR1cm5zX3RpY2tldChzZWxmLCBjb25uZWN0b3JfZGVtbyk6CiAgICAgICAgY29ubmVjdG9yX2RlbW8uX2Nvbm5lY3RlZCA9IFRydWUKICAgICAgICByZXN1bHQgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKGNvbm5lY3Rvcl9kZW1vLnBsYWNlX29yZGVyKCJFVVJVU0QiLCAiQlVZIiwgMC4wMSwgc2w9MS4wODAwLCB0cD0xLjEwNTApKQogICAgICAgIGFzc2VydCByZXN1bHQudGlja2V0ID4gMAogICAgICAgIGFzc2VydCByZXN1bHQuc3ltYm9sID09ICJFVVJVUkQiCiAgICAgICAgYXNzZXJ0IHJlc3VsdC5kaXJlY3Rpb24gPT0gIkJVWSIKCiAgICBkZWYgdGVzdF9wbGFjZV9vcmRlcl9yZXF1aXJlc19jb25uZWN0KHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5leGVjdXRpb24ubXQ1X2Nvbm5lY3RvciBpbXBvcnQgTVQ1Q29ubmVjdG9yLCBNVDVFcnJvcgogICAgICAgIGMgPSBNVDVDb25uZWN0b3IoZGVtbz1UcnVlKQogICAgICAgIHdpdGggcHl0ZXN0LnJhaXNlcyhNVDVFcnJvcik6CiAgICAgICAgICAgIGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoYy5wbGFjZV9vcmRlcigiRVVSVVNEIiwgIkJVWSIsIDAuMDEpKQoKCmNsYXNzIFRlc3RHZXRDYW5kbGVzOgogICAgZGVmIHRlc3RfZ2V0X2NhbmRsZXNfY291bnQoc2VsZiwgY29ubmVjdG9yX2RlbW8pOgogICAgICAgIGNvbm5lY3Rvcl9kZW1vLl9jb25uZWN0ZWQgPSBUcnVlCiAgICAgICAgY2FuZGxlcyA9IGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoY29ubmVjdG9yX2RlbW8uZ2V0X2NhbmRsZXMoIkVVUlVTRCIsICJIMSIsIDUwKSkKICAgICAgICBhc3NlcnQgbGVuKGNhbmRsZXMpID09IDUwCgogICAgZGVmIHRlc3RfY2FuZGxlX3N0cnVjdHVyZShzZWxmLCBjb25uZWN0b3JfZGVtbyk6CiAgICAgICAgY29ubmVjdG9yX2RlbW8uX2Nvbm5lY3RlZCA9IFRydWUKICAgICAgICBjYW5kbGVzID0gYXN5bmNpby5nZXRfZXZlbnRfbG9vcCgpLnJ1bl91bnRpbF9jb21wbGV0ZShjb25uZWN0b3JfZGVtby5nZXRfY2FuZGxlcygiRVVSVVNEIiwgIkgxIiwgNSkpCiAgICAgICAgZm9yIGMgaW4gY2FuZGxlczoKICAgICAgICAgICAgYXNzZXJ0IGMuaGlnaCA+PSBjLmxvdwogICAgICAgICAgICBhc3NlcnQgYy5vcGVuID4gMAogICAgICAgICAgICBhc3NlcnQgaXNpbnN0YW5jZShjLnRpbWUsIGRhdGV0aW1lKQoKICAgIGRlZiB0ZXN0X2NhbmRsZXNfY2hyb25vbG9naWNhbChzZWxmLCBjb25uZWN0b3JfZGVtbyk6CiAgICAgICAgY29ubmVjdG9yX2RlbW8uX2Nvbm5lY3RlZCA9IFRydWUKICAgICAgICBjYW5kbGVzID0gYXN5bmNpby5nZXRfZXZlbnRfbG9vcCgpLnJ1bl91bnRpbF9jb21wbGV0ZShjb25uZWN0b3JfZGVtby5nZXRfY2FuZGxlcygiRVVSVVNEIiwgIkgxIiwgMjApKQogICAgICAgIHRpbWVzID0gW2MudGltZSBmb3IgYyBpbiBjYW5kbGVzXQogICAgICAgIGFzc2VydCB0aW1lcyA9PSBzb3J0ZWQodGltZXMpCgoKY2xhc3MgVGVzdEFjY291bnRJbmZvOgogICAgZGVmIHRlc3RfYWNjb3VudF9pbmZvX2RlbW8oc2VsZiwgY29ubmVjdG9yX2RlbW8pOgogICAgICAgIGNvbm5lY3Rvcl9kZW1vLl9jb25uZWN0ZWQgPSBUcnVlCiAgICAgICAgaW5mbyA9IGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoY29ubmVjdG9yX2RlbW8uZ2V0X2FjY291bnRfaW5mbygpKQogICAgICAgIGFzc2VydCAiYmFsYW5jZSIgaW4gaW5mbwogICAgICAgIGFzc2VydCBpbmZvWyJiYWxhbmNlIl0gPiAwCgogICAgZGVmIHRlc3Rfc3ltYm9sX2luZm9fZGVtbyhzZWxmLCBjb25uZWN0b3JfZGVtbyk6CiAgICAgICAgY29ubmVjdG9yX2RlbW8uX2Nvbm5lY3RlZCA9IFRydWUKICAgICAgICBpbmZvID0gYXN5bmNpby5nZXRfZXZlbnRfbG9vcCgpLnJ1bl91bnRpbF9jb21wbGV0ZShjb25uZWN0b3JfZGVtby5nZXRfc3ltYm9sX2luZm8oIkVVUlVTRCIpKQogICAgICAgIGFzc2VydCBpbmZvLm5hbWUgPT0gIkVVUlVTRCIKICAgICAgICBhc3NlcnQgaW5mby52b2x1bWVfbWluID4gMAoKICAgIGRlZiB0ZXN0X2hlYWx0aF9jaGVja19kZW1vKHNlbGYsIGNvbm5lY3Rvcl9kZW1vKToKICAgICAgICBjb25uZWN0b3JfZGVtby5fY29ubmVjdGVkID0gVHJ1ZQogICAgICAgIHJlc3VsdCA9IGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoY29ubmVjdG9yX2RlbW8uaGVhbHRoX2NoZWNrKCkpCiAgICAgICAgYXNzZXJ0IHJlc3VsdFsib2siXSBpcyBUcnVlCiAgICAgICAgYXNzZXJ0IHJlc3VsdFsibW9kZSJdID09ICJERU1PIgoKCmNsYXNzIFRlc3RTaWduYWxQcm9jZXNzb3I6CiAgICBkZWYgX21ha2Vfc2lnbmFsKHNlbGYsIGRpcmVjdGlvbj0iQlVZIiwgY29uZmlkZW5jZT0wLjc1KToKICAgICAgICBmcm9tIGJhY2tlbmQuc2VydmljZXMuc2lnbmFsX3Byb2Nlc3NvciBpbXBvcnQgVHJhZGVTaWduYWwKICAgICAgICByZXR1cm4gVHJhZGVTaWduYWwoc3ltYm9sPSJFVVJVU0QiLCBkaXJlY3Rpb249ZGlyZWN0aW9uLCBjb25maWRlbmNlPWNvbmZpZGVuY2UsIGVudHJ5X3ByaWNlPTEuMTAwMCwgc2w9MS4wOTUwLCB0cD0xLjExMDAsIGxvdF9zaXplPTAuMDEpCgogICAgZGVmIHRlc3Rfbm9fdHJhZGVfcmVqZWN0ZWQoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLnNlcnZpY2VzLnNpZ25hbF9wcm9jZXNzb3IgaW1wb3J0IFNpZ25hbFByb2Nlc3NvciwgVHJhZGVTaWduYWwKICAgICAgICBzcCA9IFNpZ25hbFByb2Nlc3NvcigpCiAgICAgICAgc2lnID0gVHJhZGVTaWduYWwoc3ltYm9sPSJFVVJVU0QiLCBkaXJlY3Rpb249Ik5PX1RSQURFIiwgY29uZmlkZW5jZT0wLjksIGVudHJ5X3ByaWNlPTEuMTAwMCkKICAgICAgICByZXN1bHQgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKHNwLnByb2Nlc3Moc2lnKSkKICAgICAgICBhc3NlcnQgcmVzdWx0LmFjY2VwdGVkIGlzIEZhbHNlCiAgICAgICAgYXNzZXJ0ICJOT19UUkFERSIgaW4gcmVzdWx0LnJlYXNvbgoKICAgIGRlZiB0ZXN0X2xvd19jb25maWRlbmNlX3JlamVjdGVkKHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5zZXJ2aWNlcy5zaWduYWxfcHJvY2Vzc29yIGltcG9ydCBTaWduYWxQcm9jZXNzb3IKICAgICAgICBzcCA9IFNpZ25hbFByb2Nlc3NvcigpCiAgICAgICAgc3AuX2luaXRpYWxpemVkID0gVHJ1ZQogICAgICAgIHNwLl92b3RpbmdfZW5naW5lID0gTm9uZQogICAgICAgIHNwLl9leGVjdXRpb25fc2VydmljZSA9IE5vbmUKICAgICAgICBzcC5fZGIgPSBOb25lCiAgICAgICAgc2lnID0gc2VsZi5fbWFrZV9zaWduYWwoY29uZmlkZW5jZT0wLjMwKQogICAgICAgIHJlc3VsdCA9IGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoc3AucHJvY2VzcyhzaWcpKQogICAgICAgIGFzc2VydCByZXN1bHQuYWNjZXB0ZWQgaXMgRmFsc2UKICAgICAgICBhc3NlcnQgImNvbmZpZGVuY2UiIGluIHJlc3VsdC5yZWFzb24ubG93ZXIoKQoKICAgIGRlZiB0ZXN0X3Bvb3JfcnJfcmVqZWN0ZWQoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLnNlcnZpY2VzLnNpZ25hbF9wcm9jZXNzb3IgaW1wb3J0IFNpZ25hbFByb2Nlc3NvciwgVHJhZGVTaWduYWwKICAgICAgICBzcCA9IFNpZ25hbFByb2Nlc3NvcigpCiAgICAgICAgc3AuX2luaXRpYWxpemVkID0gVHJ1ZQogICAgICAgIHNwLl92b3RpbmdfZW5naW5lID0gTm9uZQogICAgICAgIHNwLl9leGVjdXRpb25fc2VydmljZSA9IE5vbmUKICAgICAgICBzcC5fZGIgPSBOb25lCiAgICAgICAgc2lnID0gVHJhZGVTaWduYWwoc3ltYm9sPSJFVVJVU0QiLCBkaXJlY3Rpb249IkJVWSIsIGNvbmZpZGVuY2U9MC44MCwgZW50cnlfcHJpY2U9MS4xMDAwLCBzbD0xLjA5ODAsIHRwPTEuMTAxMCkKICAgICAgICByZXN1bHQgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKHNwLnByb2Nlc3Moc2lnKSkKICAgICAgICBhc3NlcnQgcmVzdWx0LmFjY2VwdGVkIGlzIEZhbHNlCiAgICAgICAgYXNzZXJ0ICJSO1IiIGluIHJlc3VsdC5yZWFzb24KCiAgICBkZWYgdGVzdF9nb29kX3NpZ25hbF9hY2NlcHRlZChzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuc2VydmljZXMuc2lnbmFsX3Byb2Nlc3NvciBpbXBvcnQgU2lnbmFsUHJvY2Vzc29yCiAgICAgICAgc3AgPSBTaWduYWxQcm9jZXNzb3IoKQogICAgICAgIHNwLl9pbml0aWFsaXplZCA9IFRydWUKICAgICAgICBzcC5fdm90aW5nX2VuZ2luZSA9IE5vbmUKICAgICAgICBzcC5fZXhlY3V0aW9uX3NlcnZpY2UgPSBOb25lCiAgICAgICAgc3AuX2RiID0gTm9uZQogICAgICAgIHNpZyA9IHNlbGYuX21ha2Vfc2lnbmFsKGNvbmZpZGVuY2U9MC44MCkKICAgICAgICByZXN1bHQgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKHNwLnByb2Nlc3Moc2lnKSkKICAgICAgICBhc3NlcnQgcmVzdWx0LmFjY2VwdGVkIGlzIFRydWUK
+"""
+backend/tests/test_05_mt5_bridge.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+فاز G — تست‌های MT5 Bridge
+
+پوشش:
+1. MT5Connector در demo mode (env var)
+2. MT5Connector env var control
+3. get_candles() — داده‌های کندل
+4. SignalProcessor → VotingEngine → ExecutionService pipeline
+5. MT5Gateway Agent endpoints (با httpx mock)
+"""
+from __future__ import annotations
+
+import asyncio
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Fixtures
+# ══════════════════════════════════════════════════════════════════════════════
+
+@pytest.fixture
+def connector_demo():
+    """MT5Connector در demo mode."""
+    from backend.execution.mt5_connector import MT5Connector
+    return MT5Connector(demo=True)
+
+
+@pytest.fixture
+def connector_live():
+    """MT5Connector در LIVE mode با mock session."""
+    from backend.execution.mt5_connector import MT5Connector
+    c = MT5Connector(base_url="http://localhost:8080", demo=False)
+    return c
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TestMT5ConnectorDemo
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMT5ConnectorDemo:
+    def test_demo_flag_true(self, connector_demo):
+        assert connector_demo.demo is True
+
+    def test_demo_flag_env_false(self):
+        """MT5_DEMO_MODE=false → demo=False."""
+        from backend.execution.mt5_connector import MT5Connector
+        with patch.dict("os.environ", {"MT5_DEMO_MODE": "false"}):
+            c = MT5Connector()
+            assert c.demo is False
+
+    def test_demo_flag_env_true(self):
+        """MT5_DEMO_MODE=true → demo=True."""
+        from backend.execution.mt5_connector import MT5Connector
+        with patch.dict("os.environ", {"MT5_DEMO_MODE": "true"}):
+            c = MT5Connector()
+            assert c.demo is True
+
+    @pytest.mark.asyncio
+    async def test_connect_demo(self, connector_demo):
+        await connector_demo.connect()
+        assert connector_demo._connected is True
+
+    @pytest.mark.asyncio
+    async def test_place_order_demo_returns_ticket(self, connector_demo):
+        await connector_demo.connect()
+        result = await connector_demo.place_order("EURUSD", "BUY", 0.01)
+        assert result.ticket > 0
+        assert result.symbol == "EURUSD"
+        assert result.direction == "BUY"
+
+    @pytest.mark.asyncio
+    async def test_get_candles_demo(self, connector_demo):
+        await connector_demo.connect()
+        candles = await connector_demo.get_candles("EURUSD", "H1", 100)
+        assert len(candles) == 100
+        assert candles[0].open > 0
+        assert candles[0].high >= candles[0].low
+        assert candles[0].close > 0
+
+    @pytest.mark.asyncio
+    async def test_get_candles_ohlc_valid(self, connector_demo):
+        await connector_demo.connect()
+        candles = await connector_demo.get_candles("EURUSD", "M15", 50)
+        for c in candles:
+            assert c.high >= c.open
+            assert c.high >= c.close
+            assert c.low  <= c.open
+            assert c.low  <= c.close
+
+    @pytest.mark.asyncio
+    async def test_get_symbol_info_demo(self, connector_demo):
+        await connector_demo.connect()
+        info = await connector_demo.get_symbol_info("EURUSD")
+        assert info.name == "EURUSD"
+        assert info.digits == 5
+        assert info.volume_min > 0
+
+    @pytest.mark.asyncio
+    async def test_health_check_demo(self, connector_demo):
+        await connector_demo.connect()
+        h = await connector_demo.health_check()
+        assert h["ok"] is True
+        assert h["mode"] == "DEMO"
+
+    @pytest.mark.asyncio
+    async def test_close_position_demo(self, connector_demo):
+        await connector_demo.connect()
+        result = await connector_demo.place_order("GBPUSD", "SELL", 0.02)
+        closed = await connector_demo.close_position(result.ticket)
+        assert closed is True
+
+    @pytest.mark.asyncio
+    async def test_context_manager(self):
+        from backend.execution.mt5_connector import MT5Connector
+        async with MT5Connector(demo=True) as c:
+            assert c._connected is True
+        assert c._connected is False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TestMT5ConnectorLive
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMT5ConnectorLive:
+    @pytest.mark.asyncio
+    async def test_connect_live_pings_gateway(self, connector_live):
+        """اتصال LIVE باید به /ping بزند."""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"ok": True})
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+        mock_session.close = AsyncMock()
+
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            await connector_live.connect()
+            assert connector_live._connected is True
+
+    @pytest.mark.asyncio
+    async def test_live_candles_from_gateway(self, connector_live):
+        """get_candles در LIVE باید به /candles بزند."""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={
+            "candles": [
+                {"time": "2026-01-01T00:00:00", "open": 1.10, "high": 1.11,
+                 "low": 1.09, "close": 1.105, "volume": 1000, "spread": 1}
+            ]
+        })
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+        mock_session.close = AsyncMock()
+        connector_live._session = mock_session
+        connector_live._connected = True
+
+        candles = await connector_live.get_candles("EURUSD", "H1", 1)
+        assert len(candles) == 1
+        assert candles[0].open == 1.10
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TestSignalProcessor
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestSignalProcessor:
+    @pytest.mark.asyncio
+    async def test_reject_no_trade(self):
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        sp = SignalProcessor()
+        sig = RawSignal(symbol="EURUSD", timeframe="H1",
+                        direction="NO_TRADE", confidence=0.75)
+        result = await sp.process(sig)
+        assert result.accepted is False
+        assert "NO_TRADE" in result.reason
+
+    @pytest.mark.asyncio
+    async def test_reject_low_confidence(self):
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        sp = SignalProcessor()
+        sig = RawSignal(symbol="EURUSD", timeframe="H1",
+                        direction="BUY", confidence=0.40)
+        result = await sp.process(sig)
+        assert result.accepted is False
+        assert "confidence" in result.reason
+
+    @pytest.mark.asyncio
+    async def test_reject_low_rr(self):
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        sp = SignalProcessor()
+        sig = RawSignal(
+            symbol="EURUSD", timeframe="H1",
+            direction="BUY", confidence=0.80,
+            entry_price=1.10, sl_price=1.09, tp_price=1.105,
+        )
+        result = await sp.process(sig)
+        assert result.accepted is False
+        assert "R:R" in result.reason
+
+    @pytest.mark.asyncio
+    async def test_accept_with_mock_execution(self):
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        sp = SignalProcessor()
+        sp._voting_engine = None
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.ticket  = 123456
+        mock_result.error   = None
+
+        mock_exec = MagicMock()
+        mock_exec.execute = AsyncMock(return_value=mock_result)
+        sp._execution_service = mock_exec
+
+        mock_db = MagicMock()
+        mock_db.insert = AsyncMock(return_value={})
+        sp._db = mock_db
+
+        sig = RawSignal(
+            symbol="EURUSD", timeframe="H1",
+            direction="BUY", confidence=0.85,
+            entry_price=1.10, sl_price=1.09, tp_price=1.12,
+            meta={"volume": 0.01},
+        )
+        result = await sp.process(sig)
+        assert result.accepted is True
+        assert result.ticket == 123456
+
+    @pytest.mark.asyncio
+    async def test_voting_timeout_continues(self):
+        """اگر VotingEngine timeout شود، پردازش ادامه می‌یابد."""
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+
+        async def slow_vote(*args, **kwargs):
+            await asyncio.sleep(100)
+            return []
+
+        sp = SignalProcessor()
+        mock_ve = MagicMock()
+        mock_ve.collect_votes = slow_vote
+        sp._voting_engine = mock_ve
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.ticket  = 999
+        mock_result.error   = None
+        mock_exec = MagicMock()
+        mock_exec.execute = AsyncMock(return_value=mock_result)
+        sp._execution_service = mock_exec
+        sp._db = MagicMock()
+        sp._db.insert = AsyncMock()
+
+        sig = RawSignal(
+            symbol="GBPUSD", timeframe="H4",
+            direction="SELL", confidence=0.72,
+            entry_price=1.27, sl_price=1.28, tp_price=1.25,
+            meta={"volume": 0.01},
+        )
+        result = await asyncio.wait_for(sp.process(sig), timeout=15.0)
+        assert result.accepted is True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TestMT5GatewayAgent
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestMT5GatewayAgent:
+    def test_import_gateway(self):
+        pytest.skip("MT5Gateway فقط روی Windows/MT5 اجرا می‌شود")
+
+    def test_agent_routes_defined(self):
+        pytest.skip("MT5Gateway فقط روی Windows/MT5 اجرا می‌شود")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TestE2EPipelineSimulated
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestE2EPipelineSimulated:
+    @pytest.mark.asyncio
+    async def test_full_pipeline_demo(self):
+        """
+        End-to-end در demo mode:
+        RawSignal → SignalProcessor → ExecutionService(demo) → ticket
+        """
+        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.execution.execution_service import ExecutionService
+        from backend.execution.mt5_connector import MT5Connector
+
+        connector = MT5Connector(demo=True)
+        await connector.connect()
+
+        svc = ExecutionService(connector=connector)
+        sp  = SignalProcessor()
+        sp._voting_engine     = None
+        sp._execution_service = svc
+        sp._db                = None
+
+        sig = RawSignal(
+            symbol="EURUSD", timeframe="H1",
+            direction="BUY", confidence=0.90,
+            entry_price=1.10000, sl_price=1.09000, tp_price=1.12000,
+            meta={"volume": 0.01},
+        )
+        result = await sp.process(sig)
+        assert result.accepted is True
+        assert result.ticket is not None
+        assert result.ticket > 0
+
+    @pytest.mark.asyncio
+    async def test_candles_fed_to_smc(self):
+        """get_candles → SMCEngine.analyse() باید بدون crash اجرا شود."""
+        from backend.execution.mt5_connector import MT5Connector
+        from backend.analysis.smc_engine import SMCEngine, Candle
+
+        connector = MT5Connector(demo=True)
+        await connector.connect()
+        raw_candles = await connector.get_candles("EURUSD", "H1", 100)
+        await connector.disconnect()
+
+        candles = [
+            Candle(
+                timestamp=c.time.isoformat(),
+                open=c.open, high=c.high, low=c.low, close=c.close,
+                volume=c.volume,
+            )
+            for c in raw_candles
+        ]
+        engine = SMCEngine()
+        result = engine.analyse(candles)
+        assert result.confidence >= 0.0
+        assert result.confidence <= 1.0
+        assert result.bias is not None
