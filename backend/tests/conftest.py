@@ -1,21 +1,15 @@
 """conftest.py --- Global pytest fixtures for Galaxy Vast AI Trading Platform."""
 from __future__ import annotations
-import asyncio
-import sys
-import os
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
-sys.path.insert(0, os.path.dirname(__file__))
+import asyncio
+import pytest
+from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "unit: fast, no I/O")
-    config.addinivalue_line("markers", "integration: cross-module")
-    config.addinivalue_line("markers", "e2e: full pipeline")
-    config.addinivalue_line("markers", "security: security tests")
-    config.addinivalue_line("markers", "load: load tests")
+    config.addinivalue_line("markers", "live: mark test as requiring live MT5 gateway")
+    config.addinivalue_line("markers", "db: mark test as requiring live Supabase")
 
 
 @pytest.fixture(scope="session")
@@ -23,77 +17,116 @@ def event_loop_policy():
     return asyncio.DefaultEventLoopPolicy()
 
 
+# ── MT5 Connector mock ────────────────────────────────────────────────────── #
 @pytest.fixture
 def mock_broker():
-    b = AsyncMock()
-    b.initialize.return_value = True
-    b.shutdown.return_value = None
-    b.health_check.return_value = True
-    b.send_order.return_value = MagicMock(
-        retcode=10009, order=12345, volume=0.01, price=1.1000, comment="ok"
-    )
-    b.get_positions.return_value = []
-    b.close_position.return_value = True
-    return b
+    broker = MagicMock()
+    broker.connected = True
+    broker.demo = True
+    broker.connect = AsyncMock(return_value=True)
+    broker.disconnect = AsyncMock(return_value=True)
+    broker.place_order = AsyncMock(return_value={"ticket": 999001, "price": 1.1050})
+    broker.close_position = AsyncMock(return_value=True)
+    broker.get_open_positions = AsyncMock(return_value=[])
+    broker.get_account_info = AsyncMock(return_value={
+        "balance": 10_000.0, "equity": 10_050.0,
+        "margin": 200.0, "free_margin": 9_850.0,
+        "profit": 50.0, "leverage": 100,
+    })
+    broker.get_candles = AsyncMock(return_value=[
+        {"time": 1_700_000_000 + i * 3600,
+         "open": 1.1000 + i * 0.0001,
+         "high": 1.1010 + i * 0.0001,
+         "low":  1.0990 + i * 0.0001,
+         "close": 1.1005 + i * 0.0001,
+         "tick_volume": 500 + i}
+        for i in range(200)
+    ])
+    broker.health_check = AsyncMock(return_value={"status": "ok", "latency_ms": 12.3})
+    return broker
 
 
+# ── OrderStateMachine mock ────────────────────────────────────────────────── #
 @pytest.fixture
 def mock_osm():
-    osm = AsyncMock()
-    order = MagicMock()
-    order.order_id = "test-order-001"
-    order.symbol = "EURUSD"
-    order.direction = "BUY"
-    order.lot_size = 0.01
-    order.entry_price = 1.1000
-    order.stop_loss = 1.0950
-    order.take_profit = 1.1100
-    osm.create.return_value = order
-    osm.start.return_value = None
-    osm.transition.return_value = True
+    """
+    Mock که API واقعی OSM را منعکس می‌کند:
+    - register(ticket) نه create()
+    - transition(ticket, new_state)
+    - get_state(ticket)
+    - is_terminal(ticket)
+    - active_tickets
+    """
+    osm = MagicMock()
+    _states: Dict[int, str] = {}
+
+    def _register(ticket: int) -> None:
+        _states[ticket] = "PENDING"
+
+    def _transition(ticket: int, new_state: str) -> None:
+        _states[ticket] = new_state
+
+    def _get_state(ticket: int):
+        return _states.get(ticket)
+
+    def _is_terminal(ticket: int) -> bool:
+        return _states.get(ticket) in {"CLOSED", "REJECTED", "CANCELLED", "ERROR"}
+
+    osm.register = MagicMock(side_effect=_register)
+    osm.transition = MagicMock(side_effect=_transition)
+    osm.get_state = MagicMock(side_effect=_get_state)
+    osm.is_terminal = MagicMock(side_effect=_is_terminal)
+    osm.active_tickets = property(lambda self: list(_states.keys()))
+    osm.stats = MagicMock(return_value={"total": len(_states), "active": 0})
     return osm
 
 
+# ── Risk mock ─────────────────────────────────────────────────────────────── #
 @pytest.fixture
 def mock_risk():
-    r = AsyncMock()
-    result = MagicMock()
-    result.approved = True
-    result.decision = MagicMock(value="APPROVED")
-    result.block_reason = None
-    result.risk_percent = 1.0
-    result.lot_size = 0.01
-    result.lot_multiplier = 1.0
-    result.gates_passed = ["vol", "corr", "exposure"]
-    result.gates_failed = []
-    result.metadata = {}
-    r.assess.return_value = result
-    r.check.return_value = result
-    return r
+    risk = MagicMock()
+    risk.is_kill_switch_active = MagicMock(return_value=False)
+    risk.check_risk = MagicMock(return_value={"allowed": True, "reason": "ok"})
+    risk.calculate_lot = MagicMock(return_value=0.10)
+    return risk
 
 
+# ── Base signal dict ──────────────────────────────────────────────────────── #
 @pytest.fixture
 def base_signal() -> Dict[str, Any]:
     return {
-        "signal_id":          "sig-001",
-        "symbol":             "EURUSD",
-        "direction":          "BUY",
-        "balance":            10000.0,
-        "equity":             10000.0,
-        "entry_price":        1.10000,
-        "stop_loss":          1.09500,
-        "take_profit":        1.11000,
-        "stop_loss_pips":     50.0,
-        "current_atr":        15.0,
-        "atr_history":        [12.0, 13.0, 14.0, 15.0, 16.0],
-        "current_spread":     1.5,
-        "avg_spread":         1.2,
-        "open_positions":     [],
-        "today_trades_count": 0,
-        "today_pnl_usd":      0.0,
-        "week_pnl_usd":       0.0,
-        "month_pnl_usd":      0.0,
-        "win_rate":           0.55,
-        "avg_rr":             1.5,
-        "user_id":            "user-001",
+        "symbol": "EURUSD",
+        "direction": "BUY",
+        "entry": 1.1050,
+        "sl": 1.1000,
+        "tp": 1.1150,
+        "confidence": 0.82,
+        "lot": 0.10,
+        "timeframe": "H1",
+        "source": "pytest",
     }
+
+
+# ── DB mock ───────────────────────────────────────────────────────────────── #
+@pytest.fixture
+def mock_db():
+    db = MagicMock()
+    db.ping = AsyncMock(return_value=True)
+    db.select = AsyncMock(return_value=[])
+    db.insert = AsyncMock(return_value={"id": "mock-uuid-001"})
+    db.update = AsyncMock(return_value={"id": "mock-uuid-001"})
+    db.delete = AsyncMock(return_value=True)
+    return db
+
+
+# ── VotingEngine mock ─────────────────────────────────────────────────────── #
+@pytest.fixture
+def mock_voting():
+    ve = MagicMock()
+    ve.vote = AsyncMock(return_value=MagicMock(
+        approved=True,
+        confidence=0.82,
+        votes=[],
+        to_dict=lambda: {"approved": True, "confidence": 0.82}
+    ))
+    return ve

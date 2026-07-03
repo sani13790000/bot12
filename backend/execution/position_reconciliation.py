@@ -2,122 +2,87 @@
 backend/execution/position_reconciliation.py
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Background task that reconciles the internal OrderStateMachine
-with the live MT5 position list.
+Background task: تطبیق OSM با MT5
 
-What it detects
----------------
 GHOST positions:
-    Tickets that the state machine believes are OPEN but MT5 no longer
-    has — closed externally (manual close, stop-out, etc.).
+  OSM معتقد است position باز است اما MT5 آن را نمی‌شناسد.
+  → OSM را به CLOSED منتقل می‌کنیم.
 
 ORPHAN positions:
-    Tickets that MT5 has open but the state machine does not know about
-    — opened outside the bot (manual trades).
-
-Usage::
-
-    from backend.execution.position_reconciliation import reconciler
-    from backend.services.scheduler import scheduler
-
-    scheduler.register("reconcile", reconciler.run, interval_s=30)
+  MT5 یک position باز دارد که OSM از آن خبر ندارد.
+  → در OSM register و OPEN می‌کنیم.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import List
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
 
+class MismatchType(str, Enum):
+    """نوع ناهماهنگی بین OSM و MT5."""
+    GHOST  = "GHOST"   # OSM open — MT5 ندارد
+    ORPHAN = "ORPHAN"  # MT5 open — OSM نمی‌داند
+
+
+@dataclass
+class Mismatch:
+    """یک ناهماهنگی بین OSM و MT5."""
+    ticket:        int
+    mismatch_type: MismatchType
+    symbol:        Optional[str] = None
+    volume:        Optional[float] = None
+    detail:        str = ""
+
+
+@dataclass
+class ReconcileResult:
+    """نتیجه یک دور reconciliation."""
+    ghosts:     int = 0
+    orphans:    int = 0
+    mismatches: List[Mismatch] = field(default_factory=list)
+    duration_ms: float = 0.0
+    error:      Optional[str] = None
+
+
 class PositionReconciler:
     """
-    Compares internal state with live MT5 positions and resolves
-    discrepancies.
+    Reconciler بین OSM و MT5.
+
+    مثال:
+        reconciler = PositionReconciler(connector=mt5, osm=osm)
+        result = await reconciler.run()
+        print(f"GHOST: {result.ghosts}, ORPHAN: {result.orphans}")
     """
 
     def __init__(
         self,
-        connector:     object = None,   # MT5Connector
-        state_machine: object = None,   # OrderStateMachine
+        connector:    Any = None,
+        osm:          Any = None,
+        auto_close:   bool = True,
+        auto_register: bool = True,
     ) -> None:
-        self._connector     = connector
-        self._state_machine = state_machine
-        self._ghost_count   = 0
-        self._orphan_count  = 0
+        self._connector    = connector
+        self._osm          = osm
+        self._auto_close   = auto_close
+        self._auto_register = auto_register
+        self._total_runs   = 0
+        self._total_ghosts = 0
+        self._total_orphans = 0
+        self._last_run_at: Optional[float] = None
 
-    async def run(self) -> None:
-        """
-        Periodic reconciliation entry point.
+    async def run(self) -> ReconcileResult:
+        """یک دور کامل reconciliation."""
+        t0 = time.monotonic()
+        result = ReconcileResult()
 
-        Called by the Scheduler every N seconds.
-        """
-        connector, osm = self._get_deps()
-        if connector is None or osm is None:
-            return
-
-        try:
-            live_positions = await connector.get_all_positions()
-        except Exception as exc:
-            logger.warning("[reconciler] cannot fetch MT5 positions: %s", exc)
-            return
-
-        live_tickets = {p.ticket for p in live_positions}
-        active_tickets = set(osm.active_tickets())
-
-        # ── GHOST: OSM thinks open, MT5 says closed ───────────────────── #
-        ghosts = active_tickets - live_tickets
-        for ticket in ghosts:
-            logger.warning(
-                "[reconciler] GHOST ticket=%d — closing in OSM", ticket
-            )
-            try:
-                osm.transition(ticket, "CLOSED")
-                self._ghost_count += 1
-            except Exception as exc:
-                logger.error(
-                    "[reconciler] failed to close ghost ticket=%d: %s",
-                    ticket, exc,
-                )
-
-        # ── ORPHAN: MT5 has open, OSM does not know ───────────────────── #
-        orphans = live_tickets - active_tickets
-        for ticket in orphans:
-            logger.warning(
-                "[reconciler] ORPHAN ticket=%d — registering in OSM", ticket
-            )
-            try:
-                osm.register(ticket)
-                osm.transition(ticket, "SUBMITTED")
-                osm.transition(ticket, "OPEN")
-                self._orphan_count += 1
-            except Exception as exc:
-                logger.error(
-                    "[reconciler] failed to register orphan ticket=%d: %s",
-                    ticket, exc,
-                )
-
-        if ghosts or orphans:
-            logger.info(
-                "[reconciler] cycle complete: %d ghost(s), %d orphan(s)",
-                len(ghosts), len(orphans),
-            )
-        else:
-            logger.debug("[reconciler] cycle complete: no discrepancies")
-
-    def stats(self) -> dict:
-        """Return lifetime reconciliation counters."""
-        return {
-            "total_ghosts_resolved":  self._ghost_count,
-            "total_orphans_resolved": self._orphan_count,
-        }
-
-    # ── Internals ─────────────────────────────────────────────────────────── #
-
-    def _get_deps(self):
-        """Lazy-load dependencies to avoid circular imports at module level."""
         connector = self._connector
-        osm       = self._state_machine
+        osm = self._osm
 
         if connector is None:
             try:
@@ -133,8 +98,85 @@ class PositionReconciler:
             except Exception:
                 pass
 
-        return connector, osm
+        if connector is None or osm is None:
+            result.error = "connector یا osm موجود نیست"
+            return result
+
+        try:
+            mt5_positions: List[Dict[str, Any]] = (
+                await connector.get_open_positions()
+            )
+            mt5_tickets: Set[int] = {int(p["ticket"]) for p in mt5_positions}
+            mt5_by_ticket: Dict[int, Dict] = {
+                int(p["ticket"]): p for p in mt5_positions
+            }
+
+            osm_tickets: Set[int] = set(osm.active_tickets)
+
+            # ── GHOST ─────────────────────────────────────────────────── #
+            for ticket in osm_tickets - mt5_tickets:
+                if osm.is_terminal(ticket):
+                    continue
+                m = Mismatch(
+                    ticket=ticket,
+                    mismatch_type=MismatchType.GHOST,
+                    detail=f"ticket={ticket} در OSM open است اما MT5 ندارد",
+                )
+                result.mismatches.append(m)
+                result.ghosts += 1
+                logger.warning("[reconciler] GHOST ticket=%d", ticket)
+                if self._auto_close:
+                    try:
+                        osm.transition(ticket, "CLOSED")
+                    except Exception as exc:
+                        logger.error("[reconciler] GHOST close error ticket=%d: %s", ticket, exc)
+
+            # ── ORPHAN ────────────────────────────────────────────────── #
+            for ticket in mt5_tickets - osm_tickets:
+                pos = mt5_by_ticket[ticket]
+                m = Mismatch(
+                    ticket=ticket,
+                    mismatch_type=MismatchType.ORPHAN,
+                    symbol=pos.get("symbol"),
+                    volume=pos.get("volume"),
+                    detail=f"ticket={ticket} در MT5 open است اما OSM نمی‌داند",
+                )
+                result.mismatches.append(m)
+                result.orphans += 1
+                logger.warning("[reconciler] ORPHAN ticket=%d", ticket)
+                if self._auto_register:
+                    try:
+                        osm.register(ticket)
+                        osm.transition(ticket, "OPEN")
+                    except Exception as exc:
+                        logger.error("[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc)
+
+        except Exception as exc:
+            logger.error("[reconciler] run() failed: %s", exc)
+            result.error = str(exc)
+
+        result.duration_ms = (time.monotonic() - t0) * 1000
+        self._total_runs   += 1
+        self._total_ghosts  += result.ghosts
+        self._total_orphans += result.orphans
+        self._last_run_at   = time.time()
+        return result
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "total_runs":    self._total_runs,
+            "total_ghosts":  self._total_ghosts,
+            "total_orphans": self._total_orphans,
+            "last_run_at":   self._last_run_at,
+        }
+
+    async def loop(self, interval_s: float = 60.0) -> None:
+        logger.info("[reconciler] loop started interval=%.0fs", interval_s)
+        while True:
+            await self.run()
+            await asyncio.sleep(interval_s)
 
 
-# ── Module-level singleton ────────────────────────────────────────────────── #
+# ── backward-compat aliases ───────────────────────────────────────────────── #
+PositionReconciliation = PositionReconciler
 reconciler = PositionReconciler()
