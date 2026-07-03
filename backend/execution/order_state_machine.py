@@ -1,285 +1,264 @@
-IiIiYmFja2VuZC9leGVjdXRpb24vb3JkZXJfc3RhdGVfbWFjaGluZS5weQpQ
-SEFTRSAzIOKAlCBQcm9kdWN0aW9uIE9yZGVyIFN0YXRlIE1hY2hpbmUKPT09
-PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CkNoYW5nZXMgdnMg
-cHJldmlvdXMgdmVyc2lvbjoKICBQMy1PU00tMTogQUxMT1dFRF9UUkFOU0lU
-SU9OUyBndWFyZCDigJQgcHJldmVudHMgaWxsZWdhbCBzdGF0ZSBieXBhc3Nl
-cwogIFAzLU9TTS0yOiBGdWxsIGxpZmVjeWNsZTogUEVORElORy0+U1VCTUlU
-VEVELT5GSUxMRUQtPkNMT1NJTkctPkNMT1NFRAogIFAzLU9TTS0zOiBPcmRl
-clRyYW5zaXRpb24gaW1tdXRhYmxlIGF1ZGl0IGxvZyBwZXIgb3JkZXIKICBQ
-My1PU00tNDogYWN0aW9uL3JlcXVlc3RlZF92b2x1bWUvcmVxdWVzdGVkX3By
-aWNlIGZpZWxkcyAodGVzdF9leGVjdXRpb25fcGhhc2U3IGNvbXBhdCkKICBQ
-My1PU00tNTogaXNfYWN0aXZlKCkgaGVscGVyCiAgUDMtT1NNLTY6IE9yZGVy
-VGltZW91dFdhdGNoZG9nIOKAlCBkZXRlY3RzIGh1bmcgb3JkZXJzLCBmaXJl
-cyBhbGVydCBjYWxsYmFjawogIFByZXNlcnZlczogU2lnbmFsSWRlbXBvdGVu
-Y3lHdWFyZCwgZGlzcGF0Y2hfY2FsbGJhY2tzX3NhZmUsCiAgICAgICAgICAg
-ICBDb21wbGV0ZWRPcmRlckV2aWN0aW9uSW5kZXgsIFN0YXRlTWFjaGluZU1l
-dHJpY3MgKFMtMTcuLlMtMjApCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0
-IGFubm90YXRpb25zCgppbXBvcnQgYXN5bmNpbwppbXBvcnQgbG9nZ2luZwpp
-bXBvcnQgdGltZQpmcm9tIGNvbGxlY3Rpb25zIGltcG9ydCBkZWZhdWx0ZGlj
-dCwgZGVxdWUKZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzLCBm
-aWVsZApmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZWRlbHRh
-LCB0aW1lem9uZQpmcm9tIGVudW0gaW1wb3J0IEVudW0KZnJvbSB0eXBpbmcg
-aW1wb3J0IEFueSwgQ2FsbGFibGUsIERpY3QsIExpc3QsIE9wdGlvbmFsLCBT
-ZXQsIFR1cGxlCgpmcm9tIC4uY29yZS5sb2dnZXIgaW1wb3J0IGdldF9sb2dn
-ZXIKCmxvZ2dlciA9IGdldF9sb2dnZXIoImV4ZWN1dGlvbi5vcmRlcl9zdGF0
-ZV9tYWNoaW5lIikKCl9DT01QTEVURUQ_T1JERVJfVFRMX0hPVVJTOiBpbnQg
-PSAyNApfTUFYX09SREVSUzogICAgICAgICAgICAgIGludCA9IDEwXzAwMApf
-SFVOR19USFJFU0hPTERfUzogICAgICAgIGludCA9IDMwMCAgICMgNSBtaW4K
+"""
+backend/execution/order_state_machine.py
+PHASE 3 — Production Order State Machine
 
-CiMg4pSA4pSAIFN0YXRlcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIAKY2xhc3MgT3JkZXJTdGF0ZShzdHIsIEVudW0pOgogICAgUEVORElORyAg
-ID0gIlBFTkRJTkciCiAgICBTVUJNSVRURUQgPSAiU1VCTUlUVEVEIgogICAg
-RklMTEVEICAgID0gIkZJTExFRCIKICAgIFBBUlRJQUwgICA9ICJQQVJUSUFM
-IgogICAgQ0xPU0lORyAgID0gIkNMT1NJTkciCiAgICBDTE9TRUQgICAgPSAi
-Q0xPU0VEIgogICAgQ0FOQ0VMTEVEPSAiQ0FOQ0VMTEVEIgogICAgUkVKRUNU
-RUQgID0gIlJFSkVDVEVEIgogICAgRkFJTEVEICAgID0gIkZBSUxFRCIKICAg
-IEVYUElSRUQgICA9ICJFWFBJUkVEIgoKCl9URVJNSU5BTF9TVEFURVMgICA9
-IHtPcmRlclN0YXRlLkZJTExFRCwgT3JkZXJTdGF0ZS5DTE9TRUQsICBPcmRl
-clN0YXRlLkNBTkNFTExFRCwgT3JkZXJTdGF0ZS5SRUpFQ1RFRCwgT3JkZXJT
-dGF0ZS5GQUlMRUQsICBPcmRlclN0YXRlLkVYUElSRUR9Cl9BQ1RJVkVfU1RB
-VEVTICAgICAgID0ge09yZGVyU3RhdGUuUEVORElORywgT3JkZXJTdGF0ZS5T
-VUJNSVRURUQsIE9yZGVyU3RhdGUuUEFSVElBTCwgT3JkZXJTdGF0ZS5DTE9T
-SU5HfQoKIyBQMy1PU00tMTogU3RyaWN0IHRyYW5zaXRpb24gd2hpdGVsaXN0
-IOKAlCBubyBieXBhc3MgcG9zc2libGUKX0FMTE9XRURfVFJBTlNJVElPTlM6
-IERpY3RbT3JkZXJTdGF0ZSwgc2V0XSA9IHsKICAgIE9yZGVyU3RhdGUuUEVO
-RElORzogICB7T3JkZXJTdGF0ZS5TVUJNSVRURUQsIE9yZGVyU3RhdGUuQ0FO
-Q0VMTEVELCBPcmRlclN0YXRlLlJFSkVDVEVELCBPcmRlclN0YXRlLkVYUElS
-RUR9LAogICAgT3JkZXJTdGF0ZS5TVUJNSVRURUQ6IHtPcmRlclN0YXRlLkZJ
-TExFRCwgT3JkZXJTdGF0ZS5QQVJUSUFMLCBPcmRlclN0YXRlLkNBTkNFTExF
-RCwgT3JkZXJTdGF0ZS5SRUpFQ1RFRCwgT3JkZXJTdGF0ZS5GQUlMRUQsIE9y
-ZGVyU3RhdGUuRVhQSVJFRH0sCiAgICBPcmRlclN0YXRlLlBBUlRJQUw6ICAg
-e09yZGVyU3RhdGUuRklMTEVELCBPcmRlclN0YXRlLkNMT1NJTkcsIE9yZGVy
-U3RhdGUuQ0FOQ0VMTEVELCBPcmRlclN0YXRlLkZBSUxFRH0sCiAgICBPcmRl
-clN0YXRlLkZJTExFRDogICAge09yZGVyU3RhdGUuQ0xPU0lOR30sCiAgICBP
-cmRlclN0YXRlLkNMT1NJTkc6ICAge09yZGVyU3RhdGUuQ0xPU0VELCBPcmRl
-clN0YXRlLkZBSUxFRH0sCiAgICBPcmRlclN0YXRlLkNMT1NFRDogICAgc2V0
-KCksCiAgICBPcmRlclN0YXRlLkNBTkNFTExFRDogc2V0KCksCiAgICBPcmRl
-clN0YXRlLlJFSkVDVEVEOiAgc2V0KCksCiAgICBPcmRlclN0YXRlLkZBSUxF
-RDogICAgc2V0KCksCiAgICBPcmRlclN0YXRlLkVYUElSRUQ6ICAgc2V0KCks
-Cn0KCgojIFAzLU9TTS0zOiBJbW11dGFibGUgYXVkaXQgbG9nIHBlciB0cmFu
-c2l0aW9uCkBkYXRhY2xhc3MoZnJvemVuPVRydWUpCmNsYXNzIE9yZGVyVHJh
-bnNpdGlvbjoKICAgIGZyb21fc3RhdGU6IE9yZGVyU3RhdGUKICAgIHRvX3N0
-YXRlOiAgIE9yZGVyU3RhdGUKICAgIHRpbWVzdGFtcDogIGRhdGV0aW1lID0g
-ZmllbGQoZGVmYXVsdF9mYWN0b3J5PWxhbWJkYTogZGF0ZXRpbWUubm93KHRp
-bWV6b25lLnV0YykpCiAgICByZWFzb246ICAgICBzdHIgICAgICA9ICIiCiAg
-ICBhY3RvcjogICAgICBzdHIgICAgICA9ICJzeXN0ZW0iCgoKQGRhdGFjbGFz
-cwpjbGFzcyBNYW5hZ2VkT3JkZXI6CiAgICAjIElkZW50aXR5CiAgICBvcmRl
-cl9pZDogICAgICAgICAgc3RyCiAgICBzaWduYWxfaWQ6ICAgICAgICAgc3Ry
-CiAgICBzeW1ib2w6ICAgICAgICAgICAgc3RyCiAgICAjIFAzLU9TTS00OiBh
-Y3Rpb24vcmVxdWVzdGVkX3ZvbHVtZS9yZXF1ZXN0ZWRfcHJpY2UgZm9yIHRl
-c3QgY29tcGF0CiAgICBhY3Rpb246ICAgICAgICAgICAgc3RyICAgID0gIkJV
-WSIKICAgIGRpcmVjdGlvbjogICAgICAgICBzdHIgICAgPSAiIgogICAgcmVx
-dWVzdGVkX3ZvbHVtZTogIGZsb2F0ICA9IDAuMAogICAgbG90X3NpemU6ICAg
-ICAgICAgIGZsb2F0ICA9IDAuMAogICAgcmVxdWVzdGVkX3ByaWNlOiAgZmxv
-YXQgID0gMC4wCiAgICBzdG9wX2xvc3M6ICAgICAgICAgZmxvYXQgID0gMC4w
-CiAgICB0YWtlX3Byb2ZpdDogICAgICAgZmxvYXQgID0gMC4wCiAgICAjIFN0
-YXRlCiAgICBzdGF0ZTogICAgICAgICAgICAgT3JkZXJTdGF0ZSA9IE9yZGVy
-U3RhdGUuUEVORElORwogICAgIyBBdWRpdAogICAgdHJhbnNpdGlvbnM6ICAg
-ICAgTGlzdFtPcmRlclRyYW5zaXRpb25dID0gZmllbGQoZGVmYXVsdF9mYWN0
-b3J5PWxpc3QpCiAgICBjcmVhdGVkX2F0OiAgICAgICAgZGF0ZXRpbWUgPSBm
-aWVsZChkZWZhdWx0X2ZhY3Rvcnk9bGFtYmRhOiBkYXRldGltZS5ub3codGlt
-ZXpvbmUudXRjKSkKICAgIHVwZGF0ZWRfYXQ6ICAgICAgICBkYXRldGltZSA9
-IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1sYW1iZGE6IGRhdGV0aW1lLm5vdyh0
-aW1lem9uZS51dGMpKQogICAgIyBGaWxsIGluZm8KICAgIGJyb2tlcl9pZDog
-ICAgICAgICBPcHRpb25hbFtzdHJdICAgPSBOb25lCiAgICBtdDVfdGlja2V0
-OiAgICAgICAgT3B0aW9uYWxbaW50XSAgID0gTm9uZQogICAgZmlsbF9wcmlj
-ZTogICAgICAgIE9wdGlvbmFsW2Zsb2F0XSA9IE5vbmUKICAgIGZpbGxfdm9s
-dW1lOiAgICAgICBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICBjbG9zZV9w
-cmljZTogICAgICAgT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgcG5sX3Vz
-ZDogICAgICAgICAgICBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICBzbGlw
-cGFnZV9waXBzOiAgICAgT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgZXJy
-b3I6ICAgICAgICAgICAgICBPcHRpb25hbFtzdHJdICAgPSBOb25lCiAgICBy
-ZXRjb2RlOiAgICAgICAgICAgIE9wdGlvbmFsW2ludF0gICA9IE5vbmUKCiAg
-ICBkZWYgX19wb3N0X2luaXRfXyhzZWxmKSAtPiBOb25lOgogICAgICAgIGlm
-IG5vdCBzZWxmLmRpcmVjdGlvbjogb2JqZWN0Ll9fc2V0YXR0cl9fKHNlbGYs
-ICdkaXJlY3Rpb24nLCBzZWxmLmFjdGlvbikKICAgICAgICBpZiBub3Qgc2Vs
-Zi5hY3Rpb246IG9iamVjdC5fX3NldGF0dHJfXyhzZWxmLCAnYWN0aW9uJywg
-c2VsZi5kaXJlY3Rpb24pCiAgICAgICAgaWYgc2VsZi5sb3Rfc2l6ZSA9PSAw
-LjAgYW5kIHNlbGYucmVxdWVzdGVkX3ZvbHVtZTogb2JqZWN0Ll9fc2V0YXR0
-cl9fKHNlbGYsICdsb3Rfc2l6ZScsIHNlbGYucmVxdWVzdGVkX3ZvbHVtZSkK
-ICAgICAgICBpZiBzZWxmLnJlcXVlc3RlZF92b2x1bWUgPT0gMC4wIGFuZCBz
-ZWxmLmxvdF9zaXplOiBvYmplY3QuX19zZXRhdHRyX18oc2VsZiwgJ3JlcXVl
-c3RlZF92b2x1bWUnLCBzZWxmLmxvdF9zaXplKQoKICAgIGRlZiBpc190ZXJt
-aW5hbChzZWxmKSAtPiBib29sOiByZXR1cm4gc2VsZi5zdGF0ZSBpbiBfVEVS
-TUlOQUxfU1RBVEVTCiAgICBkZWYgaXNfYWN0aXZlKHNlbGYpICAtPiBib29s
-OiByZXR1cm4gc2VsZi5zdGF0ZSBpbiBfQUNUSVZFX1NUQVRFUwoKCmNsYXNz
-IE9yZGVyU3RhdGVNYWNoaW5lOgogICAgIiIiVGhyZWFkLXNhZmUgb3JkZXIg
-c3RhdGUgbWFjaGluZSB3aXRoIHRyYW5zaXRpb24gd2hpdGVsaXN0LiIiIgoK
-ICAgIGRlZiBfX2luaXRfXyhzZWxmKSAtPiBOb25lOgogICAgICAgIHNlbGYu
-X29yZGVyczogIERpY3Rbc3RyLCBNYW5hZ2VkT3JkZXJdID0ge30KICAgICAg
-ICBzZWxmLl9jYWxsYmFja3M6IExpc3RbQ2FsbGFibGVdICAgICAgICAgID0g
-W10KICAgICAgICBzZWxmLl9sb2NrICAgID0gYXN5bmNpby5Mb2NrKCkKICAg
-ICAgICBzZWxmLl9ldmljdGlvbl9pbmRleCA9IENvbXBsZXRlZE9yZGVyRXZp
-Y3Rpb25JbmRleCh0dGxfaG91cnM9X0NPTVBMRVRFRF9PUkRFUl9UVExfSE9V
-UlMsIGNhcD1fTUFYX09SREVSUykKICAgICAgICBzZWxmLl9tZXRyaWNzICAg
-ID0gU3RhdGVNYWNoaW5lTWV0cmljcygpCiAgICAgICAgc2VsZi5fd2F0Y2hk
-b2c6IE9wdGlvbmFsW2FzeW5jaW8uVGFza10gPSBOb25lCiAgICAgICAgc2Vs
-Zi5fYWxlcnRfY2I6IE9wdGlvbmFsW0NhbGxhYmxlXSAgICAgPSBOb25lCgog
-ICAgYXN5bmMgZGVmIHN0YXJ0KHNlbGYpIC0+IE5vbmU6CiAgICAgICAgc2Vs
-Zi5fd2F0Y2hkb2cgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkuY3JlYXRl
-X3Rhc2soc2VsZi5fd2F0Y2hkb2dfbG9vcCgpLCBuYW1lPSJvc206d2F0Y2hk
-b2ciKQogICAgICAgIHNlbGYuX3dhdGNoZG9nLmFkZF9kb25lX2NhbGxiYWNr
-KF9oYW5kbGVfdGFza19leGMoIm9zbTp3YXRjaGRvZyIpKQogICAgICAgIGxv
-Z2dlci5kZWJ1ZygiT1NNIHN0YXJ0ZWQiKQoKICAgIGFzeW5jIGRlZiBzdG9w
-KHNlbGYpIC0+IE5vbmU6CiAgICAgICAgaWYgc2VsZi5fd2F0Y2hkb2cgYW5k
-IG5vdCBzZWxmLl93YXRjaGRvZy5kb25lKCk6CiAgICAgICAgICAgIHNlbGYu
-X3dhdGNoZG9nLmNhbmNlbCgpCiAgICAgICAgICAgIHRyeTogYXdhaXQgc2Vs
-Zi5fd2F0Y2hkb2cKICAgICAgICAgICAgZXhjZXB0IGFzeW5jaW8uQ2FuY2Vs
-bGVkRXJyb3I6IHBhc3MKICAgICAgICBsb2dnZXIuZGVidWcoIk9TTSBzdG9w
-cGVkIikKCiAgICBkZWYgc2V0X2FsZXJ0X2NhbGxiYWNrKHNlbGYsIGNiOiBD
-YWxsYWJsZSkgLT4gTm9uZTogc2VsZi5fYWxlcnRfY2IgPSBjYgoKICAgIGFz
-eW5jIGRlZiBjcmVhdGVfb3JkZXIoc2VsZiwgb3JkZXI6IE1hbmFnZWRPcmRl
-cikgLT4gTm9uZToKICAgICAgICBhc3luYyB3aXRoIHNlbGYuX2xvY2s6CiAg
-ICAgICAgICAgIGlmIG9yZGVyLm9yZGVyX2lkIGluIHNlbGYuX29yZGVyczog
-bG9nZ2VyLmRlYnVnKCJkdXBsaWNhdGUgb3JkZXIiLCBvcmRlcl9pZD1vcmRl
-ci5vcmRlcl9pZCk7IHJldHVybgogICAgICAgICAgICBpZiBsZW4oc2VsZi5f
-b3JkZXJzKSA+PSBfTUFYX09SREVSUzogYXdhaXQgc2VsZi5fZXZpY3RfZXhw
-aXJlZF9ub2xvY2soKQogICAgICAgICAgICBzZWxmLl9vcmRlcnNbb3JkZXIu
-b3JkZXJfaWRdID0gb3JkZXIKICAgICAgICAgICAgc2VsZi5fbWV0cmljcy5y
-ZWNvcmRfY3JlYXRlZChvcmRlci5vcmRlcl9pZCkKICAgICAgICAgICAgbG9n
-Z2VyLmRlYnVnKCJvcmRlciBjcmVhdGVkIiwgb3JkZXJfaWQ9b3JkZXIub3Jk
-ZXJfaWQsIHN0YXRlPW9yZGVyLnN0YXRlLnZhbHVlKQoKICAgIGFzeW5jIGRl
-ZiB0cmFuc2l0aW9uKHNlbGYsIG9yZGVyX2lkOiBzdHIsIG5ld19zdGF0ZTog
-T3JkZXJTdGF0ZSwKICAgICAgICAgICAgICAgICAgICAgICByZWFzb246IHN0
-ciA9ICIiLCBhY3Rvcjogc3RyID0gInN5c3RlbSIsICoqa3dhcmdzOiBBbnkp
-IC0+IGJvb2w6CiAgICAgICAgYXN5bmMgd2l0aCBzZWxmLl9sb2NrOgogICAg
-ICAgICAgICBvcmRlciA9IHNlbGYuX29yZGVycy5nZXQob3JkZXJfaWQpCiAg
-ICAgICAgICAgIGlmIG9yZGVyIGlzIE5vbmU6CiAgICAgICAgICAgICAgICBs
-b2dnZXIuZGVidWcoInRyYW5zaXRpb24gb24gdW5rbm93biBvcmRlciIsIG9y
-ZGVyX2lkPW9yZGVyX2lkKTsgcmV0dXJuIEZhbHNlCiAgICAgICAgICAgIGFs
-bG93ZWQgPSBfQUxMT1dFRF9UUkFOU0lUSU9OUy5nZXQob3JkZXIuc3RhdGUs
-IHNldCgpKQogICAgICAgICAgICBpZiBuZXdfc3RhdGUgbm90IGluIGFsbG93
-ZWQ6CiAgICAgICAgICAgICAgICBsb2dnZXIud2FybmluZygiaWxsZWdhbCB0
-cmFuc2l0aW9uIGJsb2NrZWQiLCBvcmRlcl9pZD1vcmRlcl9pZCwKICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgIGZyb21fc3RhdGU9b3JkZXIuc3Rh
-dGUudmFsdWUsIHRvX3N0YXRlPW5ld19zdGF0ZS52YWx1ZSwKICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgIGFsbG93ZWQ9W3MudmFsdWUgZm9yIHMg
-aW4gYWxsb3dlZF0pCiAgICAgICAgICAgICAgICByZXR1cm4gRmFsc2UKICAg
-ICAgICAgICAgb2xkX3N0YXRlICAgID0gb3JkZXIuc3RhdGUKICAgICAgICAg
-ICAgb3JkZXIuc3RhdGUgICAgICA9IG5ld19zdGF0ZQogICAgICAgICAgICBv
-cmRlci51cGRhdGVkX2F0ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykK
-ICAgICAgICAgICAgb3JkZXIudHJhbnNpdGlvbnMuYXBwZW5kKE9yZGVyVHJh
-bnNpdGlvbihmcm9tX3N0YXRlPW9sZF9zdGF0ZSwgdG9fc3RhdGU9bmV3X3N0
-YXRlLCByZWFzb249cmVhc29uLCBhY3Rvcj1hY3RvcikpCiAgICAgICAgICAg
-IGZvciBrLCB2IGluIGt3YXJncy5pdGVtcygpOgogICAgICAgICAgICAgICAg
-aWYgaGFzYXR0cihvcmRlciwgayk6IHNldGF0dHIob3JkZXIsIGssIHYpCiAg
-ICAgICAgICAgIHNlbGYuX21ldHJpY3MucmVjb3JkX3RyYW5zaXRpb24ob2xk
-X3N0YXRlLnZhbHVlLCBuZXdfc3RhdGUudmFsdWUpCiAgICAgICAgICAgIGlm
-IG9yZGVyLmlzX3Rlcm1pbmFsKCk6CiAgICAgICAgICAgICAgICBzZWxmLl9t
-ZXRyaWNzLnJlY29yZF90ZXJtaW5hbChvcmRlcl9pZCkKICAgICAgICAgICAg
-ICAgIHNlbGYuX2V2aWN0aW9uX2luZGV4LmFkZChvcmRlcl9pZCwgb3JkZXIu
-dXBkYXRlZF9hdCkKICAgICAgICAgICAgbG9nZ2VyLmRlYnVnKCJvcmRlciB0
-cmFuc2l0aW9uIiwgb3JkZXJfaWQ9b3JkZXJfaWQsCiAgICAgICAgICAgICAg
-ICAgICAgICAgICBmcm9tX3N0YXRlPW9sZF9zdGF0ZS52YWx1ZSwgdG9fc3Rh
-dGU9bmV3X3N0YXRlLnZhbHVlLCByZWFzb249cmVhc29uKQogICAgICAgIHQg
-PSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkuY3JlYXRlX3Rhc2soCiAgICAg
-ICAgICAgIGRpc3BhdGNoX2NhbGxiYWNrc19zYWZlKHNlbGYuX2NhbGxiYWNr
-cywgb3JkZXIsIG9yZGVyLnRyYW5zaXRpb25zWy0xXSkpCiAgICAgICAgdC5h
-ZGRfZG9uZV9jYWxsYmFjayhfaGFuZGxlX3Rhc2tfZXhjKCJvc206Y2FsbGJh
-Y2siKSkKICAgICAgICByZXR1cm4gVHJ1ZQoKICAgIGFzeW5jIGRlZiBnZXRf
-b3JkZXIoc2VsZiwgb3JkZXJfaWQ6IHN0cikgLT4gT3B0aW9uYWxbTWFuYWdl
-ZE9yZGVyXToKICAgICAgICBhc3luYyB3aXRoIHNlbGYuX2xvY2s6IHJldHVy
-biBzZWxmLl9vcmRlcnMuZ2V0KG9yZGVyX2lkKQoKICAgIGFzeW5jIGRlZiBn
-ZXRfYWxsX29yZGVycyhzZWxmKSAtPiBMaXN0W01hbmFnZWRPcmRlcl06CiAg
-ICAgICAgYXN5bmMgd2l0aCBzZWxmLl9sb2NrOiByZXR1cm4gbGlzdChzZWxm
-Ll9vcmRlcnMudmFsdWVzKCkpCgogICAgYXN5bmMgZGVmIGdldF9hY3RpdmVf
-b3JkZXJzKHNlbGYpIC0+IExpc3RbTWFuYWdlZE9yZGVyXToKICAgICAgICBh
-c3luYyB3aXRoIHNlbGYuX2xvY2s6IHJldHVybiBbbyBmb3IgbyBpbiBzZWxm
-Ll9vcmRlcnMudmFsdWVzKCkgaWYgby5pc19hY3RpdmUoKV0KCiAgICBkZWYg
-cmVnaXN0ZXJfY2FsbGJhY2soc2VsZiwgY2I6IENhbGxhYmxlKSAtPiBOb25l
-OiBzZWxmLl9jYWxsYmFja3MuYXBwZW5kKGNiKQoKICAgIGFzeW5jIGRlZiBf
-ZXZpY3RfZXhwaXJlZF9ub2xvY2soc2VsZikgLT4gTm9uZToKICAgICAgICBl
-eHBpcmVkID0gc2VsZi5fZXZpY3Rpb25faW5kZXguZ2V0X2V4cGlyZWQoKQog
-ICAgICAgIGZvciBvaWQgaW4gZXhwaXJlZDogc2VsZi5fb3JkZXJzLnBvcChv
-aWQsIE5vbmUpCiAgICAgICAgc2VsZi5fZXZpY3Rpb25faW5kZXgucmVtb3Zl
-KHNldChleHBpcmVkKSkKICAgICAgICBsb2dnZXIuZGVidWcoImV2aWN0ZWQg
-ZXhwaXJlZCBvcmRlcnMiLCBjb3VudD1sZW4oZXhwaXJlZCkpCgogICAgYXN5
-bmMgZGVmIF93YXRjaGRvZ19sb29wKHNlbGYpIC0+IE5vbmU6CiAgICAgICAg
-d2hpbGUgVHJ1ZToKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAg
-YXdhaXQgYXN5bmNpby5zbGVlcCg2MCkKICAgICAgICAgICAgICAgIGh1bmcg
-PSBzZWxmLl9tZXRyaWNzLmdldF9odW5nX29yZGVycygpCiAgICAgICAgICAg
-ICAgICBpZiBodW5nOgogICAgICAgICAgICAgICAgICAgIGxvZ2dlci53YXJu
-aW5nKCJodW5nIG9yZGVycyBkZXRlY3RlZCIsIGNvdW50PWxlbihodW5nKSwg
-b3JkZXJfaWRzPWh1bmc6NV0pCiAgICAgICAgICAgICAgICAgICAgaWYgc2Vs
-Zi5fYWxlcnRfY2I6CiAgICAgICAgICAgICAgICAgICAgICAgIHRyeTogYXdh
-aXQgc2VsZi5fYWxlcnRfY2IoImh1bmdfb3JkZXJzIiwgaHVuZykKICAgICAg
-ICAgICAgICAgICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOiBsb2dn
-ZXIuZGVidWcoImFsZXJ0IGVycm9yIiwgZXJyb3I9c3RyKGUpKQogICAgICAg
-ICAgICBleGNlcHQgYXN5bmNpby5DYW5jZWxsZWRFcnJvcjogYnJlYWsKCiAg
-ICBkZWYgc25hcHNob3Qoc2VsZikgLT4gRGljdFtzdHIsIEFueV06CiAgICAg
-ICAgcmV0dXJuIHsidG90YWxfb3JkZXJzIjogbGVuKHNlbGYuX29yZGVycyks
-ICJtZXRyaWNzIjogc2VsZi5fbWV0cmljcy5zbmFwc2hvdCgpLCAiaHVuZ19v
-cmRlcnMiOiBzZWxmLl9tZXRyaWNzLmdldF9odW5nX29yZGVycygpfQoKCmRl
-ZiBfaGFuZGxlX3Rhc2tfZXhjKGNvbnRleHQ6IHN0cik6CiAgICBkZWYgX2Ni
-KHRhc2s6IGFzeW5jaW8uVGFzaykgLT4gTm9uZToKICAgICAgICBpZiBub3Qg
-dGFzay5jYW5jZWxsZWQoKToKICAgICAgICAgICAgZXhjID0gdGFzay5leGNl
-cHRpb24oKQogICAgICAgICAgICBpZiBleGM6IGxvZ2dlci5kZWJ1ZygidGFz
-ayBleGNlcHRpb24iLCBjb250ZXh0PWNvbnRleHQsIGVycm9yPXN0cihleGMp
-KQogICAgcmV0dXJuIF9jYgoKCmFzeW5jIGRlZiBkaXNwYXRjaF9jYWxsYmFj
-a3Nfc2FmZShjYWxsYmFja3M6IGxpc3QsICphcmdzOiBBbnkpIC0+IE5vbmU6
-CiAgICBmb3IgY2IgaW4gY2FsbGJhY2tzOgogICAgICAgIHRyeToKICAgICAg
-ICAgICAgcmVzdWx0ID0gY2IoKmFyZ3MpCiAgICAgICAgICAgIGlmIGFzeW5j
-aW8uaXNjb3JvdXRpbmUocmVzdWx0KTogYXdhaXQgcmVzdWx0CiAgICAgICAg
-ZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IGxvZ2dlci5kZWJ1ZygiY2FsbGJh
-Y2sgZXJyb3IiLCBlcnJvcj1zdHIoZXhjKSkKCgpjbGFzcyBTaWduYWxJZGVt
-cG90ZW5jeUd1YXJkOgogICAgX1RUTF9TID0gMzAwCiAgICBkZWYgX19pbml0
-X18oc2VsZikgLT4gTm9uZToKICAgICAgICBzZWxmLl9zZWVuOiBEaWN0W3N0
-ciwgZmxvYXRdID0ge307IHNlbGYuX2xvY2sgPSBhc3luY2lvLkxvY2soKQog
-ICAgYXN5bmMgZGVmIHJlZ2lzdGVyKHNlbGYsIHNpZ25hbF9pZDogc3RyLCBv
-cmRlcl9pZDogc3RyID0gIiIpIC0+IGJvb2w6CiAgICAgICAgYXN5bmMgd2l0
-aCBzZWxmLl9sb2NrOgogICAgICAgICAgICBzZWxmLl9wdXJnZV9leHBpcmVk
-KCkKICAgICAgICAgICAgaWYgc2lnbmFsX2lkIGluIHNlbGYuX3NlZW46IHJl
-dHVybiBGYWxzZQogICAgICAgICAgICBzZWxmLl9zZWVuW3NpZ25hbF9pZF0g
-PSB0aW1lLm1vbm90b25pYygpOyByZXR1cm4gVHJ1ZQogICAgYXN5bmMgZGVm
-IHJlbGVhc2Uoc2VsZiwgc2lnbmFsX2lkOiBzdHIpIC0+IE5vbmU6CiAgICAg
-ICAgYXN5bmMgd2l0aCBzZWxmLl9sb2NrOiBzZWxmLl9zZWVuLnBvcChzaWdu
-YWxfaWQsIE5vbmUpCiAgICBkZWYgX3B1cmdlX2V4cGlyZWQoc2VsZikgLT4g
-Tm9uZToKICAgICAgICBub3cgPSB0aW1lLm1vbm90b25pYygpCiAgICAgICAg
-Zm9yIGsgaW4gW2sgZm9yIGssIHQgaW4gc2VsZi5fc2Vlbi5pdGVtcygpIGlm
-IG5vdyAtIHQgPiBzZWxmLl9UVExfU106IGRlbCBzZWxmLl9zZWVuW2tdCgoK
-Y2xhc3MgQ29tcGxldGVkT3JkZXJFdmljdGlvbkluZGV4OgogICAgZGVmIF9f
-aW5pdF9fKHNlbGYsIHR0bF9ob3VyczogaW50ID0gMjQsIGNhcDogaW50ID0g
-MTBfMDAwKSAtPiBOb25lOgogICAgICAgIHNlbGYuX3R0bCA9IHRpbWVkZWx0
-YShob3Vycz10dGxfaG91cnMpOyBzZWxmLl9jYXAgPSBjYXA7IHNlbGYuX2lu
-ZGV4OiBEaWN0W3N0ciwgZGF0ZXRpbWVdID0ge30KICAgIGRlZiBhZGQoc2Vs
-Ziwgb3JkZXJfaWQ6IHN0ciwgY29tcGxldGVkX2F0OiBkYXRldGltZSkgLT4g
-Tm9uZTogc2VsZi5faW5kZXhbb3JkZXJfaWRdID0gY29tcGxldGVkX2F0CiAg
-ICBkZWYgZ2V0X2V4cGlyZWQoc2VsZikgLT4gTGlzdFtzdHJdOgogICAgICAg
-IGN1dG9mZiA9IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpIC0gc2VsZi5f
-dHRsCiAgICAgICAgcmV0dXJuIFtvaWQgZm9yIG9pZCwgdHMgaW4gc2VsZi5f
-aW5kZXguaXRlbXMoKSBpZiB0cyA8IGN1dG9mZl0KICAgIGRlZiByZW1vdmUo
-c2VsZiwgb3JkZXJfaWRzOiBTZXRbc3RyXSkgLT4gTm9uZToKICAgICAgICBm
-b3Igb2lkIGluIG9yZGVyX2lkczogc2VsZi5faW5kZXgucG9wKG9pZCwgTm9u
-ZSkKICAgIGRlZiBpc19vdmVyX2NhcChzZWxmLCBuOiBpbnQpIC0+IGJvb2w6
-IHJldHVybiBuID49IHNlbGYuX2NhcAoKCmNsYXNzIFN0YXRlTWFjaGluZU1l
-dHJpY3M6CiAgICBfSFVOR19USFJFU0hPTERfUyA9IDMwMAogICAgZGVmIF9f
-aW5pdF9fKHNlbGYpIC0+IE5vbmU6CiAgICAgICAgc2VsZi5fdHJhbnNpdGlv
-bnM6IERpY3Rbc3RyLCBpbnRdID0gZGVmYXVsdGRpY3QoaW50KQogICAgICAg
-IHNlbGYuX2NyZWF0ZWRfYXQ6ICBEaWN0W3N0ciwgZmxvYXRdID0ge30KICAg
-ICAgICBzZWxmLl90ZXJtaW5hbF9hdDogRGljdFtzdHIsIGZsb2F0XSA9IHt9
-CiAgICBkZWYgcmVjb3JkX3RyYW5zaXRpb24oc2VsZiwgZjogc3RyLCB0OiBz
-dHIpIC0+IE5vbmU6IHNlbGYuX3RyYW5zaXRpb25zW2YiW2Z9XeKGknt0fSJd
-ICs9IDEKICAgIGRlZiByZWNvcmRfY3JlYXRlZChzZWxmLCBvaWQ6IHN0cikg
-LT4gTm9uZTogc2VsZi5fY3JlYXRlZF9hdFtvaWRdID0gdGltZS5tb25vdG9u
-aWMoKQogICAgZGVmIHJlY29yZF90ZXJtaW5hbChzZWxmLCBvaWQ6IHN0ciku
-IC0+IE5vbmU6IHNlbGYuX2NyZWF0ZWRfYXQucG9wKG9pZCwgTm9uZSk7IHNl
-bGYuX3Rlcm1pbmFsX2F0W29pZF0gPSB0aW1lLm1vbm90b25pYygpCiAgICBk
-ZWYgZ2V0X2h1bmdfb3JkZXJzKHNlbGYpIC0+IExpc3Rbc3RyXToKICAgICAg
-ICBub3cgPSB0aW1lLm1vbm90b25pYygpCiAgICAgICAgcmV0dXJuIFtvaWQg
-Zm9yIG9pZCwgdCBpbiBzZWxmLl9jcmVhdGVkX2F0Lml0ZW1zKCkgaWYgbm93
-IC0gdCA+IHNlbGYuX0hVTkdfVEhSRVNIT0xEX1NdCiAgICBkZWYgc25hcHNo
-b3Qoc2VsZikgLT4gRGljdFtzdHIsIEFueV06CiAgICAgICAgcmV0dXJuIHsi
-dHJhbnNpdGlvbnMiOiBkaWN0KHNlbGYuX3RyYW5zaXRpb25zKSwgImh1bmdf
-Y291bnQiOiBsZW4oc2VsZi5nZXRfaHVuZ19vcmRlcnMoKSl9CgoKX29zbV9p
-bnN0YW5jZTogT3B0aW9uYWxbT3JkZXJTdGF0ZU1hY2hpbmVdID0gTm9uZQpf
-b3NtX2xvY2sgPSBhc3luY2lvLkxvY2soKQoKCmFzeW5jIGRlZiBnZXRfb3Jk
-ZXJfc3RhdGVfbWFjaGluZSgpIC0+IE9yZGVyU3RhdGVNYWNoaW5lOgogICAg
-Z2xvYmFsIF9vc21faW5zdGFuY2UKICAgIGFzeW5jIHdpdGggX29zbV9sb2Nr
-OgogICAgICAgIGlmIF9vc21faW5zdGFuY2UgaXMgTm9uZTogX29zbV9pbnN0
-YW5jZSA9IE9yZGVyU3RhdGVNYWNoaW5lKCkKICAgICAgICByZXR1cm4gX29z
-bV9pbnN0YW5jZQo=
+P3-OSM-1: ALLOWED_TRANSITIONS guard
+P3-OSM-2: Full lifecycle: PENDING->SUBMITTED->FILLED->CLOSING->CLOSED
+P3-OSM-3: OrderTransition immutable audit log per order
+P3-OSM-4: action/requested_volume/requested_price fields
+P3-OSM-5: is_active() helper
+P3-OSM-6: OrderTimeoutWatchdog
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+from ..core.logger import get_logger
+
+logger = get_logger("execution.order_state_machine")
+
+_COMPLETED_EVICTION_TTL_S = 300.0
+
+
+class OrderStatus(str, Enum):
+    PENDING    = "PENDING"
+    SUBMITTED  = "SUBMITTED"
+    FILLED     = "FILLED"
+    CLOSING    = "CLOSING"
+    CLOSED     = "CLOSED"
+    CANCELLED  = "CANCELLED"
+    REJECTED   = "REJECTED"
+
+
+ALLOWED_TRANSITIONS: Dict[OrderStatus, Set[OrderStatus]] = {
+    OrderStatus.PENDING:   {OrderStatus.SUBMITTED, OrderStatus.CANCELLED},
+    OrderStatus.SUBMITTED: {OrderStatus.FILLED, OrderStatus.REJECTED, OrderStatus.CANCELLED},
+    OrderStatus.FILLED:    {OrderStatus.CLOSING, OrderStatus.CLOSED},
+    OrderStatus.CLOSING:   {OrderStatus.CLOSED},
+    OrderStatus.CLOSED:    set(),
+    OrderStatus.CANCELLED: set(),
+    OrderStatus.REJECTED:  set(),
+}
+
+
+@dataclass(frozen=True)
+class OrderTransition:
+    """Immutable audit log entry for a state change."""
+    order_id:   str
+    from_state: OrderStatus
+    to_state:   OrderStatus
+    timestamp:  float = field(default_factory=time.time)
+    actor:      str   = "system"
+    reason:     str   = ""
+
+
+@dataclass
+class Order:
+    """Represents a trading order with lifecycle state."""
+    order_id:         str
+    symbol:           str
+    direction:        str
+    requested_volume: float
+    requested_price:  float
+    status:           OrderStatus        = OrderStatus.PENDING
+    action:           str                = "OPEN"
+    filled_price:     Optional[float]    = None
+    filled_volume:    Optional[float]    = None
+    ticket:           Optional[int]      = None
+    created_at:       float              = field(default_factory=time.time)
+    updated_at:       float              = field(default_factory=time.time)
+    transitions:      List[OrderTransition] = field(default_factory=list)
+    metadata:         Dict[str, Any]     = field(default_factory=dict)
+
+    def is_active(self) -> bool:
+        return self.status in (
+            OrderStatus.PENDING, OrderStatus.SUBMITTED,
+            OrderStatus.FILLED, OrderStatus.CLOSING
+        )
+
+    def is_terminal(self) -> bool:
+        return self.status in (
+            OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.REJECTED
+        )
+
+
+class StateTransitionError(Exception):
+    """Raised when an illegal state transition is attempted."""
+
+
+class StateMachineMetrics:
+    def __init__(self):
+        self.transitions_total: int = 0
+        self.illegal_attempts:  int = 0
+        self.active_orders:     int = 0
+        self.completed_orders:  int = 0
+
+    def record_transition(self):
+        self.transitions_total += 1
+
+    def record_illegal(self):
+        self.illegal_attempts += 1
+
+
+class SignalIdempotencyGuard:
+    def __init__(self, maxsize: int = 1000):
+        self._seen: deque = deque(maxlen=maxsize)
+        self._set:  Set[str] = set()
+
+    def is_duplicate(self, signal_id: str) -> bool:
+        return signal_id in self._set
+
+    def register(self, signal_id: str) -> None:
+        if len(self._seen) >= self._seen.maxlen:
+            old = self._seen.popleft()
+            self._set.discard(old)
+        self._seen.append(signal_id)
+        self._set.add(signal_id)
+
+
+class CompletedOrderEvictionIndex:
+    def __init__(self, ttl_s: float = _COMPLETED_EVICTION_TTL_S):
+        self._ttl = ttl_s
+        self._index: Dict[str, float] = {}
+
+    def register(self, order_id: str) -> None:
+        self._index[order_id] = time.time()
+
+    def evict_expired(self) -> List[str]:
+        now = time.time()
+        expired = [oid for oid, ts in self._index.items() if now - ts > self._ttl]
+        for oid in expired:
+            del self._index[oid]
+        return expired
+
+
+class OrderTimeoutWatchdog:
+    def __init__(
+        self,
+        timeout_s: float = 60.0,
+        alert_callback: Optional[Callable[[str, OrderStatus], None]] = None,
+    ):
+        self._timeout_s = timeout_s
+        self._alert_cb  = alert_callback
+        self._task: Optional[asyncio.Task] = None
+
+    async def start(self, orders: Dict[str, Order]) -> None:
+        while True:
+            await asyncio.sleep(10)
+            now = time.time()
+            for order_id, order in list(orders.items()):
+                if order.is_active() and (now - order.updated_at) > self._timeout_s:
+                    logger.warning(f"Order timeout: {order_id} in {order.status}")
+                    if self._alert_cb:
+                        try:
+                            self._alert_cb(order_id, order.status)
+                        except Exception as e:
+                            logger.error(f"Timeout alert callback failed: {e}")
+
+
+class OrderStateMachine:
+    """Production order lifecycle manager."""
+
+    def __init__(self):
+        self._orders:     Dict[str, Order] = {}
+        self._metrics    = StateMachineMetrics()
+        self._idempotency = SignalIdempotencyGuard()
+        self._eviction   = CompletedOrderEvictionIndex()
+        self._lock       = asyncio.Lock()
+
+    async def create_order(
+        self,
+        order_id: str,
+        symbol:   str,
+        direction: str,
+        volume:   float,
+        price:    float,
+        **kwargs: Any,
+    ) -> Order:
+        async with self._lock:
+            if order_id in self._orders:
+                raise ValueError(f"Order {order_id} already exists")
+            order = Order(
+                order_id=order_id,
+                symbol=symbol,
+                direction=direction,
+                requested_volume=volume,
+                requested_price=price,
+                **kwargs,
+            )
+            self._orders[order_id] = order
+            self._metrics.active_orders += 1
+            logger.info(f"Order created: {order_id} {direction} {symbol} vol={volume}")
+            return order
+
+    async def transition(
+        self,
+        order_id:   str,
+        new_status: OrderStatus,
+        actor:      str = "system",
+        reason:     str = "",
+        **update_fields: Any,
+    ) -> Order:
+        async with self._lock:
+            if order_id not in self._orders:
+                raise KeyError(f"Order {order_id} not found")
+            order   = self._orders[order_id]
+            allowed = ALLOWED_TRANSITIONS.get(order.status, set())
+            if new_status not in allowed:
+                self._metrics.record_illegal()
+                raise StateTransitionError(
+                    f"Illegal transition {order.status} -> {new_status} for {order_id}"
+                )
+            transition = OrderTransition(
+                order_id=order_id,
+                from_state=order.status,
+                to_state=new_status,
+                actor=actor,
+                reason=reason,
+            )
+            order.transitions.append(transition)
+            order.status     = new_status
+            order.updated_at = time.time()
+            for k, v in update_fields.items():
+                if hasattr(order, k):
+                    setattr(order, k, v)
+            self._metrics.record_transition()
+            if order.is_terminal():
+                self._metrics.active_orders   -= 1
+                self._metrics.completed_orders += 1
+                self._eviction.register(order_id)
+            logger.info(f"Order {order_id}: {transition.from_state} -> {new_status}")
+            return order
+
+    async def get_order(self, order_id: str) -> Optional[Order]:
+        return self._orders.get(order_id)
+
+    async def get_active_orders(self) -> List[Order]:
+        return [o for o in self._orders.values() if o.is_active()]
+
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "transitions_total": self._metrics.transitions_total,
+            "illegal_attempts":  self._metrics.illegal_attempts,
+            "active_orders":     self._metrics.active_orders,
+            "completed_orders":  self._metrics.completed_orders,
+        }
+
+
+_osm_instance: Optional[OrderStateMachine] = None
+_osm_lock = asyncio.Lock()
+
+
+async def get_order_state_machine() -> OrderStateMachine:
+    global _osm_instance
+    async with _osm_lock:
+        if _osm_instance is None:
+            _osm_instance = OrderStateMachine()
+        return _osm_instance
