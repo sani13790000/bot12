@@ -1,12 +1,9 @@
 """
-backend/core/config_v11.py  -- Phase-E fix
+backend/core/config_v11.py -- Phase-E fix
 
-Phase-E fixes:
-  E-5  JWT_SECRET = "change-me-in-production" was hardcoded.
-       Now reads from environment variable JWT_SECRET.
-       Raises ValueError on startup if not set in production.
-  E-6  BCRYPT_ROUNDS, RATE_LIMIT_*, CORS_ORIGINS all read from env
-       with safe defaults.
+E-5: JWT_SECRET was hardcoded 'change-me-in-production'
+     Now reads from JWT_SECRET env var with validation on startup.
+E-6: All security settings read from environment variables.
 """
 from __future__ import annotations
 
@@ -18,20 +15,21 @@ class SecurityConfig:
     """
     Security settings loaded from environment variables.
 
-    Required in production:
-      - JWT_SECRET       : long random string (min 32 chars)
-      - BCRYPT_ROUNDS    : int (default 12)
+    Required env vars in production:
+      JWT_SECRET        - min 32 char random string
+      BCRYPT_ROUNDS     - int (default 12)
 
-    Set in .env file or deployment secrets manager.
+    Generate JWT_SECRET:
+      python -c "import secrets; print(secrets.token_hex(32))"
     """
 
-    # JWT
+    # JWT settings
     JWT_SECRET: str = os.environ.get("JWT_SECRET", "")
     JWT_ALGORITHM: str = os.environ.get("JWT_ALGORITHM", "HS256")
     JWT_EXPIRE_MINUTES: int = int(os.environ.get("JWT_EXPIRE_MINUTES", "60"))
     JWT_REFRESH_EXPIRE_DAYS: int = int(os.environ.get("JWT_REFRESH_EXPIRE_DAYS", "30"))
 
-    # Bcrypt
+    # Password hashing
     BCRYPT_ROUNDS: int = int(os.environ.get("BCRYPT_ROUNDS", "12"))
 
     # Rate limiting
@@ -52,17 +50,22 @@ class SecurityConfig:
         if o.strip()
     ]
 
-    # Audit / session
-    AUDIT_LOG_ENABLED: bool = os.environ.get("AUDIT_LOG_ENABLED", "true").lower() == "true"
-    SESSION_COOKIE_SECURE: bool = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"
+    # Audit
+    AUDIT_LOG_ENABLED: bool = (
+        os.environ.get("AUDIT_LOG_ENABLED", "true").lower() == "true"
+    )
+    SESSION_COOKIE_SECURE: bool = (
+        os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"
+    )
     SESSION_COOKIE_HTTPONLY: bool = True
     SESSION_COOKIE_SAMESITE: str = os.environ.get("SESSION_COOKIE_SAMESITE", "lax")
 
     @classmethod
     def validate(cls) -> None:
         """
-        Call once at application startup.
-        Raises ValueError if critical secrets are missing or too short.
+        Validate security settings at startup.
+        In production: raises ValueError if JWT_SECRET is missing or too short.
+        In development: generates ephemeral key and logs a warning.
         """
         env = os.environ.get("APP_ENV", "development").lower()
 
@@ -70,15 +73,17 @@ class SecurityConfig:
             if env == "production":
                 raise ValueError(
                     "JWT_SECRET environment variable is required in production. "
-                    "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+                    "Generate: python -c \"import secrets; print(secrets.token_hex(32))\""
                 )
+            # Development only: generate ephemeral key
             cls.JWT_SECRET = secrets.token_hex(32)
             import logging
             logging.getLogger(__name__).warning(
-                "JWT_SECRET not set — using ephemeral random key. "
-                "All sessions will be invalidated on restart. "
-                "Set JWT_SECRET in .env for development."
+                "JWT_SECRET not set - using ephemeral random key. "
+                "Sessions will be invalidated on restart. "
+                "Add JWT_SECRET to your .env file."
             )
+            return
 
         if len(cls.JWT_SECRET) < 32:
             raise ValueError(
@@ -88,7 +93,7 @@ class SecurityConfig:
 
     @classmethod
     def get_jwt_secret(cls) -> str:
-        """Safe getter — always validated before use."""
+        """Always-validated getter for use in auth middleware."""
         if not cls.JWT_SECRET:
             cls.validate()
         return cls.JWT_SECRET
