@@ -1,35 +1,26 @@
 """
 backend/api/routes/signals.py
-Galaxy Vast AI — Trading Signals API Routes
+Galaxy Vast AI — Signals API Routes
 """
 from __future__ import annotations
-
-from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Any
 
 router = APIRouter(prefix="/signals", tags=["signals"])
 
-
-class SignalResponse(BaseModel):
-    signal_id: str
-    symbol: str
-    direction: str
-    confidence: float
-    timestamp: str
-
-
-@router.get("/", response_model=List[Dict[str, Any]])
+@router.get("/")
 async def list_signals(
-    symbol: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=500),
-):
-    """List recent trading signals."""
-    return []
-
+    symbol: str | None = Query(None),
+    limit: int = Query(50, le=500),
+) -> dict[str, Any]:
+    return {"signals": [], "total": 0, "symbol": symbol}
 
 @router.get("/{signal_id}")
-async def get_signal(signal_id: str):
-    """Get a specific signal by ID."""
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signal not found")
+async def get_signal(signal_id: str) -> dict[str, Any]:
+    return {"id": signal_id, "status": "not_found"}
+
+@router.post("/")
+async def create_signal(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"created": True, "payload": payload}
+
+__all__ = ["router"]
