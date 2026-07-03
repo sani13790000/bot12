@@ -1,1 +1,140 @@
-"""\nGalaxy Vast AI Trading Platform\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nماژول: PositionReconciliation\n\nوظیفه:\n  هر 30 ثانیه پوزیشن‌های باز در MT5 را با سیستم مقایسه می‌کند.\n\nانواع ناهماهنگی:\n  • GHOST:  در سیستم ما هست، در MT5 نیست → auto-close\n  • ORPHAN: در MT5 هست، در سیستم نیست → alert\n"""\n\nfrom __future__ import annotations\nimport asyncio, logging\nfrom dataclasses import dataclass\nfrom datetime import datetime, timezone\nfrom enum import Enum\nfrom typing import List, Optional, Set\n\nlogger = logging.getLogger(__name__)\n\n\nclass MismatchType(str, Enum):\n    GHOST  = \"GHOST\"\n    ORPHAN = \"ORPHAN\"\n    STALE  = \"STALE\"\n\n\n@dataclass\nclass Mismatch:\n    mismatch_type: MismatchType\n    order_id:      Optional[str]\n    ticket:        Optional[int]\n    symbol:        Optional[str]\n    detected_at:   datetime\n    resolved:      bool = False\n    resolution:    Optional[str] = None\n\n\nclass PositionReconciliation:\n    \"\"\"\n    سرویس تطابق پوزیشن‌ها با MT5.\n\n    مثال:\n        r = PositionReconciliation(mt5_connector=conn, osm=osm)\n        await r.start()\n    \"\"\"\n\n    def __init__(self, mt5_connector: object, osm: object,\n                 interval_seconds: int = 30,\n                 stale_threshold: int = 120) -> None:\n        self._mt5            = mt5_connector\n        self._osm            = osm\n        self._interval       = interval_seconds\n        self._stale_threshold = stale_threshold\n        self._running        = False\n        self._task: Optional[asyncio.Task] = None\n        self._mismatches: List[Mismatch]   = []\n        self._run_count  = 0\n        self._last_run:  Optional[datetime] = None\n\n    async def start(self) -> None:\n        if self._running: return\n        self._running = True\n        self._task = asyncio.create_task(self._loop(), name=\"reconciliation\")\n        logger.info(\"reconciliation.started interval=%ds\", self._interval)\n\n    async def stop(self) -> None:\n        self._running = False\n        if self._task and not self._task.done():\n            self._task.cancel()\n            try: await self._task\n            except asyncio.CancelledError: pass\n        logger.info(\"reconciliation.stopped\")\n\n    async def _loop(self) -> None:\n        while self._running:\n            try: await self._run_once()\n            except asyncio.CancelledError: break\n            except Exception as exc: logger.exception(\"reconciliation.error: %s\", exc)\n            await asyncio.sleep(self._interval)\n\n    async def _run_once(self) -> List[Mismatch]:\n        self._run_count += 1\n        self._last_run   = datetime.now(timezone.utc)\n        new_mismatches: List[Mismatch] = []\n\n        try:\n            mt5_positions, system_orders = await asyncio.gather(\n                self._get_mt5_positions(), self._get_system_orders()\n            )\n            mt5_tickets: Set[int] = {p.ticket for p in mt5_positions}\n            sys_tickets: Set[int] = {o.ticket for o in system_orders\n                                     if o.ticket is not None}\n\n            # GHOST: در سیستم هست، در MT5 نیست\n            for order in system_orders:\n                if order.ticket and order.ticket not in mt5_tickets:\n                    m = Mismatch(MismatchType.GHOST, order.order_id,\n                                 order.ticket, order.symbol, self._last_run)\n                    await self._resolve_ghost(m, order)\n                    new_mismatches.append(m)\n\n            # ORPHAN: در MT5 هست، در سیستم نیست\n            for pos in mt5_positions:\n                if pos.ticket not in sys_tickets:\n                    m = Mismatch(MismatchType.ORPHAN, None,\n                                 pos.ticket, pos.symbol, self._last_run)\n                    await self._handle_orphan(m, pos)\n                    new_mismatches.append(m)\n\n            if new_mismatches:\n                self._mismatches.extend(new_mismatches)\n                logger.warning(\"reconciliation.mismatches found=%d\", len(new_mismatches))\n            else:\n                logger.debug(\"reconciliation.ok run=%d\", self._run_count)\n\n        except Exception as exc:\n            logger.error(\"reconciliation.run_once failed: %s\", exc)\n\n        return new_mismatches\n\n    async def _resolve_ghost(self, mismatch: Mismatch, order: object) -> None:\n        try:\n            from backend.execution.order_state_machine import OrderEvent\n            self._osm.transition(order.order_id, OrderEvent.CLOSE, profit=0.0)\n            mismatch.resolved   = True\n            mismatch.resolution = \"auto_closed: not found in MT5\"\n            logger.warning(\"reconciliation.ghost_resolved order_id=%s\", order.order_id)\n        except Exception as exc:\n            logger.error(\"reconciliation.ghost_resolve failed: %s\", exc)\n\n    async def _handle_orphan(self, mismatch: Mismatch, position: object) -> None:\n        mismatch.resolution = \"logged_only: manual review needed\"\n        logger.critical(\"reconciliation.orphan ticket=%s symbol=%s\",\n                        position.ticket, position.symbol)\n\n    async def _get_mt5_positions(self) -> list:\n        try: return await self._mt5.get_open_positions()\n        except Exception as exc:\n            logger.error(\"reconciliation: MT5 error: %s\", exc); return []\n\n    async def _get_system_orders(self) -> list:\n        try: return self._osm.list_active()\n        except Exception as exc:\n            logger.error(\"reconciliation: OSM error: %s\", exc); return []\n\n    def get_status(self) -> dict:\n        unresolved = [m for m in self._mismatches if not m.resolved]\n        return {\"running\": self._running, \"run_count\": self._run_count,\n                \"last_run\": self._last_run.isoformat() if self._last_run else None,\n                \"total_mismatches\": len(self._mismatches),\n                \"unresolved\": len(unresolved), \"interval_s\": self._interval}\n\n    def get_mismatches(self, unresolved_only: bool = True) -> List[Mismatch]:\n        if unresolved_only: return [m for m in self._mismatches if not m.resolved]\n        return list(self._mismatches)\n
+"""
+backend/execution/position_reconciliation.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Background task that reconciles the internal OrderStateMachine
+with the live MT5 position list.
+
+What it detects
+---------------
+GHOST positions:
+    Tickets that the state machine believes are OPEN but MT5 no longer
+    has — closed externally (manual close, stop-out, etc.).
+
+ORPHAN positions:
+    Tickets that MT5 has open but the state machine does not know about
+    — opened outside the bot (manual trades).
+
+Usage::
+
+    from backend.execution.position_reconciliation import reconciler
+    from backend.services.scheduler import scheduler
+
+    scheduler.register("reconcile", reconciler.run, interval_s=30)
+"""
+from __future__ import annotations
+
+import logging
+from typing import List
+
+logger = logging.getLogger(__name__)
+
+
+class PositionReconciler:
+    """
+    Compares internal state with live MT5 positions and resolves
+    discrepancies.
+    """
+
+    def __init__(
+        self,
+        connector:     object = None,   # MT5Connector
+        state_machine: object = None,   # OrderStateMachine
+    ) -> None:
+        self._connector     = connector
+        self._state_machine = state_machine
+        self._ghost_count   = 0
+        self._orphan_count  = 0
+
+    async def run(self) -> None:
+        """
+        Periodic reconciliation entry point.
+
+        Called by the Scheduler every N seconds.
+        """
+        connector, osm = self._get_deps()
+        if connector is None or osm is None:
+            return
+
+        try:
+            live_positions = await connector.get_all_positions()
+        except Exception as exc:
+            logger.warning("[reconciler] cannot fetch MT5 positions: %s", exc)
+            return
+
+        live_tickets = {p.ticket for p in live_positions}
+        active_tickets = set(osm.active_tickets())
+
+        # ── GHOST: OSM thinks open, MT5 says closed ───────────────────── #
+        ghosts = active_tickets - live_tickets
+        for ticket in ghosts:
+            logger.warning(
+                "[reconciler] GHOST ticket=%d — closing in OSM", ticket
+            )
+            try:
+                osm.transition(ticket, "CLOSED")
+                self._ghost_count += 1
+            except Exception as exc:
+                logger.error(
+                    "[reconciler] failed to close ghost ticket=%d: %s",
+                    ticket, exc,
+                )
+
+        # ── ORPHAN: MT5 has open, OSM does not know ───────────────────── #
+        orphans = live_tickets - active_tickets
+        for ticket in orphans:
+            logger.warning(
+                "[reconciler] ORPHAN ticket=%d — registering in OSM", ticket
+            )
+            try:
+                osm.register(ticket)
+                osm.transition(ticket, "SUBMITTED")
+                osm.transition(ticket, "OPEN")
+                self._orphan_count += 1
+            except Exception as exc:
+                logger.error(
+                    "[reconciler] failed to register orphan ticket=%d: %s",
+                    ticket, exc,
+                )
+
+        if ghosts or orphans:
+            logger.info(
+                "[reconciler] cycle complete: %d ghost(s), %d orphan(s)",
+                len(ghosts), len(orphans),
+            )
+        else:
+            logger.debug("[reconciler] cycle complete: no discrepancies")
+
+    def stats(self) -> dict:
+        """Return lifetime reconciliation counters."""
+        return {
+            "total_ghosts_resolved":  self._ghost_count,
+            "total_orphans_resolved": self._orphan_count,
+        }
+
+    # ── Internals ─────────────────────────────────────────────────────────── #
+
+    def _get_deps(self):
+        """Lazy-load dependencies to avoid circular imports at module level."""
+        connector = self._connector
+        osm       = self._state_machine
+
+        if connector is None:
+            try:
+                from backend.execution.mt5_connector import mt5_connector
+                connector = mt5_connector
+            except Exception:
+                pass
+
+        if osm is None:
+            try:
+                from backend.execution.order_state_machine import order_state_machine
+                osm = order_state_machine
+            except Exception:
+                pass
+
+        return connector, osm
+
+
+# ── Module-level singleton ────────────────────────────────────────────────── #
+reconciler = PositionReconciler()

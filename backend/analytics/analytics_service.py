@@ -1,161 +1,171 @@
-"""Galaxy Vast AI Trading Platform
-Analytics Service
+"""
+backend/analytics/analytics_service.py
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Analytics service: aggregates trade history and computes
+performance statistics for the dashboard and Telegram reports.
 
-Fixes applied:
-- DEAD CODE: _calculate_win_rate() was defined twice — second definition
-  silently overrode the first (different logic). Removed duplicate.
-- LOGIC: _safe_divide() was inline in multiple places — extracted to module helper.
-- ASYNC: get_performance_metrics() called sync DB helpers — now properly async.
-- MEDIUM: Empty trade list not guarded — ZeroDivisionError possible → guarded.
+Usage::
+
+    from backend.analytics.analytics_service import analytics_service
+
+    stats = await analytics_service.get_performance_stats(days=30)
+    print(stats["win_rate"], stats["net_pnl"])
 """
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def _safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
-    """Avoid ZeroDivisionError; return default when denominator is 0."""
-    return numerator / denominator if denominator else default
-
-
 class AnalyticsService:
-    """Trade analytics and performance metrics engine."""
+    """
+    Computes aggregated performance metrics from the trade history.
 
-    def __init__(self) -> None:
-        self._trades: List[Dict[str, Any]] = []
-        self._cache: Dict[str, Any] = {}
+    All heavy queries are cached for *cache_ttl_s* seconds to avoid
+    hammering the database on every dashboard refresh.
+    """
 
-    # ── Public API ──────────────────────────────────────────────────
+    def __init__(self, cache_ttl_s: float = 60.0) -> None:
+        self._cache_ttl  = cache_ttl_s
+        self._cache:     Dict[str, Any] = {}
+        self._cache_ts:  Dict[str, float] = {}
 
-    def add_trade(self, trade: Dict[str, Any]) -> None:
-        """Record a closed trade for analytics."""
-        self._trades.append(trade)
-        self._cache.clear()  # invalidate cache on new data
+    # ── Public API ───────────────────────────────────────────────────────── #
 
-    def get_summary(self) -> Dict[str, Any]:
-        """Return a cached performance summary."""
-        if "summary" not in self._cache:
-            self._cache["summary"] = self._compute_summary()
-        return self._cache["summary"]
+    async def get_performance_stats(self, days: int = 30) -> Dict[str, Any]:
+        """
+        Return aggregated performance stats for the last *days* days.
 
-    def get_equity_curve(self) -> List[float]:
-        """Cumulative equity curve from initial balance."""
-        equity = 10_000.0
-        curve = [equity]
-        for t in self._trades:
-            equity += t.get("pnl", 0.0)
-            curve.append(round(equity, 2))
-        return curve
+        Returns
+        -------
+        dict with keys:
+            total_trades, winning_trades, losing_trades,
+            win_rate, net_pnl, gross_pnl,
+            max_drawdown, avg_rr, best_trade, worst_trade
+        """
+        cache_key = f"perf:{days}"
+        if self._is_cached(cache_key):
+            return self._cache[cache_key]
 
-    def get_drawdown_series(self) -> List[float]:
-        """Per-trade drawdown from peak equity."""
-        curve = self.get_equity_curve()
-        peak = curve[0]
-        drawdowns: List[float] = []
-        for eq in curve:
-            if eq > peak:
-                peak = eq
-            dd = _safe_divide(peak - eq, peak) * 100
-            drawdowns.append(round(dd, 2))
-        return drawdowns
+        trades = await self._fetch_closed_trades(days)
+        stats  = self._compute_stats(trades)
+        self._set_cache(cache_key, stats)
+        return stats
 
-    def get_monthly_breakdown(self) -> Dict[str, Any]:
-        """PnL grouped by YYYY-MM."""
-        monthly: Dict[str, float] = {}
-        for t in self._trades:
-            ts = t.get("closed_at") or t.get("timestamp", "")
-            key = str(ts)[:7]  # YYYY-MM
-            monthly[key] = monthly.get(key, 0.0) + t.get("pnl", 0.0)
-        return {k: round(v, 2) for k, v in sorted(monthly.items())}
+    async def get_symbol_breakdown(self, days: int = 30) -> List[Dict[str, Any]]:
+        """
+        Return per-symbol performance breakdown.
 
-    def get_symbol_breakdown(self) -> Dict[str, Any]:
-        """PnL and trade count grouped by symbol."""
-        sym: Dict[str, Dict[str, Any]] = {}
-        for t in self._trades:
-            s = t.get("symbol", "UNKNOWN")
-            if s not in sym:
-                sym[s] = {"pnl": 0.0, "count": 0, "wins": 0}
-            sym[s]["pnl"]   += t.get("pnl", 0.0)
-            sym[s]["count"] += 1
-            if t.get("pnl", 0.0) > 0:
-                sym[s]["wins"] += 1
-        return {
-            s: {
-                "pnl":      round(d["pnl"], 2),
-                "count":    d["count"],
-                "win_rate": round(_safe_divide(d["wins"], d["count"]) * 100, 1),
-            }
-            for s, d in sym.items()
-        }
+        Returns a list of dicts: [{symbol, trades, win_rate, net_pnl}, ...]
+        sorted by net_pnl descending.
+        """
+        trades = await self._fetch_closed_trades(days)
+        by_symbol: Dict[str, List[Dict]] = {}
+        for t in trades:
+            sym = t.get("symbol", "UNKNOWN")
+            by_symbol.setdefault(sym, []).append(t)
 
-    def clear(self) -> None:
-        """Reset all recorded trades and cache."""
-        self._trades.clear()
-        self._cache.clear()
+        result = []
+        for sym, sym_trades in by_symbol.items():
+            stats = self._compute_stats(sym_trades)
+            result.append({"symbol": sym, **stats})
 
-    # ── Internal ──────────────────────────────────────────────────
+        result.sort(key=lambda x: x["net_pnl"], reverse=True)
+        return result
 
-    def _compute_summary(self) -> Dict[str, Any]:
-        trades = self._trades
+    # ── Computation ───────────────────────────────────────────────────────── #
+
+    @staticmethod
+    def _compute_stats(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Derive key metrics from a list of closed trade records."""
         if not trades:
             return {
-                "total_trades": 0,
-                "win_rate": 0.0,
-                "profit_factor": 0.0,
-                "total_pnl": 0.0,
-                "avg_pnl": 0.0,
-                "max_win": 0.0,
-                "max_loss": 0.0,
-                "max_drawdown_pct": 0.0,
-                "sharpe_ratio": 0.0,
-                "expectancy": 0.0,
+                "total_trades":   0,
+                "winning_trades": 0,
+                "losing_trades":  0,
+                "win_rate":       0.0,
+                "net_pnl":        0.0,
+                "gross_pnl":      0.0,
+                "max_drawdown":   0.0,
+                "avg_rr":         0.0,
+                "best_trade":     0.0,
+                "worst_trade":    0.0,
             }
 
-        pnls  = [t.get("pnl", 0.0) for t in trades]
-        wins  = [p for p in pnls if p > 0]
-        losses = [p for p in pnls if p < 0]
+        pnls     = [float(t.get("pnl", 0.0)) for t in trades]
+        rrs      = [float(t.get("risk_reward", 0.0)) for t in trades if t.get("risk_reward")]
+        winners  = [p for p in pnls if p > 0]
+        losers   = [p for p in pnls if p < 0]
+        gross    = sum(winners)
+        net      = sum(pnls)
 
-        total_pnl      = sum(pnls)
-        win_rate       = _safe_divide(len(wins), len(pnls)) * 100
-        gross_profit   = sum(wins)
-        gross_loss     = abs(sum(losses))
-        profit_factor  = _safe_divide(gross_profit, gross_loss)
-        avg_win        = _safe_divide(sum(wins),   len(wins))
-        avg_loss       = _safe_divide(sum(losses), len(losses))
-        expectancy     = (win_rate / 100) * avg_win + (1 - win_rate / 100) * avg_loss
-        max_drawdown   = max(self.get_drawdown_series()) if pnls else 0.0
-
-        # Sharpe (simplified, assuming 0 risk-free rate)
-        if len(pnls) > 1:
-            import statistics
-            mu  = statistics.mean(pnls)
-            std = statistics.stdev(pnls)
-            sharpe = _safe_divide(mu, std) * (252 ** 0.5)  # annualized
-        else:
-            sharpe = 0.0
+        # Max drawdown: largest peak-to-trough drop in cumulative P&L
+        cumulative = 0.0
+        peak       = 0.0
+        max_dd     = 0.0
+        for p in pnls:
+            cumulative += p
+            if cumulative > peak:
+                peak = cumulative
+            dd = (peak - cumulative) / peak if peak > 0 else 0.0
+            if dd > max_dd:
+                max_dd = dd
 
         return {
-            "total_trades":    len(trades),
-            "win_rate":        round(win_rate, 2),
-            "profit_factor":   round(profit_factor, 3),
-            "total_pnl":       round(total_pnl, 2),
-            "avg_pnl":         round(_safe_divide(total_pnl, len(pnls)), 2),
-            "max_win":         round(max(pnls), 2),
-            "max_loss":        round(min(pnls), 2),
-            "max_drawdown_pct": round(max_drawdown, 2),
-            "sharpe_ratio":    round(sharpe, 3),
-            "expectancy":      round(expectancy, 2),
-            "gross_profit":    round(gross_profit, 2),
-            "gross_loss":      round(gross_loss, 2),
+            "total_trades":   len(trades),
+            "winning_trades": len(winners),
+            "losing_trades":  len(losers),
+            "win_rate":       len(winners) / len(trades) if trades else 0.0,
+            "net_pnl":        round(net, 2),
+            "gross_pnl":      round(gross, 2),
+            "max_drawdown":   round(max_dd, 4),
+            "avg_rr":         round(sum(rrs) / len(rrs), 2) if rrs else 0.0,
+            "best_trade":     round(max(pnls), 2),
+            "worst_trade":    round(min(pnls), 2),
         }
 
-    # Removed: duplicate _calculate_win_rate() that silently overrode
-    # a first definition with different logic (dead code).
+    # ── Data access ───────────────────────────────────────────────────────── #
+
+    async def _fetch_closed_trades(self, days: int) -> List[Dict[str, Any]]:
+        """Fetch closed trades from the database."""
+        try:
+            from backend.database.client import db_client
+            if days > 0:
+                since = (
+                    datetime.now(timezone.utc) - timedelta(days=days)
+                ).isoformat()
+                rows = await db_client.select(
+                    "trades",
+                    filters={"status": "closed", "closed_at__gte": since},
+                    limit=10_000,
+                )
+            else:
+                rows = await db_client.select(
+                    "trades",
+                    filters={"status": "closed"},
+                    limit=10_000,
+                )
+            return rows or []
+        except Exception as exc:
+            logger.warning("[analytics] _fetch_closed_trades failed: %s", exc)
+            return []
+
+    # ── Cache helpers ───────────────────────────────────────────────────────── #
+
+    def _is_cached(self, key: str) -> bool:
+        import time
+        ts = self._cache_ts.get(key, 0.0)
+        return key in self._cache and (time.time() - ts) < self._cache_ttl
+
+    def _set_cache(self, key: str, value: Any) -> None:
+        import time
+        self._cache[key]    = value
+        self._cache_ts[key] = time.time()
 
 
-# Module-level singleton
+# ── Module-level singleton ────────────────────────────────────────────────── #
 analytics_service = AnalyticsService()
