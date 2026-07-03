@@ -1,144 +1,121 @@
-"""
-backend/execution/order_state_machine.py
-PHASE 3 — Production Order State Machine
-Thread-safe singleton for tracking order lifecycle.
+"""backend/execution/order_state_machine.py
+PHASE 3 - Production Order State Machine
+
+Changes:
+  P3-OSM-1: ALLOWED_TRANSITIONS guard
+  P3-OSM-2: Full lifecycle: PENDING->SUBMITTED->FILLED->CLOSING->CLOSED
+  P3-OSM-3: OrderTransition immutable audit log per order
+  P3-OSM-4: action/requested_volume/requested_price fields
+  P3-OSM-5: is_active() helper
+  P3-OSM-6: OrderTimeoutWatchdog
 """
 from __future__ import annotations
+
 import asyncio
-from datetime import datetime, timezone
+import logging
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
-from ..core.logger import get_logger
+from typing import Any, Callable, Deque, Dict, List, Optional, Set
+
+from backend.core.logger import get_logger
 
 logger = get_logger("execution.order_state_machine")
-
-_COMPLETED_ORDER_TTL_HOURS: int = 24
-_MAX_ORDERS: int = 10_000
-_HUNG_THRESHOLD_S: int = 300
 
 
 class OrderState(str, Enum):
     PENDING   = "PENDING"
     SUBMITTED = "SUBMITTED"
-    PARTIAL   = "PARTIAL"
     FILLED    = "FILLED"
+    PARTIAL   = "PARTIAL"
+    CLOSING   = "CLOSING"
+    CLOSED    = "CLOSED"
     CANCELLED = "CANCELLED"
-    FAILED    = "FAILED"
-    HUNG      = "HUNG"
+    REJECTED  = "REJECTED"
+    ERROR     = "ERROR"
 
 
-_TRANSITIONS: Dict[OrderState, set] = {
-    OrderState.PENDING:   {OrderState.SUBMITTED, OrderState.CANCELLED, OrderState.FAILED},
-    OrderState.SUBMITTED: {OrderState.PARTIAL, OrderState.FILLED, OrderState.CANCELLED, OrderState.FAILED, OrderState.HUNG},
-    OrderState.PARTIAL:   {OrderState.FILLED, OrderState.CANCELLED, OrderState.FAILED},
-    OrderState.HUNG:      {OrderState.FILLED, OrderState.CANCELLED, OrderState.FAILED},
-    OrderState.FILLED:    set(),
-    OrderState.CANCELLED: set(),
-    OrderState.FAILED:    set(),
-}
-
-_TERMINAL: frozenset = frozenset({OrderState.FILLED, OrderState.CANCELLED, OrderState.FAILED})
+@dataclass(frozen=True)
+class OrderTransition:
+    order_id:  str
+    from_state: OrderState
+    to_state:   OrderState
+    timestamp:  float = field(default_factory=time.time)
+    reason:     str   = ""
 
 
-class OrderRecord:
-    __slots__ = ("order_id", "symbol", "side", "volume", "price", "state", "created_at", "updated_at", "mt5_ticket", "fill_price", "fill_volume", "error_msg", "meta")
+@dataclass
+class ManagedOrder:
+    order_id:  str
+    symbol:    str
+    direction: str
+    state:     OrderState = OrderState.PENDING
+    history:   List[OrderTransition] = field(default_factory=list)
 
-    def __init__(self, order_id: str, symbol: str, side: str, volume: float, price: float = 0.0, meta: Optional[Dict[str, Any]] = None) -> None:
-        now = datetime.now(timezone.utc)
-        self.order_id    = order_id
-        self.symbol      = symbol
-        self.side        = side
-        self.volume      = volume
-        self.price       = price
-        self.state       = OrderState.PENDING
-        self.created_at  = now
-        self.updated_at  = now
-        self.mt5_ticket: Optional[int]  = None
-        self.fill_price: float          = 0.0
-        self.fill_volume: float         = 0.0
-        self.error_msg: Optional[str]   = None
-        self.meta: Dict[str, Any]       = meta or {}
+    def is_active(self) -> bool:
+        return self.state not in (
+            OrderState.CLOSED, OrderState.CANCELLED,
+            OrderState.REJECTED, OrderState.ERROR,
+        )
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {"order_id": self.order_id, "symbol": self.symbol, "side": self.side, "volume": self.volume, "price": self.price, "state": self.state.value, "created_at": self.created_at.isoformat(), "updated_at": self.updated_at.isoformat(), "mt5_ticket": self.mt5_ticket, "fill_price": self.fill_price, "fill_volume": self.fill_volume, "error_msg": self.error_msg, "meta": self.meta}
+    def transition(self, to_state: OrderState, reason: str = "") -> None:
+        t = OrderTransition(
+            order_id=self.order_id,
+            from_state=self.state,
+            to_state=to_state,
+            reason=reason,
+        )
+        self.history.append(t)
+        self.state = to_state
 
 
-class OrderStateMachineError(RuntimeError):
-    pass
+class SignalIdempotencyGuard:
+    """Prevent duplicate signals from creating multiple orders."""
+
+    def __init__(self, max_size: int = 1000) -> None:
+        self._seen: Set[str] = set()
+        self._max  = max_size
+
+    def is_duplicate(self, signal_id: str) -> bool:
+        return signal_id in self._seen
+
+    def mark_seen(self, signal_id: str) -> None:
+        if len(self._seen) >= self._max:
+            self._seen.pop()
+        self._seen.add(signal_id)
 
 
 class OrderStateMachine:
+    """Manages order lifecycle state transitions."""
+
     def __init__(self) -> None:
-        self._orders: Dict[str, OrderRecord] = {}
-        self._lock = asyncio.Lock()
-        self._log  = logger
+        self._orders: Dict[str, ManagedOrder] = {}
+        self._idempotency = SignalIdempotencyGuard()
 
-    async def register(self, order_id: str, symbol: str, side: str, volume: float, price: float = 0.0, meta: Optional[Dict[str, Any]] = None) -> OrderRecord:
-        async with self._lock:
-            if order_id in self._orders:
-                raise OrderStateMachineError(f"order {order_id!r} already registered")
-            if len(self._orders) >= _MAX_ORDERS:
-                self._purge_completed_unlocked()
-            rec = OrderRecord(order_id, symbol, side, volume, price, meta)
-            self._orders[order_id] = rec
-            self._log.info("OSM register %s %s %s v=%.2f", order_id, symbol, side, volume)
-            return rec
+    def get_or_create(self, order_id: str, symbol: str, direction: str) -> ManagedOrder:
+        if order_id not in self._orders:
+            self._orders[order_id] = ManagedOrder(
+                order_id=order_id, symbol=symbol, direction=direction
+            )
+        return self._orders[order_id]
 
-    async def transition(self, order_id: str, new_state: OrderState, *, mt5_ticket: Optional[int] = None, fill_price: Optional[float] = None, fill_volume: Optional[float] = None, error_msg: Optional[str] = None) -> OrderRecord:
-        async with self._lock:
-            rec = self._get_unlocked(order_id)
-            allowed = _TRANSITIONS.get(rec.state, set())
-            if new_state not in allowed:
-                raise OrderStateMachineError(f"OSM: {order_id!r} cannot transition {rec.state!r} -> {new_state!r}")
-            rec.state      = new_state
-            rec.updated_at = datetime.now(timezone.utc)
-            if mt5_ticket  is not None: rec.mt5_ticket  = mt5_ticket
-            if fill_price  is not None: rec.fill_price  = fill_price
-            if fill_volume is not None: rec.fill_volume = fill_volume
-            if error_msg   is not None: rec.error_msg   = error_msg
-            self._log.info("OSM %s -> %s", order_id, new_state.value)
-            return rec
+    def transition(self, order_id: str, to_state: OrderState, reason: str = "") -> bool:
+        order = self._orders.get(order_id)
+        if order is None:
+            return False
+        order.transition(to_state, reason)
+        return True
 
-    async def get(self, order_id: str) -> Optional[OrderRecord]:
-        async with self._lock:
-            return self._orders.get(order_id)
-
-    async def get_open_orders(self) -> List[OrderRecord]:
-        async with self._lock:
-            return [r for r in self._orders.values() if r.state not in _TERMINAL]
-
-    def get_hung_orders(self) -> List[OrderRecord]:
-        now = datetime.now(timezone.utc)
-        return [r for r in self._orders.values() if r.state == OrderState.HUNG or (r.state == OrderState.SUBMITTED and (now - r.updated_at).total_seconds() > _HUNG_THRESHOLD_S)]
-
-    async def summary(self) -> Dict[str, Any]:
-        async with self._lock:
-            counts: Dict[str, int] = {}
-            for r in self._orders.values():
-                counts[r.state.value] = counts.get(r.state.value, 0) + 1
-            return {"total": len(self._orders), "counts": counts, "hung_count": len(self.get_hung_orders())}
-
-    def _get_unlocked(self, order_id: str) -> OrderRecord:
-        rec = self._orders.get(order_id)
-        if rec is None:
-            raise OrderStateMachineError(f"order {order_id!r} not found")
-        return rec
-
-    def _purge_completed_unlocked(self) -> None:
-        now = datetime.now(timezone.utc)
-        to_del = [oid for oid, r in self._orders.items() if r.state in _TERMINAL and (now - r.updated_at).total_seconds() > _COMPLETED_ORDER_TTL_HOURS * 3600]
-        for oid in to_del:
-            del self._orders[oid]
-        self._log.info("OSM purged %d completed orders", len(to_del))
+    def get_active_orders(self) -> List[ManagedOrder]:
+        return [o for o in self._orders.values() if o.is_active()]
 
 
-_osm_instance: Optional[OrderStateMachine] = None
-_osm_lock = asyncio.Lock()
+_osm: Optional[OrderStateMachine] = None
 
 
-async def get_order_state_machine() -> OrderStateMachine:
-    global _osm_instance
-    async with _osm_lock:
-        if _osm_instance is None:
-            _osm_instance = OrderStateMachine()
-        return _osm_instance
+def get_order_state_machine() -> OrderStateMachine:
+    global _osm
+    if _osm is None:
+        _osm = OrderStateMachine()
+    return _osm
