@@ -1,11 +1,5 @@
-"""
-Module: alerts
-Path: backend/telegram/handlers/alerts.py
-Telegram alerts handler stub.
-"""
+"""backend/telegram/handlers/alerts.py — stub"""
 from __future__ import annotations
-
-
-async def handle_alert(update, context):
-    """Handle alert messages."""
-    pass
+import logging
+logger = logging.getLogger(__name__)
+__all__: list[str] = []

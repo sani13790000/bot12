@@ -1,16 +1,5 @@
-"""
-Module: reports
-Path: backend/telegram/handlers/reports.py
-Telegram reports handler stub.
-"""
+"""backend/telegram/handlers/reports.py — stub"""
 from __future__ import annotations
-
-
-async def handle_daily_report(update, context):
-    """Send daily report."""
-    pass
-
-
-async def handle_performance_report(update, context):
-    """Send performance report."""
-    pass
+import logging
+logger = logging.getLogger(__name__)
+__all__: list[str] = []

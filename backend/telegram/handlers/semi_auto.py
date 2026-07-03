@@ -1,16 +1,5 @@
-"""
-Module: semi_auto
-Path: backend/telegram/handlers/semi_auto.py
-Telegram semi-auto handler stub.
-"""
+"""backend/telegram/handlers/semi_auto.py — stub"""
 from __future__ import annotations
-
-
-async def handle_approve(update, context):
-    """Handle trade approval command."""
-    pass
-
-
-async def handle_reject(update, context):
-    """Handle trade rejection command."""
-    pass
+import logging
+logger = logging.getLogger(__name__)
+__all__: list[str] = []

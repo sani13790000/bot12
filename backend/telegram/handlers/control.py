@@ -1,16 +1,5 @@
-"""
-Module: control
-Path: backend/telegram/handlers/control.py
-Telegram control handler stub.
-"""
+"""backend/telegram/handlers/control.py — stub"""
 from __future__ import annotations
-
-
-async def handle_control(update, context):
-    """Handle control commands."""
-    pass
-
-
-async def handle_kill_switch(update, context):
-    """Handle kill switch command."""
-    pass
+import logging
+logger = logging.getLogger(__name__)
+__all__: list[str] = []
