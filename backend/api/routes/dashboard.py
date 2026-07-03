@@ -1,1 +1,108 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9kYXNoYm9hcmQucHkKUDktRklYLUJBQ0stMTogb3duZXJzaGlwIGVuZm9yY2VtZW50IOKAlCBjdXN0b21lciBzZWVzIE9OTFkgb3duIHN0YXRzClA5LUZJWC1CQUNLLTI6IGVycm9yIGRldGFpbCBub3QgbGVha2VkIOKAlCBnZW5lcmljIDUwMyBvbiBpbnRlcm5hbCBlcnJvclAKUDktRklYLUJBQ0stMzogZXF1aXR5LWN1cnZlIGZhbGxiYWNrIHdoZW4gbm8gdHJhZGUgaGlzdG9yeQpQOS1GSVgtQkFDSy00OiB0b2RheV9wcm9maXQgYWRkZWQgdG8gc3RhdHMgcmVzcG9uc2UKUDktRklYLUJBQ0stNTogYm90X3N0YXR1cyBlbmRwb2ludCBhZGRlZAoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGxvZ2dpbmcKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZSwgZGF0ZXRpbWUsIHRpbWV6b25lCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIE9wdGlvbmFsCgpmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgRGVwZW5kcywgSFRUUEV4Y2VwdGlvbiwgUXVlcnksIHN0YXR1cwpmcm9tIHB5ZGFudGljIGltcG9ydCBCYXNlTW9kZWwKCmZyb20gYmFja2VuZC5jb3JlLmRlcHNfdjIgaW1wb3J0IGdldF9hdXRoX2NvbnRleHQsIEF1dGhDb250ZXh0CmZyb20gYmFja2VuZC5zZXJ2aWNlcy50cmFkZV9zZXJ2aWNlIGltcG9ydCBUcmFkZVNlcnZpY2UKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIocHJlZml4PSIvZGFzaGJvYXJkIiwgdGFncz1bImRhc2hib2FyZCJdKQoKX3RyYWRlX3N2YyA9IFRyYWRlU2VydmljZSgpCgoKY2xhc3MgRGFzaGJvYXJkU3RhdHMoQmFzZU1vZGVsKToKICAgIGJhbGFuY2U6ICAgICAgICBmbG9hdAogICAgZXF1aXR5OiAgICAgICAgIGZsb2F0CiAgICB0b2RheV9wcm9maXQ6ICAgZmxvYXQKICAgIHRvdGFsX3BubDogICAgICBmbG9hdAogICAgd2luX3JhdGU6ICAgICAgIGZsb2F0CiAgICB0b3RhbF90cmFkZXM6ICAgaW50CiAgICBvcGVuX3RyYWRlczogICAgaW50CiAgICBzZWN1cml0eV9zY29yZTogaW50CiAgICBkcmF3ZG93bl9wY3Q6ICAgZmxvYXQKICAgIGJvdF9vbmxpbmU6ICAgICBib29sCgoKY2xhc3MgRXF1aXR5UG9pbnQoQmFzZU1vZGVsKToKICAgIHRpbWVzdGFtcDogc3RyCiAgICBlcXVpdHk6ICAgIGZsb2F0CiAgICBiYWxhbmNlOiAgIGZsb2F0CiAgICBkcmF3ZG93bjogIGZsb2F0CgoKY2xhc3MgRXF1aXR5Q3VydmVSZXNwb25zZShCYXNlTW9kZWwpOgogICAgcG9pbnRzOiBsaXN0W0VxdWl0eVBvaW50XQoKCmNsYXNzIEJvdFN0YXR1cyhCYXNlTW9kZWwpOgogICAgb25saW5lOiAgICAgICAgIGJvb2wKICAgIGxhc3RfaGVhcnRiZWF0OiBPcHRpb25hbFtzdHJdCiAgICBtb2RlOiAgICAgICAgICAgc3RyCiAgICBraWxsX3N3aXRjaDogICAgYm9vbAogICAgbWFyZ2luX2xldmVsOiAgIE9wdGlvbmFsW2Zsb2F0XQogICAgb3Blbl90cmFkZXM6ICAgIGludAoKCmRlZiBfc2FmZShmbjoKIEFueSwgZGVmYXVsdDogQW55ID0gTm9uZSkgLT4gQW55OgogICAgdHJ5OgogICAgICAgIHJldHVybiBmbigpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIuZXhjZXB0aW9uKCJkYXNoYm9hcmQgc2FmZS1jYWxsIGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgcmV0dXJuIGRlZmF1bHQKCgpAcm91dGVyLmdldCgiL3N0YXRzIiwgcmVzcG9uc2VfbW9kZWw9RGFzaGJvYXJkU3RhdHMpCmFzeW5jIGRlZiBnZXRfc3RhdHMoY3R4OiBBdXRoQ29udGV4dCA9IERlcGVuZHMoZ2V0X2F1dGhfY29udGV4dCkpIC0+IERhc2hib2FyZFN0YXRzOgogICAgdWlkID0gY3R4LnVzZXJfaWQKICAgIHRyeToKICAgICAgICBzdGF0cyA9IGF3YWl0IF90cmFkZV9zdmMuZ2V0X2Rhc2hib2FyZF9zdGF0cyh1c2VyX2lkPXVpZCkKICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigiZ2V0X3N0YXRzIGZhaWxlZCBmb3IgdXNlciAlcyIsIHVpZCkKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQX3NlcnZpY2VfdW5hdmFpbGFibGUsIGRldGFpbD0i2K/Yp9i22KjZiNix2K8g2YXZiNmR2KrYpyBkZCDYr9iiINYp2LHYs9iqZXIgWM2YbmiLiIpCiAgICB0b2RheV9wcm9maXQgPSBzdGF0cy5nZXQoInRvZGF5X3Byb2ZpdCIpIG9yIF9zYWZlKGxhbWJkYTogc3RhdHMuZ2V0KCJkYWlseV9wbmwiLCAwLjApLCAwLjApCiAgICByZXR1cm4gRGFzaGJvYXJkU3RhdHMoCiAgICAgICAgYmFsYW5jZSAgICAgICAgPSBzdGF0cy5nZXQoImJhbGFuY2UiLCAgICAgICAgMC4wKSwKICAgICAgICBlcXVpdHkgICAgICAgICA9IHN0YXRzLmdldCgiZXF1aXR5IiwgICAgICAgICAwLjApLAogICAgICAgIHRvZGF5X3Byb2ZpdCAgID0gdG9kYXlfcHJvZml0LAogICAgICAgIHRvdGFsX3BubCAgICAgID0gc3RhdHMuZ2V0KCJ0b3RhbF9wbmwiLCAgICAgIDAuMCksCiAgICAgICAgd2luX3JhdGUgICAgICAgPSBzdGF0cy5nZXQoIndpbl9yYXRlIiwgICAgICAgIDAuMCksCiAgICAgICAgdG90YWxfdHJhZGVzICAgPSBzdGF0cy5nZXQoInRvdGFsX3RyYWRlcyIsICAgMCksCiAgICAgICAgb3Blbl90cmFkZXMgICAgPSBzdGF0cy5nZXQoIm9wZW5fdHJhZGVzIiwgICAgMCksCiAgICAgICAgc2VjdXJpdHlfc2NvcmUgPSBzdGF0cy5nZXQoInNlY3VyaXR5X3Njb3JlIiwgMCksCiAgICAgICAgZHJhd2Rvd25fcGN0ICAgPSBzdGF0cy5nZXQoImRyYXdkb3duX3BjdCIsICAgMC4wKSwKICAgICAgICBib3Rfb25saW5lICAgICA9IHN0YXRzLmdldCgiYm90X29ubGluZSIsICAgICBGYWxzZSksCiAgICApCgoKQHJvdXRlci5nZXQoIi9lcXVpdHktY3VydmUiLCByZXNwb25zZV9tb2RlbD1FcXVpdHlDdXJ2ZVJlc3BvbnNlKQphc3luYyBkZWYgZ2V0X2VxdWl0eV9jdXJ2ZShkYXlzOiBpbnQgPSBRdWVyeSgzMCwgZ2U9MSwgbGU9MzY1KSwgY3R4OiBBdXRoQ29udGV4dCA9IERlcGVuZHMoZ2V0X2F1dGhfY29udGV4dCkpIC0+IEVxdWl0eUN1cnZlUmVzcG9uc2U6CiAgICB1aWQgPSBjdHgudXNlcl9pZAogICAgdHJ5OgogICAgICAgIHJhdyA9IGF3YWl0IF90cmFkZV9zdmMuZ2V0X2VxdWl0eV9jdXJ2ZSh1c2VyX2lkPXVpZCwgZGF5cz1kYXlzKQogICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICBsb2dnZXIuZXhjZXB0aW9uKCJnZXRfZXF1aXR5X2N1cnZlIGZhaWxlZCBmb3IgdXNlciAlcyIsIHVpZCkKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXzUwM19TRVJWSUNFX1VOQVZBSUxBQkxFLCBkZXRhaWw9Itm... DYp9mC2KjZiNix2K8g2YXYqNmE2Yi2YdmFYayAbW8g2K/YogogIOKAaFIrWMyY2YYiKQogICAgcG9pbnRzOiBsaXN0W0VxdWl0eVBvaW50XSA9IFtdCiAgICBmb3Igcm93IGluIChyYXcgb3IgW10pOgogICAgICAgIHRyeToKICAgICAgICAgICAgcG9pbnRzLmFwcGVuZChFcXVpdHlQb2ludCgKICAgICAgICAgICAgICAgIHRpbWVzdGFtcCA9IHJvd1sidGltZXN0YW1wIl0gaWYgaXNpbnN0YW5jZShyb3dbInRpbWVzdGFtcCJdLCBzdHIpCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBlbHNlIGRhdGV0aW1lLmZyb210aW1lc3RhbXAocm93WyJ0aW1lc3RhbXAiXSwgdHo9dGltZXpvbmUudXRjKS5pc29mb3JtYXQoKSwKICAgICAgICAgICAgICAgIGVxdWl0eSAgICA9IGZsb2F0KHJvdy5nZXQoImVxdWl0eSIsICAgMC4wKSksCiAgICAgICAgICAgICAgICBiYWxhbmNlICAgPSBmbG9hdChyb3cuZ2V0KCJiYWxhbmNlIiwgIDAuMCkpLAogICAgICAgICAgICAgICAgZHJhd2Rvd24gID0gZmxvYXQocm93LmdldCgiZHJhd2Rvd24iLCAwLjApKSwKICAgICAgICAgICAgKSkKICAgICAgICBleGNlcHQgKEtleUVycm9yLCBWYWx1ZUVycm9yLCBUeXBlRXJyb3IpOgogICAgICAgICAgICBjb250aW51ZQogICAgcmV0dXJuIEVxdWl0eUN1cnZlUmVzcG9uc2UocG9pbnRzPXBvaW50cykKCgpAcm91dGVyLmdldCgiL2JvdC1zdGF0dXMiLCByZXNwb25zZV9tb2RlbD1Cb3RTdGF0dXMpCmFzeW5jIGRlZiBnZXRfYm90X3N0YXR1cyhjdHg6IEF1dGhDb250ZXh0ID0gRGVwZW5kcyhnZXRfYXV0aF9jb250ZXh0KSkgLT4gQm90U3RhdHVzOgogICAgdWlkID0gY3R4LnVzZXJfaWQKICAgIHRyeToKICAgICAgICBzdGF0dXNfZGF0YSA9IGF3YWl0IF90cmFkZV9zdmMuZ2V0X2JvdF9zdGF0dXModXNlcl9pZD11aWQpCiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIGxvZ2dlci5leGNlcHRpb24oImdldF9ib3Rfc3RhdHVzIGZhaWxlZCBmb3IgdXNlciAlcyIsIHVpZCkKICAgICAgICByZXR1cm4gQm90U3RhdHVzKG9ubGluZT1GYWxzZSwgbGFzdF9oZWFydGJlYXQ9Tm9uZSwgbW9kZT0iU1RPUFBFRCIsIGtpbGxfc3dpdGNoIFZpZGVvRmFsc2UsIG1hcmdpbl9sZXZlbD1Ob25lLCBvcGVuX3RyYWRlcz0wKQogICAgcmV0dXJuIEJvdFN0YXR1cygKICAgICAgICBvbmxpbmUgICAgICAgICA9IHN0YXR1c19kYXRhLmdldCgib25saW5lIiwgICAgICAgICBGYWxzZSksCiAgICAgICAgbGFzdF9oZWFydGJlYXQgPSBzdGF0dXNfZGF0YS5nZXQoImxhc3RfaGVhcnRiZWF0IiwgTm9uZSksCiAgICAgICAgbW9kZSAgICAgICAgICAgPSBzdGF0dXNfZGF0YS5nZXQoIm1vZGUiLCAgICAgICAgICAgIlNUT1BQRUQiKSwKICAgICAgICBraWxsX3N3aXRjaCAgICA9IHN0YXR1c19kYXRhLmdldCgia2lsbF9zd2l0Y2giLCAgICBGYWxzZSksCiAgICAgICAgbWFyZ2luX2xldmVsICAgPSBzdGF0dXNfZGF0YS5nZXQoIm1hcmdpbl9sZXZlbCIsICAgTm9uZSksCiAgICAgICAgb3Blbl90cmFkZXMgICAgPSBzdGF0dXNfZGF0YS5nZXQoIm9wZW5fdHJhZGVzIiwgICAgMCksCiAgICApCg==
+from __future__ import annotations
+import logging
+from datetime import datetime, timezone
+from typing import Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from backend.core.deps_v2 import get_auth_context, AuthContext
+from backend.services.trade_service import TradeService
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix='/dashboard', tags=['dashboard'])
+_trade_svc = TradeService()
+
+
+class DashboardStats(BaseModel):
+    balance:        float
+    equity:         float
+    today_profit:   float
+    total_pnl:      float
+    win_rate:       float
+    total_trades:   int
+    open_trades:    int
+    security_score: int
+    drawdown_pct:   float
+    bot_online:     bool
+
+
+class EquityPoint(BaseModel):
+    timestamp: str
+    equity:    float
+    balance:   float
+    drawdown:  float
+
+
+class EquityCurveResponse(BaseModel):
+    points: list[EquityPoint]
+
+
+class BotStatus(BaseModel):
+    online:         bool
+    last_heartbeat: Optional[str]
+    mode:           str
+    kill_switch:    bool
+    margin_level:   Optional[float]
+    open_trades:    int
+
+
+@router.get('/stats', response_model=DashboardStats)
+async def get_stats(ctx: AuthContext = Depends(get_auth_context)) -> DashboardStats:
+    uid = ctx.user_id
+    try:
+        stats = await _trade_svc.get_dashboard_stats(user_id=uid)
+    except Exception:
+        logger.exception('get_stats failed for user %s', uid)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Service unavailable')
+    today_profit = stats.get('today_profit') or stats.get('daily_pnl', 0.0)
+    return DashboardStats(
+        balance        = stats.get('balance',        0.0),
+        equity         = stats.get('equity',         0.0),
+        today_profit   = today_profit,
+        total_pnl      = stats.get('total_pnl',      0.0),
+        win_rate       = stats.get('win_rate',        0.0),
+        total_trades   = stats.get('total_trades',   0),
+        open_trades    = stats.get('open_trades',    0),
+        security_score = stats.get('security_score', 0),
+        drawdown_pct   = stats.get('drawdown_pct',   0.0),
+        bot_online     = stats.get('bot_online',     False),
+    )
+
+
+@router.get('/equity-curve', response_model=EquityCurveResponse)
+async def get_equity_curve(days: int = Query(30, ge=1, le=365), ctx: AuthContext = Depends(get_auth_context)) -> EquityCurveResponse:
+    uid = ctx.user_id
+    try:
+        raw = await _trade_svc.get_equity_curve(user_id=uid, days=days)
+    except Exception:
+        logger.exception('get_equity_curve failed for user %s', uid)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Service unavailable')
+    if not raw:
+        return EquityCurveResponse(points=[])
+    points: list[EquityPoint] = []
+    for row in raw:
+        try:
+            ts = row['timestamp']
+            if not isinstance(ts, str):
+                ts = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+            points.append(EquityPoint(timestamp=ts, equity=float(row.get('equity', 0.0)), balance=float(row.get('balance', 0.0)), drawdown=float(row.get('drawdown', 0.0))))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return EquityCurveResponse(points=points)
+
+
+@router.get('/bot-status', response_model=BotStatus)
+async def get_bot_status(ctx: AuthContext = Depends(get_auth_context)) -> BotStatus:
+    uid = ctx.user_id
+    try:
+        data = await _trade_svc.get_bot_status(user_id=uid)
+    except Exception:
+        logger.exception('get_bot_status failed for user %s', uid)
+        return BotStatus(online=False, last_heartbeat=None, mode='STOPPED', kill_switch=False, margin_level=None, open_trades=0)
+    return BotStatus(
+        online         = data.get('online',         False),
+        last_heartbeat = data.get('last_heartbeat', None),
+        mode           = data.get('mode',           'STOPPED'),
+        kill_switch    = data.get('kill_switch',    False),
+        margin_level   = data.get('margin_level',   None),
+        open_trades    = data.get('open_trades',    0),
+    )
