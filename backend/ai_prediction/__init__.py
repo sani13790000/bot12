@@ -1,4 +1,5 @@
-"""AI prediction package — XGBoost + drift detection."""
-from backend.ai_prediction.prediction_service import PredictionService
+"""AI Prediction package."""
+from .prediction_service import PredictionService
+from .model_manager import ModelManager
 
-__all__ = ["PredictionService"]
+__all__ = ["PredictionService", "ModelManager"]
