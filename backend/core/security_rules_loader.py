@@ -1,78 +1,65 @@
 """
 backend/core/security_rules_loader.py
-Phase-5 — Security Rule Engine loader.
-Loads YAML/JSON security rules at startup.
+Phase-5 Security Rules Loader
 """
 from __future__ import annotations
-
 import json
 import logging
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-
-@dataclass
-class SecurityRule:
-    rule_id: str
-    name: str
-    description: str
-    severity: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
-    enabled: bool = True
-    conditions: List[Dict[str, Any]] = field(default_factory=list)
-    actions: List[Dict[str, Any]] = field(default_factory=list)
-
-
-@dataclass
-class SecurityRuleSet:
-    version: str
-    rules: List[SecurityRule] = field(default_factory=list)
-
-    def get_rule(self, rule_id: str) -> Optional[SecurityRule]:
-        for rule in self.rules:
-            if rule.rule_id == rule_id:
-                return rule
-        return None
-
-    def get_enabled(self, severity: Optional[str] = None) -> List[SecurityRule]:
-        rules = [r for r in self.rules if r.enabled]
-        if severity:
-            rules = [r for r in rules if r.severity == severity]
-        return rules
+DEFAULT_RULES: dict[str, Any] = {
+    "rate_limit": {"requests_per_minute": 60, "burst": 10},
+    "auth": {"max_failed_attempts": 5, "lockout_minutes": 15},
+    "cors": {"allowed_origins": ["http://localhost:3000"]},
+    "injection": {"enabled": True, "patterns": ["sql", "xss", "path_traversal"]},
+}
 
 
 class SecurityRulesLoader:
-    """Loads and manages security rules from config."""
+    """Loads and validates security rules from JSON or defaults."""
 
-    def __init__(self, rules_path: Optional[str] = None) -> None:
-        self._path  = rules_path or os.environ.get("SECURITY_RULES_PATH", "")
-        self._rules: Optional[SecurityRuleSet] = None
+    def __init__(self, rules_path: str | Path | None = None) -> None:
+        self._path = Path(rules_path) if rules_path else None
+        self._rules: dict[str, Any] = {}
 
-    def load(self) -> SecurityRuleSet:
-        if self._rules:
-            return self._rules
-
-        if self._path and Path(self._path).exists():
+    def load(self) -> dict[str, Any]:
+        if self._path and self._path.exists():
             try:
-                raw = Path(self._path).read_text(encoding="utf-8")
-                data = json.loads(raw)
-                rules = [SecurityRule(**r) for r in data.get("rules", [])]
-                self._rules = SecurityRuleSet(version=data.get("version", "1.0"), rules=rules)
-                log.info("security_rules_loaded rules=%d", len(rules))
-                return self._rules
-            except Exception as exc:
-                log.warning("security_rules_load_error: %s", exc)
-
-        # Default empty ruleset
-        self._rules = SecurityRuleSet(version="1.0", rules=[])
+                with open(self._path) as f:
+                    loaded = json.load(f)
+                self._rules = {**DEFAULT_RULES, **loaded}
+                logger.info(f"Security rules loaded from {self._path}")
+            except Exception as e:
+                logger.warning(f"Failed to load rules from {self._path}: {e}; using defaults")
+                self._rules = dict(DEFAULT_RULES)
+        else:
+            self._rules = dict(DEFAULT_RULES)
         return self._rules
 
+    def get(self, key: str, default: Any = None) -> Any:
+        if not self._rules:
+            self.load()
+        return self._rules.get(key, default)
 
-_loader = SecurityRulesLoader()
+    def reload(self) -> dict[str, Any]:
+        self._rules = {}
+        return self.load()
 
 
-def get_security_rules() -> SecurityRuleSet:
-    return _loader.load()
+_loader: SecurityRulesLoader | None = None
+
+
+def get_security_rules() -> SecurityRulesLoader:
+    global _loader
+    if _loader is None:
+        rules_path = os.environ.get("SECURITY_RULES_PATH")
+        _loader = SecurityRulesLoader(rules_path)
+        _loader.load()
+    return _loader
+
+
+__all__ = ["SecurityRulesLoader", "get_security_rules", "DEFAULT_RULES"]
