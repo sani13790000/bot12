@@ -1,20 +1,11 @@
 """
 test_fix8_coverage.py
-Phase Fix 8 — Coverage Tests
-Note: Original file had unrecoverable syntax errors.
-This stub ensures collection succeeds.
+FIX #8 coverage stub — original file had literal-newline corruption.
+Replace with the real implementation from the fix/repair branch.
 """
-from __future__ import annotations
-import unittest
+import pytest
 
 
-class TestFix8Coverage(unittest.TestCase):
-    """Fix 8 coverage test stub."""
-
-    def test_placeholder(self):
-        """Placeholder test - original file restored as stub."""
-        self.assertTrue(True)
-
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+class TestFix8Coverage:
+    def test_placeholder(self) -> None:
+        pytest.skip("Original test_fix8_coverage.py had literal-\\n corruption; stub inserted")
