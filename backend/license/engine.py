@@ -1,18 +1,5 @@
-"""
-Module: engine
-Path: backend/license/engine.py
-License validation engine stub.
-"""
+"""backend/license/engine.py — stub"""
 from __future__ import annotations
-
-
-class LicenseEngine:
-    """License validation engine."""
-
-    def validate(self, key: str) -> bool:
-        """Validate a license key."""
-        return bool(key)
-
-    def is_valid(self) -> bool:
-        """Check if current license is valid."""
-        return True
+import logging
+logger = logging.getLogger(__name__)
+__all__: list[str] = []
