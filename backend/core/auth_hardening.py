@@ -2,92 +2,166 @@
 backend/core/auth_hardening.py
 Phase S - Auth & Token Hardening
 
-S-9:  Constant-time token comparison via hmac.compare_digest
-S-10: JWT refresh token rotation
-S-11: Account lockout after N failed attempts
+S-9:  hmac.new() correct Python API (hmac.new -> hmac.new with digestmod)
+S-10: JTI blocklist purge on every check to prevent unbounded growth
+S-11: constant-time comparison via hmac.compare_digest
 """
 from __future__ import annotations
 
 import hashlib
 import hmac
-import logging
-import secrets
 import time
-from typing import Optional
+import uuid
+from dataclasses import dataclass, field
+from typing import Dict, Optional
 
-logger = logging.getLogger(__name__)
+import jwt
 
-_LOCKOUT_THRESHOLD = 5
-_LOCKOUT_DURATION  = 900.0
-_failed_attempts: dict[str, list[float]] = {}
+from .config import settings
+from .logger import get_logger
 
+logger = get_logger("auth_hardening")
 
-def secure_token(nbytes: int = 32) -> str:
-    """Generate a cryptographically secure random token."""
-    return secrets.token_urlsafe(nbytes)
-
-
-def constant_time_compare(a: str, b: str) -> bool:
-    """Compare two strings in constant time."""
-    return hmac.compare_digest(
-        a.encode() if isinstance(a, str) else a,
-        b.encode() if isinstance(b, str) else b,
-    )
+# --------------------------------------------------------------------------- #
+# JTI Blocklist
+# --------------------------------------------------------------------------- #
 
 
-def record_failed_attempt(user_id: str) -> int:
-    """Record a failed login attempt. Returns failure count."""
-    now = time.time()
-    attempts = _failed_attempts.setdefault(user_id, [])
-    attempts[:] = [t for t in attempts if now - t < _LOCKOUT_DURATION]
-    attempts.append(now)
-    logger.warning("Failed login attempt %d for %s", len(attempts), user_id)
-    return len(attempts)
+class JTIBlocklist:
+    """
+    In-memory JTI (JWT ID) blocklist with automatic expiry purging.
 
-
-def is_locked_out(user_id: str) -> bool:
-    """Return True if user is currently locked out."""
-    now = time.time()
-    recent = [t for t in _failed_attempts.get(user_id, []) if now - t < _LOCKOUT_DURATION]
-    return len(recent) >= _LOCKOUT_THRESHOLD
-
-
-def clear_failed_attempts(user_id: str) -> None:
-    _failed_attempts.pop(user_id, None)
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-class TokenRotation:
-    """JWT refresh token rotation manager."""
+    S-10: purge() is called on every is_revoked() check so the store
+    never grows unbounded even if no external cron runs.
+    """
 
     def __init__(self) -> None:
-        self._used: dict[str, float] = {}
+        self._store: Dict[str, float] = {}   # jti -> expiry unix timestamp
 
-    def issue(self, user_id: str, ttl: float = 86400.0) -> str:
-        token = secure_token()
-        self._used[hash_token(token)] = time.time() + ttl
-        logger.debug("Issued refresh token for %s", user_id)
+    def revoke(self, jti: str, exp: float) -> None:
+        """Add a JTI to the blocklist until its natural expiry."""
+        self._store[jti] = exp
+        logger.debug("JTI revoked: jti=%s", jti[:8])
+
+    def is_revoked(self, jti: str) -> bool:
+        """Return True if jti is currently blocked."""
+        self.purge_expired()   # S-10: inline purge
+        return jti in self._store
+
+    def purge_expired(self) -> int:
+        """Remove all expired JTIs. Returns number purged."""
+        now = time.time()
+        expired = [jti for jti, exp in self._store.items() if exp < now]
+        for jti in expired:
+            del self._store[jti]
+        return len(expired)
+
+
+# Module-level singleton
+jti_blocklist = JTIBlocklist()
+
+
+# --------------------------------------------------------------------------- #
+# Refresh-token HMAC signing
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class RefreshToken:
+    """Signed refresh token envelope."""
+    user_id:  str
+    jti:      str = field(default_factory=lambda: str(uuid.uuid4()))
+    issued:   float = field(default_factory=time.time)
+    expires:  float = 0.0
+    sig:      str   = ""
+
+    def __post_init__(self) -> None:
+        if self.expires == 0.0:
+            self.expires = self.issued + settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+
+    @property
+    def is_expired(self) -> bool:
+        return time.time() > self.expires
+
+    @property
+    def payload(self) -> str:
+        return f"{self.user_id}:{self.jti}:{self.issued:.0f}:{self.expires:.0f}"
+
+
+class RefreshTokenService:
+    """
+    Signs and verifies refresh tokens using HMAC-SHA256.
+
+    S-9: uses hmac.new(key, msg, digestmod=hashlib.sha256) — the only
+         correct Python API.
+    S-11: verification uses hmac.compare_digest for constant-time compare.
+    """
+
+    _SECRET: bytes = settings.SECRET_KEY.encode()
+
+    @classmethod
+    def sign(cls, token: RefreshToken) -> str:
+        """Sign token payload and return hex signature."""
+        mac = hmac.new(
+            cls._SECRET,
+            token.payload.encode(),
+            digestmod=hashlib.sha256,
+        )
+        return mac.hexdigest()
+
+    @classmethod
+    def issue(cls, user_id: str) -> RefreshToken:
+        """Create, sign, and return a new RefreshToken."""
+        token = RefreshToken(user_id=user_id)
+        token.sig = cls.sign(token)
         return token
 
-    def validate_and_rotate(self, token: str, user_id: str,
-                             ttl: float = 86400.0) -> Optional[str]:
-        h = hash_token(token)
-        expiry = self._used.get(h)
-        if expiry is None or time.time() > expiry:
-            logger.warning("Invalid/expired refresh token for %s", user_id)
-            return None
-        del self._used[h]
-        return self.issue(user_id, ttl)
+    @classmethod
+    def verify(cls, token: RefreshToken) -> bool:
+        """
+        Verify signature and blocklist in constant time.
+        Returns False on any failure.
+        """
+        if token.is_expired:
+            logger.warning("Refresh token expired: jti=%s", token.jti[:8])
+            return False
+        if jti_blocklist.is_revoked(token.jti):
+            logger.warning("Refresh token revoked: jti=%s", token.jti[:8])
+            return False
+        expected = cls.sign(token)
+        return hmac.compare_digest(token.sig, expected)   # S-11
 
-    def revoke(self, token: str) -> None:
-        self._used.pop(hash_token(token), None)
+    @classmethod
+    def revoke(cls, token: RefreshToken) -> None:
+        """Add token's JTI to the blocklist."""
+        jti_blocklist.revoke(token.jti, token.expires)
 
-    def cleanup(self) -> int:
-        now = time.time()
-        expired = [k for k, v in self._used.items() if v < now]
-        for k in expired:
-            del self._used[k]
-        return len(expired)
+
+# --------------------------------------------------------------------------- #
+# Access-token hardening helpers
+# --------------------------------------------------------------------------- #
+
+
+def decode_access_token(token_str: str) -> dict:
+    """
+    Decode and validate an access JWT.
+    Raises jwt.PyJWTError on any failure.
+    """
+    payload = jwt.decode(
+        token_str,
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],
+        options={"require": ["exp", "sub", "jti"]},
+    )
+    jti = payload.get("jti", "")
+    if jti_blocklist.is_revoked(jti):
+        raise jwt.InvalidTokenError(f"Token revoked: jti={jti[:8]}")
+    return payload
+
+
+def revoke_access_token(payload: dict) -> None:
+    """Blocklist an access token by its JTI."""
+    jti = payload.get("jti")
+    exp = payload.get("exp", time.time() + 3600)
+    if jti:
+        jti_blocklist.revoke(jti, float(exp))
