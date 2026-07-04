@@ -9,7 +9,10 @@ Async HTTP bridge to the MetaTrader 5 REST gateway.
 - get_candles() اضافه شد
 - get_symbol_info() اضافه شد
 - singleton با تنظیمات env ساخته می‌شود
-- health_check() اضافه شً
+- health_check() اضافه شد
+
+فاز P — تغییرات:
+- P-FIX-2: MT5TIMEOUT_S ⇒ MT5_GATEWAY_TIMEOUT (consistent with config_v11.py)
 
 Usage::
 
@@ -25,8 +28,8 @@ Usage::
 
 Design notes:
 - All I/O is async (aiohttp).
-- demo=False → real MT5 REST gateway calls.
-- demo=True  → logged stubs (safe for CI/testing).
+- demo=False ⇒ real MT5 REST gateway calls.
+- demo=True  ⇒ logged stubs (safe for CI/testing).
 - Retries use exponential back-off (max 3 attempts).
 - Every public method raises MT5Error on unrecoverable failure.
 - MT5_DEMO_MODE env var controls default: "false" = LIVE, "true" = DEMO
@@ -103,7 +106,8 @@ class MT5Connector:
             env_demo = os.environ.get("MT5_DEMO_MODE", "true").lower()
             demo = env_demo not in ("false", "0", "no", "off")
         self.base_url = (base_url or os.environ.get("MT5_GATEWAY_URL", "http://localhost:8080")).rstrip("/")
-        self.timeout_s = float(os.environ.get("MT5TIMEOUT_S", str(timeout_s)))
+        # P-FIX-2: was MT5TIMEOUT_S (missing underscore) — now consistent with config_v11.py
+        self.timeout_s = float(os.environ.get("MT5_GATEWAY_TIMEOUT", str(timeout_s)))
         self.max_retries = int(os.environ.get("MT5_MAX_RETRIES", str(max_retries)))
         self.demo = demo
         self._session = None
@@ -233,7 +237,7 @@ class MT5Connector:
             return {"balance": 10000.0, "equity": 10000.0, "margin": 0.0, "free_margin": 10000.0, "profit": 0.0, "leverage": 100, "currency": "USD"}
         return await self._get("/account")
 
-    # ── Internals ────────────────────────────────────────────────────────────
+    # ── Internals ─────────────────────────────────────────────────────────────
 
     def _require_connected(self):
         if not self._connected:
@@ -249,7 +253,7 @@ class MT5Connector:
                 async with self._session.get(self.base_url + path, params=params) as r:
                     if r.status >= 400:
                         text = await r.text()
-                        raise MT5Error(f"GET {path} → {r.status}: {text}")
+                        raise MT5Error(f"GET {path} ⇒ {r.status}: {text}")
                     return await r.json()
             except MT5Error:
                 raise
@@ -265,7 +269,7 @@ class MT5Connector:
                 async with self._session.post(self.base_url + path, json=payload) as r:
                     if r.status >= 400:
                         text = await r.text()
-                        raise MT5Error(f"POST {path} → {r.status}: {text}")
+                        raise MT5Error(f"POST {path} ⇒ {r.status}: {text}")
                     return await r.json()
             except MT5Error:
                 raise
