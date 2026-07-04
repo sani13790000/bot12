@@ -1,1 +1,175 @@
-"""\nGalaxy Vast AI Trading Platform\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nماژول: DecisionEngine\n\nوظیفه:\n  تصمیم‌گیری نهایی برای ورود به معامله با ترکیب نتایج:\n    • SMCEngine\n    • PriceActionEngine\n    • XGBoost Predictor\n\nقوانین:\n  - اگر همه سه موتور موافق باشند → ورود مجاز\n  - اگر دو موتور موافق باشند و اطمینان > 0.65 → ورود مجاز\n  - در غیر این صورت → NO_TRADE\n"""\n\nfrom __future__ import annotations\nimport logging\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom typing import List, Optional\n\nlogger = logging.getLogger(__name__)\n\n\nclass TradeDirection(str, Enum):\n    BUY      = \"BUY\"\n    SELL     = \"SELL\"\n    NO_TRADE = \"NO_TRADE\"\n\n\nclass DecisionReason(str, Enum):\n    ALL_AGREE      = \"ALL_AGREE\"\n    MAJORITY_AGREE = \"MAJORITY_AGREE\"\n    LOW_CONFIDENCE = \"LOW_CONFIDENCE\"\n    CONFLICTING    = \"CONFLICTING\"\n    KILL_SWITCH    = \"KILL_SWITCH\"\n    RISK_LIMIT     = \"RISK_LIMIT\"\n\n\n@dataclass\nclass EngineVote:\n    engine_name:  str\n    direction:    TradeDirection\n    confidence:   float\n    entry_price:  Optional[float] = None\n    sl_price:     Optional[float] = None\n    tp_price:     Optional[float] = None\n    notes:        List[str] = field(default_factory=list)\n\n\n@dataclass\nclass TradeDecision:\n    direction:    TradeDirection\n    reason:       DecisionReason\n    confidence:   float\n    entry_price:  Optional[float]\n    sl_price:     Optional[float]\n    tp_price:     Optional[float]\n    risk_reward:  Optional[float]\n    votes:        List[EngineVote]\n    symbol:       str\n    timeframe:    str\n    notes:        List[str] = field(default_factory=list)\n\n    @property\n    def should_trade(self) -> bool:\n        return self.direction != TradeDirection.NO_TRADE\n\n    def to_dict(self) -> dict:\n        return {\n            \"direction\":   self.direction.value,\n            \"reason\":      self.reason.value,\n            \"confidence\":  round(self.confidence, 3),\n            \"entry_price\": self.entry_price,\n            \"sl_price\":    self.sl_price,\n            \"tp_price\":    self.tp_price,\n            \"risk_reward\": self.risk_reward,\n            \"should_trade\": self.should_trade,\n            \"symbol\":      self.symbol,\n            \"timeframe\":   self.timeframe,\n            \"notes\":       self.notes,\n            \"votes\": [{\"engine\": v.engine_name, \"direction\": v.direction.value,\n                       \"confidence\": round(v.confidence, 3)} for v in self.votes],\n        }\n\n\nclass DecisionEngine:\n    \"\"\"\n    موتور تصمیم‌گیری نهایی معاملات.\n\n    مثال:\n        engine = DecisionEngine(min_confidence=0.65, min_votes=2)\n        decision = engine.decide(votes, symbol=\"EURUSD\", timeframe=\"H1\")\n        if decision.should_trade:\n            execute(decision)\n    \"\"\"\n\n    def __init__(self, min_confidence: float = 0.65,\n                 min_votes: int = 2, min_rr: float = 1.5) -> None:\n        self.min_confidence = min_confidence\n        self.min_votes      = min_votes\n        self.min_rr         = min_rr\n\n    def decide(self, votes: List[EngineVote], symbol: str, timeframe: str,\n               kill_switch_active: bool = False) -> TradeDecision:\n        if kill_switch_active:\n            return self._no_trade(votes, symbol, timeframe,\n                                  DecisionReason.KILL_SWITCH,\n                                  \"کیل‌سوییچ فعال است — هیچ معامله‌ای مجاز نیست\")\n        if not votes:\n            return self._no_trade(votes, symbol, timeframe,\n                                  DecisionReason.LOW_CONFIDENCE, \"هیچ رأیی دریافت نشد\")\n\n        buy_votes  = [v for v in votes if v.direction == TradeDirection.BUY]\n        sell_votes = [v for v in votes if v.direction == TradeDirection.SELL]\n\n        if len(buy_votes) > len(sell_votes):\n            direction, agreeing = TradeDirection.BUY, buy_votes\n        elif len(sell_votes) > len(buy_votes):\n            direction, agreeing = TradeDirection.SELL, sell_votes\n        else:\n            return self._no_trade(votes, symbol, timeframe,\n                                  DecisionReason.CONFLICTING,\n                                  f\"رأی‌های متضاد: {len(buy_votes)} BUY vs {len(sell_votes)} SELL\")\n\n        if len(agreeing) < self.min_votes:\n            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,\n                                  f\"فقط {len(agreeing)} از {self.min_votes} موتور موافق‌اند\")\n\n        avg_confidence = sum(v.confidence for v in agreeing) / len(agreeing)\n        if avg_confidence < self.min_confidence:\n            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,\n                                  f\"اطمینان {avg_confidence:.1%} کمتر از حداقل {self.min_confidence:.1%}\")\n\n        entry, sl, tp = self._aggregate_prices(agreeing, direction)\n        rr = self._calculate_rr(direction, entry, sl, tp)\n        if rr is not None and rr < self.min_rr:\n            return self._no_trade(votes, symbol, timeframe, DecisionReason.RISK_LIMIT,\n                                  f\"R:R {rr:.2f} کمتر از حداقل {self.min_rr:.2f}\")\n\n        reason = (DecisionReason.ALL_AGREE if len(agreeing) == len(votes)\n                  else DecisionReason.MAJORITY_AGREE)\n        notes = [f\"{'همه' if reason == DecisionReason.ALL_AGREE else len(agreeing)} موتور موافق‌اند\",\n                 f\"اطمینان: {avg_confidence:.1%}\"]\n        if rr: notes.append(f\"R:R: {rr:.2f}\")\n\n        return TradeDecision(direction=direction, reason=reason,\n                             confidence=avg_confidence, entry_price=entry,\n                             sl_price=sl, tp_price=tp, risk_reward=rr,\n                             votes=votes, symbol=symbol, timeframe=timeframe, notes=notes)\n\n    def _aggregate_prices(self, votes: List[EngineVote],\n                          direction: TradeDirection) -> tuple:\n        entries = [v.entry_price for v in votes if v.entry_price is not None]\n        sls     = [v.sl_price    for v in votes if v.sl_price    is not None]\n        tps     = [v.tp_price    for v in votes if v.tp_price    is not None]\n        return (sum(entries)/len(entries) if entries else None,\n                sum(sls)/len(sls)         if sls     else None,\n                sum(tps)/len(tps)         if tps     else None)\n\n    def _calculate_rr(self, direction: TradeDirection, entry: Optional[float],\n                      sl: Optional[float], tp: Optional[float]) -> Optional[float]:\n        if entry is None or sl is None or tp is None: return None\n        risk = abs(entry - sl); reward = abs(tp - entry)\n        return round(reward / risk, 2) if risk else None\n\n    def _no_trade(self, votes: List[EngineVote], symbol: str, timeframe: str,\n                  reason: DecisionReason, note: str) -> TradeDecision:\n        logger.info(\"decision.NO_TRADE reason=%s note=%s\", reason.value, note)\n        return TradeDecision(direction=TradeDirection.NO_TRADE, reason=reason,\n                             confidence=0.0, entry_price=None, sl_price=None,\n                             tp_price=None, risk_reward=None, votes=votes,\n                             symbol=symbol, timeframe=timeframe, notes=[note])\n
+"""
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ماژول: DecisionEngine
+
+وظیفه:
+  تصمیم‌گیری نهایی برای موتود معامله به معامله با ترکیب نتایج:
+    • SMCEngine
+    • PriceActionEngine
+    • XGBoost Predictor
+
+قوانین:
+  - اگر همه سه موتور موافق باشند → ورود مجاز
+  - اگر دو موتور موافق باشند و اطمینان > 0.65 → ورود مجاز
+  - در غیر این صورت → NO_TRADE
+"""
+
+from __future__ import annotations
+import logging
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class TradeDirection(str, Enum):
+    BUY      = "BUY"
+    SELL     = "SELL"
+    NO_TRADE = "NO_TRADE"
+
+
+class DecisionReason(str, Enum):
+    ALL_AGREE      = "ALL_AGREE"
+    MAJORITY_AGREE = "MAJORITY_AGREE"
+    LOW_CONFIDENCE = "LOW_CONFIDENCE"
+    CONFLICTING    = "CONFLICTING"
+    KILL_SWITCH    = "KILL_SWITCH"
+    RISK_LIMIT     = "RISK_LIMIT"
+
+
+@dataclass
+class EngineVote:
+    engine_name:  str
+    direction:    TradeDirection
+    confidence:   float
+    entry_price:  Optional[float] = None
+    sl_price:     Optional[float] = None
+    tp_price:     Optional[float] = None
+    notes:        List[str] = field(default_factory=list)
+
+
+@dataclass
+class TradeDecision:
+    direction:    TradeDirection
+    reason:       DecisionReason
+    confidence:   float
+    entry_price:  Optional[float]
+    sl_price:     Optional[float]
+    tp_price:     Optional[float]
+    risk_reward:  Optional[float]
+    votes:        List[EngineVote]
+    symbol:       str
+    timeframe:    str
+    notes:        List[str] = field(default_factory=list)
+
+    @property
+    def should_trade(self) -> bool:
+        return self.direction != TradeDirection.NO_TRADE
+
+    def to_dict(self) -> dict:
+        return {
+            "direction":   self.direction.value,
+            "reason":      self.reason.value,
+            "confidence":  round(self.confidence, 3),
+            "entry_price": self.entry_price,
+            "sl_price":    self.sl_price,
+            "tp_price":    self.tp_price,
+            "risk_reward": self.risk_reward,
+            "should_trade": self.should_trade,
+            "symbol":      self.symbol,
+            "timeframe":   self.timeframe,
+            "notes":       self.notes,
+            "votes": [{"engine": v.engine_name, "direction": v.direction.value,
+                       "confidence": round(v.confidence, 3)} for v in self.votes],
+        }
+
+
+class DecisionEngine:
+    """
+    موتور تصمیم‌گیری نهایی معاملات.
+
+    مثال:
+        engine = DecisionEngine(min_confidence=0.65, min_votes=2)
+        decision = engine.decide(votes, symbol="EURUSD", timeframe="H1")
+        if decision.should_trade:
+            execute(decision)
+    """
+
+    def __init__(self, min_confidence: float = 0.65,
+                 min_votes: int = 2, min_rr: float = 1.5) -> None:
+        self.min_confidence = min_confidence
+        self.min_votes      = min_votes
+        self.min_rr         = min_rr
+
+    def decide(self, votes: List[EngineVote], symbol: str, timeframe: str,
+               kill_switch_active: bool = False) -> TradeDecision:
+        if kill_switch_active:
+            return self._no_trade(votes, symbol, timeframe,
+                                  DecisionReason.KILL_SWITCH,
+                                  "کیل‌سوییچ فعال است — هیچ معامله‌ای مجاز نیست")
+        if not votes:
+            return self._no_trade(votes, symbol, timeframe,
+                                  DecisionReason.LOW_CONFIDENCE, "هیچ رأیی دریافت نشد")
+
+        buy_votes  = [v for v in votes if v.direction == TradeDirection.BUY]
+        sell_votes = [v for v in votes if v.direction == TradeDirection.SELL]
+
+        if len(buy_votes) > len(sell_votes):
+            direction, agreeing = TradeDirection.BUY, buy_votes
+        elif len(sell_votes) > len(buy_votes):
+            direction, agreeing = TradeDirection.SELL, sell_votes
+        else:
+            return self._no_trade(votes, symbol, timeframe,
+                                  DecisionReason.CONFLICTING,
+                                  f"رأی‌های متظاد: {len(buy_votes)} BUY vs {len(sell_votes)} SELL")
+
+        if len(agreeing) < self.min_votes:
+            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,
+                                  f"فقط {len(agreeing)} از {self.min_votes} موتور موافق‌اند")
+
+        avg_confidence = sum(v.confidence for v in agreeing) / len(agreeing)
+        if avg_confidence < self.min_confidence:
+            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,
+                                  f"اطمینان {avg_confidence:.1%} کمتر از حداقل {self.min_confidence:.1%}")
+
+        entry, sl, tp = self._aggregate_prices(agreeing, direction)
+        rr = self._calculate_rr(direction, entry, sl, tp)
+        if rr is not None and rr < self.min_rr:
+            return self._no_trade(votes, symbol, timeframe, DecisionReason.RISK_LIMIT,
+                                  f"R:R {rr:.2f} کمتر از حداقل {self.min_rr:.2f}")
+
+        reason = (DecisionReason.ALL_AGREE if len(agreeing) == len(votes)
+                  else DecisionReason.MAJORITY_AGREE)
+        notes = [f"{'همه' if reason == DecisionReason.ALL_AGREE else len(agreeing)} موتور موافق‌اند",
+                 f"اطمینان: {avg_confidence:.1%}"]
+        if rr: notes.append(f"R:R: {rr:.2f}")
+
+        return TradeDecision(direction=direction, reason=reason,
+                             confidence=avg_confidence, entry_price=entry,
+                             sl_price=sl, tp_price=tp, risk_reward=rr,
+                             votes=votes, symbol=symbol, timeframe=timeframe, notes=notes)
+
+    def _aggregate_prices(self, votes: List[EngineVote],
+                          direction: TradeDirection) -> tuple:
+        entries = [v.entry_price for v in votes if v.entry_price is not None]
+        sls     = [v.sl_price    for v in votes if v.sl_price    is not None]
+        tps     = [v.tp_price    for v in votes if v.tp_price    is not None]
+        return (sum(entries)/len(entries) if entries else None,
+                sum(sls)/len(sls)         if sls     else None,
+                sum(tps)/len(tps)         if tps     else None)
+
+    def _calculate_rr(self, direction: TradeDirection, entry: Optional[float],
+                      sl: Optional[float], tp: Optional[float]) -> Optional[float]:
+        if entry is None or sl is None or tp is None: return None
+        risk = abs(entry - sl); reward = abs(tp - entry)
+        return round(reward / risk, 2) if risk else None
+
+    def _no_trade(self, votes: List[EngineVote], symbol: str, timeframe: str,
+                  reason: DecisionReason, note: str) -> TradeDecision:
+        logger.info("decision.NO_TRADE reason=%s note=%s", reason.value, note)
+        return TradeDecision(direction=TradeDirection.NO_TRADE, reason=reason,
+                             confidence=0.0, entry_price=None, sl_price=None,
+                             tp_price=None, risk_reward=None, votes=votes,
+                             symbol=symbol, timeframe=timeframe, notes=[note])
