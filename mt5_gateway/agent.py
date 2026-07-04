@@ -1,1 +1,194 @@
-IiIiCkdhbGF4eSBWYXN0IEFJIC0tIE1UNSBHYXRld2F5IEFnZW50IHYyLjEuMArZgdin2LIgTCAtLSBidWdmaXg6IFRSQURFX1JFVENPREVFX0RPTkUgKyBHQVRFV0FZX0FQSV9LRVkgYXV0aAoiIiIKaW1wb3J0IG9zLCB0aW1lLCBhcmdwYXJzZSwgYXN5bmNpbwpmcm9tIGNvbnRleHRsaWIgaW1wb3J0IGFzeW5jY29udGV4dG1hbmFnZXIKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lCmZyb20gdHlwaW5nIGltcG9ydCBPcHRpb25hbAoKaW1wb3J0IHV2aWNvcm4KZnJvbSBmYXN0YXBpIGltcG9ydCBGYXN0QVBJLCBIVFRQRXhjZXB0aW9uLCBEZXBlbmRzLCBTZWN1cml0eQpmcm9tIGZhc3RhcGkubWlkZGxld2FyZS5jb3JzIGltcG9ydCBDT1JTTWlkZGxld2FyZQpmcm9tIGZhc3RhcGkuc2VjdXJpdHkgaW1wb3J0IEFQSUtleUhlYWRlcgpmcm9tIHB5ZGFudGljIGltcG9ydCBCYXNlTW9kZWwsIEZpZWxkCgojIC0tLSBNVDUKdHJ5OgogICAgaW1wb3J0IE1ldGFUcmFkZXI1IGFzIG10NQogICAgTVQ1X0FWQUlMQUJMRSA9IFRydWUKZXhjZXB0IEltcG9ydEVycm9yOgogICAgTVQ1X0FWQUlMQUJMRSA9IEZhbHNlCgpfbXQ1X2Nvbm5lY3RlZCA9IEZhbHNlCl9zdGFydF90aW1lICAgID0gdGltZS50aW1lKCkKX29yZGVyX2NvdW50ICAgPSAwCgojIC0tLSBMLUZJWC1HVy0yOiBHQVRFV0FZX0FQSV9LRVkgYXV0aApfQVBJX0tFWV9IRUFERVIgPSBBUElLZXlIZWFkZXIobmFtZT0iWC1HYXRld2F5LUtleSIsIGF1dG9fZXJyb3I9RmFsc2UpCl9HQVRFV0FZX0tFWSAgICA9IG9zLmVudmlyb24uZ2V0KCJHQVRFV0FZX0FQSV9LRVkiLCAiIikKCmRlZiBfdmVyaWZ5X2tleShfa2V5OiBPcHRpb25hbFtzdHJdID0gU2VjdXJpdHkoX0FQSV9LRVlfSEVBREVSKSk6CiAgICAiIiJBUEkga2V5IGd1YXJkIC0tLSDYp6dYsiBHQVRFV0FZX0FQSV9LRVkg2KrZhNix24zZhSDZhtWIgNix2K/YvyDYvtmI2K/gIGRldiBtb2RlIGJ5cGFzcyDZhticgNin2K8uIiIiCiAgICBpZiBub3QgX0dBVEVXQVlfS0VZOgogICAgICAgIHJldHVybiAgIyBkZXYgbW9kZTogbm8ga2V5IHJlcXVpcmVkCiAgICBpZiBfa2V5ICE9IF9HQVRFV0FZX0tFWToKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTQwMSwgZGV0YWlsPSJYLUdhdGV3YXktS2V5IG5hbW90ZWJhZ2hlZyBhc3QiKQoKY2xhc3MgT3JkZXJSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgIHN0cgogICAgZGlyZWN0aW9uOiBzdHIgICAgICAgICAgIyAiYnV5IiB8ICJzZWxsIgogICAgbG90OiAgICAgICBmbG9hdCAgICAgICAgPSBGaWVsZChndD0wKQogICAgc2xfcGlwczogICBmbG9hdCAgICAgICAgPSBGaWVsZChkZWZhdWx0PTUwLjAsIGdlPTApCiAgICB0cF9waXBzOiAgIGZsb2F0ICAgICAgICA9IEZpZWxkKGRlZmF1bHQ9MTAwLjAsIGdlPTApCiAgICBkZXZpYXRpb246IGludCAgICAgICAgICA9IEZpZWxkKGRlZmF1bHQ9MjAsIGdlPTApCiAgICBtYWdpYzogICAgIGludCAgICAgICAgICA9IEZpZWxkKGRlZmF1bHQ9MjAyNDAwKQogICAgc2lnbmFsX2lkOiBPcHRpb25hbFtzdHJdID0gTm9uZQoKY2xhc3MgQ2xvc2VSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICB0aWNrZXQ6IGludAogICAgbG90OiAgICBPcHRpb25hbFtmbG9hdF0gPSBOb25lCgpjbGFzcyBNb2RpZnlSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICB0aWNrZXQ6IGludAogICAgc2w6ICAgICBPcHRpb25hbFtmbG9hdF0gPSBOb25lCiAgICB0cDogICAgIE9wdGlvbmFsW2Zsb2F0XSA9IE5vbmUKCmNsYXNzIENhbmRsZVJlcXVlc3QoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogICAgc3RyCiAgICB0aW1lZnJhbWU6IHN0ciA9IEZpZWxkKGRlZmF1bHQ9IkgxIikKICAgIGNvdW50OiAgICAgaW50ID0gRmllbGQoZGVmYXVsdD0xMDAsIGdlPTEsIGxlPTEwMDApCgpkZWYgX3RmX2NvbnN0KHRmOiBzdHIpIC0+IGludDoKICAgIGlmIG5vdCBNVDVfQVZBSUxBQkxFOiByZXR1cm4gMAogICAgbWFwcGluZyA9IHsiTTEiOiBtdDUuVElNRUZSQU1FX00xLCAiTTUiOiBtdDUuVElNRUZSQU1FX001LCAiTTE1IjogbXQ1LlRJTUVGUkFNRV9NMTUsCiAgICAgICAgICAgICAgICJNMzAiOiBtdDUuVElNRUZSQU1FX00zMCwgIkgxIjogbXQ1LlRJTUVGUkFNRV9IMSwgIkg0IjogbXQ1LlRJTUVGUkFNRV9INCwKICAgICAgICAgICAgICAgIkQxIjogbXQ1LlRJTUVGUkFNRV9EMX0KICAgIHJldHVybiBtYXBwaW5nLmdldCh0Zi51cHBlcigpLCBtdDUuVElNRUZSQU1FX0gxKQoKQGFzeW5jY29udGV4dG1hbmFnZXIKYXN5bmMgZGVmIGxpZmVzcGFuKGFwcCk6CiAgICBnbG9iYWwgX210NV9jb25uZWN0ZWQKICAgIGlmIE1UNV9BVkFJTEFCTEU6CiAgICAgICAgbG9naW4gICAgPSBpbnQob3MuZW52aXJvbi5nZXQoIk1UNV9MT0dJTiIsICIwIikpCiAgICAgICAgcGFzc3dvcmQgPSBvcy5lbnZpcm9uLmdldCgiTVQ1X1BBU1NXT1JEIiwgIiIpCiAgICAgICAgc2VydmVyICAgPSBvcy5lbnZpcm9uLmdldCgiTVQ1X1NFUlZFUiIsICIiKQogICAgICAgIGlmIGxvZ2luIGFuZCBwYXNzd29yZCBhbmQgc2VydmVyOgogICAgICAgICAgICBpZiBtdDUuaW5pdGlhbGl6ZShsb2dpbj1sb2dpbiwgcGFzc3dvcmQ9cGFzc3dvcmQsIHNlcnZlcj1zZXJ2ZXIpOgogICAgICAgICAgICAgICAgX210NV9jb25uZWN0ZWQgPSBUcnVlCiAgICAgICAgICAgIGVsc2U6CiAgICAgICAgICAgICAgICBwYXNzICAjIGxpZmVzcGFuIGRhciBzb3VyYXRlIHNoZWthc3QgYWRhbWUgbWlrb25hZCB0YSAvcGluZyBkYXIgZGFzdHJhcyBiYXNoYWQKICAgIHlpZWxkCiAgICBpZiBfbXQ1X2Nvbm5lY3RlZCBhbmQgTVQ1X0FWQUlMQUJMRToKICAgICAgICBtdDUuc2h1dGRvd24oKQoKYXBwID0gRmFzdEFQSSh0aXRsZT0iR2FsYXh5IFZhc3QgTVQ1IEdhdGV3YXkiLCB2ZXJzaW9uPSIyLjEuMCIsIGxpZmVzcGFuPWxpZmVzcGFuLAogICAgICAgICAgICAgIGRvY3NfdXJsPSIvZG9jcyIgaWYgb3MuZW52aXJvbi5nZXQoIkdBVEVXQVlfRU5WIikgIT0gInByb2R1Y3Rpb24iIGVsc2UgTm9uZSkKYXBwLmFkZF9taWRkbGV3YXJlKENPUlNNaWRkbGV3YXJlLAogICAgICAgICAgICAgICAgICAgYWxsb3dfb3JpZ2lucz1bb3MuZW52aXJvbi5nZXQoIkJBQ0tFTkRfVVJMIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAwMCIpXSwKICAgICAgICAgICAgICAgICAgIGFsbG93X21ldGhvZHM9WyJHRVQiLCAiUE9TVCJdLCBhbGxvd19oZWFkZXJzPVsiKiJdKQoKZGVmIHJlcXVpcmVfbXQ1KCk6CiAgICBpZiBub3QgX210NV9jb25uZWN0ZWQ6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDMsIGRldGFpbD0iTVQ1IG11dGFzYWwgbmlzdCIpCgpAYXBwLmdldCgiL3BpbmciKQphc3luYyBkZWYgcGluZygpOgogICAgcmV0dXJuIHsic3RhdHVzIjogIm9rIiwgIm10NV9jb25uZWN0ZWQiOiBfbXQ1X2Nvbm5lY3RlZCwgIm10NV9hdmFpbGFibGUiOiBNVDVfQVZBSUxBQkxFLAogICAgICAgICAgICAidXB0aW1lX3NlY29uZHMiOiByb3VuZCh0aW1lLnRpbWUoKSAtIF9zdGFydF90aW1lKSwKICAgICAgICAgICAgIm9yZGVyc19leGVjdXRlZCI6IF9vcmRlcl9jb3VudCwKICAgICAgICAgICAgImF1dGhfcmVxdWlyZWQiOiBib29sKF9HQVRFV0FZX0tFWSksCiAgICAgICAgICAgICJ0aW1lc3RhbXAiOiBkYXRldGltZS5ub3codGltZXpvbmUudXRjKS5pc29mb3JtYXQoKX0KCkBhcHAuZ2V0KCIvYWNjb3VudCIpCmFzeW5jIGRlZiBnZXRfYWNjb3VudChfOiBOb25lID0gRGVwZW5kcyhyZXF1aXJlX210NSksIF9fOiBOb25lID0gRGVwZW5kcyhfdmVyaWZ5X2tleSkpOgogICAgaW5mbyA9IG10NS5hY2NvdW50X2luZm8oKQogICAgaWYgaW5mbyBpcyBOb25lOiByYWlzZSBIVFRQRXhjZXB0aW9uKDUwMiwgZiJ7bXQ1Lmxhc3RfZXJyb3IoKX0iKQogICAgcmV0dXJuIHsibG9naW4iOiBpbmZvLmxvZ2luLCAic2VydmVyIjogaW5mby5zZXJ2ZXIsICJiYWxhbmNlIjogaW5mby5iYWxhbmNlLAogICAgICAgICAgICAiZXF1aXR5IjogaW5mby5lcXVpdHksICJtYXJnaW4iOiBpbmZvLm1hcmdpbiwgImZyZWVfbWFyZ2luIjogaW5mby5tYXJnaW5fZnJlZSwKICAgICAgICAgICAgInByb2ZpdCI6IGluZm8ucHJvZml0LCAiY3VycmVuY3kiOiBpbmZvLmN1cnJlbmN5LCAibGV2ZXJhZ2UiOiBpbmZvLmxldmVyYWdlLCAibmFtZSI6IGluZm8ubmFtZX0KCkBhcHAucG9zdCgiL2NhbmRsZXMiKQphc3luYyBkZWYgZ2V0X2NhbmRsZXMocmVxOiBDYW5kbGVSZXF1ZXN0LCBfOiBOb25lID0gRGVwZW5kcyhyZXF1aXJlX210NSksIF9fOiBOb25lID0gRGVwZW5kcyhfdmVyaWZ5X2tleSkpOgogICAgcmF0ZXMgPSBtdDUuY29weV9yYXRlc19mcm9tX3BvcyhyZXEuc3ltYm9sLCBfdGZfY29uc3QocmVxLnRpbWVmcmFtZSksIDAsIHJlcS5jb3VudCkKICAgIGlmIHJhdGVzIGlzIE5vbmUgb3IgbGVuKHJhdGVzKSA9PSAwOiByYWlzZSBIVFRQRXhjZXB0aW9uKDUwMiwgZiJ7bXQ1Lmxhc3RfZXJyb3IoKX0iKQogICAgcmV0dXJuIHsic3ltYm9sIjogcmVxLnN5bWJvbCwgInRpbWVmcmFtZSI6IHJlcS50aW1lZnJhbWUsICJjb3VudCI6IGxlbihyYXRlcyksCiAgICAgICAgICAgICJjYW5kbGVzIjogW3sidGltZSI6IGludChyWyJ0aW1lIl0pLCAib3BlbiI6IGZsb2F0KHJbIm9wZW4iXSksICJoaWdoIjogZmxvYXQoclsiaGlnaCJdKSwKICAgICAgICAgICAgICAgICAgICAgICAgICJsb3ciOiBmbG9hdChyWyJsb3ciXSksICJjbG9zZSI6IGZsb2F0KHJbImNsb3NlIl0pLCAidm9sdW1lIjogaW50KHJbInRpY2tfdm9sdW1lIl0pfQogICAgICAgICAgICAgICAgICAgICAgICBmb3IgciBpbiByYXRlc119CgpAYXBwLnBvc3QoIi9vcmRlci9vcGVuIikKYXN5bmMgZGVmIG9wZW5fb3JkZXIocmVxOiBPcmRlclJlcXVlc3QsIF86IE5vbmUgPSBEZXBlbmRzKHJlcXVpcmVfbXQ1KSwgX186IE5vbmUgPSBEZXBlbmRzKF92ZXJpZnlfa2V5KSk6CiAgICBnbG9iYWwgX29yZGVyX2NvdW50CiAgICBpbmZvID0gbXQ1LnN5bWJvbF9pbmZvKHJlcS5zeW1ib2wpCiAgICBpZiBpbmZvIGlzIE5vbmU6IHJhaXNlIEhUVFBFeGNlcHRpb24oNDA0LCBmIm5hbWFkIHtyZXEuc3ltYm9sfSBwaWRhIG5hc2hhZCIpCiAgICBwdCAgID0gaW5mby5wb2ludAogICAgdGljayA9IG10NS5zeW1ib2xfaW5mb190aWNrKHJlcS5zeW1ib2wpCiAgICBpZiB0aWNrIGlzIE5vbmU6IHJhaXNlIEhUVFBFeGNlcHRpb24oNTAyLCAia2hhdGEgZGFyIGRhcnlhZnQgZ2hleWFtdCIpCiAgICBpZiByZXEuZGlyZWN0aW9uID09ICJidXkiOgogICAgICAgIG90ID0gbXQ1Lk9SREVSX1RZUEVfQlVZOyAgcHJpY2UgPSB0aWNrLmFzawogICAgICAgIHNsID0gcHJpY2UgLSByZXEuc2xfcGlwcyAqIHB0ICogMTA7IHRwID0gcHJpY2UgKyByZXEudHBfcGlwcyAqIHB0ICogMTAKICAgIGVsc2U6CiAgICAgICAgb3QgPSBtdDUuT1JERVJfVFlQRV9TRUxMOyBwcmljZSA9IHRpY2suYmlkCiAgICAgICAgc2wgPSBwcmljZSArIHJlcS5zbF9waXBzICogcHQgKiAxMDsgdHAgPSBwcmljZSAtIHJlcS50cF9waXBzICogcHQgKiAxMAogICAgcmVxdWVzdCA9IHsiYWN0aW9uIjogbXQ1LlRSQURFX0FDVElPTl9ERUFMLCAIYW1ib2wiOiByZXEuc3ltYm9sLCAidm9sdW1lIjogcmVxLmxvdCwKICAgICAgICAgICAgICAgInR5cGUiOiBvdCwgInByaWNlIjogcHJpY2UsICJzbCI6IHJvdW5kKHNsLCBpbmZvLmRpZ2l0cyksICJ0cCI6IHJvdW5kKHRwLCBpbmZvLmRpZ2l0cyksCiAgICAgICAgICAgICAgICJkZXZpYXRpb24iOiByZXEuZGV2aWF0aW9uLCAibWFnaWMiOiByZXEubWFnaWMsCiAgICAgICAgICAgICAgICJjb21tZW50IjogZiJHVl97cmVxLnNpZ25hbF9pZH0iIGlmIHJlcS5zaWduYWxfaWQgZWxzZSAiR2FsYXh5VmFzdCIsCiAgICAgICAgICAgICAgICJ0eXBlX3RpbWUiOiBtdDUuT1JERVJfVElNRV9HVEMsICJ0eXBlX2ZpbGxpbmciOiBtdDUuT1JERVJfRklMTElOR19JT0N9CiAgICByZXN1bHQgPSBtdDUub3JkZXJfc2VuZChyZXF1ZXN0KQogICAgaWYgcmVzdWx0IGlzIE5vbmUgb3IgcmVzdWx0LnJldGNvZGUgIT0gbXQ1LlRSQURFX1JFVENPREVFX0RPTkU6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbig1MDIsIGYicmV0Y29kZT17cmVzdWx0LnJldGNvZGUgaWYgcmVzdWx0IGVsc2UgLTF9IikKICAgIF9vcmRlcl9jb3VudCArPSAxCiAgICByZXR1cm4geyJ0aWNrZXQiOiByZXN1bHQub3JkZXIsICJkaXJlY3Rpb24iOiByZXEuZGlyZWN0aW9uLCAibG90IjogcmVxLmxvdCwgInByaWNlIjogcmVzdWx0LnByaWNlLCAicmV0Y29kZSI6IHJlc3VsdC5yZXRjb2RlfQoKQGFwcC5wb3N0KCIvb3JkZXIvY2xvc2UiKQphc3luYyBkZWYgY2xvc2Vfb3JkZXIocmVxOiBDbG9zZVJlcXVlc3QsIF86IE5vbmUgPSBEZXBlbmRzKHJlcXVpcmVfbXQ1KSwgX186IE5vbmUgPSBEZXBlbmRzKF92ZXJpZnlfa2V5KSk6CiAgICBwb3MgPSBtdDUucG9zaXRpb25zX2dldCh0aWNrZXQ9cmVxLnRpY2tldCkKICAgIGlmIG5vdCBwb3M6IHJhaXNlIEhUVFBFeGNlcHRpb24oNDA0LCBmInBvemlzaGlvbiB7cmVxLnRpY2tldH0gcGlkYSBuYXNoYWQiKQogICAgcCAgICA9IHBvc1swXTsgdGljayA9IG10NS5zeW1ib2xfaW5mb190aWNrKHAuc3ltYm9sKQogICAgb3QgICA9IG10NS5PUkRFUl9UWVBFX1NFTEwgaWYgcC50eXBlID09IDAgZWxzZSBtdDUuT1JERVJfVFlQRV9CVVkKICAgIHByaWNlID0gdGljay5iaWQgaWYgcC50eXBlID09IDAgZWxzZSB0aWNrLmFzawogICAgcmVxdWVzdCA9IHsiYWN0aW9uIjogbXQ1LlRSQURFX0FDVElPTl9ERUFMLCAIC5zeW1ib2wiOiBwLnN5bWJvbCwgInZvbHVtZSI6IHJlcS5sb3Qgb3IgcC52b2x1bWUsCiAgICAgICAgICAgICAgICJ0eXBlIjogb3QsICJwcmljZSI6IHByaWNlLCAicG9zaXRpb24iOiByZXEudGlja2V0LCAiZGV2aWF0aW9uIjogMjAsCiAgICAgICAgICAgICAgICJtYWdpYyI6IHAubWFnaWMsICJjb21tZW50IjogIkdWX2Nsb3NlIiwgInR5cGVfdGltZSI6IG10NS5PUkRFUl9USU1FX0dUQywKICAgICAgICAgICAgICAgInR5cGVfZmlsbGluZyI6IG10NS5PUkRFUl9GSUxMSU5HX0lPQ30KICAgIHJlc3VsdCA9IG10NS5vcmRlcl9zZW5kKHJlcXVlc3QpCiAgICBpZiByZXN1bHQgaXMgTm9uZSBvciByZXN1bHQucmV0Y29kZSAhPSBtdDUuVFJBREVfUkVUQ09ERV9ET05FOgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oNTAyLCBmInJldGNvZGU9e3Jlc3VsdC5yZXRjb2RlIGlmIHJlc3VsdCBlbHNlIC0xfSIpCiAgICByZXR1cm4geyJ0aWNrZXQiOiByZXEudGlja2V0LCAiY2xvc2VkIjogVHJ1ZX0KCkBhcHAucG9zdCgiL29yZGVyL21vZGlmeSIpCmFzeW5jIGRlZiBtb2RpZnlfb3JkZXIocmVxOiBNb2RpZnlSZXF1ZXN0LCBfOiBOb25lID0gRGVwZW5kcyhyZXF1aXJlX210NSksIF9fOiBOb25lID0gRGVwZW5kcyhfdmVyaWZ5X2tleSkpOgogICAgcG9zID0gbXQ1LnBvc2l0aW9uc19nZXQodGlja2V0PXJlcS50aWNrZXQpCiAgICBpZiBub3QgcG9zOiByYWlzZSBIVFRQRXhjZXB0aW9uKDQwNCwgZiJwb3ppc2hpb24ge3JlcS50aWNrZXR9IHBpZGEgbmFzaGFkIikKICAgIHAgPSBwb3NbMF0KICAgIHJlcXVlc3QgPSB7ImFjdGlvbiI6IG10NS5UUkFERV9BQ1RJT05fU0xUUCwgInBvc2l0aW9uIjogcmVxLnRpY2tldCwgInN5bWJvbCI6IHAuc3ltYm9sLAogICAgICAgICAgICAgICAic2wiOiByZXEuc2wgaWYgcmVxLnNsIGlzIG5vdCBOb25lIGVsc2UgcC5zbCwKICAgICAgICAgICAgICAgInRwIjogcmVxLnRwIGlmIHJlcS50cCBpcyBub3QgTm9uZSBlbHNlIHAudHB9CiAgICByZXN1bHQgPSBtdDUub3JkZXJfc2VuZChyZXF1ZXN0KQogICAgIyBMLUZJWC1HVy0xOiBUUkFERV9SRVRDT0RFWV9ET05FIC0tPiBUUkFERV9SRVRDT0RFX0RPTkUgKHR5cG8gYmFyYWZ0YWQgc2hvZCkKICAgIGlmIHJlc3VsdCBpcyBOb25lIG9yIHJlc3VsdC5yZXRjb2RlICE9IG10NS5UUkFERV9SRVRDT0RFX0RPTkU6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbig1MDIsIGYicmV0Y29kZT17cmVzdWx0LnJldGNvZGUgaWYgcmVzdWx0IGVsc2UgLTF9IikKICAgIHJldHVybiB7InRpY2tldCI6IHJlcS50aWNrZXQsICJtb2RpZmllZCI6IFRydWV9CgpAYXBwLmdldCgiL3Bvc2l0aW9ucyIpCmFzeW5jIGRlZiBnZXRfcG9zaXRpb25zKF86IE5vbmUgPSBEZXBlbmRzKHJlcXVpcmVfbXQ1KSwgX186IE5vbmUgPSBEZXBlbmRzKF92ZXJpZnlfa2V5KSk6CiAgICBwb3NpdGlvbnMgPSBtdDUucG9zaXRpb25zX2dldCgpIG9yIFtdCiAgICByZXR1cm4geyJjb3VudCI6IGxlbihwb3NpdGlvbnMpLCAicG9zaXRpb25zIjogWwogICAgICAgIHsidGlja2V0IjogcC50aWNrZXQsICJzeW1ib2wiOiBwLnN5bWJvbCwgInR5cGUiOiAiYnV5IiBpZiBwLnR5cGUgPT0gMCBlbHNlICJzZWxsIiwKICAgICAgICAgInZvbHVtZSI6IHAudm9sdW1lLCAib3Blbl9wcmljZSI6IHAucHJpY2Vfb3BlbiwgInNsIjogcC5zbCwgInRwIjogcC50cCwgInByb2ZpdCI6IHAucHJvZml0fQogICAgICAgIGZvciBwIGluIHBvc2l0aW9uc119CgppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOgogICAgcGFyc2VyID0gYXJncGFyc2UuQXJndW1lbnRQYXJzZXIoKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgiLS1sb2dpbiIsICAgIHR5cGU9aW50LCBkZWZhdWx0PTApCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCItLXBhc3N3b3JkIiwgdHlwZT1zdHIsIGRlZmF1bHQ9IiIpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCItLXNlcnZlciIsICAgdHlwZT1zdHIsIGRlZmF1bHQ9IiIpCiAgICBwYXJzZXIuYWRkX2FyZ3VtZW50KCItLWhvc3QiLCAgICAgdHlwZT1zdHIsIGRlZmF1bHQ9IjAuMC4wLjAiKQogICAgcGFyc2VyLmFkZF9hcmd1bWVudCgiLS1wb3J0IiwgICAgIHR5cGU9aW50LCBkZWZhdWx0PTgwODApCiAgICBhcmdzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKQogICAgaWYgYXJncy5sb2dpbjogICAgb3MuZW52aXJvblsiTVQ1X0xPR0lOIl0gICAgPSBzdHIoYXJncy5sb2dpbikKICAgIGlmIGFyZ3MucGFzc3dvcmQ6IG9zLmVudmlyb25bIk1UNV9QQVNTV09SRCJdID0gYXJncy5wYXNzd29yZAogICAgaWYgYXJncy5zZXJ2ZXI6ICAgb3MuZW52aXJvblsiTVQ1X1NFUlZFUiJdICAgPSBhcmdzLnNlcnZlcgogICAgdXZpY29ybi5ydW4oImFnZW50OmFwcCIsIGhvc3Q9YXJncy5ob3N0LCBwb3J0PWFyZ3MucG9ydCwgcmVsb2FkPUZhbHNlKQo=
+"""
+Galaxy Vast AI -- MT5 Gateway Agent v2.1.0
+فاز O -- bugfix: TRADE_RETCODE_DONE (O-FIX-1) + GATEWAY_API_KEY auth
+"""
+import os, time, argparse, asyncio
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Optional
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
+from pydantic import BaseModel, Field
+
+# --- MT5
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+except ImportError:
+    MT5_AVAILABLE = False
+
+_mt5_connected = False
+_start_time    = time.time()
+_order_count   = 0
+
+# --- L-FIX-GW-2: GATEWAY_API_KEY auth
+_API_KEY_HEADER = APIKeyHeader(name="X-Gateway-Key", auto_error=False)
+_GATEWAY_KEY    = os.environ.get("GATEWAY_API_KEY", "")
+
+def _verify_key(_key: Optional[str] = Security(_API_KEY_HEADER)):
+    """API key guard"""
+    if not _GATEWAY_KEY:
+        return  # dev mode: no key required
+    if _key != _GATEWAY_KEY:
+        raise HTTPException(status_code=401, detail="X-Gateway-Key namotebaghegh ast")
+
+class OrderRequest(BaseModel):
+    symbol:    str
+    direction: str          # "buy" | "sell"
+    lot:       float        = Field(gt=0)
+    sl_pips:   float        = Field(default=50.0, ge=0)
+    tp_pips:   float        = Field(default=100.0, ge=0)
+    deviation: int          = Field(default=20, ge=0)
+    magic:     int          = Field(default=202400)
+    signal_id: Optional[str] = None
+
+class CloseRequest(BaseModel):
+    ticket: int
+    lot:    Optional[float] = None
+
+class ModifyRequest(BaseModel):
+    ticket: int
+    sl:     Optional[float] = None
+    tp:     Optional[float] = None
+
+class CandleRequest(BaseModel):
+    symbol:    str
+    timeframe: str = Field(default="H1")
+    count:     int = Field(default=100, ge=1, le=1000)
+
+def _tf_const(tf: str) -> int:
+    if not MT5_AVAILABLE: return 0
+    mapping = {"M1": mt5.TIMEFRAME_M1, "M5": mt5.TIMEFRAME_M5, "M15": mt5.TIMEFRAME_M15,
+               "M30": mt5.TIMEFRAME_M30, "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4,
+               "D1": mt5.TIMEFRAME_D1}
+    return mapping.get(tf.upper(), mt5.TIMEFRAME_H1)
+
+@asynccontextmanager
+async def lifespan(app):
+    global _mt5_connected
+    if MT5_AVAILABLE:
+        login    = int(os.environ.get("MT5_LOGIN", "0"))
+        password = os.environ.get("MT5_PASSWORD", "")
+        server   = os.environ.get("MT5_SERVER", "")
+        if login and password and server:
+            if mt5.initialize(login=login, password=password, server=server):
+                _mt5_connected = True
+            else:
+                pass  # lifespan dar soorate shekast adame mikonad ta /ping dar dashtras bashad
+    yield
+    if _mt5_connected and MT5_AVAILABLE:
+        mt5.shutdown()
+
+app = FastAPI(title="Galaxy Vast MT5 Gateway", version="2.1.0", lifespan=lifespan,
+             docs_url="/docs" if os.environ.get("GATEWAY_ENV") != "production" else None)
+app.add_middleware(CORSMiddleware,
+                   allow_origins=[os.environ.get("BACKEND_URL", "http://localhost:8000")],
+                   allow_methods=["GET", "POST"], allow_headers=["*"])
+
+def require_mt5():
+    if not _mt5_connected:
+        raise HTTPException(status_code=503, detail="MT5 mutasal nist")
+
+@app.get("/ping")
+async def ping():
+    return {"status": "ok", "mt5_connected": _mt5_connected, "mt5_available": MT5_AVAILABLE,
+            "uptime_seconds": round(time.time() - _start_time),
+            "orders_executed": _order_count,
+            "auth_required": bool(_GATEWAY_KEY),
+            "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/account")
+async def get_account(_: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    info = mt5.account_info()
+    if info is None: raise HTTPException(502, f"{mt5.last_error()}")
+    return {"login": info.login, "server": info.server, "balance": info.balance,
+            "equity": info.equity, "margin": info.margin, "free_margin": info.margin_free,
+            "profit": info.profit, "currency": info.currency, "leverage": info.leverage, "name": info.name}
+
+@app.post("/candles")
+async def get_candles(req: CandleRequest, _: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    rates = mt5.copy_rates_from_pos(req.symbol, _tf_const(req.timeframe), 0, req.count)
+    if rates is None or len(rates) == 0: raise HTTPException(502, f"{mt5.last_error()}")
+    return {"symbol": req.symbol, "timeframe": req.timeframe, "count": len(rates),
+            "candles": [{"time": int(r["time"]), "open": float(r["open"]), "high": float(r["high"]),
+                         "low": float(r["low"]), "close": float(r["close"]), "volume": int(r["tick_volume"])}
+                        for r in rates]}
+
+@app.post("/order/open")
+async def open_order(req: OrderRequest, _: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    global _order_count
+    info = mt5.symbol_info(req.symbol)
+    if info is None: raise HTTPException(404, f"namad {req.symbol} pida nashad")
+    pt   = info.point
+    tick = mt5.symbol_info_tick(req.symbol)
+    if tick is None: raise HTTPException(502, "khata dar daryaft gheyamt")
+    if req.direction == "buy":
+        ot = mt5.ORDER_TYPE_BUY;  price = tick.ask
+        sl = price - req.sl_pips * pt * 10; tp = price + req.tp_pips * pt * 10
+    else:
+        ot = mt5.ORDER_TYPE_SELL; price = tick.bid
+        sl = price + req.sl_pips * pt * 10; tp = price - req.tp_pips * pt * 10
+    request = {"action": mt5.TRADE_ACTION_DEAL, "symbol": req.symbol, "volume": req.lot,
+               "type": ot, "price": price, "sl": round(sl, info.digits), "tp": round(tp, info.digits),
+               "deviation": req.deviation, "magic": req.magic,
+               "comment": f"GV_{req.signal_id}" if req.signal_id else "GalaxyVast",
+               "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC}
+    result = mt5.order_send(request)
+    # O-FIX-1: TRADE_RETCODE_DONE (E اضافه برداشته شد)
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        raise HTTPException(502, f"retcode={result.retcode if result else -1}")
+    _order_count += 1
+    return {"ticket": result.order, "direction": req.direction, "lot": req.lot, "price": result.price, "retcode": result.retcode}
+
+@app.post("/order/close")
+async def close_order(req: CloseRequest, _: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    pos = mt5.positions_get(ticket=req.ticket)
+    if not pos: raise HTTPException(404, f"pozishion {req.ticket} pida nashad")
+    p    = pos[0]; tick = mt5.symbol_info_tick(p.symbol)
+    ot   = mt5.ORDER_TYPE_SELL if p.type == 0 else mt5.ORDER_TYPE_BUY
+    price = tick.bid if p.type == 0 else tick.ask
+    request = {"action": mt5.TRADE_ACTION_DEAL, "symbol": p.symbol, "volume": req.lot or p.volume,
+               "type": ot, "price": price, "position": req.ticket, "deviation": 20,
+               "magic": p.magic, "comment": "GV_close", "type_time": mt5.ORDER_TIME_GTC,
+               "type_filling": mt5.ORDER_FILLING_IOC}
+    result = mt5.order_send(request)
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        raise HTTPException(502, f"retcode={result.retcode if result else -1}")
+    return {"ticket": req.ticket, "closed": True}
+
+@app.post("/order/modify")
+async def modify_order(req: ModifyRequest, _: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    pos = mt5.positions_get(ticket=req.ticket)
+    if not pos: raise HTTPException(404, f"pozishion {req.ticket} pida nashad")
+    p = pos[0]
+    request = {"action": mt5.TRADE_ACTION_SLTP, "position": req.ticket, "symbol": p.symbol,
+               "sl": req.sl if req.sl is not None else p.sl,
+               "tp": req.tp if req.tp is not None else p.tp}
+    result = mt5.order_send(request)
+    if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+        raise HTTPException(502, f"retcode={result.retcode if result else -1}")
+    return {"ticket": req.ticket, "modified": True}
+
+@app.get("/positions")
+async def get_positions(_: None = Depends(require_mt5), __: None = Depends(_verify_key)):
+    positions = mt5.positions_get() or []
+    return {"count": len(positions), "positions": [
+        {"ticket": p.ticket, "symbol": p.symbol, "type": "buy" if p.type == 0 else "sell",
+         "volume": p.volume, "open_price": p.price_open, "sl": p.sl, "tp": p.tp, "profit": p.profit}
+        for p in positions]}
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--login",    type=int, default=0)
+    parser.add_argument("--password", type=str, default="")
+    parser.add_argument("--server",   type=str, default="")
+    parser.add_argument("--host",     type=str, default="0.0.0.0")
+    parser.add_argument("--port",     type=int, default=8080)
+    args = parser.parse_args()
+    if args.login:    os.environ["MT5_LOGIN"]    = str(args.login)
+    if args.password: os.environ["MT5_PASSWORD"] = args.password
+    if args.server:   os.environ["MT5_SERVER"]   = args.server
+    uvicorn.run("agent:app", host=args.host, port=args.port, reload=False)
