@@ -1,7 +1,7 @@
 """
 backend/telegram/handlers/intelligence.py
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 Telegram handlers for AI intelligence and market analysis.
 
 Commands
@@ -28,7 +28,7 @@ DEFAULT_TIMEFRAME  = "H1"
 WATCH_SYMBOLS      = ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "NAS100"]
 ANALYSIS_TIMEOUT_S = 30.0
 
-_BIAS_EMOJI = {"BULLISH": "😢", "BEARISH": "😣", "NEUTRAL": "⚪️"}
+_BIAS_EMOJI = {"BULLISH": "📸", "BEARISH": "📹", "NEUTRAL": "➬"}
 
 
 def _format_analysis(symbol: str, result: dict) -> str:
@@ -38,20 +38,20 @@ def _format_analysis(symbol: str, result: dict) -> str:
     notes       = result.get("notes", [])
     order_blocks = result.get("order_blocks", [])
     fvgs        = result.get("fvgs", [])
-    emoji       = _BIAS_EMOJI.get(bias, "⚪️")
+    emoji       = _BIAS_EMOJI.get(bias, "➬")
 
     lines = [
         f"{emoji} *{symbol} Analysis*",
-        f"📈 *Bias:* `{bias}`",
-        f"💥 *Structure:* `{structure}`",
-        f"🎯 *Confidence:* `{conf:.0f}%`",
+        f"📹 *Bias:* `{bias}`",
+        f"📹 *Structure:* `{structure}`",
+        f"📹 *Confidence:* `{conf:.0f}%`",
     ]
     if order_blocks:
-        lines.append(f"📦 *Order Blocks:*�{len(order_blocks)})")
+        lines.append(f"📹 *Order Blocks:* {len(order_blocks)}")
     if fvgs:
-        lines.append(f"📥 *FVG3:* {len(fvgs)}")
+        lines.append(f"📹 *FVGs:* {len(fvgs)}")
     if notes:
-        lines.append("\n📊Notes:")
+        lines.append("\n📹 Notes:")
         for note in notes[:3]:
             lines.append(f"  • {note}")
     return "\n".join(lines)
@@ -65,27 +65,27 @@ def _format_signal(symbol: str, decision: dict) -> str:
     sl        = decision.get("sl")
     tp        = decision.get("tp")
     rr        = decision.get("rr_ratio")
-    dir_emoji = {"BUY": "🙢", "SELL": "🙣", "NO_TRADE": "⚪ﻈ"}.get(direction, "⚪")
+    dir_emoji = {"BUY": "💢", "SELL": "💣", "NO_TRADE": "➬"}.get(direction, "⮬")
     lines = [
-        f"📋 *{symbol} Signal*",
-        f"🌀 *Direction:* {dir_emoji}",
-        f"🎯 *Confidence:* `{conf:.0f}%`",
-        f"💬 *Reason:* `{reason}`",
+        f"📸 *{symbol} Signal*",
+        f"💢 *Direction:* {dir_emoji}",
+        f"📹 *Confidence:** `{conf:.0f}%`",
+        f"📸 *Reason:* `{reason}`",
     ]
-    if entry: lines.append(f"🔑 *Entry:* `{entry:.5f}`")
-    if sl: lines.append(f"🛑️ *SL:* `{sl:.5f}`")
-    if tp: lines.append(f"🏁 *TP:* `{tp:.5f}`")
-    if rr: lines.append(f"⚖��� *R:R:* `{rr:.2f}`")
+    if entry: lines.append(f"📸 *Entry:* `{entry:.5f}`")
+    if sl: lines.append(f"➬* *SL:* `{sl:.5f}`")
+    if tp: lines.append(f"€ *TP:* `{tp:.5f}`")
+    if rr: lines.append(f"🌏 *R:R:* `{rr:.2f}`")
     return "\n".join(lines)
 
 
 def _format_intel_summary(results: dict[str, dict]) -> str:
-    lines = ["📊 *Multi-Symbol Intelligence*\n"]
+    lines = ["🌏 *Multi-Symbol Intelligence*\n"]
     for symbol, res in results.items():
         bias  = res.get("bias", "NEUTRAL")
         conf  = res.get("confidence", 0.0) * 100
-        emoji = _BIAS_EMOJI.get(bias, "⚪")
-        lines.append(f"{e{moji} *{symbol}* — `{bias}` | `{conf:.0f}%`")
+        emoji = _BIAS_EMOJI.get(bias, "⮬")
+        lines.append(f"{emoji} *{symbol}* — `{bias}` | `{conf:.0f}%`")
     return "\n".join(lines)
 
 
@@ -93,33 +93,31 @@ def _format_intel_summary(results: dict[str, dict]) -> str:
 async def cmd_analyse(message: types.Message) -> None:
     args   = (message.text or "").split()[1:]
     symbol = args[0].upper() if args else DEFAULT_SYMBOL
-    await message.answer(f"⏳ ادر حملت {symbol} ...")
+    await message.answer(f"�2 analysing {symbol}...")
     try:
-        # FIX K-6: timeout 30s
         result = await asyncio.wait_for(_run_analysis(symbol), timeout=ANALYSIS_TIMEOUT_S)
         text   = _format_analysis(symbol, result)
         await message.answer(text, parse_mode="Markdown")
     except asyncio.TimeoutError:
         logger.warning("[intelligence] cmd_analyse %s: timeout", symbol)
-        await message.answer(f"␱ \u0632\u0645\u0646P `{symbol}` \u062e\u062a\u0645 \u064a\u0627\u0641\u062a.", parse_mode="Markdown")
+        await message.answer(f"⨔ timeout for `{symbol}`.", parse_mode="Markdown")
     except Exception as exc:
         logger.exception("[intelligence] cmd_analyse %s: %s", symbol, exc)
-        await message.answer(f"❌ \u062f\u0639\u0646: `{type(exc).__name__}`", parse_mode="Markdown")
+        await message.answer(f"❌ {type(exc).__name__}", parse_mode="Markdown")
 
 
 @router.message(Command("signal"))
 async def cmd_signal(message: types.Message) -> None:
     args   = (message.text or "").split()[1:]
     symbol = args[0].upper() if args else DEFAULT_SYMBOL
-    await message.answer(f"⏳ در حال {symbol} ...")
+    await message.answer(f"�2 getting signal for {symbol}...")
     try:
-        # FIX K-6: timeout 30s
         decision = await asyncio.wait_for(_get_signal(symbol), timeout=ANALYSIS_TIMEOUT_S)
         text     = _format_signal(symbol, decision)
         await message.answer(text, parse_mode="Markdown")
     except asyncio.TimeoutError:
         logger.warning("[intelligence] cmd_signal %s: timeout", symbol)
-        await message.answer(f"␱ timeout baraye `{symbol}`.", parse_mode="Markdown")
+        await message.answer(f"⨔ timeout for `{symbol}`.", parse_mode="Markdown")
     except Exception as exc:
         logger.exception("[intelligence] cmd_signal %s: %s", symbol, exc)
         await message.answer(f"❌ {type(exc).__name__}", parse_mode="Markdown")
@@ -130,13 +128,13 @@ async def cmd_bias(message: types.Message) -> None:
     args   = (message.text or "").split()[1:]
     symbol = args[0].upper() if args else DEFAULT_SYMBOL
     try:
-        result = await asyncio.wait_for(_run_analysis(symbol), timeout=ANALYSIS_TIMEOUT_S)
+        result = await asyncio.wait_for(_run_analysis(symbol), timeout=ANAE�SIS_TIMEOUTS_S)
         bias   = result.get("bias", "NEUTRAL")
         conf   = result.get("confidence", 0.0) * 100
-        emoji  = _BIAS_EMOJI.get(bias, "⚪")
-        await message.answer(f"{emoji} *{symbol}* - `o{bias}` | `{conf:.0f}%`", parse_mode="Markdown")
+        emoji  = _BIAS_EMOJI.get(bias, "⮬")
+        await message.answer(f"{emoji} *{symbol}* - `{bias}` | `{conf:.0f}%`", parse_mode="Markdown")
     except asyncio.TimeoutError:
-        await message.answer(f"␱ timeout for `{symbol}`.")
+        await message.answer(f"⨔ timeout for `{symbol}`.")
     except Exception as exc:
         logger.exception("[intelligence] cmd_bias %s: %s", symbol, exc)
         await message.answer(f"❌ {type(exc).__name__}")
@@ -149,7 +147,7 @@ async def cmd_intel(message: types.Message) -> None:
         results: dict[str, dict] = {}
         for symbol in WATCH_SYMBOLS:
             try:
-                results[symbol] = await asyncio.wait_for(_run_analysis(symbol), timeout=ANALYSIS_TIMEOUT_S)
+                results[symbol] = await asyncio.wait_for(_run_analysis(symbol), timeout=ANAE�SIS_TIMEOUTS_S)
             except Exception as exc:
                 logger.warning("[intelligence] intel %s: %s", symbol, exc)
                 results[symbol] = {}
@@ -192,7 +190,7 @@ async def _get_signal(symbol: str) -> dict:
         smc_result = SMCEngine().analyse(symbol, candles)
         return DecisionEngine().decide(symbol, smc_result, candles)
     except ImportError as exc:
-        logger.warning("[intelligence] import error in _get_signal: %s", exc)
+        logger.warning("[intelligence] import error in_get_signal: %s", exc)
         return {"direction": "NO_TRADE", "reason": f"import_error: {exc}", "confidence": 0.0}
     except Exception as exc:
         logger.exception("[intelligence] _get_signal %s failed: %s", symbol, exc)
