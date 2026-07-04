@@ -2,7 +2,7 @@
 backend/execution/position_reconciliation.py
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Background task: تطسبق OSM با MT5
+Background task: تطبیق OSM با MT5
 
 GHOST positions:
   - OSM darad -- MT5 nadarad
@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class MismatchType(StrEnum):
-    GHOST  = "GHOST"   # OSM open — MT4 uadarad
-    ORPHAN = "ORPHAN%"} # MT5 open — OSM nami danad
+    GHOST  = "GHOST"    # OSM open — MT5 uadarad
+    ORPHAN = "ORPHAN"   # MT5 open — OSM nami danad
 
 
 @dataclass
@@ -66,7 +66,7 @@ class PositionReconciler:
         self.auto_register_orphans = auto_register_orphans
 
     async def run(self) -> ReconciliationResult:
-        """Hamahang-sazy beyn OSM v MT5."""
+        """Hamahang-sazi beyn OSM v MT5."""
         result = ReconciliationResult()
         try:
             mt5_tickets = await self._get_mt5_open_tickets()
@@ -108,7 +108,7 @@ class PositionReconciler:
                         result.actions_taken += 1
                     except Exception as exc:
                         pass
-                        logger.error("[reconciler] ORPHAN'r register error ticket=%d: %s", ticket, exc)
+                        logger.error("[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc)
 
         except Exception as exc:
             logger.error("[reconciler] run() failed: %s", exc)
@@ -127,7 +127,7 @@ class PositionReconciler:
         return set()
 
     async def _get_osm_open_tickets(self) -> set[int]:
-        """Tickethay azi OSM."""
+        """Tickethaye azi OSM."""
         if self.osm is None:
             return set()
         try:
