@@ -1,1 +1,104 @@
-IiIiCmJhY2tlbmQvY29yZS9wcm9kdWN0aW9uX2hhcmRlbmluZy5weQpHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtIOKAlCBQcm9kdWN0aW9uIEhhcmRlbmluZyBMYXllcgoKZmF6IEk6CiAgSS0xOiBTZWN1cml0eSBoZWFkZXJzIChDU1AsIEhTVFMsIFgtRnJhbWUtT3B0aW9ucywgLi4uKQogIEktMjogQ09SUyBzdHJpY3QgbW9kZSDigJQgZnFhdCBvcmlnaW5zIG1hamF6IGRhciBwcm9kdWN0aW9uCiAgSS0zOiBSYXRlIGxpbWl0IHByb2R1Y3Rpb24gdGhyZXNob2xkcwogIEktNDogUmVxdWVzdCBzaXplIGxpbWl0cwogIEktNTogSVAgYWxsb3dsaXN0IGJhcmF5ZSBhZG1pbiBlbmRwb2ludHMKICBJLTY6IFNsb3ctcmVxdWVzdCBsb2dnaW5nICg+MnMpCiAgSS03OiBSZXF1ZXN0IElEIG1pZGRsZXdhcmUKIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBvcwppbXBvcnQgdGltZQppbXBvcnQgdXVpZAppbXBvcnQgbG9nZ2luZwpmcm9tIHR5cGluZyBpbXBvcnQgQ2FsbGFibGUsIFNldAoKZnJvbSBmYXN0YXBpIGltcG9ydCBGYXN0QVBJLCBSZXF1ZXN0LCBSZXNwb25zZQpmcm9tIGZhc3RhcGkubWlkZGxld2FyZS5jb3JzIGltcG9ydCBDT1JTTWlkZGxld2FyZQpmcm9tIHN0YXJsZXR0ZS5taWRkbGV3YXJlLmJhc2UgaW1wb3J0IEJhc2VIVFRQTWlkZGxld2FyZQpmcm9tIHN0YXJsZXR0ZS5yZXNwb25zZXMgaW1wb3J0IEpTT05SZXNwb25zZQpmcm9tIHN0YXJsZXR0ZS50eXBlcyBpbXBvcnQgQVNHSUFwcAoKbG9nID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgpfRU5WID0gb3MuZW52aXJvbi5nZXQoIkFQUF9FTlYiLCAiZGV2ZWxvcG1lbnQiKS5sb3dlcigpCl9JU19QUk9EID0gX0VOViA9PSAicHJvZHVjdGlvbiIKCl9BTExPV0VEX09SSUdJTlNfUkFXID0gb3MuZW52aXJvbi5nZXQoCiAgICAiQ09SU19PUklHSU5TIiwKICAgICJodHRwOi8vbG9jYWxob3N0OjMwMDAsaHR0cDovL2xvY2FsaG9zdDo1MTczIgopCkFMTE9XRURfT1JJR0lOUzogbGlzdFtzdHJdID0gWwogICAgby5zdHJpcCgpIGZvciBvIGluIF9BTExPV0VEX09SSUdJTlNfUkFXLnNwbGl0KCIsIikgaWYgby5zdHJpcCgpCl0KCl9BRE1JTl9BTExPV0xJU1RfUkFXID0gb3MuZW52aXJvbi5nZXQoIkFETUlOX0lQX0FMTE9XTElTVCIsICIiKQpBRE1JTl9JUF9BTExPV0xJU1Q6IFNldFtzdHJdID0gewogICAgaXAuc3RyaXAoKSBmb3IgaXAgaW4gX0FETUlOX0FMTE9XTElTVF9SQVcuc3BsaXQoIiwiKSBpZiBpcC5zdHJpcCgpCn0KCk1BWF9SRVFVRVNUX0JPRFlfQllURVMgPSBpbnQob3MuZW52aXJvbi5nZXQoIk1BWF9SRVFVRVNUX0JPRFlfTUIiLCAiMiIpKSAqIDEwMjQgKiAxMDI0ClNMT1dfUkVRVUVTVF9USFJFU0hPTERfU0VDID0gZmxvYXQob3MuZW52aXJvbi5nZXQoIlNMT1dfUkVRVUVTVF9USFJFU0hPTERfU0VDIiwgIjIuMCIpKQoKCmNsYXNzIFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUoQmFzZUhUVFBNaWRkbGV3YXJlKToKICAgIF9DU1AgPSAoCiAgICAgICAgImRlZmF1bHQtc3JjICdzZWxmJzsgIgogICAgICAgICJzY3JpcHQtc3JjICdzZWxmJzsgIgogICAgICAgICJzdHlsZS1zcmMgJ3NlbGYnICd1bnNhZmUtaW5saW5lJzsgIgogICAgICAgICJpbWctc3JjICdzZWxmJyBkYXRhOjsgIgogICAgICAgICJmb250LXNyYyAnc2VsZic7ICIKICAgICAgICAiY29ubmVjdC1zcmMgJ3NlbGYnOyAiCiAgICAgICAgImZyYW1lLWFuY2VzdG9ycyAnbm9uZSc7IgogICAgKQoKICAgIGFzeW5jIGRlZiBkaXNwYXRjaChzZWxmLCByZXF1ZXN0OiBSZXF1ZXN0LCBjYWxsX25leHQ6IENhbGxhYmxlKSAtPiBSZXNwb25zZToKICAgICAgICByZXNwb25zZTogUmVzcG9uc2UgPSBhd2FpdCBjYWxsX25leHQocmVxdWVzdCkKICAgICAgICByZXNwb25zZS5oZWFkZXJzWyJYLUNvbnRlbnQtVHlwZS1PcHRpb25zIl0gPSAibm9zbmlmZiIKICAgICAgICByZXNwb25zZS5oZWFkZXJzWyJYLUZyYW1lLU9wdGlvbnMiXSA9ICJERU5ZIgogICAgICAgIHJlc3BvbnNlLmhlYWRlcnNbIlgtWFNTLVByb3RlY3Rpb24iXSA9ICIxOyBtb2RlPWJsb2NrIgogICAgICAgIHJlc3BvbnNlLmhlYWRlcnNbIlJlZmVycmVyLVBvbGljeSJdID0gInN0cmljdC1vcmlnaW4td2hlbi1jcm9zcy1vcmlnaW4iCiAgICAgICAgcmVzcG9uc2UuaGVhZGVyc1siUGVybWlzc2lvbnMtUG9saWN5Il0gPSAoCiAgICAgICAgICAgICJjYW1lcmE9KCksIG1pY3JvcGhvbmU9KCksIGdlb2xvY2F0aW9uPSgpIgogICAgICAgICkKICAgICAgICBpZiBfSVNfUFJPRDoKICAgICAgICAgICAgcmVzcG9uc2UuaGVhZGVyc1siU3RyaWN0LVRyYW5zcG9ydC1TZWN1cml0eSJdID0gKAogICAgICAgICAgICAgICAgIm1heC1hZ2U9NjMwNzIwMDA7IGluY2x1ZGVTdWJEb21haW5zOyBwcmVsb2FkIgogICAgICAgICAgICApCiAgICAgICAgICAgIHJlc3BvbnNlLmhlYWRlcnNbIkNvbnRlbnQtU2VjdXJpdHktUG9saWN5Il0gPSBzZWxmLl9DU1AKICAgICAgICByZXR1cm4gcmVzcG9uc2UKCgpjbGFzcyBSZXF1ZXN0SURNaWRkbGV3YXJlKEJhc2VIVFRQTWV0aGxld2FyZSk6CiAgICBhc3luYyBkZWYgZGlzcGF0Y2goc2VsZiwgcmVxdWVzdDogUmVxdWVzdCwgY2FsbF9uZXh0OiBDYWxsYWJsZSkgLT4gUmVzcG9uc2U6CiAgICAgICAgcmVxdWVzdF9pZCA9IHJlcXVlc3QuaGVhZGVycy5nZXQoIlgtUmVxdWVzdC1JRCIpIG9yIHN0cih1dWlkLnV1aWQ0KCkpCiAgICAgICAgcmVxdWVzdC5zdGF0ZS5yZXF1ZXN0X2lkID0gcmVxdWVzdF9pZAogICAgICAgIHJlc3BvbnNlOiBSZXNwb25zZSA9IGF3YWl0IGNhbGxfbmV4dChyZXF1ZXN0KQogICAgICAgIHJlc3BvbnNlLmhlYWRlcnNbIlgtUmVxdWVzdC1JRCJdID0gcmVxdWVzdF9pZAogICAgICAgIHJldHVybiByZXNwb25zZQoKCmNsYXNzIFNsb3dSZXF1ZXN0TWlkZGxld2FyZShCYXNlSFRUUE1pZGRsZXdhcmUpOgogICAgYXN5bmMgZGVmIGRpc3BhdGNoKHNlbGYsIHJlcXVlc3Q6IFJlcXVlc3QsIGNhbGxfbmV4dDogQ2FsbGFibGUpIC0+IFJlc3BvbnNlOgogICAgICAgIHN0YXJ0ID0gdGltZS5wZXJmX2NvdW50ZXIoKQogICAgICAgIHJlc3BvbnNlOiBSZXNwb25zZSA9IGF3YWl0IGNhbGxfbmV4dChyZXF1ZXN0KQogICAgICAgIGVsYXBzZWQgPSB0aW1lLnBlcmZfY291bnRlcigpIC0gc3RhcnQKICAgICAgICByZXNwb25zZS5oZWFkZXJzWyJYLVJlc3BvbnNlLVRpbWUtTXMiXSA9IHN0cihyb3VuZChlbGFwc2VkICogMTAwMCkpCiAgICAgICAgaWYgZWxhcHNlZCA+IFNMT1dfUkVRVUVTVF9USFJFU0hPTERfU0VDOgogICAgICAgICAgICBsb2cud2FybmluZygKICAgICAgICAgICAgICAgICJTTE9XIFJFUVVFU1QgfCAlcyAlcyB8ICUuM2ZzIHwgc3RhdHVzPSVzIHwgcmVxdWVzdF9pZD0lcyIsCiAgICAgICAgICAgICAgICByZXF1ZXN0Lm1ldGhvZCwKICAgICAgICAgICAgICAgIHJlcXVlc3QudXJsLnBhdGgsCiAgICAgICAgICAgICAgICBlbGFwc2VkLAogICAgICAgICAgICAgICAgcmVzcG9uc2Uuc3RhdHVzX2NvZGUsCiAgICAgICAgICAgICAgICBnZXRhdHRyKHJlcXVlc3Quc3RhdGUsICJyZXF1ZXN0X2lkIiwgIi0iKSwKICAgICAgICAgICAgKQogICAgICAgIHJldHVybiByZXNwb25zZQoKCmNsYXNzIFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUoQmFzZUhUVFBNaWRkbGV3YXJlKToKICAgIGFzeW5jIGRlZiBkaXNwYXRjaChzZWxmLCByZXF1ZXN0OiBSZXF1ZXN0LCBjYWxsX25leHQ6IENhbGxhYmxlKSAtPiBSZXNwb25zZToKICAgICAgICBjb250ZW50X2xlbmd0aCA9IHJlcXVlc3QuaGVhZGVycy5nZXQoImNvbnRlbnQtbGVuZ3RoIikKICAgICAgICBpZiBjb250ZW50X2xlbmd0aCBhbmQgaW50KGNvbnRlbnRfbGVuZ3RoKSA+IE1BWF9SRVFVRVNUX0JPRFlfQllURVM6CiAgICAgICAgICAgIGxvZy53YXJuaW5nKAogICAgICAgICAgICAgICAgIlJFUVVFU1QgVE9PIExBUkdFIHwgJXMgfCBjb250ZW50LWxlbmd0aD0lcyB8IG1heD0lcyIsCiAgICAgICAgICAgICAgICByZXF1ZXN0LnVybC5wYXRoLAogICAgICAgICAgICAgICAgY29udGVudF9sZW5ndGgsCiAgICAgICAgICAgICAgICBNQVhfUkVRVUVTVF9CT0RZX0JZVEVTLAogICAgICAgICAgICApCiAgICAgICAgICAgIHJldHVybiBKU09OUmVzcG9uc2UoCiAgICAgICAgICAgICAgICB7ImRldGFpbCI6ICJSZXF1ZXN0IGJvZHkgdG9vIGxhcmdlIn0sCiAgICAgICAgICAgICAgICBzdGF0dXNfY29kZT00MTMsCiAgICAgICAgICAgICkKICAgICAgICByZXR1cm4gYXdhaXQgY2FsbF9uZXh0KHJlcXVlc3QpCgoKY2xhc3MgQWRtaW5JUEFsbG93bGlzdE1pZGRsZXdhcmUoQmFzZUhUVFBNaWRkbGV3YXJlKToKICAgIGFzeW5jIGRlZiBkaXNwYXRjaChzZWxmLCByZXF1ZXN0OiBSZXF1ZXN0LCBjYWxsX25leHQ6IENhbGxhYmxlKSAtPiBSZXNwb25zZToKICAgICAgICBpZiBub3QgQURNSU5fSVBfQUxMT1dMSVNUOgogICAgICAgICAgICByZXR1cm4gYXdhaXQgY2FsbF9uZXh0KHJlcXVlc3QpCiAgICAgICAgaWYgbm90IHJlcXVlc3QudXJsLnBhdGguc3RhcnRzd2l0aCgiL2FwaS9hZG1pbiIpOgogICAgICAgICAgICByZXR1cm4gYXdhaXQgY2FsbF9uZXh0KHJlcXVlc3QpCiAgICAgICAgY2xpZW50X2lwID0gX2dldF9jbGllbnRfaXAocmVxdWVzdCkKICAgICAgICBpZiBjbGllbnRfaXAgbm90IGluIEFETUlOX0lQX0FMTE9XTElTVDoKICAgICAgICAgICAgbG9nLndhcm5pbmcoCiAgICAgICAgICAgICAgICAiQURNSU4gQUNDRVNTIERFTklFRCB8IGlwPSVzIHwgcGF0aD0lcyIsCiAgICAgICAgICAgICAgICBjbGllbnRfaXAsCiAgICAgICAgICAgICAgICByZXF1ZXN0LnVybC5wYXRoLAogICAgICAgICAgICApCiAgICAgICAgICAgIHJldHVybiBKU09OUmVzcG9uc2UoeyJkZXRhaWwiOiAiQWNjZXNzIGRlbmllZCJ9LCBzdGF0dXNfY29kZT00MDMpCiAgICAgICAgcmV0dXJuIGF3YWl0IGNhbGxfbmV4dChyZXF1ZXN0KQoKCmRlZiBhcHBseV9wcm9kdWN0aW9uX2hhcmRlbmluZyhhcHA6IEZhc3RBUEkpIC0+IE5vbmU6CiAgICBhcHAuYWRkX21pZGRsZXdhcmUoCiAgICAgICAgQ09SU01pZGRsZXdhcmUsCiAgICAgICAgYWxsb3dfb3JpZ2lucz1BTExPV0VEX09SSUdJTlMsCiAgICAgICAgYWxsb3dfY3JlZGVudGlhbHM9VHJ1ZSwKICAgICAgICBhbGxvd19tZXRob2RzPVsiR0VUIiwgIlBPU1QiLCAiUFVUIiwgIlBBVENIIiwgIkRFTEVURSIsICJPUFRJT05TIl0sCiAgICAgICAgYWxsb3dfaGVhZGVycz1bIkF1dGhvcml6YXRpb24iLCAiQ29udGVudC1UeXBlIiwgIlgtUmVxdWVzdC1JRCJdLAogICAgICAgIGV4cG9zZV9oZWFkZXJzPVsiWC1SZXF1ZXN0LUlEIiwgIlgtUmVzcG9uc2UtVGltZS1NcyJdLAogICAgICAgIG1heF9hZ2U9NjAwLAogICAgKQogICAgYXBwLmFkZF9taWRkbGV3YXJlKFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUpCiAgICBhcHAuYWRkX21pZGRsZXdhcmUoUmVxdWVzdElETWlkZGxld2FyZSkKICAgIGFwcC5hZGRfbWlkZGxld2FyZShTbG93UmVxdWVzdE1pZGRsZXdhcmUpCiAgICBhcHAuYWRkX21pZGRsZXdhcmUoUmVxdWVzdFNpemVMaW1pdGVyTWlkZGxld2FyZSkKICAgIGFwcC5hZGRfbWlkZGxld2FyZShBZG1pbklQQWxsb3dsaXN0TWlkZGxld2FyZSkKICAgIGxvZy5pbmZvKAogICAgICAgICJQcm9kdWN0aW9uIGhhcmRlbmluZyBhcHBsaWVkIHwgZW52PSVzIHwgY29yc19vcmlnaW5zPSVzIiwKICAgICAgICBfRU5WLCBBTExPV0VEX09SSUdJTlMsCiAgICApCgoKZGVmIF9nZXRfY2xpZW50X2lwKHJlcXVlc3Q6IFJlcXVlc3QpIC0+IHN0cjoKICAgIGZvcndhcmRlZF9mb3IgPSByZXF1ZXN0LmhlYWRlcnMuZ2V0KCJYLUZvcndhcmRlZC1Gb3IiKQogICAgaWYgZm9yd2FyZGVkX2ZvcjoKICAgICAgICByZXR1cm4gZm9yd2FyZGVkX2Zvci5zcGxpdCgiLCIpWzBdLnN0cmlwKCkKICAgIGlmIHJlcXVlc3QuY2xpZW50OgogICAgICAgIHJldHVybiByZXF1ZXN0LmNsaWVudC5ob3N0CiAgICByZXR1cm4gInVua25vd24iCg==
+"""
+backend/core/production_hardening.py
+Galaxy Vast AI Trading Platform — Production Hardening Layer
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+faz I:
+  I-1: Security headers (CSP, HSTS, X-Frame-Options) -> middleware/security_hardened.py
+  I-2: Rate limiting (Redis + in-memory fallback) -> middleware/rate_limit.py
+  I-3: JWT signing + verification -> core/auth.py
+  I-4: Supabase RLS policies -> supabase/migrations
+"""
+
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class ProductionHardening:
+    """
+    Production security hardening checks and utilities.
+    Run on startup to validate production environment.
+    """
+
+    CRITICAL_SECRETS: List[str] = [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
+        "SECRET_KEY",
+        "JWT_SECRET_KEY",
+    ]
+
+    SECURITY_HEADERS_REQUIRED: List[str] = [
+        "X-Content-Type-Options",
+        "X-Frame-Options",
+        "X-XSS-Protection",
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+    ]
+
+    def __init__(self) -> None:
+        self.errors     = []
+        self.warnings   = []
+        self.app_env    = os.getenv("APP_ENV", "development")
+        self.is_prod    = self.app_env == "production"
+
+    def run_all_checks(self) -> Dict[str, Any]:
+        """Run all production hardening checks."""
+        self._check_secrets()
+        self._check_debug_mode()
+        self._check_cors()
+        self._check_mt5_demo_mode()
+        self._check_gateway_key()
+
+        status = "fail" if self.errors else "warn" if self.warnings else "pass"
+        logger.info("ProductionHardening: %s (errors=%d warnings=%d)",
+                    status, len(self.errors), len(self.warnings))
+        return {
+            "status":    status,
+            "errors":    self.errors,
+            "warnings":  self.warnings,
+            "env":       self.app_env,
+        }
+
+    def _check_secrets(self) -> None:
+        for key in self.CRITICAL_SECRETS:
+            val = os.getenv(key, "")
+            if not val:
+                self.errors.append(f"Missing critical env var: {key}")
+            elif len(val) < 16:
+                self.warnings.append(f"{ky} is too short (<16 chars)")
+
+    def _check_debug_mode(self) -> None:
+        debug = os.getenv("DEBUG", "").lower()
+        if self.is_prod and debug in ("true", "1", "yes"):
+            self.errors.append("DEBUG=true in production -- DISABLE IMMEDIATELY")
+
+    def _check_cors(self) -> None:
+        cors = os.getenv("CORS_ORIGINS", "")
+        if self.is_prod and "localhost" in cors.lower():
+            self.warnings.append(f"CORS_ORIGINS contains localhost in production: {cors}")
+
+    def _check_mt5_demo_mode(self) -> None:
+        demo = os.getenv("MT5_DEMO_MODE", "true").lower()
+        if demo in ("true", "1", "yes"):
+            msg = "MT5_DEMO_MODE=true -- No real trades will be placed!"
+            if self.is_prod:
+                self.errors.append(msg)
+            else:
+                self.warnings.append(msg)
+            logger.warning("⚨ %s", msg)
+
+    def _check_gateway_key(self) -> None:
+        key = os.getenv("GATEWAY_API_KEY", "")
+        if not key:
+            self.warnings.append("GATEWAY_API_KEY not set -- gateway runs without auth")
+        elif len(key) < 16:
+            self.warnings.append("GATEWAY_API_KEY is too short (<16 chars)")
+
+
+def run_production_checks() -> Dict[str, Any]:
+    """Convenience function for startup_validator."""
+    return ProductionHardening().run_all_checks()
