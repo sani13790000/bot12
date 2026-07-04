@@ -1,1 +1,139 @@
-IiIiCmJhY2tlbmQvc2VydmljZXMvc2lnbmFsX3Byb2Nlc3Nvci5weQpHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtCuKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgQoK2YXYp9i32YjZhDogU2lnbmFsUHJvY2Vzc29yCgrZiNi424zZgdmHOgogIC0g2K/Ys9iq24zagdiqINin24zZhiDat9in2K/Zhdin2YkgaW5jb21pbmcg2KjYsSBTdXBhYmFzZQogIC0g2KzYsNq3INiq2YPYsdqp24zYqiDYs9uM2q/ZhdmE2Ycg2YXYrNin2LIg2KjYsSDYs9uM2q/ZhdmE2Ycg2KbZhdmHCiAgLSDZgdmI2LQgdm90aW5nX2VuZ2luZSDZiCDYqtm2auKAjNmH24zYr9mHINin24zZhgogIC0g2KrYs9q3 INuM2LMg2KjZhyBleGVjdXRpb25fc2VydmljZQoKSW1wb3J0czoKICAtIGFzeW5jaW8KICAtIGRhdGFjbGFzc2VzCiAgLSB0eXBpbmcKIiIiCgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmltcG9ydCBhc3luY2lvCmltcG9ydCBsb2dnaW5nCmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcywgZmllbGQKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWV6b25lCmZyb20gdHlwaW5nIGltcG9ydCBMaXN0LCBPcHRpb25hbAoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgoKQGRhdGFjbGFzcwpjbGFzcyBUcmFkaW5nU2lnbmFsOgogICAgaWQ6ICAgICAgICAgICAgICAgc3RyCiAgICBzeW1ib2w6ICAgICAgICAgICBzdHIKICAgIHRpbWVmcmFtZTogICAgICAgIHN0cgogICAgZGlyZWN0aW9uOiAgICAgICAgc3RyCiAgICBlbnRyeV9wcmljZTogICAgICBmbG9hdAogICAgc2xfcHJpY2U6ICAgICAgICAgZmxvYXQKICAgIHRwX3ByaWNlOiAgICAgICAgIGZsb2F0CiAgICBjb25maWRlbmNlOiAgICAgICBmbG9hdCAgICAgICAgICAgICAgICMgMC4wIC0gMS4wCiAgICBzb3VyY2U6ICAgICAgICAgICBzdHIgICAgICAgICAgICAgICAgICMgImF1dG8iIHwgInNlbWlfYXV0byIgfCAibWFudWFsIgogICAgdXNlcl9pZDogICAgICAgICAgT3B0aW9uYWxbc3RyXSAgPSBOb25lCiAgICBub3RlczogICAgICAgICAgICBMaXN0W3N0cl0gICAgICA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1saXN0KQogICAgY3JlYXRlZF9hdDogICAgICAgT3B0aW9uYWxbZGF0ZXRpbWVdID0gTm9uZQoKCkBkYXRhY2xhc3MKY2xhc3MgUHJvY2Vzc1Jlc3VsdDoKICAgIHN1Y2Nlc3M6ICAgICAgYm9vbAogICAgc2lnbmFsX2lkOiAgICBzdHIKICAgIHN0YWdlOiAgICAgICAgc3RyCiAgICBtZXNzYWdlOiAgICAgIHN0cgogICAgZWxhcHNlZF9tczogICBmbG9hdAogICAgZXhlY3V0ZWQ6ICAgICBib29sICAgICAgID0gRmFsc2UKICAgIHRpY2tldDogICAgICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKICAgIG5vdGVzOiAgICAgICAgTGlzdFtzdHJdICA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1saXN0KQoKCmNsYXNzIFNpZ25hbFByb2Nlc3NvcjoKICAgICIiIgogICAg2KfZhtqvINmE24zagdrEjNuMINig2K8g2LXZhdi02KfZgCDYs9uM2q/ZhdmE2Ycg2YXYrNin2LIuCgogICAg2YXYsdiq2KogUHJvY2VzczoKICAgICAgICAxLiAgRGF0ZSBWYWxpZGF0aW9uICjYs9mG2K8g24zYqiDYstmF2KfZhiDZiNmI2LHZiNiv24wg2KjYp9i02YbYrykKICAgICAgICAyLiAgUmlzay9SZXdhcmQgY2hlY2sgKNiz2YbYryDYqdiv2KfZgtmEIFI6UikKICAgICAgICAzLiAgVm90aW5nIGNvbmZpcm1hdGlvbiAo2KrZhdqv24zYqiDZiNiq24zZhiDZiNiq24zZhiDYotix2KfbjCDYsNmIINiw2K/bjCkKICAgICAgICA0LiAgRXhlY3V0aW9uIHZpYSBFeGVjdXRpb25TZXJ2aWNlCiAgICAgICAgNS4gIEFsZXJ0IHZpYSBUZWxlZ3JhbQogICAgIiIiCgogICAgTUlOX0NPTkZJREVOQ0UgPSAwLjYwCiAgICBNSU5fUlJfUkFUSU8gICA9IDEuNQogICAgVElNRU9VVF9TICAgICAgPSAzMAoKICAgIGRlZiBfX2luaXRfXyhzZWxmLCBleGVjdXRpb25fc2VydmljZT1Ob25lLCB2b3RpbmdfZW5naW5lPU5vbmUsCiAgICAgICAgICAgICAgICAgdGVsZWdyYW1fYWxlcnRzPU5vbmUpIC0+IE5vbmU6CiAgICAgICAgc2VsZi5leGVjdXRpb25fc2VydmljZSA9IGV4ZWN1dGlvbl9zZXJ2aWNlCiAgICAgICAgc2VsZi52b3RpbmdfZW5naW5lICAgICA9IHZvdGluZ19lbmdpbmUKICAgICAgICBzZWxmLnRlbGVncmFtX2FsZXJ0cyAgID0gdGVsZWdyYW1fYWxlcnRzCgogICAgYXN5bmMgZGVmIHByb2Nlc3Moc2VsZiwgc2lnbmFsOiBUcmFkaW5nU2lnbmFsKSAtPiBQcm9jZXNzUmVzdWx0OgogICAgICAgIHQwID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykudGltZXN0YW1wKCkKICAgICAgICB0cnk6CiAgICAgICAgICAgIHJldHVybiBhd2FpdCBhc3luY2lvLndhaXRfZm9yKAogICAgICAgICAgICAgICAgc2VsZi5fcHJvY2Vzc19pbnRlcm5hbChzaWduYWwsIHQwKSwKICAgICAgICAgICAgICAgIHRpbWVvdXQ9c2VsZi5USU1FT1VUX1MKICAgICAgICAgICAgKQogICAgICAgIGV4Y2VwdCBhc3luY2lvLlRpbWVvdXRFcnJvcjoKICAgICAgICAgICAgbXNnID0gZiJzaWduYWwge3NpZ25hbC5pZH0gdGltZWQgb3V0IGFmdGVyIHtzZWxmLlRJTUVPVVRfU31zIgogICAgICAgICAgICBsb2dnZXIuZXJyb3IobXNnKQogICAgICAgICAgICBhd2FpdCBzZWxmLl9zZW5kX2FsZXJ0KGYi4pqoIFRpbWVvdXQ6IHttc2d9IikKICAgICAgICAgICAgcmV0dXJuIHNlbGYuX3JlamVjdChzaWduYWwsIG1zZywgdDApCgogICAgYXN5bmMgZGVmIF9wcm9jZXNzX2ludGVybmFsKHNlbGYsIHNpZ25hbDogVHJhZGluZ1NpZ25hbCwgdDA6IGZsb2F0KSAtPiBQcm9jZXNzUmVzdWx0OgogICAgICAgICMgMTogdmFsaWRhdGUKICAgICAgICBpZiBzaWduYWwuY29uZmlkZW5jZSA8IHNlbGYuTUlOX0NPTkZJREVOQ0U6CiAgICAgICAgICAgIHJldHVybiBzZWxmLl9yZWplY3Qoc2lnbmFsLCBmImNvbmZpZGVuY2Uge3NpZ25hbC5jb25maWRlbmNlOi4yZn0gPCB7c2VsZi5NSU5fQ09ORklERU5DRX0iLCB0MCkKICAgICAgICBpZiBzaWduYWwuc2xfcHJpY2UgYW5kIHNpZ25hbC50cF9wcmljZToKICAgICAgICAgICAgcmlzayAgID0gYWJzKHNpZ25hbC5lbnRyeV9wcmljZSAtIHNpZ25hbC5zbF9wcmljZSkKICAgICAgICAgICAgcmV3YXJkID0gYWJzKHNpZ25hbC50cF9wcmljZSAtIHNpZ25hbC5lbnRyeV9wcmljZSkKICAgICAgICAgICAgaWYgcmlzayA+IDAgYW5kIChyZXdhcmQgLyByaXNrKSA8IHNlbGYuTUlOX1JSX1JBVElPOgogICAgICAgICAgICAgICAgcmV0dXJuIHNlbGYuX3JlamVjdChzaWduYWwsIGYiUjpSIHtyZXdhcmQvcmlzazouMmZ9IDwge3NlbGYuTUlOX1JSX1JBVElPfSIsIHQwKQogICAgICAgIGlmIG5vdCBhd2FpdCBzZWxmLl92b3RpbmdfY29uZmlybXMoc2lnbmFsKToKICAgICAgICAgICAgcmV0dXJuIHNlbGYuX3JlamVjdChzaWduYWwsICJWb3RpbmdFbmdpbmUgcmVqZWN0ZWQiLCB0MCkKICAgICAgICAjIDI6IGV4ZWN1dGUKICAgICAgICByZXN1bHQgPSBhd2FpdCBzZWxmLl9leGVjdXRlKHNpZ25hbCkKICAgICAgICBlbGFwc2VkID0gcm91bmQoKGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLnRpbWVzdGFtcCgpIC0gdDApICogMTAwMCwgMikKICAgICAgICBhd2FpdCBzZWxmLl9zZW5kX2FsZXJ0KGYi4pyFIFNpZ25hbCB7c2lnbmFsLmlkfSBleGVjdXRlZDoge3Jlc3VsdH0iKQogICAgICAgIHJldHVybiBQcm9jZXNzUmVzdWx0KHN1Y2Nlc3M9VHJ1ZSwgc2lnbmFsX2lkPXNpZ25hbC5pZCwgc3RhZ2U9ImV4ZWN1dGVkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICBtZXNzYWdlPXN0cihyZXN1bHQpLCBlbGFwc2VkX21zPWVsYXBzZWQsIGV4ZWN1dGVkPVRydWUsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdGlja2V0PXN0cihyZXN1bHQpIGlmIHJlc3VsdCBlbHNlIE5vbmUpCgogICAgYXN5bmMgZGVmIF92b3RpbmdfY29uZmlybXMoc2VsZiwgc2lnbmFsOiBUcmFkaW5nU2lnbmFsKSAtPiBib29sOgogICAgICAgIGlmIG5vdCBzZWxmLnZvdGluZ19lbmdpbmU6CiAgICAgICAgICAgIHJldHVybiBUcnVlCiAgICAgICAgdHJ5OgogICAgICAgICAgICByZXN1bHQgPSBhd2FpdCBzZWxmLnZvdGluZ19lbmdpbmUudm90ZShzaWduYWwpCiAgICAgICAgICAgIHJldHVybiBib29sKHJlc3VsdCkKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJ2b3RpbmcgZXJyb3I6ICVzIiwgZSkKICAgICAgICAgICAgcmV0dXJuIFRydWUKCiAgICBhc3luYyBkZWYgX2V4ZWN1dGUoc2VsZiwgc2lnbmFsOiBUcmFkaW5nU2lnbmFsKToKICAgICAgICBpZiBub3Qgc2VsZi5leGVjdXRpb25fc2VydmljZToKICAgICAgICAgICAgcmV0dXJuIE5vbmUKICAgICAgICByZXR1cm4gYXdhaXQgc2VsZi5leGVjdXRpb25fc2VydmljZS5leGVjdXRlKHNpZ25hbCkKCiAgICBhc3luYyBkZWYgX3NlbmRfYWxlcnQoc2VsZiwgbXNnOiBzdHIpIC0+IE5vbmU6CiAgICAgICAgaWYgbm90IHNlbGYudGVsZWdyYW1fYWxlcnRzOgogICAgICAgICAgICByZXR1cm4KICAgICAgICB0cnk6CiAgICAgICAgICAgIGF3YWl0IHNlbGYudGVsZWdyYW1fYWxlcnRzLnNlbmQobXNnKQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgbG9nZ2VyLndhcm5pbmcoImFsZXJ0IGZhaWxlZDogJXMiLCBlKQoKICAgIGRlZiBfcmVqZWN0KHNlbGYsIHNpZ25hbDogVHJhZGluZ1NpZ25hbCwgcmVhc29uOiBzdHIsIHQwOiBmbG9hdCkgLT4gUHJvY2Vzc1Jlc3VsdDoKICAgICAgICBsb2dnZXIuaW5mbygiUkVKRUNURUQgJXM6ICVzIiwgc2lnbmFsLmlkLCByZWFzb24pCiAgICAgICAgZWxhcHNlZCA9IHJvdW5kKChkYXRldGltZS5ub3codGltZXpvbmUudXRjKS50aW1lc3RhbXAoKSAtIHQwKSAqIDEwMDAsIDIpCiAgICAgICAgcmV0dXJuIFByb2Nlc3NSZXN1bHQoc3VjY2Vzcz1GYWxzZSwgc2lnbmFsX2lkPXNpZ25hbC5pZCwgc3RhZ2U9InJlamVjdGVkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICBtZXNzYWdlPXJlYXNvbiwgZWxhcHNlZF9tcz1lbGFwc2VkKQo=
+"""
+backend/services/signal_processor.py
+Galaxy Vast AI Trading Platform
+âââââââââââââââââââââââââââââ
+
+ÙØ§Ø·ÙÙ: SignalProcessor
+
+ÙØ¸ÛÙÙ:
+  - Ø¯Ø³ØªÛÚØª Ø§ÛÙ Ú·Ø§Ø¯ÙØ§Ù incoming Ø¨Ø± Supabase
+  - Ø¬Ø°Ú· ØªÙØ±Ú©ÛØª Ø³ÛÚ¯ÙÙÙ ÙØ¬Ø§Ø² Ø¨Ø± Ø³ÛÚ¯ÙÙÙ Ø¦ÙÙ
+  - ÙÙØ´ voting_engine Ù ØªÙ¶jâÙÛØ¯Ù Ø§ÛÙ
+  - ØªØ³Ú· ÛØ³ Ø¨Ù execution_service
+
+Imports:
+  - asyncio
+  - dataclasses
+  - typing
+"""
+
+from __future__ import annotations
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TradingSignal:
+    id:               str
+    symbol:           str
+    timeframe:        str
+    direction:        str
+    entry_price:      float
+    sl_price:         float
+    tp_price:         float
+    confidence:       float               # 0.0 - 1.0
+    source:           str                 # "auto" | "semi_auto" | "manual"
+    user_id:          Optional[str]  = None
+    notes:            List[str]      = field(default_factory=list)
+    created_at:       Optional[datetime] = None
+
+
+@dataclass
+class ProcessResult:
+    success:      bool
+    signal_id:    str
+    stage:        str
+    message:      str
+    elapsed_ms:   float
+    executed:     bool       = False
+    ticket:       Optional[str] = None
+    notes:        List[str]  = field(default_factory=list)
+
+
+class SignalProcessor:
+    """
+    Ø§ÙÚ¯ ÙÛÚÚÄÛ Ø Ø¯ ØµÙØ´Ø§Ù Ø³ÛÚ¯ÙÙÙ ÙØ¬Ø§Ø².
+
+    ÙØ±ØªØª Process:
+        1.  Date Validation (Ø³ÙØ¯ ÛØª Ø²ÙØ§Ù ÙÙØ±ÙØ¯Û Ø¨Ø§Ø´ÙØ¯)
+        2.  Risk/Reward check (Ø³ÙØ¯ Ø©Ø¯Ø§ÙÙ R:R)
+        3.  Voting confirmation (ØªÙÚ¯ÛØª ÙØªÛÙ ÙØªÛÙ Ø¢Ø±Ø§Û Ø°Ù Ø°Ø¯Û)
+        4.  Execution via ExecutionService
+        5.  Alert via Telegram
+    """
+
+    MIN_CONFIDENCE = 0.60
+    MIN_RR_RATIO   = 1.5
+    TIMEOUT_S      = 30
+
+    def __init__(self, execution_service=None, voting_engine=None,
+                 telegram_alerts=None) -> None:
+        self.execution_service = execution_service
+        self.voting_engine     = voting_engine
+        self.telegram_alerts   = telegram_alerts
+
+    async def process(self, signal: TradingSignal) -> ProcessResult:
+        t0 = datetime.now(timezone.utc).timestamp()
+        try:
+            return await asyncio.wait_for(
+                self._process_internal(signal, t0),
+                timeout=self.TIMEOUT_S
+            )
+        except asyncio.TimeoutError:
+            msg = f"signal {signal.id} timed out after {self.TIMEOUT_S}s"
+            logger.error(msg)
+            await self._send_alert(f"â¨ Timeout: {msg}")
+            return self._reject(signal, msg, t0)
+
+    async def _process_internal(self, signal: TradingSignal, t0: float) -> ProcessResult:
+        # 1: validate
+        if signal.confidence < self.MIN_CONFIDENCE:
+            return self._reject(signal, f"confidence {signal.confidence:.2f} < {self.MIN_CONFIDENCE}", t0)
+        if signal.sl_price and signal.tp_price:
+            risk   = abs(signal.entry_price - signal.sl_price)
+            reward = abs(signal.tp_price - signal.entry_price)
+            if risk > 0 and (reward / risk) < self.MIN_RR_RATIO:
+                return self._reject(signal, f"R:R {reward/risk:.2f} < {self.MIN_RR_RATIO}", t0)
+        if not await self._voting_confirms(signal):
+            return self._reject(signal, "VotingEngine rejected", t0)
+        # 2: execute
+        result = await self._execute(signal)
+        elapsed = round((datetime.now(timezone.utc).timestamp() - t0) * 1000, 2)
+        await self._send_alert(f"â Signal {signal.id} executed: {result}")
+        return ProcessResult(success=True, signal_id=signal.id, stage="executed",
+                             message=str(result), elapsed_ms=elapsed, executed=True,
+                             ticket=str(result) if result else None)
+
+    async def _voting_confirms(self, signal: TradingSignal) -> bool:
+        if not self.voting_engine:
+            return True
+        try:
+            result = await self.voting_engine.vote(signal)
+            return bool(result)
+        except Exception as e:
+            logger.warning("voting error: %s", e)
+            return True
+
+    async def _execute(self, signal: TradingSignal):
+        if not self.execution_service:
+            return None
+        return await self.execution_service.execute(signal)
+
+    async def _send_alert(self, msg: str) -> None:
+        if not self.telegram_alerts:
+            return
+        try:
+            await self.telegram_alerts.send(msg)
+        except Exception as e:
+            logger.warning("alert failed: %s", e)
+
+    def _reject(self, signal: TradingSignal, reason: str, t0: float) -> ProcessResult:
+        logger.info("REJECTED %s: %s", signal.id, reason)
+        elapsed = round((datetime.now(timezone.utc).timestamp() - t0) * 1000, 2)
+        return ProcessResult(success=False, signal_id=signal.id, stage="rejected",
+                             message=reason, elapsed_ms=elapsed)
