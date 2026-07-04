@@ -1,1 +1,78 @@
-IiIiCkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0K4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBCuKUjCBUZWxlZ3JhbSBBZG1pbiBSb3V0ZXIg4pSMCuKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgQoiIiIKCmltcG9ydCBsb2dnaW5nCmZyb20gYWlvZ3JhbSBpbXBvcnQgUm91dGVyLCBGCmZyb20gYWlvZ3JhbS50eXBlcyBpbXBvcnQgTWVzc2FnZSwgQ2FsbGJhY2tRdWVyeQpmcm9tIGFpb2dyYW0uZmlsdGVycyBpbXBvcnQgQ29tbWFuZAoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCnJvdXRlciA9IFJvdXRlcigpCgoKQHJvdXRlci5tZXNzYWdlKENvbW1hbmQoImFkbWluIikpCmFzeW5jIGRlZiBhZG1pbl9wYW5lbChtZXNzYWdlOiBNZXNzYWdlKSAtPiBOb25lOgogICAgIiIi2YXZhduM2Yog2YbZhdilINmF2K/bjNix24zYqiDYp9iv2YXbjNmGIiIiCiAgICB1c2VyX2lkID0gbWVzc2FnZS5mcm9tX3VzZXIuaWQgaWYgbWVzc2FnZS5mcm9tX3VzZXIgZWxzZSBOb25lCiAgICBsb2dnZXIuaW5mbygiYWRtaW5fcGFuZWwgcmVxdWVzdGVkIGJ5IHVzZXJfaWQ9JXMiLCB1c2VyX2lkKQoKICAgIGtleWJvYXJkX3RleHQgPSAoCiAgICAgICAgIvCfm4ogPGI+R2FsYXh5IFZhc3QgQUkgLS0g2pan2K/ZhdbuM2Yog2YXZhbuM2YI8L2I+XG5cbiIKICAgICAgICAi8J+TiyBhZG1pbl91c2Vycywg8J+TgCBraWxsX3N3aXRjaCwg8J+TiSBzdGF0dXMiCiAgICApCiAgICBhd2FpdCBtZXNzYWdlLmFuc3dlcihrZXlib2FyZF90ZXh0LCBwYXJzZV9tb2RlPSJIVE1MIikKCgpAcm91dGVyLm1lc3NhZ2UoQ29tbWFuZCgiYWRtaW5fdXNlcnMiKSkKYXN5bmMgZGVmIGFkbWluX3VzZXJzKG1lc3NhZ2U6IE1lc3NhZ2UpIC0+IE5vbmU6CiAgICAiIiLZhdi52KfZhdmE2KcgbGlzdCDaqdix2KjYp9mG24zZhiIiIgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5kYXRhYmFzZS5jb25uZWN0aW9uIGltcG9ydCBnZXRfc3VwYWJhc2VfY2xpZW50CiAgICAgICAgc2IgPSBnZXRfc3VwYWJhc2VfY2xpZW50KCkKICAgICAgICByZXNwID0gc2IudGFibGUoInVzZXJzIikuc2VsZWN0KCJpZCx0ZWxlZ3JhbV9pZCxlbWFpbCxyb2xlLGlzX2FjdGl2ZSIpXAogICAgICAgICAgICAgICAgIC5vcmRlcigiY3JlYXRlZF9hdCIsIGRlc2M9VHJ1ZSkubGltaXQoMjApLmV4ZWN1dGUoKQogICAgICAgIHJvd3MgPSByZXNwLmRhdGEgb3IgW10KICAgICAgICBpZiBub3Qgcm93czoKICAgICAgICAgICAgYXdhaXQgbWVzc2FnZS5hbnN3ZXIoIvCfkI0g2YfbjNqGINqp2LHYqNin2YbbjNmGINiw2KfZgti12KfZhCDZhdmI2KvZiNivIikKICAgICAgICAgICAgcmV0dXJuCiAgICAgICAgbGluZXMgPSBbIjxiPvCfkI0g2YbZhdmI2K/Yp9ix2KcgKDIwIOKAkyDYrNiv24zYr9qvKTo8L2I+Il0KICAgICAgICBmb3IgciBpbiByb3dzOgogICAgICAgICAgICBhY3RpdmVfaWNvbiA9ICLinIUiIGlmIHIuZ2V0KCJpc19hY3RpdmUiKSBlbHNlICLinIwiCiAgICAgICAgICAgIGxpbmVzLmFwcGVuZCgKICAgICAgICAgICAgICAgIGYie2FjdGl2ZV9pY29ufSA8Y29kZT57ci5nZXQoJ2lkJywgJz8nKX08L2NvZGU+ICIKICAgICAgICAgICAgICAgIGYifiB7ci5nZXQoJ2VtYWlsJywgJ24vYScpfSBbe3IuZ2V0KCdyb2xlJywgJ3VzZXInKX1dIgogICAgICAgICAgICApCiAgICAgICAgYXdhaXQgbWVzc2FnZS5hbnN3ZXIoIlxuIi5qb2luKGxpbmVzKSwgcGFyc2VfbW9kZT0iSFRNTCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigiYWRtaW5fdXNlcnMgZXJyb3I6ICVzIiwgZSkKICAgICAgICBhd2FpdCBtZXNzYWdlLmFuc3dlcihmIuKamCDYrtmC2KfjgIzYqSDZiNmC2YjYuSB0cmVlOiB7ZX0iKQoKCkByb3V0ZXIubWVzc2FnZShDb21tYW5kKCJraWxsX3N3aXRjaCIpKQphc3luYyBkZWYgdG9nZ2xlX2tpbGxfc3dpdGNoKG1lc3NhZ2U6IE1lc3NhZ2UpIC0+IE5vbmU6CiAgICAiIiLZgdi12LnYp9mEIEtpbGwgU3dpdGNoIiIiCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLnJpc2sua2lsbF9zd2l0Y2ggaW1wb3J0IEtpbGxTd2l0Y2gKICAgICAgICBrcyA9IEtpbGxTd2l0Y2goKQogICAgICAgIGlzX2FjdGl2ZSA9IGtzLmlzX2FjdGl2ZSgpCiAgICAgICAgaWYgaXNfYWN0aXZlOgogICAgICAgICAgICBrcy5kZWFjdGl2YXRlKCkKICAgICAgICAgICAgYXdhaXQgbWVzc2FnZS5hbnN3ZXIoIuKchCBLaWxsIFN3aXRjaCDYºZgtu52KcgLS0g2YXYudين2YTZh+KAjNin24wg2YXYrNin2LIg2KLar9in2LIg2LTYr9iMIikKICAgICAgICBlbHNlOgogICAgICAgICAgICBrcy5hY3RpdmF0ZSgic3RvcCIpCiAgICAgICAgICAgIGF3YWl0IG1lc3NhZ2UuYW5zd2VyKCLimqggS2lsbCBTd2l0Y2gg2YHYudin2YEgLS0g2YfZhdmHINmF2LnYp9mF2YTZh+KAjNin24wg2YXYrNin2LIg2KrZiNqv2YHiIikKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICBsb2dnZXIuZXhjZXB0aW9uKCJraWxsX3N3aXRjaCBlcnJvcjogJXMiLCBlKQogICAgICAgIGF3YWl0IG1lc3NhZ2UuYW5zd2VyKGYi4pqYINit2LfYpToge2V9IikKCgpAcm91dGVyLm1lc3NhZ2UoQ29tbWFuZCgic3RhdHVzIikpCmFzeW5jIGRlZiBzeXN0ZW1fc3RhdHVzKG1lc3NhZ2U6IE1lc3NhZ2UpIC0+IE5vbmU6CiAgICAiIiLZiNi52LTZhdmHINmI2q/YuNin24wg2LPbjNiz2KrZhSIiIgogICAgaW1wb3J0IHN5cywgcGxhdGZvcm0sIGFzeW5jaW8KICAgIGltcG9ydCBvcwogICAgdHJ5OgogICAgICAgIHB5diA9IHN5cy52ZXJzaW9uLnNwbGl0KClbMF0KICAgICAgICBvc25hbWUgPSBwbGF0Zm9ybS5zeXN0ZW0oKQogICAgICAgIGVudiA9IG9zLmdldGVudigiQVBQX0VOViIsICJ1bmtub3duIikKICAgICAgICBkZW1vX3JhdyA9IG9zLmdldGVudigiTVQ1X0RFTU9fTU9ERSIsICJ0cnVlIikubG93ZXIoKQogICAgICAgIGRlbW9faWNvbiA9ICLimqgiIGlmIGRlbW9fcmF3IGluICgidHJ1ZSIsICIxIikgZWxzZSAi4pyFIgogICAgICAgIHRleHQgPSAoCiAgICAgICAgICAgIGYiPGI+8J+TiyDZiNi22YHZhdmHINuM2qnZvdmF2Kcg2LPbjNiz2KrZhTwvYj5cblxuIgogICAgICAgICAgICBmIvCfkIogUHl0aG9uOiB7cHl2fVxuIgogICAgICAgICAgICBmIvCfk4AgT1M6IHtvc25hbWV9XG4iCiAgICAgICAgICAgIGYi8J+MjyBFbnY6IHtlbnZ9XG4iCiAgICAgICAgICAgIGYie2RlbW9faWNvbn0gTVQ1IERlbW86IHtkZW1vX3Jhd31cbiIKICAgICAgICApCiAgICAgICAgYXdhaXQgbWVzc2FnZS5hbnN3ZXIodGV4dCwgcGFyc2VfbW9kZT0iSFRNTCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigic3RhdHVzIGVycm9yOiAlcyIsIGUpCiAgICAgICAgYXdhaXQgbWVzc2FnZS5hbnN3ZXIoZiLimqgg2K7Zgtinin2KqiDZiNqv2YHZiNiv24w6IHtlfSIpCg==
+"""
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ماژول: Telegram Admin Router — Admin Router
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+from __future__ import annotations
+import logging
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import Message
+from backend.telegram.middlewares import IsAdmin
+
+logger = logging.getLogger(__name__)
+router = Router()
+router.message.filter(IsAdmin())
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message) -> None:
+    """نمایش آمار کلی ربات به ادمین."""
+    from backend.services.trade_service import TradeService
+    ts = TradeService()
+    stats = await ts.get_stats()
+    await message.answer(
+        f"📊 <b>آمار کلی</b>\n"
+        f"معاملات باز: {stats.get('open', 0)}\n"
+        f"معاملات بسته: {stats.get('closed', 0)}\n"
+        f"Win Rate: {stats.get('win_rate', 0):.1%}\n"
+        f"PnL امروز: {stats.get('daily_pnl', 0):.2f}",
+        parse_mode="HTML"
+    )
+
+
+@router.message(Command("kill"))
+async def cmd_kill(message: Message) -> None:
+    """فعال‌سازی Kill Switch از طریق ادمین."""
+    from backend.risk.kill_switch import KillSwitch
+    ks = KillSwitch()
+    await ks.activate(reason="admin_telegram_command")
+    logger.warning("kill_switch.activated by admin user=%s", message.from_user.id if message.from_user else "unknown")
+    await message.answer("🔴 Kill Switch فعال شد — همه معاملات جدید متوقف شدند.", parse_mode="HTML")
+
+
+@router.message(Command("resume"))
+async def cmd_resume(message: Message) -> None:
+    """غیرفعال‌سازی Kill Switch."""
+    from backend.risk.kill_switch import KillSwitch
+    ks = KillSwitch()
+    await ks.deactivate()
+    await message.answer("🟢 Kill Switch غیرفعال شد — معاملات از سر گرفته شدند.", parse_mode="HTML")
+
+
+@router.message(Command("users"))
+async def cmd_users(message: Message) -> None:
+    """لیست کاربران فعال."""
+    from backend.services.session_service import SessionService
+    ss = SessionService()
+    users = await ss.list_active()
+    lines = [f"👤 {u['user_id']} — {u.get('plan','?')}" for u in users[:20]]
+    await message.answer("\n".join(lines) or "هیچ کاربر فعالی یافت نشد.", parse_mode="HTML")
+
+
+@router.message(Command("health"))
+async def cmd_health(message: Message) -> None:
+    """وضعیت سیستم."""
+    from backend.database.connection import get_db_health
+    from backend.execution.mt5_connector import MT5Connector
+    db_ok = await get_db_health()
+    mt5_ok = MT5Connector().is_connected()
+    valid_icon = "✅ بله" if db_ok else "❌ خیر"
+    mt5_icon  = "✅ بله" if mt5_ok else "❌ خیر"
+    await message.answer(
+        f"🖥 <b>وضعیت سیستم</b>\n"
+        f"Database: {valid_icon}\n"
+        f"MT5 Gateway: {mt5_icon}",
+        parse_mode="HTML"
+    )
