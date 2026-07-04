@@ -1,1 +1,155 @@
-ZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwppbXBvcnQgYXN5bmNpbywgdGltZQpmcm9tIGRhdGFjbGFzc2VzIGltcG9ydCBkYXRhY2xhc3MsIGZpZWxkCmZyb20gZW51bSBpbXBvcnQgRW51bQpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBDYWxsYWJsZSwgQ29yb3V0aW5lLCBEaWN0LCBMaXN0LCBPcHRpb25hbApmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlcgpmcm9tIC4uY29yZS5sb2dnZXIgaW1wb3J0IGdldF9sb2dnZXIKbG9nZ2VyID0gZ2V0X2xvZ2dlcignYXBpLmhlYWx0aCcpCnJvdXRlciA9IEFQSVJvdXRlcih0YWdzPVsnaGVhbHRoJ10pCgpjbGFzcyBIZWFsdGhTdGF0dXMoc3RyLCBFbnVtKToKICAgIEhFQUxUSFkgICA9ICdoZWFsdGh5JwogICAgREVHUkFERUQgID0gJ2RlZ3JhZGVkJwogICAgVU5IRUFMVEhZID0gJ3VuaGVhbHRoeScKCkBkYXRhY2xhc3MKY2xhc3MgQ29tcG9uZW50SGVhbHRoOgogICAgbmFtZTogc3RyOyBzdGF0dXM6IEhlYWx0aFN0YXR1czsgbGF0ZW5jeV9tczogZmxvYXQKICAgIGRldGFpbDogRGljdFtzdHIsIEFueV0gPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9ZGljdCkKICAgIGVycm9yOiBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgZGVmIHRvX2RpY3Qoc2VsZikgLT4gRGljdFtzdHIsIEFueV06CiAgICAgICAgZDogRGljdFtzdHIsIEFueV0gPSB7J3N0YXR1cyc6IHNlbGYuc3RhdHVzLnZhbHVlLCAnbGF0ZW5jeV9tcyc6IHJvdW5kKHNlbGYubGF0ZW5jeV9tcywgMil9CiAgICAgICAgaWYgc2VsZi5kZXRhaWw6IGRbJ2RldGFpbCddID0gc2VsZi5kZXRhaWwKICAgICAgICBpZiBzZWxmLmVycm9yOiAgZFsnZXJyb3InXSAgPSBzZWxmLmVycm9yCiAgICAgICAgcmV0dXJuIGQKCkBkYXRhY2xhc3MKY2xhc3MgU3lzdGVtSGVhbHRoOgogICAgc3RhdHVzOiBIZWFsdGhTdGF0dXM7IHZlcnNpb246IHN0cjsgdXB0aW1lX3M6IGZsb2F0CiAgICBjb21wb25lbnRzOiBMaXN0W0NvbXBvbmVudEhlYWx0aF0gPSBmaWVsZChkZWZhdWx0X2ZhY3Rvcnk9bGlzdCkKICAgIGRlZiB0b19kaWN0KHNlbGYpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgICAgIHJldHVybiB7J3N0YXR1cyc6IHNlbGYuc3RhdHVzLnZhbHVlLCAndmVyc2lvbic6IHNlbGYudmVyc2lvbiwgJ3VwdGltZV9zJzogcm91bmQoc2VsZi51cHRpbWVfcywgMSksICdjb21wb25lbnRzJzoge2MubmFtZTogYy50b19kaWN0KCkgZm9yIGMgaW4gc2VsZi5jb21wb25lbnRzfX0KCmFzeW5jIGRlZiBfY2hlY2sobmFtZTogc3RyLCBmbjogQ2FsbGFibGVbW10sIENvcm91dGluZVtBbnksIEFueSwgRGljdFtzdHIsIEFueV1dXSwgY3JpdGljYWw6IGJvb2wgPSBUcnVlKSAtPiBDb21wb25lbnRIZWFsdGg6CiAgICB0MCA9IHRpbWUubW9ub3RvbmljKCkKICAgIHRyeToKICAgICAgICBkZXRhaWwgPSBhd2FpdCBhc3luY2lvLndhaXRfZm9yKGZuKCksIHRpbWVvdXQ9NS4wKQogICAgICAgIHN0YXR1cyA9IEhlYWx0aFN0YXR1cy5IRUFMVEhZOyBlcnJvciA9IE5vbmUKICAgIGV4Y2VwdCBhc3luY2lvLlRpbWVvdXRFcnJvcjoKICAgICAgICBkZXRhaWwgPSB7fTsgc3RhdHVzID0gSGVhbHRoU3RhdHVzLlVOSEVBTFRIWSBpZiBjcml0aWNhbCBlbHNlIEhlYWx0aFN0YXR1cy5ERUdSQURFRDsgZXJyb3IgPSAndGltZW91dCBhZnRlciA1cycKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGRldGFpbCA9IHt9OyBzdGF0dXMgPSBIZWFsdGhTdGF0dXMuVU5IRUFMVEhZIGlmIGNyaXRpY2FsIGVsc2UgSGVhbHRoU3RhdHVzLkRFR1JBREVEOyBlcnJvciA9IHN0cihleGMpWzoyMDBdCiAgICByZXR1cm4gQ29tcG9uZW50SGVhbHRoKG5hbWU9bmFtZSwgc3RhdHVzPXN0YXR1cywgbGF0ZW5jeV9tcz0odGltZS5tb25vdG9uaWMoKS10MCkqMTAwMCwgZGV0YWlsPWRldGFpbCwgZXJyb3I9ZXJyb3IpCgphc3luYyBkZWYgX2NoZWNrX2RhdGFiYXNlKCkgLT4gRGljdFtzdHIsIEFueV06CiAgICAiIiJGSVggSy03OiB1c2UgZ2V0X2RiX2NsaWVudCgpIGluc3RlYWQgb2YgYnJva2VuIGFzeW5jLWZvciBnZW5lcmF0b3IuIiIiCiAgICB0cnk6CiAgICAgICAgZnJvbSAuLmRhdGFiYXNlLmNvbm5lY3Rpb24gaW1wb3J0IGdldF9kYl9jbGllbnQKICAgICAgICBjbGllbnQgPSBnZXRfZGJfY2xpZW50KCkKICAgICAgICBpZiBjbGllbnQgaXMgTm9uZToKICAgICAgICAgICAgcmV0dXJuIHsnb2snOiBGYWxzZSwgJ3JlYXNvbic6ICdjbGllbnRfbm90X2luaXRpYWxpemVkJ30KICAgICAgICAjIE1pbmltYWwgaGVhbHRoIGNoZWNrOiB0cnkgYSBsaWdodHdlaWdodCBxdWVyeQogICAgICAgIHRyeToKICAgICAgICAgICAgcmVzdWx0ID0gY2xpZW50LnRhYmxlKCdfaGVhbHRoJykuc2VsZWN0KCcxJykubGltaXQoMSkuZXhlY3V0ZSgpCiAgICAgICAgICAgIHJldHVybiB7J29rJzogVHJ1ZSwgJ3Jvd3MnOiBsZW4ocmVzdWx0LmRhdGEpIGlmIGhhc2F0dHIocmVzdWx0LCAnZGF0YScpIGVsc2UgMH0KICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICAjIFRhYmxlIG1heSBub3QgZXhpc3QgLS0gY29ubmVjdGlvbiBzdGlsbCBPSwogICAgICAgICAgICByZXR1cm4geydvayc6IFRydWUsICdyZWFzb24nOiAnY29ubmVjdGVkX25vX2hlYWx0aF90YWJsZSd9CiAgICBleGNlcHQgSW1wb3J0RXJyb3IgYXMgZXhjOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcihmJ0RCIGltcG9ydCBmYWlsZWQ6IHtleGN9JykgZnJvbSBleGMKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcihmJ0RCIGNoZWNrIGZhaWxlZDoge2V4Y30nKSBmcm9tIGV4YwoKYXN5bmMgZGVmIF9jaGVja19yZWRpcygpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGltcG9ydCByZWRpcy5hc3luY2lvIGFzIGFpb3JlZGlzCiAgICAgICAgZnJvbSAuLmNvcmUuY29uZmlnIGltcG9ydCBzZXR0aW5ncwogICAgICAgIHIgPSBhaW9yZWRpcy5mcm9tX3VybChzZXR0aW5ncy5SRURJU19VUkwsIHNvY2tldF9jb25uZWN0X3RpbWVvdXQ9MikKICAgICAgICBhd2FpdCByLnBpbmcoKTsgYXdhaXQgci5hY2xvc2UoKTsgcmV0dXJuIHsnb2snOiBUcnVlfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IHJhaXNlIFJ1bnRpbWVFcnJvcihmJ1JlZGlzIHBpbmcgZmFpbGVkOiB7ZXhjfScpIGZyb20gZXhjCgphc3luYyBkZWYgX2NoZWNrX210NSgpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGZyb20gLi5leGVjdXRpb24ubXQ1X2Nvbm5lY3RvciBpbXBvcnQgbXQ1X2Nvbm5lY3RvcgogICAgICAgIG9rID0gYXdhaXQgYXN5bmNpby53YWl0X2ZvcihtdDVfY29ubmVjdG9yLmhlYWx0aF9jaGVjaygpLCB0aW1lb3V0PTMuMCkKICAgICAgICByZXR1cm4geyCdjb25uZWN0ZWQnOiBva30KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOiByYWlzZSBSdW50aW1lRXJyb3IoZidNVDU6IHtleGN9JykgZnJvbSBleGMKCmFzeW5jIGRlZiBfY2hlY2tfcmlzaygpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGZyb20gLi5yaXNrLnJpc2tfb3JjaGVzdHJhdG9yIGltcG9ydCBnZXRfcmlza19vcmNoZXN0cmF0b3IKICAgICAgICBvcmNoID0gYXdhaXQgZ2V0X3Jpc2tfb3JjaGVzdHJhdG9yKCkKICAgICAgICByZXR1cm4geydnYXRlcyc6IGxpc3Qob3JjaC5fZ2F0ZXMua2V5cygpKSBpZiBoYXNhdHRyKG9yY2gsICdfZ2F0ZXMnKSBlbHNlIFtdfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IHJhaXNlIFJ1bnRpbWVFcnJvcihmJ1Jpc2s6IHtleGN9JykgZnJvbSBleGMKCmFzeW5jIGRlZiBfY2hlY2tfZXF1aXR5KCkgLT4gRGljdFtzdHIsIEFueV06CiAgICB0cnk6CiAgICAgICAgZnJvbSAuLnJpc2suZXF1aXR5X3Byb3RlY3Rpb24gaW1wb3J0IGdldF9lcXVpdHlfcHJvdGVjdGlvbgogICAgICAgIGVwID0gZ2V0X2VxdWl0eV9wcm90ZWN0aW9uKCkKICAgICAgICBzbmFwID0gZXAuc25hcHNob3QoKSBpZiBoYXNhdHRyKGVwLCAnc25hcHNob3QnKSBlbHNlIHt9CiAgICAgICAgcmV0dXJuIHsnaW5pdGlhbGl6ZWQnOiBlcC5pc19pbml0aWFsaXplZCwgKipzbmFwfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IHJhaXNlIFJ1bnRpbWVFcnJvcihmJ0VxdWl0eToge2V4Y30nKSBmcm9tIGV4YwoKYXN5bmMgZGVmIF9jaGVja19jaXJjdWl0X2JyZWFrZXIoKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBmcm9tIC4uY2lyY3VpdF9icmVha2VyIGltcG9ydCBnZXRfbXQ1X2JyZWFrZXIKICAgICAgICBjYiA9IGdldF9tdDVfYnJlYWtlcigpCiAgICAgICAgcmV0dXJuIGNiLnNuYXBzaG90KCkgaWYgaGFzYXR0cihjYiwgJ3NuYXBzaG90JykgZWxzZSB7fQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IHJhaXNlIFJ1bnRpbWVFcnJvcihmJ0NCOiB7ZXhjfScpIGZyb20gZXhjCgphc3luYyBkZWYgX2NoZWNrX3NjaGVkdWxlcigpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGZyb20gLi5zZXJ2aWNlcy5zY2hlZHVsZXIgaW1wb3J0IGdldF9zY2hlZHVsZXIKICAgICAgICBzID0gZ2V0X3NjaGVkdWxlcigpCiAgICAgICAgcmV0dXJuIHMuaGVhbHRoKCkgaWYgaGFzYXR0cihzLCAnaGVhbHRoJykgZWxzZSB7fQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6IHJhaXNlIFJ1bnRpbWVFcnJvcihmJ1NjaGVkdWxlcjoge2V4Y30nKSBmcm9tIGV4YwoKX1NUQVJURURfQVQgPSB0aW1lLnRpbWUoKQpkZWYgX3VwdGltZSgpIC0+IGZsb2F0OiByZXR1cm4gdGltZS50aW1lKCkgLSBfU1RBUlRFRF9BVApkZWYgX3ZlcnNpb24oKSAtPiBzdHI6CiAgICB0cnk6IGZyb20gLi5jb3JlLmNvbmZpZyBpbXBvcnQgc2V0dGluZ3M7IHJldHVybiBzZXR0aW5ncy5BUFBfVkVSU0lPTgogICAgZXhjZXB0IEV4Y2VwdGlvbjogcmV0dXJuICd1bmtub3duJwoKQHJvdXRlci5nZXQoJy9oZWFsdGgnLCBzdW1tYXJ5PSdMaXZlbmVzcyBwcm9iZScpCmFzeW5jIGRlZiBsaXZlbmVzcygpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgcmV0dXJuIHsnc3RhdHVzJzogJ29rJywgJ3VwdGltZV9zJzogcm91bmQoX3VwdGltZSgpLCAxKSwgJ3ZlcnNpb24nOiBfdmVyc2lvbigpfQoKQHJvdXRlci5nZXQoJy9oZWFsdGgvcmVhZHknLCBzdW1tYXJ5PSdSZWFkaW5lc3MgcHJvYmUnKQphc3luYyBkZWYgcmVhZGluZXNzKCkgLT4gRGljdFtzdHIsIEFueV06CiAgICBmcm9tIGZhc3RhcGkucmVzcG9uc2VzIGltcG9ydCBKU09OUmVzcG9uc2UKICAgIGNoZWNrcyA9IGF3YWl0IGFzeW5jaW8uZ2F0aGVyKF9jaGVjaygnZGF0YWJhc2UnLCBfY2hlY2tfZGF0YWJhc2UsIGNyaXRpY2FsPVRydWUpLCBfY2hlY2soJ3Jpc2tfZW5naW5lJywgX2NoZWNrX3Jpc2ssIGNyaXRpY2FsPVRydWUpLCByZXR1cm5fZXhjZXB0aW9ucz1GYWxzZSkKICAgIGZhaWxlZCA9IFtjIGZvciBjIGluIGNoZWNrcyBpZiBjLnN0YXR1cyA9PSBIZWFsdGhTdGF0dXMuVU5IRUFMVEhZXQogICAgb3ZlcmFsbCA9IEhlYWx0aFN0YXR1cy5IRUFMVEhZIGlmIG5vdCBmYWlsZWQgZWxzZSBIZWFsdGhTdGF0dXMuVU5IRUFMVEhZCiAgICByZXR1cm4gSlNPTlJlc3BvbnNlKGNvbnRlbnQ9eydzdGF0dXMnOiBvdmVyYWxsLnZhbHVlLCAndXB0aW1lX3MnOiByb3VuZChfdXB0aW1lKCksIDEpLCAnY2hlY2tzJzoge2MubmFtZTogYy50b19kaWN0KCkgZm9yIGMgaW4gY2hlY2tzfX0sIHN0YXR1c19jb2RlPTIwMCBpZiBvdmVyYWxsID09IEhlYWx0aFN0YXR1cy5IRUFMVEhZIGVsc2UgNTAzKQoKQHJvdXRlci5nZXQoJy9oZWFsdGgvZGVlcCcsIHN1bW1hcnk9J0Z1bGwgc3lzdGVtIGhlYWx0aCcpCmFzeW5jIGRlZiBkZWVwX2hlYWx0aCgpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgY2hlY2tzID0gYXdhaXQgYXN5bmNpby5nYXRoZXIoCiAgICAgICAgX2NoZWNrKCdkYXRhYmFzZScsICAgICAgICAgIF9jaGVja19kYXRhYmFzZSwgICAgICAgY3JpdGljYWw9VHJ1ZSksCiAgICAgICAgX2NoZWNrKCdyZWRpcycsICAgICAgICAgICAgIF9jaGVja19yZWRpcywgICAgICAgICAgY3JpdGljYWw9RmFsc2UpLAogICAgICAgIF9jaGVjaygnbXQ1JywgICAgICAgICAgICAgICBfY2hlY2tfbXQ1LCAgICAgICAgICAgIGNyaXRpY2FsPVRydWUpLAogICAgICAgIF9jaGVjaygncmlza19lbmdpbmUnLCAgICAgICBfY2hlY2tfcmlzaywgICAgICAgICAgIGNyaXRpY2FsPVRydWUpLAogICAgICAgIF9jaGVjaygnZXF1aXR5X3Byb3RlY3Rpb24nLCBfY2hlY2tfZXF1aXR5LCAgICAgICAgIGNyaXRpY2FsPVRydWUpLAogICAgICAgIF9jaGVjaygnY2lyY3VpdF9icmVha2VyJywgICBfY2hlY2tfY2lyY3VpdF9icmVha2VyLGNyaXRpY2FsPUZhbHNlKSwKICAgICAgICBfY2hlY2soJ3NjaGVkdWxlcicsICAgICAgICAgX2NoZWNrX3NjaGVkdWxlciwgICAgICBjcml0aWNhbD1GYWxzZSksCiAgICAgICAgcmV0dXJuX2V4Y2VwdGlvbnM9RmFsc2UsCiAgICApCiAgICBjcml0aWNhbCA9IFtjIGZvciBjIGluIGNoZWNrcyBpZiBjLnN0YXR1cyA9PSBIZWFsdGhTdGF0dXMuVU5IRUFMVEhZXQogICAgZGVncmFkZWQgPSBbYyBmb3IgYyBpbiBjaGVja3MgaWYgYy5zdGF0dXMgPT0gSGVhbHRoU3RhdHVzLkRFR1JBREVEXQogICAgb3ZlcmFsbCAgPSBIZWFsdGhTdGF0dXMuVU5IRUFMVEhZIGlmIGNyaXRpY2FsIGVsc2UgKEhlYWx0aFN0YXR1cy5ERUdSQURFRCBpZiBkZWdyYWRlZCBlbHNlIEhlYWx0aFN0YXR1cy5IRUFMVEhZKQogICAgbG9nZ2VyLmluZm8oJ0RlZXAgaGVhbHRoJywgc3RhdHVzPW92ZXJhbGwudmFsdWUsIHVuaGVhbHRoeT1bYy5uYW1lIGZvciBjIGluIGNyaXRpY2FsXSwgZGVncmFkZWQ9W2MubmFtZSBmb3IgYyBpbiBkZWdyYWRlZF0pCiAgICB0cnk6CiAgICAgICAgZnJvbSAuLm9ic2VydmFiaWxpdHkubWV0cmljcyBpbXBvcnQgbWV0cmljc19yZWdpc3RyeQogICAgICAgIG1ldHJpY3NfcmVnaXN0cnkuZ2F1Z2UoJ3N5c3RlbV9oZWFsdGgnLCAwLjAgaWYgY3JpdGljYWwgZWxzZSAoMC41IGlmIGRlZ3JhZGVkIGVsc2UgMS4wKSkKICAgIGV4Y2VwdCBFeGNlcHRpb246IHBhc3MKICAgIHJldHVybiBTeXN0ZW1IZWFsdGgoc3RhdHVzPW92ZXJhbGwsIHZlcnNpb249X3ZlcnNpb24oKSwgdXB0aW1lX3M9X3VwdGltZSgpLCBjb21wb25lbnRzPWxpc3QoY2hlY2tzKSkudG9fZGljdCgpCg==
+from __future__ import annotations
+import asyncio, time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Coroutine, Dict, List, Optional
+from fastapi import APIRouter
+from ..core.logger import get_logger
+from ..core.config_v11 import Settings
+
+logger = get_logger("api.health")
+router = APIRouter(tags=["health"])
+
+class HealthStatus(str, Enum):
+    HEALTHY   = "healthy"
+    DEGRADED  = "degraded"
+    UNHEALTHY = "unhealthy"
+
+@dataclass
+class ComponentHealth:
+    name:    str
+    status:  HealthStatus
+    latency: Optional[float] = None
+    error:   Optional[str]   = None
+    detail:  Dict[str, Any]  = field(default_factory=dict)
+
+_start_time = time.time()
+_settings   = Settings()
+
+async def _check_database(settings: Settings) -> ComponentHealth:
+    """Check Supabase DB connectivity."""
+    t0 = time.monotonic()
+    try:
+        from ..database.connection import get_db_client
+        db = get_db_client()
+        result = db.table("signals").select("id").limit(1).execute()
+        latency = time.monotonic() - t0
+        return ComponentHealth(
+            name="database", status=HealthStatus.HEALTHY, latency=round(latency, 3),
+            detail={"rows": len(result.data)}
+        )
+    except Exception as e:
+        return ComponentHealth(
+            name="database", status=HealthStatus.UNHEALTHY,
+            error=str(e), latency=round(time.monotonic() - t0, 3)
+        )
+
+async def _check_mt5(settings: Settings) -> ComponentHealth:
+    """Check MT5 gateway connectivity."""
+    import httpx
+    t0 = time.monotonic()
+    try:
+        gw_url = getattr(settings, "MT5_GATEWAY_URL", "http://localhost:8080")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{gw_url}/ping")
+            data = r.json()
+            latency = time.monotonic() - t0
+            return ComponentHealth(
+                name="mt5_gateway",
+                status=HealthStatus.HEALTHY if data.get("mt5_connected") else HealthStatus.DEGRADED,
+                latency=round(latency, 3),
+                detail={"mt5_connected": data.get("mt5_connected"), "uptime": data.get("uptime_seconds")}
+            )
+    except Exception as e:
+        return ComponentHealth(
+            name="mt5_gateway", status=HealthStatus.UNHEALTHY,
+            error=str(e), latency=round(time.monotonic() - t0, 3)
+        )
+
+async def _check_kill_switch() -> ComponentHealth:
+    """Check Kill Switch state."""
+    try:
+        from ..risk.kill_switch import KillSwitch
+        ks = KillSwitch()
+        active = await ks.is_active()
+        return ComponentHealth(
+            name="kill_switch",
+            status=HealthStatus.DEGRADED if active else HealthStatus.HEALTHY,
+            detail={"active": active}
+        )
+    except Exception as e:
+        return ComponentHealth(name="kill_switch", status=HealthStatus.UNHEALTHY, error=str(e))
+
+async def _check_redis() -> ComponentHealth:
+    """Check Redis connectivity."""
+    try:
+        from ..middleware.rate_limit import get_rate_limiter
+        rl = await get_rate_limiter()
+        mode = getattr(rl, "mode", "unknown")
+        return ComponentHealth(
+            name="redis",
+            status=HealthStatus.HEALTHY if mode == "redis" else HealthStatus.DEGRADED,
+            detail={"mode": mode}
+        )
+    except Exception as e:
+        return ComponentHealth(name="redis", status=HealthStatus.UNHEALTHY, error=str(e))
+
+@router.get("/health")
+async def health_check():
+    """Full health check — all components."""
+    t0 = time.monotonic()
+    checks: List[ComponentHealth] = await asyncio.gather(
+        _check_database(_settings),
+        _check_mt5(_settings),
+        _check_kill_switch(),
+        _check_redis(),
+        return_exceptions=False
+    )
+    overall = (
+        HealthStatus.UNHEALTHY if any(c.status == HealthStatus.UNHEALTHY for c in checks)
+        else HealthStatus.DEGRADED if any(c.status == HealthStatus.DEGRADED for c in checks)
+        else HealthStatus.HEALTHY
+    )
+    return {
+        "status": overall,
+        "uptime_seconds": round(time.monotonic() - _start_time),
+        "latency_ms": round((time.monotonic() - t0) * 1000, 1),
+        "components": [
+            {"name": c.name, "status": c.status, "latency_ms": round((c.latency or 0) * 1000, 1),
+             "error": c.error, "detail": c.detail}
+            for c in checks
+        ],
+        "environment": getattr(_settings, "APP_ENV", "unknown"),
+        "version": getattr(_settings, "APP_VERSION", "unknown"),
+    }
+
+@router.get("/live")
+async def liveness_check():
+    """Kubernetes liveness probe — fast, no external calls."""
+    return {"status": "ok", "uptime_seconds": round(time.monotonic() - _start_time)}
+
+@router.get("/ready")
+async def readiness_check():
+    """
+    Kubernetes readiness probe.
+    O-FIX-2: برمی‌گرداند 503 (نه 500) اگر DB یا MT5 قطع باشد.
+    """
+    from fastapi import Response
+    checks: List[ComponentHealth] = await asyncio.gather(
+        _check_database(_settings),
+        _check_mt5(_settings),
+        return_exceptions=False
+    )
+    unhealthy = [c for c in checks if c.status == HealthStatus.UNHEALTHY]
+    body = {
+        "status": "ready" if not unhealthy else "not_ready",
+        "checks": [
+            {"name": c.name, "status": c.status, "error": c.error}
+            for c in checks
+        ]
+    }
+    if unhealthy:
+        # O-FIX-2: 503 Service Unavailable (نه 500 Internal Server Error)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content=body)
+    return body
