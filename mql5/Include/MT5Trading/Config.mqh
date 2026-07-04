@@ -1,13 +1,13 @@
-//+------------------------------------------------------------------+
-//| Galaxy Vast AI Trading Platform                                  |
-//| Config.mqh -- tnzimat markazi EA                                  |
-//| faz L -- production-ready -- all bugs fixed                      |
-//+------------------------------------------------------------------+
+//+--------------------------------------------------------------------+
+//| Galaxy Vast AI Trading Platform                                   |
+//| Config.mqh -- tnzimat markazi EA                                   |
+//| faz L -- production-ready -- all bugs fixed                       |
+//+--------------------------------------------------------------------+
 #ifndef __CONFIG_MQH__
 #define __CONFIG_MQH__
 
 //--- naskhe
-#define EA_VERSION              "3.31"
+#define EA_VERSION              "3.32"
 #define EA_MAGIC                202400
 
 //--- API
@@ -33,10 +33,10 @@
 #define SIGNAL_POLL_SEC         30
 #define SIGNAL_TIMEOUT_SEC      60
 
-//--- L-FIX-CONFIG-1: Yoid --> void, TEME_SECONDS --> TIME_SECONDS
+//--- L(fix): TIME_SECONDS (was TEME_SECONDS -- typo causing compile error)
 void LogMessage(const string level, const string msg)
 {
-   PrintFormat("[%s] %s | %s", level, TimeToString(TimeCurrent(), TIME_DATE|TEME_SECONDS), msg);
+   PrintFormat("[%s] %s | %s", level, TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS), msg);
 }
 
 //--- JSON helpers (inline -- mored niaz EA)
