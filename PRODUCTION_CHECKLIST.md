@@ -1,1 +1,152 @@
-IyDinIUg0bfpayLZhNmOc3QgUHJvZHVjdGlvbiDilJQgR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybQoKPiDYp9mK2YYg0bfpayLZhNmOc3QgcmEgKipcu2JlZm9yZSBoYXIgYmFyIGRlcGxveSoqIGthbWVsIGtvbmlkLgo+IEhpY2ggbWFyaGFsZWkgcmEgcmFkIG5ha29uaWQuCgotLS0KCiMjIOKCrjEuIG1haGlkIHZhIHRhbnlpbWF0IChFbnZpcm9ubWVudCkKCi0gWyBdIGBBUFBfRU5WPXByb2R1Y3Rpb25gIHRhbnlpbSBzaGFkZQotIFsgXSBgSldUX1NFQ1JFVGB6YWRhIG1pbnVtYW0gMzIga2FyYWt0YXIgdGFzYWRvZmkgZGFyYWQgKGBweXRob24gLWMgImltcG9ydCBzZWNyZXRzOyBwcmludChzZWNyZXRzLnRva2VuX2hleCgzMikpImApCi0gWyBdIGBMSUNFTlNFX1NFQ1JFVGB6YWRhIG1pbnVtYW0gMzIga2FyYWt0YXIgdGFzYWRvZmkgZGFyYWQKLSBbIF0gYFNVUEFCQVNFX1VSTGAgdmEgYFNVUEFCQVNFX1NFUlZJQ0VfUk9MRV9LRVlgIHRhbnlpbSBzaGFkZQotIFsgXSBgVEVMRUdSQU1fQk9UX1RPS0VOYCB2YSBgVEVMRUdSQU1fQ0hBVF9JRGAgdGFueWltIHNoYWRlCi0gWyBdIGBNVDVfR0FURVdBWV9VUkxgIGJlIGdhdGV3YXkgd2luZG93cyBhc2hhcmUgbWkta29uYWQKLSBbIF0gYE1UNV9ERU1PX01PREU9ZmFsc2VgIHRhbnlpbSBzaGFkZSAoYmFyYXllIExJVkUpCi0gWyBdIGBDT1JTX09SSUdJTlNgIGZhcWF0IHNoYW1lbCBkb21haW5oYXllIHZhcWVpIGFzdCAoYmVkdW5lIGAqYCkKLSBbIF0gYEFETUlOX0lQX0FMTE9XTElTVGAgdGFueWltIHNoYWRlCi0gWyBdIGBTRU5UUllfRFNOYCB0YW55aW0gc2hhZGUKLSBbIF0gdmFsaWRhdG9yIGFqcmEgc2hhZGU6IGBweXRob24gLW0gYmFja2VuZC5jb3JlLnN0YXJ0dXBfdmFsaWRhdG9yYAoKLS0tCgojIyDigrIyLiBEYXRhYmFzZSAoU3VwYWJhc2UpCgotIFsgXSBoYW1lIG1pZ3JhdGlvbmhhIG9qcmEgc2hhZGU6IGBzdXBhYmFzZSBkYiBwdXNoYAotIFsgXSBSTFMgKFJvdyBMZXZlbCBTZWN1cml0eSkgZmFhbCBhc3Qgcm9vc3QgaGFtZSBqYWRhdmFsCi0gWyBdIGJhY2t1cCBraG9ka2FyIFN1cGFiYXNlIGZhYWwgYXN0CgotLS0KCiMjIOKCszMuIEFtbml5YXQKCi0gWyBdIEhUVFBTIGZhYWwgYXN0IChyZXZlcnNlIHByb3h5OiBuZ2lueC9jYWRkeSkKLSBbIF0gSFNUUyBoZWFkZXIgYXJzYWwgbWkgc2hhZAotIFsgXSBDU1AgaGVhZGVyIHRhbnlpbSBzaGFkZQotIFsgXSBSYXRlIGxpbWl0aW5nIGZhYWwgYXN0Ci0gWyBdIEFkbWluIElQIGFsbG93bGlzdCB0YW55aW0gc2hhZGUKLSBbIF0gSldUIGV4cGlyeSBtYWdob29sIGFzdCAo4omkIDYwIGRhcWlxYSkKLSBbIF0gaGlkaCBzZWNyZXQgZGFyIGtvZCB5YSBsb2cgbmlzdAotIFsgXSBgcHl0aG9uIC1tIHB5dGVzdCBiYWNrZW5kL3Rlc3RzL3Rlc3RfMDRfc2VjdXJpdHkucHkgLXZgIGhhbWUgcGFzcwoKLS0tCgojIyDigrQ0LiBNVDUgR2F0ZXdheQoKLSBbIF0gR2F0ZXdheSByb29zdGUgd2luZG93cyBhanJhIHNoYWRlOiBgcHl0aG9uIG10NV9nYXRld2F5L2FnZW50LnB5YAotIFsgXSBNVDUgdGVybWluYWwgYmF6IGFzdCB2YSBiZSBicm9rZXIgdmFzYWwgYXN0Ci0gWyBdIGAvcGluZ2AgZW5kcG9pbnQgcGFzZWttaS1kYWhhZAotIFsgXSBZZWsgb3JkZXIgYXptYXllc2hpIGRhciBEZW1vIEFjY291bnQgbW9mYWdoIGJ1ZGUKCi0tLQoKIyMg4oK1NS4g2KrYs9qpaGEKCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzAxX3Ntb2tlLnB5IC12YCDijJIgaGFtZSBwYXNzCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzAyX3VuaXRfZXhlY3V0aW9uLnB5IC12YCDijJIgaGFtZSBwYXNzCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzAzX2ludGVncmF0aW9uLnB5IC12YCDijJIgaGFtZSBwYXNzCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzA0X3NlY3VyaXR5LnB5IC12YCDijJIgaGFtZSBwYXNzCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzA1X210NV9icmlkZ2UucHkgLXZgIOKMkiBoYW1lIHBhc3MKLSBbIF0gYHB5dGVzdCBiYWNrZW5kL3Rlc3RzL3Rlc3RfMDZfZTJlLnB5IC12YCDijJIgaGFtZSBwYXNzCi0gWyBdIGBweXRlc3QgYmFja2VuZC90ZXN0cy90ZXN0XzA3X2FwaV9lbmRwb2ludHMucHkgLXZgIOKMkiBoYW1lIHBhc3MKLSBbIF0gYHB5dGVzdCBiYWNrZW5kL3Rlc3RzL3Rlc3RfMDhfZGF0YWJhc2UucHkgLXZgIOKMkiBoYW1lIHBhc3MKLSBbIF0gYHB5dGVzdCBiYWNrZW5kL3Rlc3RzL3Rlc3RfMDlfcHJvZHVjdGlvbi5weSAtdmAgIOKMkiBoYW1lIHBhc3MKLSBbIF0gYHB5dGhvbiAtbSBjb21waWxlYWxsIGJhY2tlbmQvIC1xYCDijJIgMCBraGF0YQoKLS0tCgojIyDigrY2LiBGcm9udGVuZAoKLSBbIF0gYG5wbSBydW4gYnVpbGRgIGJlZHVuZSBraGF0YQotIFsgXSBgVklURV9BUElfVVJMYCBiZSBwcm9kdWN0aW9uIGJhY2tlbmQgYXNoYXJlIG1pLWtvbmFkCi0gWyBdIExvZ2luL0xvZ291dCBrYXIgbWkta29uYWQKLSBbIF0gRGFzaGJvYXJkIGxvYWQgbWkgc2hhZAoKLS0tCgojIyDigrc3LiBNb25pdG9yaW5nCgotIFsgXSBTZW50cnkgZXJyb3JzIGRhcnlhZnQgbWkgc2hhZAotIFsgXSBQcm9tZXRoZXVzIG1ldHJpY3MgZGFyIGAvbWV0cmljc2AgcWFiZWwgZGFzdGFyc2kgYXN0Ci0gWyBdIExvZ2hhIGRhciBKU09OIGZvcm1hdCBoYXN0YW5kCi0gWyBdIEFsZXJ0aGF5ZSBkcmF3ZG93biB0YXN0IHNoYWRlCgotLS0KCiMjIOKCuDguIERlcGxveSBQcm9jZXNzCgotIFsgXSBgZ2l0IHB1bGxgIGFraGFyaW4ga29kCi0gWyBdIGBwaXAgaW5zdGFsbCAtciByZXF1aXJlbWVudHMudHh0YAotIFsgXSBgcHl0aG9uIC1tIGJhY2tlbmQuY29yZS5zdGFydHVwX3ZhbGlkYXRvcmAgLT4gaGFtZSBPSwotIFsgXSBgdXZpY29ybiBiYWNrZW5kLmFwaS5tYWluOmFwcCAtLWhvc3QgMC4wLjAuMCAtLXBvcnQgODAwMCAtLXdvcmtlcnMgMmAKLSBbIF0gSGVhbHRoIGNoZWNrOiBgY3VybCBodHRwczovL3lvdXJkb21haW4uY29tL2hlYWx0aGAKLSBbIF0gWWVrIHRyYWRlIGF6bWF5ZXNoaSBkYXIgRGVtbyBBY2NvdW50Ci0gWyBdIG1hbml0b3IgMjQgc2FhdCBxYWJsIGF6IExJVkUKCi0tLQoKIyMg4oK5OS4gcWFibCBheiBMSVZFCgotIFsgXSBoYWRhZ2hhbCAxIGhvZnRlaCByb29zdGUgRGVtbyBBY2NvdW50IGthbWVsIHRlc3Qgc2hhZGUKLSBbIF0gV2luIHJhdGUgcm9vc3RlIERlbW8g4omlIDU1JQotIFsgXSBNYXggZHJhd2Rvd24gcm9vc3RlIERlbW8gPCA1JQotIFsgXSBLaWxsIFN3aXRjaCB0YXN0IHNoYWRlIHZhIGthciBtaS1rb25hZAotIFsgXSBMb3Qgc2l6ZSByb29zdGUgaGFkYWdoYWwgdGFueWltIHNoYWRlICgwLjAxKQotIFsgXSBNYXggZGFpbHkgbG9zcyDiiaQgMiUgdGFueWltIHNoYWRlCgotLS0KCiMjIERhc3RvcmF0IG1vZmlkCgpgYGBiYXNoCiMgYWpyYXllIHZhbGlkYXRvcgpweXRob24gLW0gYmFja2VuZC5jb3JlLnN0YXJ0dXBfdmFsaWRhdG9yCgojIGFqcmF5ZSBoYW1lIHRhc3RoYQpweXRlc3QgYmFja2VuZC90ZXN0cy8gLXYgLS10Yi1zaG9ydCAtcQoKIyBhancgcmF5ZSBzZXJ2ZXIKIHV2aWNvcm4gYmFja2VuZC5hcGkubWFpbjphcHAgLS1ob3N0IDAuMC4wLjAgLS1wb3J0IDgwMDAgLS1yZWxvYWQKCiMgYWpyYXllIGdhdGV3YXkKcHl0aG9uIG10NV9nYXRld2F5L2FnZW50LnB5IC0tbG9naW4gWU9VUl9MT0dJTiAtLXBhc3N3b3JkIFlPVVJfUEFTUyAtLXNlcnZlciBZT1VSX1NFUlZFUgoKIyBIZWFsdGggY2hlY2sKY3VybCAtcyBodHRwOi8vbG9jYWxob3N0OjgwMDAvaGVhbHRoIHwgcHl0aG9uIC1tIGpzb24udG9vbApgYGAKCi0tLQoKKipBa2hhcmluIGJlLXJvei1yYXNhbmk6KiogZmF6IEkg4oCUIFByb2R1Y3Rpb24gSGFyZGVuaW5nCg==
+# ✅ چک‌لیست Production — Galaxy Vast AI Trading Platform
+
+> این چک‌لیست را **قبل از هر بار deploy** کامل کنید.
+> هیچ مرحله‌ای را رد نکنید.
+
+---
+
+## ⚙️ ۱. محیط و تنظیمات (Environment)
+
+- [ ] `APP_ENV=production` تنظیم شده
+- [ ] `JWT_SECRET` حداقل ۳۲ کاراکتر تصادفی دارد
+  ```bash
+  python -c "import secrets; print(secrets.token_hex(32))"
+  ```
+- [ ] `LICENSE_SECRET` حداقل ۳۲ کاراکتر تصادفی دارد
+- [ ] `SUPABASE_URL` و `SUPABASE_SERVICE_ROLE_KEY` تنظیم شده
+- [ ] `TELEGRAM_BOT_TOKEN` و `TELEGRAM_CHAT_ID` تنظیم شده
+- [ ] `MT5_GATEWAY_URL` به gateway ویندوز اشاره می‌کند (نه localhost)
+- [ ] `MT5_DEMO_MODE=false` تنظیم شده (برای LIVE)
+- [ ] `GATEWAY_API_KEY` حداقل ۱۶ کاراکتر تصادفی دارد
+- [ ] `CORS_ORIGINS` فقط شامل domain‌های واقعی است (بدون `*`)
+- [ ] `ADMIN_IP_ALLOWLIST` تنظیم شده
+- [ ] `SENTRY_DSN` تنظیم شده
+- [ ] validator اجرا شده:
+  ```bash
+  python -m backend.core.startup_validator
+  ```
+
+---
+
+## 🗄️ ۲. Database (Supabase)
+
+- [ ] همه migration‌ها اجرا شده: `supabase db push`
+- [ ] RLS (Row Level Security) فعال است روی همه جداول
+- [ ] Backup خودکار Supabase فعال است
+- [ ] اتصال به Supabase تست شده:
+  ```bash
+  python -c "from backend.database.connection import get_db; print('OK')"
+  ```
+
+---
+
+## 🔒 ۳. امنیت
+
+- [ ] HTTPS فعال است (reverse proxy: nginx/caddy)
+- [ ] HSTS header ارسال می‌شود
+- [ ] CSP header تنظیم شده
+- [ ] Rate limiting فعال است
+- [ ] Admin IP allowlist تنظیم شده
+- [ ] JWT expiry معقول است (≤ ۶۰ دقیقه)
+- [ ] هیچ secret در کد یا log نیست
+- [ ] تست امنیت:
+  ```bash
+  pytest backend/tests/test_04_security.py -v
+  ```
+
+---
+
+## 🖥️ ۴. MT5 Gateway (ویندوز)
+
+- [ ] MT5 Terminal باز است و به broker وصل است
+- [ ] Gateway اجرا شده:
+  ```powershell
+  set GATEWAY_API_KEY=your-secret-key
+  set MT5_DEMO_MODE=false
+  python mt5_gateway\agent.py --login YOUR_LOGIN --password YOUR_PASS --server YOUR_SERVER
+  ```
+- [ ] `/ping` endpoint پاسخ می‌دهد:
+  ```bash
+  curl -H "X-Gateway-Key: your-secret-key" http://WINDOWS_IP:8080/ping
+  ```
+- [ ] `mt5_connected: true` در پاسخ ping است
+- [ ] یک order آزمایشی در Demo Account موفق بوده
+
+---
+
+## 🧪 ۵. تست‌ها
+
+- [ ] `pytest backend/tests/test_01_smoke.py -v` — همه pass
+- [ ] `pytest backend/tests/test_02_unit_execution.py -v` — همه pass
+- [ ] `pytest backend/tests/test_03_integration.py -v` — همه pass
+- [ ] `pytest backend/tests/test_04_security.py -v` — همه pass
+- [ ] `pytest backend/tests/test_05_mt5_bridge.py -v -k "not gateway"` — همه pass
+- [ ] `pytest backend/tests/test_06_e2e.py -v` — همه pass
+- [ ] `pytest backend/tests/test_phase_q.py -v` — همه pass
+- [ ] `pytest backend/tests/test_phase_s_live.py -m http -v` — همه pass
+- [ ] `python -m compileall backend/ -q` — ۰ خطا
+
+---
+
+## 🖼️ ۶. Frontend
+
+- [ ] `npm run build` بدون خطا
+- [ ] `VITE_API_URL` به production backend اشاره می‌کند
+- [ ] `VITE_WS_URL` به production backend اشاره می‌کند (بدون localhost)
+- [ ] Login/Logout کار می‌کند
+- [ ] Dashboard load می‌شود
+- [ ] WebSocket در Dashboard متصل می‌شود (نشانگر سبز)
+
+---
+
+## 📊 ۷. Monitoring
+
+- [ ] Sentry errors دریافت می‌شود
+- [ ] Prometheus metrics در `/metrics` قابل دسترسی است
+- [ ] Log‌ها در JSON format هستند
+- [ ] Alert‌های drawdown تست شده
+
+---
+
+## 🚀 ۸. فرآیند Deploy
+
+```bash
+# ۱. کد آخرین
+git pull origin main
+
+# ۲. نصب وابستگی‌ها
+pip install -r requirements.txt
+
+# ۳. اجرای validator
+python -m backend.core.startup_validator
+# انتظار: همه OK یا WARNING — هیچ BLOCKED نباشد
+
+# ۴. اجرای سرور
+uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+# ۵. Health check
+curl https://yourdomain.com/health
+curl https://yourdomain.com/live
+curl https://yourdomain.com/ready
+
+# ۶. یک trade آزمایشی در Demo Account
+# (طبق LIVE_DEPLOY_CHECKLIST.md)
+
+# ۷. مانیتور ۲۴ ساعت قبل از LIVE
+```
+
+---
+
+## ⚡ ۹. قبل از LIVE
+
+- [ ] حداقل ۱ هفته روی Demo Account کامل تست شده
+- [ ] Win rate روی Demo ≥ ۵۵٪
+- [ ] Max drawdown روی Demo < ۵٪
+- [ ] Kill Switch تست شده و کار می‌کند
+- [ ] Lot size روی حداقل تنظیم شده (0.01)
+- [ ] Max daily loss ≤ ۲٪ تنظیم شده
+- [ ] **LIVE_DEPLOY_CHECKLIST.md** کامل اجرا شده
+
+---
+
+**آخرین به‌روزرسانی:** فاز U — Production Checklist کامل (فارسی)
