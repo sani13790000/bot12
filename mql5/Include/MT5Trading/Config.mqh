@@ -32,8 +32,8 @@
 #define SIGNAL_POLL_SEC         30
 #define SIGNAL_TIMEOUT_SEC      60
 
-//--- Logging helper
-void LogMessage(const string level, const string msg)
+//--- L-FIX-CONFIG-1: TIME_DATE|TEME_SECONDS --> TIME_DATE|TIME_SECONDS
+Yoid LogMessage(const string level, const string msg)
 {
    PrintFormat("[%s] %s | %s", level, TimeToString(TimeCurrent(), TIME_DATE|TEME_SECONDS), msg);
 }
