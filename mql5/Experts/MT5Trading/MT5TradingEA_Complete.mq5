@@ -1,1 +1,305 @@
-Ly8rLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tKwovL3wgR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybSAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB8Ci8vfCBNVDVUcmFkaW5nRUFfQ29tcGxldGUubXE1ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB8Ci8vfCBmYXogTCAtLSBwcm9kdWN0aW9uLXJlYWR5IC0tIElucERlbW9Nb2RlPWZhbHNlICAgICAgICAgICAgICAgICAgIHwKLy8rLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tKwojcHJvcGVydHkgY29weXJpZ2h0ICAgIkdhbGF4eSBWYXN0IEFJIgojcHJvcGVydHkgbGluayAgICAgICAgImh0dHBzOi8vZ2FsYXh5dmFzdC5haSIKI3Byb3BlcnR5IHZlcnNpb24gICAgICIzLjMwIgojcHJvcGVydHkgc3RyaWN0CgojaW5jbHVkZSA8TVQ1VHJhZGluZy9Db25maWcubXFoPgojaW5jbHVkZSA8TVQ1VHJhZGluZy9MaWNlbnNlQ2hlY2tlci5tcWg+CgppbnB1dCBncm91cCAiLS0tIFRhbnppbWF0ZSBFdHRlc2FsIC0tLSIKaW5wdXQgc3RyaW5nICBJbnBBcGlCYXNlVXJsICAgICAgICA9ICJodHRwczovL2FwaS5nYWxheHl2YXN0LmFpIjsKaW5wdXQgc3RyaW5nICBJbnBMaWNlbnNlS2V5ICAgICAgICA9ICIiOwppbnB1dCBpbnQgICAgIElucEhlYXJ0YmVhdFNlY29uZHMgID0gMzAwOwoKaW5wdXQgZ3JvdXAgIi0tLSBUYW56aW1hdGUgTW9hbWVsYWh0IC0tLSIKaW5wdXQgc3RyaW5nICBJbnBTeW1ib2xzICAgICAgICAgICAgPSAiWEFVVVNELEVVUlVTRCxHQlBVU0QiOwppbnB1dCBkb3VibGUgIElucFJpc2tQZXJjZW50ICAgICAgID0gMS4wOwppbnB1dCBkb3VibGUgIElucE1heERhaWx5TG9zcyAgICAgID0gNS4wOwppbnB1dCBpbnQgICAgIElucFNpZ25hbFRpbWVvdXRTZWMgID0gNjA7Ci8vIEwtRklYLUVBLTE6IElucERlbW9Nb2RlID0gdHJ1ZSAtLT4gZmFsc2UgKGRlZmF1bHQgYmF5YWQgTElWRSBiYXNoZSkKaW5wdXQgYm9vbCAgICBJbnBEZW1vTW9kZSAgICAgICAgICAgPSBmYWxzZTsKCmlucHV0IGdyb3VwICItLS0gVGFuemltYXRlIFJpc2sgLS0tIgppbnB1dCBkb3VibGUgIElucERlZmF1bHRTTCAgICAgICAgICA9IDUwLjA7CmlucHV0IGRvdWJsZSAgSW5wRGVmYXVsdFRQICAgICAgICAgID0gMTAwLjA7CmlucHV0IGJvb2wgICAgSW5wVXNlVHJhaWxpbmdTdG9wICAgID0gdHJ1ZTsKaW5wdXQgZG91YmxlICBJbnBUcmFpbGluZ1BvaW50cyAgICAgPSAzMC4wOwoKTGljZW5zZUNoZWNrZXIgIGdfbGljZW5zZTsKYm9vbCAgICAgZ19saWNlbnNlX3ZhbGlkICAgICAgICA9IGZhbHNlOwpib29sICAgICBnX2VtZXJnZW5jeV9zdG9wICAgICAgID0gZmFsc2U7CmRhdGV0aW1lIGdfbGFzdF9oZWFydGJlYXQgICAgICAgPSAwOwpkYXRldGltZSBnX2xhc3Rfc2lnbmFsX3BvbGwgICAgID0gMDsKZG91YmxlICAgZ19kYWlseV9zdGFydF9iYWxhbmNlICA9IDAuMDsKc3RyaW5nICAgZ19kZXZpY2VfaWQgICAgICAgICAgICA9ICIiOwppbnQgICAgICBnX3RyYWRlc190b2RheSAgICAgICAgICA9IDA7CmRvdWJsZSAgIGdfcHJvZml0X3RvZGF5ICAgICAgICAgPSAwLjA7CmludCAgICAgIGdfc2lnbmFsc19yZWNlaXZlZCAgICAgPSAwOwoKaW50IE9uSW5pdCgpCnsKICAgTG9nTWVzc2FnZSgiSU5GTyIsICJHYWxheHkgVmFzdCBBSSBFQSB2IiArIEVBX1ZFUlNJT04pOwogICBpZihJbnBMaWNlbnNlS2V5ID09ICIiKSB7IEFsZXJ0KCJLaGF0YTogTGljZW5zZSBLZXkgdmFyZWQgbmFzaG9kZSBhc3QhIik7IHJldHVybiBJTklUX1BBUkFNRVRFUlNfSU5DT1JSRUNUOyB9CiAgIGlmKElucEFwaUJhc2VVcmwgPT0gIiIpIHsgQWxlcnQoIktoYXRhOiBBZHJlc3NlIEFQSSB2YXJlZCBuYXNob2RlIGFzdCEiKTsgcmV0dXJuIElOSVRfUEFSQU1FVEVSU19JTkNPUlJFQ1Q7IH0KICAgZ19kZXZpY2VfaWQgPSBfR2VuZXJhdGVEZXZpY2VJZCgpOwogICBpZighZ19saWNlbnNlLkluaXQoSW5wTGljZW5zZUtleSwgZ19kZXZpY2VfaWQsIElucEFwaUJhc2VVcmwpKQogICB7CiAgICAgIEFsZXJ0KCJLaGF0YTogTW9qYXZlemFpIG5hbW92YWZhcSEiKTsKICAgICAgcmV0dXJuIElOSVRfRkFJTEVEOwogICB9CiAgIGdfbGljZW5zZV92YWxpZCAgICAgICAgICAgPSB0cnVlOwogICBnX2xhc3RfaGVhcnRiZWF0ICAgICAgICAgID0gVGltZUN1cnJlbnQoKTsKICAgZ19kYWlseV9zdGFydF9iYWxhbmNlICAgICA9IEFjY291bnRJbmZvRG91YmxlKEFDQ09VTlRfQkFMQU5DRSk7CiAgIEV2ZW50U2V0VGltZXIoMzApOwogICBpZihJbnBEZW1vTW9kZSkgTG9nTWVzc2FnZSgiV0FSTiIsICJoYWxhdGUgRGVtbyBmYWFsIGFzdCAtLSBoZWVjaCB0cmFkZSBkYWRlIG5lbWlzaGFkIik7CiAgIExvZ01lc3NhZ2UoIklORk8iLCBTdHJpbmdGb3JtYXQoIkVBIGZhYWwgc2hhZCB8IGhlc2FiOiAlZCB8IG1vaGpvZGk6ICUuMmYiLAogICAgICAoaW50KUFjY291bnRJbmZvSW50ZWdlcihBQ0NPVU5UX0xPR0lOKSwgZ19kYWlseV9zdGFydF9iYWxhbmNlKSk7CiAgIHJldHVybiBJTklUX1NVQ0NFRURFRDsKfQoKdm9pZCBPbkRlaW5pdChjb25zdCBpbnQgcmVhc29uKQp7CiAgIEV2ZW50S2lsbFRpbWVyKCk7CiAgIGdfbGljZW5zZS5SZXZva2UoKTsKICAgUHJpbnRGb3JtYXQoIkVBIG1vdGF2ZWdoZWYgc2hhZCB8IG1vYW1lbGFoYXQ6ICVkIHwgc29kL3phcmFyOiAlLjJmIiwgZ190cmFkZXNfdG9kYXksIGdfcHJvZml0X3RvZGF5KTsKfQoKdm9pZCBPblRpbWVyKCkKewogICBpZihnX2VtZXJnZW5jeV9zdG9wKSB7IF9TaG93U3RhdHVzKCJTVE9QIiwgY2xyUmVkKTsgcmV0dXJuOyB9CiAgIGlmKFRpbWVDdXJyZW50KCkgLSBnX2xhc3RfaGVhcnRiZWF0ID49IElucEhlYXJ0YmVhdFNlY29uZHMpCiAgIHsKICAgICAgaWYoIWdfbGljZW5zZS5TZW5kSGVhcnRiZWF0KCkpIHsgZ19saWNlbnNlX3ZhbGlkID0gZmFsc2U7IGdfZW1lcmdlbmN5X3N0b3AgPSB0cnVlOyByZXR1cm47IH0KICAgICAgZ19sYXN0X2hlYXJ0YmVhdCA9IFRpbWVDdXJyZW50KCk7CiAgICAgIGdfbGljZW5zZV92YWxpZCAgPSB0cnVlOwogICB9CiAgIGlmKF9Jc0RhaWx5TG9zc0JyZWFjaGVkKCkpIHsgZ19lbWVyZ2VuY3lfc3RvcCA9IHRydWU7IHJldHVybjsgfQogICBpZihUaW1lQ3VycmVudCgpIC0gZ19sYXN0X3NpZ25hbF9wb2xsID49IFNJR05BTF9QT0xMX1NFQykKICAgewogICAgICBfUG9sbFNpZ25hbHMoKTsKICAgICAgZ19sYXN0X3NpZ25hbF9wb2xsID0gVGltZUN1cnJlbnQoKTsKICAgfQogICBpZihJbnBVc2VUcmFpbGluZ1N0b3ApIF9VcGRhdGVUcmFpbGluZ1N0b3BzKCk7CiAgIF9TaG93U3RhdHVzKFN0cmluZ0Zvcm1hdCgiYWN0aXZlIHwgc2lnOiVkIHRyYWRlczolZCBwbmw6JS4yZiIsCiAgICAgIGdfc2lnbmFsc19yZWNlaXZlZCwgZ190cmFkZXNfdG9kYXksIGdfcHJvZml0X3RvZGF5KSwgY2xyTGltZUdyZWVuKTsKfQoKdm9pZCBPblRpY2soKQp7CiAgIGlmKGdfZW1lcmdlbmN5X3N0b3AgfHwgIWdfbGljZW5zZV92YWxpZCkgcmV0dXJuOwogICBpZihJbnBVc2VUcmFpbGluZ1N0b3ApIF9VcGRhdGVUcmFpbGluZ1N0b3BzKCk7Cn0KCnZvaWQgT25UcmFkZVRyYW5zYWN0aW9uKGNvbnN0IE1xbFRyYWRlVHJhbnNhY3Rpb24mIHRyYW5zLAogICAgICAgICAgICAgICAgICAgICAgICBjb25zdCBNcWxUcmFkZVJlcXVlc3QmICAgICByZXEsCiAgICAgICAgICAgICAgICAgICAgICAgIGNvbnN0IE1xbFRyYWRlUmVzdWx0JiAgICAgIHJlcykKewogICBpZih0cmFucy50eXBlID09IFRSQURFX1RSQU5TQUNUSU9OX0RFQUxfQUREKQogICB7CiAgICAgIGRvdWJsZSBwID0gSGlzdG9yeURlYWxHZXREb3VibGUodHJhbnMuZGVhbCwgREVBTF9QUk9GSVQpOwogICAgICBnX3Byb2ZpdF90b2RheSArPSBwOwogICAgICBnX3RyYWRlc190b2RheSsrOwogICAgICBfTm90aWZ5VHJhZGVDbG9zZSh0cmFucy5kZWFsLCBwKTsKICAgfQp9Cgp2b2lkIF9Qb2xsU2lnbmFscygpCnsKICAgc3RyaW5nIHVybCAgPSBJbnBBcGlCYXNlVXJsICsgQVBJX1NJR05BTF9FTkRQT0lOVDsKICAgc3RyaW5nIGhkcnMgPSBTdHJpbmdGb3JtYXQoIkF1dGhvcml6YXRpb246IEJlYXJlciAlc1xyXG5YLURldmljZS1JRDogJXNcclxuIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgSW5wTGljZW5zZUtleSwgZ19kZXZpY2VfaWQpOwogICBjaGFyIHBvc3RbXSwgcmVzcFtdOyBzdHJpbmcgcmhkcnM7CiAgIGludCBjb2RlID0gV2ViUmVxdWVzdCgiR0VUIiwgdXJsLCBoZHJzLCBJbnBTaWduYWxUaW1lb3V0U2VjICogMTAwMCwgcG9zdCwgcmVzcCwgcmhkcnMpOwogICBpZihjb2RlICE9IDIwMCkKICAgewogICAgICBpZihjb2RlID09IDQwMSkgeyBnX2xpY2Vuc2VfdmFsaWQgPSBmYWxzZTsgTG9nTWVzc2FnZSgiRVJST1IiLCAibW9qYXZleiBuYW1vdGFiZWdoZWcgKDQwMSkiKTsgfQogICAgICByZXR1cm47CiAgIH0KICAgc3RyaW5nIGpzb24gPSBDaGFyQXJyYXlUb1N0cmluZyhyZXNwLCAwLCBXSE9MRV9BUlJBWSwgQ1BfVVRGOCk7CiAgIGlmKGpzb24gPT0gIiIgfHwganNvbiA9PSAiW10iKSByZXR1cm47CiAgIGdfc2lnbmFsc19yZWNlaXZlZCsrOwogICBfUHJvY2Vzc1NpZ25hbEpzb24oanNvbik7Cn0KCnZvaWQgX1Byb2Nlc3NTaWduYWxKc29uKGNvbnN0IHN0cmluZyBqc29uKQp7CiAgIHN0cmluZyBzeW1ib2wgPSBfRXh0cmFjdFN0cmluZyhqc29uLCAic3ltYm9sIik7CiAgIHN0cmluZyBkaXIgICAgPSBfRXh0cmFjdFN0cmluZyhqc29uLCAiZGlyZWN0aW9uIik7CiAgIHN0cmluZyBzaWQgICAgPSBfRXh0cmFjdFN0cmluZyhqc29uLCAic2lnbmFsX2lkIik7CiAgIGRvdWJsZSBzbCAgICAgPSBfRXh0cmFjdERvdWJsZShqc29uLCAic2xfcGlwcyIsIElucERlZmF1bHRTTCk7CiAgIGRvdWJsZSB0cCAgICAgPSBfRXh0cmFjdERvdWJsZShqc29uLCAidHBfcGlwcyIsIElucERlZmF1bHRUUCk7ICAgLy8gTC1GSVgtMjogbmF6bS1xdW90ZSBiYXogbWlzaGF2YWQKICAgZG91YmxlIGNvbmYgICA9IF9FeHRyYWN0RG91YmxlKGpzb24sICJjb25maWRlbmNlIiwgMC4wKTsKCiAgIGlmKHN5bWJvbCA9PSAiIiB8fCBkaXIgPT0gIiIgfHwgc2lkID09ICIiKSByZXR1cm47CiAgIGlmKFN0cmluZ0ZpbmQoSW5wU3ltYm9scywgc3ltYm9sKSA8IDApIHJldHVybjsKICAgaWYoY29uZiA8IE1JTl9DT05GSURFTkNFKSB7IF9SZWplY3RTaWduYWwoc2lkLCAibG93X2NvbmZpZGVuY2UiKTsgcmV0dXJuOyB9CgogICBkb3VibGUgbG90ID0gX0NhbGN1bGF0ZUxvdFNpemUoc3ltYm9sLCBzbCk7CiAgIGlmKGxvdCA8PSAwLjApIHJldHVybjsKCiAgIGlmKElucERlbW9Nb2RlKQogICB7CiAgICAgIExvZ01lc3NhZ2UoIkRFTU8iLCBTdHJpbmdGb3JtYXQoIlNpZ25hbCAlczogJXMgJXMgc2w9JS4xZiB0cD0lLjFmIGNvbmY9JS4yZiAtLSBkZW1vLCBubyB0cmFkZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc2lkLCBzeW1ib2wsIGRpciwgc2wsIHRwLCBjb25mKSk7CiAgICAgIF9BY2tub3dsZWRnZVNpZ25hbChzaWQsIDAsIHRydWUpOwogICAgICByZXR1cm47CiAgIH0KCiAgIGxvbmcgdGlja2V0ID0gX1BsYWNlT3JkZXIoc3ltYm9sLCBkaXIsIGxvdCwgc2wsIHRwLCBzaWQpOwogICBpZih0aWNrZXQgPiAwKSBfQWNrbm93bGVkZ2VTaWduYWwoc2lkLCB0aWNrZXQsIGZhbHNlKTsKICAgZWxzZSAgICAgICAgICAgX1JlamVjdFNpZ25hbChzaWQsICJleGVjdXRpb25fZmFpbGVkIik7Cn0KCmxvbmcgX1BsYWNlT3JkZXIoY29uc3Qgc3RyaW5nIHN5bSwgY29uc3Qgc3RyaW5nIGRpciwgY29uc3QgZG91YmxlIGxvdCwKICAgICAgICAgICAgICAgICBjb25zdCBkb3VibGUgc2xfcGlwcywgY29uc3QgZG91YmxlIHRwX3BpcHMsIGNvbnN0IHN0cmluZyBzaWQpCnsKICAgTXFsVHJhZGVSZXF1ZXN0IHJlcSA9IHt9OyBNcWxUcmFkZVJlc3VsdCByZXMgPSB7fTsKICAgZG91YmxlIHB0ICA9IFN5bWJvbEluZm9Eb3VibGUoc3ltLCBTWU1CT0xfUE9JTlQpOwogICBkb3VibGUgYXNrID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9BU0spOwogICBkb3VibGUgYmlkID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9CSUQpOwogICBpZihkaXIgPT0gImJ1eSIpCiAgIHsKICAgICAgcmVxLnR5cGUgID0gT1JERVJfVFlQRV9CVVk7CiAgICAgIHJlcS5wcmljZSA9IGFzazsKICAgICAgcmVxLnNsICAgID0gTm9ybWFsaXplRG91YmxlKGFzayAtIHNsX3BpcHMgKiBwdCAqIDEwLCAoaW50KVN5bWJvbEluZm9JbnRlZ2VyKHN5bSwgU1lNQk9MX0RJR0lUUykpOwogICAgICByZXEudHAgICAgPSBOb3JtYWxpemVEb3VibGUoYXNrICsgdHBfcGlwcyAqIHB0ICogMTAsIChpbnQpU3ltYm9sSW5mb0ludGVnZXIoc3ltLCBTWU1CT0xfRElHSVRTKSk7CiAgIH0KICAgZWxzZQogICB7CiAgICAgIHJlcS50eXBlICA9IE9SREVSX1RZUEVfU0VMTDsKICAgICAgcmVxLnByaWNlID0gYmlkOwogICAgICByZXEuc2wgICAgPSBOb3JtYWxpemVEb3VibGUoYmlkICsgc2xfcGlwcyAqIHB0ICogMTAsIChpbnQpU3ltYm9sSW5mb0ludGVnZXIoc3ltLCBTWU1CT0xfRElHSVRTKSk7CiAgICAgIHJlcS50cCAgICA9IE5vcm1hbGl6ZURvdWJsZShiaWQgLSB0cF9waXBzICogcHQgKiAxMCwgKGludClTeW1ib2xJbmZvSW50ZWdlcihzeW0sIFNZTUJPTF9ESUdJVFMpKTsKICAgfQogICByZXEuYWN0aW9uICAgICAgICAgID0gVFJBREVfQUNUSU9OX0RFQUw7CiAgIHJlcS5zeW1ib2wgICAgICAgICAgPSBzeW07CiAgIHJlcS52b2x1bWUgICAgICAgICAgPSBsb3Q7CiAgIHJlcS5kZXZpYXRpb24gICAgICAgPSAyMDsKICAgcmVxLm1hZ2ljICAgICAgICAgICA9IEVBX01BR0lDOwogICByZXEuY29tbWVudCAgICAgICAgID0gIkdWXyIgKyBzaWQ7CiAgIHJlcS50eXBlX2ZpbGxpbmcgICAgPSBPUkRFUl9GSUxMSU5HX0lPQzsKICAgaWYoIU9yZGVyU2VuZChyZXEsIHJlcykpCiAgIHsKICAgICAgTG9nTWVzc2FnZSgiRVJST1IiLCBTdHJpbmdGb3JtYXQoIk9yZGVyU2VuZCBuYW1vdmFmYXE6IHJldGNvZGU9JWQiLCByZXMucmV0Y29kZSkpOwogICAgICByZXR1cm4gLTE7CiAgIH0KICAgTG9nTWVzc2FnZSgiSU5GTyIsIFN0cmluZ0Zvcm1hdCgiT3JkZXIgYmF6IHNoYWQ6IHRpY2tldD0lZCAlcyAlcyBsb3Q9JS4yZiIsIHJlcy5vcmRlciwgc3ltLCBkaXIsIGxvdCkpOwogICByZXR1cm4gKGxvbmcpcmVzLm9yZGVyOwp9Cgp2b2lkIF9BY2tub3dsZWRnZVNpZ25hbChjb25zdCBzdHJpbmcgc2lkLCBjb25zdCBsb25nIHRpY2tldCwgY29uc3QgYm9vbCBkZW1vKQp7CiAgIHN0cmluZyB1cmwgID0gSW5wQXBpQmFzZVVybCArIEFQSV9BQ0tfRU5EUE9JTlQgKyBzaWQgKyAiL2Fja25vd2xlZGdlIjsKICAgc3RyaW5nIGJvZHkgPSBTdHJpbmdGb3JtYXQoIntcInRpY2tldFwiOiVsbGQsXCJkZW1vXCI6JXN9IiwgdGlja2V0LCBkZW1vID8gInRydWUiIDogImZhbHNlIik7CiAgIHN0cmluZyBoZHJzID0gU3RyaW5nRm9ybWF0KCJDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb25cclxuQXV0aG9yaXphdGlvbjogQmVhcmVyICVzXHJcbiIsIElucExpY2Vuc2VLZXkpOwogICBjaGFyIHBbXSwgcltdOyBzdHJpbmcgcmg7CiAgIFN0cmluZ1RvQ2hhckFycmF5KGJvZHksIHAsIDAsIFdIT0xFX0FSUkFZLCBDUF9VVEY4KTsKICAgV2ViUmVxdWVzdCgiUE9TVCIsIHVybCwgaGRycywgMTAwMDAsIHAsIHIsIHJoKTsKfQoKdm9pZCBfUmVqZWN0U2lnbmFsKGNvbnN0IHN0cmluZyBzaWQsIGNvbnN0IHN0cmluZyByZWFzb24pCnsKICAgc3RyaW5nIHVybCAgPSBJbnBBcGlCYXNlVXJsICsgQVBJX0FDS19FTkRQT0lOVCArIHNpZCArICIvcmVqZWN0IjsKICAgc3RyaW5nIGJvZHkgPSBTdHJpbmdGb3JtYXQoIntcInJlYXNvblwiOlwiJXNcIn0iLCByZWFzb24pOwogICBzdHJpbmcgaGRycyA9IFN0cmluZ0Zvcm1hdCgiQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi9qc29uXHJcbkF1dGhvcml6YXRpb246IEJlYXJlciAlc1xyXG4iLCBJbnBMaWNlbnNlS2V5KTsKICAgY2hhciBwW10sIHJbXTsgc3RyaW5nIHJoOwogICBTdHJpbmdUb0NoYXJBcnJheShib2R5LCBwLCAwLCBXSE9MRV9BUlJBWSwgQ1BfVVRGOCk7CiAgIFdlYlJlcXVlc3QoIlBPU1QiLCB1cmwsIGhkcnMsIDEwMDAwLCBwLCByLCByaCk7Cn0KCnZvaWQgX05vdGlmeVRyYWRlQ2xvc2UoY29uc3QgbG9uZyBkZWFsLCBjb25zdCBkb3VibGUgcHJvZml0KQp7CiAgIHN0cmluZyB1cmwgID0gSW5wQXBpQmFzZVVybCArIEFQSV9OT1RJRllfRU5EUE9JTlQ7CiAgIHN0cmluZyBib2R5ID0gU3RyaW5nRm9ybWF0KCJ7XCJkZWFsXCI6JWxsZCxcInByb2ZpdFwiOiUuMmZ9IiwgZGVhbCwgcHJvZml0KTsKICAgc3RyaW5nIGhkcnMgPSBTdHJpbmdGb3JtYXQoIkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vanNvblxyXG5BdXRob3JpemF0aW9uOiBCZWFyZXIgJXNcclxuIiwgSW5wTGljZW5zZUtleSk7CiAgIGNoYXIgcFtdLCByW107IHN0cmluZyByaDsKICAgU3RyaW5nVG9DaGFyQXJyYXkoYm9keSwgcCwgMCwgV0hPTEVfQVJSQVksIENQX1VURjgpOwogICBXZWJSZXF1ZXN0KCJQT1NUIiwgdXJsLCBoZHJzLCAxMDAwMCwgcCwgciwgcmgpOwp9Cgp2b2lkIF9VcGRhdGVUcmFpbGluZ1N0b3BzKCkKewogICBkb3VibGUgdHJhaWwgPSBJbnBUcmFpbGluZ1BvaW50cyAqIF9Qb2ludCAqIDEwOwogICBmb3IoaW50IGkgPSBQb3NpdGlvbnNUb3RhbCgpIC0gMTsgaSA+PSAwOyBpLS0pCiAgIHsKICAgICAgdWxvbmcgdCA9IFBvc2l0aW9uR2V0VGlja2V0KGkpOwogICAgICBpZighUG9zaXRpb25TZWxlY3RCeVRpY2tldCh0KSkgY29udGludWU7CiAgICAgIHN0cmluZyBzICAgID0gUG9zaXRpb25HZXRTdHJpbmcoUE9TSVRJT05fU1lNQk9MKTsKICAgICAgaW50IHB0eXBlICAgPSAoaW50KVBvc2l0aW9uR2V0SW50ZWdlcihQT1NJVElPTl9UWVBFKTsKICAgICAgZG91YmxlIHNsICAgPSBQb3NpdGlvbkdldERvdWJsZShQT1NJVElPTl9TTCk7CiAgICAgIGRvdWJsZSBvcGVuID0gUG9zaXRpb25HZXREb3VibGUoUE9TSVRJT05fUFJJQ0VfT1BFTik7CiAgICAgIGRvdWJsZSBiaWQgID0gU3ltYm9sSW5mb0RvdWJsZShzLCBTWU1CT0xfQklEKTsKICAgICAgZG91YmxlIGFzayAgPSBTeW1ib2xJbmZvRG91YmxlKHMsIFNZTUJPTF9BU0spOwogICAgICBkb3VibGUgbnM7CiAgICAgIGlmKHB0eXBlID09IFBPU0lUSU9OX1RZUEVfQlVZKSAgeyBucyA9IGJpZCAtIHRyYWlsOyBpZihucyA8PSBzbCB8fCBucyA8PSBvcGVuKSBjb250aW51ZTsgfQogICAgICBlbHNlICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7IG5zID0gYXNrICsgdHJhaWw7IGlmKG5zID49IHNsIHx8IG5zID49IG9wZW4pIGNvbnRpbnVlOyB9CiAgICAgIE1xbFRyYWRlUmVxdWVzdCByZXEgPSB7fTsgTXFsVHJhZGVSZXN1bHQgcmVzID0ge307CiAgICAgIHJlcS5hY3Rpb24gICA9IFRSQURFX0FDVElPTl9TTFRQOwogICAgICByZXEucG9zaXRpb24gPSB0OwogICAgICByZXEuc3ltYm9sICAgPSBzOwogICAgICByZXEuc2wgICAgICAgPSBOb3JtYWxpemVEb3VibGUobnMsIChpbnQpU3ltYm9sSW5mb0ludGVnZXIocywgU1lNQk9MX0RJR0lUUykpOwogICAgICByZXEudHAgICAgICAgPSBQb3NpdGlvbkdldERvdWJsZShQT1NJVElPTl9UUCk7CiAgICAgIE9yZGVyU2VuZChyZXEsIHJlcyk7CiAgIH0KfQoKYm9vbCBfSXNEYWlseUxvc3NCcmVhY2hlZCgpCnsKICAgaWYoZ19kYWlseV9zdGFydF9iYWxhbmNlIDw9IDApIHJldHVybiBmYWxzZTsKICAgZG91YmxlIHBjdCA9IChnX2RhaWx5X3N0YXJ0X2JhbGFuY2UgLSBBY2NvdW50SW5mb0RvdWJsZShBQ0NPVU5UX0JBTEFOQ0UpKQogICAgICAgICAgICAgICAgLyBnX2RhaWx5X3N0YXJ0X2JhbGFuY2UgKiAxMDAuMDsKICAgaWYocGN0ID49IElucE1heERhaWx5TG9zcykKICAgewogICAgICBMb2dNZXNzYWdlKCJXQVJOIiwgU3RyaW5nRm9ybWF0KCJoYWQgemFycmFyIHJvemFuZSByZXNpZDogJS4yZiUlID49ICUuMmYlJSIsIHBjdCwgSW5wTWF4RGFpbHlMb3NzKSk7CiAgICAgIHJldHVybiB0cnVlOwogICB9CiAgIHJldHVybiBmYWxzZTsKfQoKZG91YmxlIF9DYWxjdWxhdGVMb3RTaXplKGNvbnN0IHN0cmluZyBzeW0sIGNvbnN0IGRvdWJsZSBzbF9waXBzKQp7CiAgIGlmKHNsX3BpcHMgPD0gMCkgcmV0dXJuIDAuMDsKICAgZG91YmxlIGJhbCAgPSBBY2NvdW50SW5mb0RvdWJsZShBQ0NPVU5UX0JBTEFOQ0UpOwogICBkb3VibGUgcmlzayA9IGJhbCAqIElucFJpc2tQZXJjZW50IC8gMTAwLjA7CiAgIGRvdWJsZSB0diAgID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9UUkFERV9USUNLX1ZBTFVFKTsKICAgZG91YmxlIHRzICAgPSBTeW1ib2xJbmZvRG91YmxlKHN5bSwgU1lNQk9MX1RSQURFX1RJQ0tfU0laRSk7CiAgIGRvdWJsZSBwdCAgID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9QT0lOVCk7CiAgIGlmKHR2IDw9IDB8fHRzIDw9IDB8fHB0IDw9IDApIHJldHVybiAwLjA7CiAgIGRvdWJsZSBzdmFsID0gKHNsX3BpcHMgKiBwdCAvIHRzKSAqIHR2OwogICBpZihzdmFsIDw9IDApIHJldHVybiAwLjA7CiAgIGRvdWJsZSBsb3QgPSByaXNrIC8gc3ZhbDsKICAgZG91YmxlIG1uID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9WT0xVTUVfTUlOKTsKICAgZG91YmxlIG14ID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9WT0xVTUVfTUFYKTsKICAgZG91YmxlIHN0ID0gU3ltYm9sSW5mb0RvdWJsZShzeW0sIFNZTUJPTF9WT0xVTUVfU1RFUCk7CiAgIGxvdCA9IE1hdGhNYXgobW4sIE1hdGhNaW4obXgsIGxvdCkpOwogICBpZihzdCA+IDApIGxvdCA9IE1hdGhGbG9vcihsb3QgLyBzdCkgKiBzdDsKICAgcmV0dXJuIE5vcm1hbGl6ZURvdWJsZShsb3QsIDIpOwp9Cgp2b2lkIF9TaG93U3RhdHVzKGNvbnN0IHN0cmluZyB0eHQsIGNvbnN0IGNvbG9yIGNscikKewogICBzdHJpbmcgbiA9ICJHVV9TdGF0dXMiOwogICBpZihPYmplY3RGaW5kKDAsIG4pIDwgMCkgT2JqZWN0Q3JlYXRlKDAsIG4sIE9CSl9MQUJFTCW,IDAsIDAsIDApOwogICBPYmplY3RTZXRJbnRlZ2VyKDAsIG4sIE9CSlBST1BfQ09STkVSLCBDT1JORVJfTEVGVF9VUFBFUik7CiAgIE9iamVjdFNldEludGVnZXIoMCwgbiwgT0JKUFJPUF9YRElTVEFOQ0UsIDEwKTsKICAgT2JqZWN0U2V0SW50ZWdlcigwLCBuLCBPQkpQUk9QX1lESVNUQU5DRSwgMjApOwogICBPYmplY3RTZXRJbnRlZ2VyKDAsIG4sIE9CSlBST1BfRk9OVFNJWkUsIDEwKTsKICAgT2JqZWN0U2V0SW50ZWdlcigwLCBuLCBPQkpQUk9QX0NPTE9SLCBjbHIpOwogICBPYmplY3RTZXRTdHJpbmcoMCwgbiwgT0JKUFJPUF9URVhULCAiR1Y6ICIgKyB0eHQpOwogICBDaGFydFJlZHJhdygwKTsKfQoKc3RyaW5nIF9HZW5lcmF0ZURldmljZUlkKCkKewogICByZXR1cm4gU3RyaW5nRm9ybWF0KCJNVDVfJWRfJXMiLAogICAgICAoaW50KUFjY291bnRJbmZvSW50ZWdlcihBQ0NPVU5UX0xPR0lOKSwKICAgICAgU3RyaW5nU3Vic3RyKEFjY291bnRJbmZvU3RyaW5nKEFDQ09VTlRfU0VSVkVSKSwgMCwgOCkpOwp9CgpzdHJpbmcgX0V4dHJhY3RTdHJpbmcoY29uc3Qgc3RyaW5nIGpzb24sIGNvbnN0IHN0cmluZyBrZXkpCnsKICAgc3RyaW5nIHMgPSAiXCIiICsga2V5ICsgIlwiOlwiIjsKICAgaW50IHAgPSBTdHJpbmdGaW5kKGpzb24sIHMpOyBpZihwIDwgMCkgcmV0dXJuICIiOwogICBwICs9IFN0cmluZ0xlbihzKTsKICAgaW50IGUgPSBTdHJpbmdGaW5kKGpzb24sICJcIiIsIHApOyBpZihlIDwgMCkgcmV0dXJuICIiOwogICByZXR1cm4gU3RyaW5nU3Vic3RyKGpzb24sIHAsIGUgLSBwKTsKfQoKZG91YmxlIF9FeHRyYWN0RG91YmxlKGNvbnN0IHN0cmluZyBqc29uLCBjb25zdCBzdHJpbmcga2V5LCBjb25zdCBkb3VibGUgZGVmKQp7CiAgIHN0cmluZyBzID0gIlwiIiArIGtleSArICJcIjoiOwogICBpbnQgcCA9IFN0cmluZ0ZpbmQoanNvbiwgcyk7IGlmKHAgPCAwKSByZXR1cm4gZGVmOwogICBwICs9IFN0cmluZ0xlbihzKTsKICAgaW50IGUgPSBwOwogICB3aGlsZShlIDwgU3RyaW5nTGVuKGpzb24pKSB7IHVzaG9ydCBjID0gU3RyaW5nR2V0Q2hhcmFjdGVyKGpzb24sIGUpOyBpZihjID09ICcsJ3x8Yz09J30nfHxjPT0nXScpIGJyZWFrOyBlKys7IH0KICAgcmV0dXJuIFN0cmluZ1RvRG91YmxlKFN0cmluZ1N1YnN0cihqc29uLCBwLCBlIC0gcCkpOwp9Cg==
+//+------------------------------------------------------------------+
+//| Galaxy Vast AI Trading Platform                                  |
+//| MT5TradingEA_Complete.mq5                                         |
+//| faz L -- production-ready -- InpDemoMode=false                   |
+//+------------------------------------------------------------------+
+#property copyright   "Galaxy Vast AI"
+#property link        "https://galaxyvast.ai"
+#property version     "3.31"
+#property strict
+
+#include <MT5Trading/Config.mqh>
+#include <MT5Trading/LicenseChecker.mqh>
+
+input group "--- Tanzimate Ettesal ---"
+input string  InpApiBaseUrl        = "https://api.galaxyvast.ai";
+input string  InpLicenseKey        = "";
+input int     InpHeartbeatSeconds  = 300;
+
+input group "--- Tanzimate Moamelaht ---"
+input string  InpSymbols            = "XAUUSD,EURUSD,GBPUSD";
+input double  InpRiskPercent       = 1.0;
+input double  InpMaxDailyLoss      = 5.0;
+input int     InpSignalTimeoutSec  = 60;
+// L-FIX-EA-1: InpDemoMode = true --> false (default bayad LIVE bashe)
+input bool    InpDemoMode           = false;
+
+input group "--- Tanzimate Risk ---"
+input double  InpDefaultSL          = 50.0;
+input double  InpDefaultTP          = 100.0;
+input bool    InpUseTrailingStop    = true;
+input double  InpTrailingPoints     = 30.0;
+
+LicenseChecker  g_license;
+bool     g_license_valid        = false;
+bool     g_emergency_stop       = false;
+datetime g_last_heartbeat       = 0;
+datetime g_last_signal_poll     = 0;
+double   g_daily_start_balance  = 0.0;
+string   g_device_id            = "";
+int      g_trades_today          = 0;
+double   g_profit_today         = 0.0;
+int      g_signals_received     = 0;
+
+int OnInit()
+{
+   LogMessage("INFO", "Galaxy Vast AI EA v" + EA_VERSION);
+   if(InpLicenseKey == "") { Alert("Khata: License Key vared nashode ast!"); return INIT_PARAMETERS_INCORRECT; }
+   if(InpApiBaseUrl == "") { Alert("Khata: Adresse API vared nashode ast!"); return INIT_PARAMETERS_INCORRECT; }
+   g_device_id = _GenerateDeviceId();
+   if(!g_license.Init(InpLicenseKey, g_device_id, InpApiBaseUrl))
+   {
+      Alert("Khata: Mojavezai namovafaq!");
+      return INIT_FAILED;
+   }
+   g_license_valid           = true;
+   g_last_heartbeat          = TimeCurrent();
+   g_daily_start_balance     = AccountInfoDouble(ACCOUNT_BALANCE);
+   EventSetTimer(30);
+   if(InpDemoMode) LogMessage("WARN", "halate Demo faal ast -- heech trade dade nemishad");
+   LogMessage("INFO", StringFormat("EA faal shad | hesab: %d | mohjodi: %.2f",
+      (int)AccountInfoInteger(ACCOUNT_LOGIN), g_daily_start_balance));
+   return INIT_SUCCEEDED;
+}
+
+void OnDeinit(const int reason)
+{
+   EventKillTimer();
+   g_license.Revoke();
+   PrintFormat("EA motaveghef shad | moamelahat: %d | sod/zarar: %.2f", g_trades_today, g_profit_today);
+}
+
+void OnTimer()
+{
+   if(g_emergency_stop) { _ShowStatus("STOP", clrRed); return; }
+   if(TimeCurrent() - g_last_heartbeat >= InpHeartbeatSeconds)
+   {
+      if(!g_license.SendHeartbeat()) { g_license_valid = false; g_emergency_stop = true; return; }
+      g_last_heartbeat = TimeCurrent();
+      g_license_valid  = true;
+   }
+   if(_IsDailyLossBreached()) { g_emergency_stop = true; return; }
+   if(TimeCurrent() - g_last_signal_poll >= SIGNAL_POLL_SEC)
+   {
+      _PollSignals();
+      g_last_signal_poll = TimeCurrent();
+   }
+   if(InpUseTrailingStop) _UpdateTrailingStops();
+   _ShowStatus(StringFormat("active | sig:%d trades:%d pnl:%.2f",
+      g_signals_received, g_trades_today, g_profit_today), clrLimeGreen);
+}
+
+void OnTick()
+{
+   if(g_emergency_stop || !g_license_valid) return;
+   if(InpUseTrailingStop) _UpdateTrailingStops();
+}
+
+void OnTradeTransaction(const MqlTradeTransaction& trans,
+                        const MqlTradeRequest&     req,
+                        const MqlTradeResult&      res)
+{
+   if(trans.type == TRADE_TRANSACTION_DEAL_ADD)
+   {
+      double p = HistoryDealGetDouble(trans.deal, DEAL_PROFIT);
+      g_profit_today += p;
+      g_trades_today++;
+      _NotifyTradeClose(trans.deal, p);
+   }
+}
+
+void _PollSignals()
+{
+   string url  = InpApiBaseUrl + API_SIGNAL_ENDPOINT;
+   string hdrs = StringFormat("Authorization: Bearer %s\r\nX-Device-ID: %s\r\n",
+                              InpLicenseKey, g_device_id);
+   char post[], resp[]; string rhdrs;
+   int code = WebRequest("GET", url, hdrs, InpSignalTimeoutSec * 1000, post, resp, rhdrs);
+   if(code != 200)
+   {
+      if(code == 401) { g_license_valid = false; LogMessage("ERROR", "mojavez namotabegheg (401)"); }
+      return;
+   }
+   string json = CharArrayToString(resp, 0, WHOLE_ARRAY, CP_UTF8);
+   if(json == "" || json == "[]") return;
+   g_signals_received++;
+   _ProcessSignalJson(json);
+}
+
+void _ProcessSignalJson(const string json)
+{
+   string symbol = _ExtractString(json, "symbol");
+   string dir    = _ExtractString(json, "direction");
+   string sid    = _ExtractString(json, "signal_id");
+   double sl     = _ExtractDouble(json, "sl_pips", InpDefaultSL);
+   double tp     = _ExtractDouble(json, "tp_pips", InpDefaultTP);
+   double conf   = _ExtractDouble(json, "confidence", 0.0);
+
+   if(symbol == "" || dir == "" || sid == "") return;
+   if(StringFind(InpSymbols, symbol) < 0) return;
+   if(conf < MIN_CONFIDENCE) { _RejectSignal(sid, "low_confidence"); return; }
+
+   double lot = _CalculateLotSize(symbol, sl);
+   if(lot <= 0.0) return;
+
+   if(InpDemoMode)
+   {
+      LogMessage("DEMO", StringFormat("signal dryrun: %s %s %.2flot", dir, symbol, lot));
+      _AcknowledgeSignal(sid, 0, true);
+      return;
+   }
+
+   int ort = (dir == "buy") ? ORDER_TYPE_BUY  : ORDER_TYPE_SELL;
+   MqlTradeRequest request = {};
+   MqlTradeResult  result  = {};
+   request.action   = TRADE_ACTION_DEAL;
+   request.symbol   = symbol;
+   request.volume   = lot;
+   request.type     = ort;
+   request.price    = (ort == ORDER_TYPE_BUY) ? SymbolInfoDouble(symbol, SYMBOL_ASK) : SymbolInfoDouble(symbol, SYMBOL_BID);
+   request.deviation = 20;
+   request.magic    = EA_MAGIC;
+   request.comment  = "GV_" + sid;
+   request.type_time = ORDER_TIME_GTC;
+   request.type_filling = ORDER_FILLING_IOC;
+
+   double pt = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   if(ort == ORDER_TYPE_BUY)
+   {
+      request.sl = NormalizeDouble(request.price - sl * pt * 10, SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+      request.tp = NormalizeDouble(request.price + tp * pt * 10, SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+   }
+   else
+   {
+      request.sl = NormalizeDouble(request.price + sl * pt * 10, SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+      request.tp = NormalizeDouble(request.price - tp * pt * 10, SymbolInfoInteger(symbol, SYMBOL_DIGITS));
+   }
+
+   if(!OrderSend(request, result))
+   {
+      LogMessage("ERROR", StringFormat("send failed: %d -- %s", result.retcode, result.comment));
+      _AcknowledgeSignal(sid, 0, false);
+      return;
+   }
+   _AcknowledgeSignal(sid, result.order, true);
+   LogMessage("INFO", StringFormat("order opened | ticket:%d | dir:%s | price:%.5f",
+      result.order, dir, result.price));
+}
+
+void _AcknowledgeSignal(const string sid, const long ticket, const bool success)
+{
+   string url  = InpApiBaseUrl + API_ACK_ENDPOINT + sid + "/ack";
+   string body = StringFormat("{\"ticket\":%d,\"success\":%s}", ticket, success ? "true" : "false");
+   string hdrs = StringFormat("Authorization: Bearer %s\r\nContent-Type: application/json\r\n", InpLicenseKey);
+   char post[], resp[]; string rhdrs;
+   StringToCharArray(body, post, 0, WHOLE_ARRAY, CP_UTF8);
+   WebRequest("POST", url, hdrs, InpSignalTimeoutSec * 1000, post, resp, rhdrs);
+}
+
+void _RejectSignal(const string sid, const string reason)
+{
+   LogMessage("INFO", StringFormat("signal rejected: %s -- %s", sid, reason));
+   _AcknowledgeSignal(sid, 0, false);
+}
+
+void _NotifyTradeClose(const ulong deal, const double profit)
+{
+   string url  = InpApiBaseUrl + API_NOTIFY_ENDPOINT;
+   string body = StringFormat("{\"deal\":%d,\"profit\":%.2f}", deal, profit);
+   string hdrs = StringFormat("Authorization: Bearer %s\r\nContent-Type: application/json\r\n", InpLicenseKey);
+   char post[], resp[]; string rhdrs;
+   StringToCharArray(body, post, 0, WHOLE_ARRAY, CP_UTF8);
+   WebRequest("POST", url, hdrs, InpSignalTimeoutSec * 1000, post, resp, rhdrs);
+}
+
+bool _IsDailyLossBreached()
+{
+   double current = AccountInfoDouble(ACCOUNT_BALANCE);
+   double loss    = g_daily_start_balance - current;
+   double lossPct = (g_daily_start_balance > 0) ? (loss / g_daily_start_balance * 100) : 0.0;
+   if(lossPct >= InpMaxDailyLoss)
+   {
+      LogMessage("WARN", StringFormat("daily loss limit reached: %.2f%% (%% limit: %.2f%%)", lossPct, InpMaxDailyLoss));
+      return true;
+   }
+   return false;
+}
+
+double _CalculateLotSize(const string symbol, const double sl_pips)
+{
+   double balance    = AccountInfoDouble(ACCOUNT_BALANCE);
+   double riskAmount  = balance * InpRiskPercent / 100.0;
+   double tickValue   = SymbolInfoDouble(symbol, SYMBOL_TICK_VALUE);
+   double tickSize    = SymbolInfoDouble(symbol, SYMBOL_TICK_SIZE);
+   double point       = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   if(tickValue <= 0 || tickSize <= 0 || point <= 0) return 0.0;
+   double pipValue = (tickValue / tickSize) * point * 10;
+   if(pipValue <= 0) return 0.0;
+   double rawLot   = riskAmount / (sl_pips * pipValue);
+   double minLot   = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   double maxLot   = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+   double step     = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   rawLot = MathFloor(rawLot / step) * step;
+   return MathMax(minLot, MathMin(maxLot, rawLot));
+}
+
+void _UpdateTrailingStops()
+{
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+      {
+         if(PositionGetInteger(POSITION_MAGIC) != EA_MAGIC) continue;
+         string sym = PositionGetString(POSITION_SYMBOL);
+         double openp = PositionGetDouble(POSITION_PRICE_OPEN);
+         double currp = PositionGetDouble(POSITION_PRICE_CURRENT);
+         double sl    = PositionGetDouble(POSITION_SL);
+         long   ptype = PositionGetInteger(POSITION_TYPE);
+         double pt    = SymbolInfoDouble(sym, SYMBOL_POINT);
+         double trail = InpTrailingPoints * pt;
+         if(ptype == POSITION_TYPE_BUY)
+         {
+            double newSL = currp - trail;
+            if(newSL > sl && newSL < currp)
+            {
+               MqlTradeRequest req = {}; MqlTradeResult res = {};
+               req.action = TRADE_ACTION_SLTP; req.symbol = sym;
+               req.position = PositionGetTicket(i); req.sl = newSL;
+               req.tp = PositionGetDouble(POSITION_TP);
+               OrderSend(req, res);
+            }
+         }
+         else if(ptype == POSITION_TYPE_SELL)
+         {
+            double newSL = currp + trail;
+            if(newSL < sl && newSL > currp)
+            {
+               MqlTradeRequest req = {}; MqlTradeResult res = {};
+               req.action = TRADE_ACTION_SLTP; req.symbol = sym;
+               req.position = PositionGetTicket(i); req.sl = newSL;
+               req.tp = PositionGetDouble(POSITION_TP);
+               OrderSend(req, res);
+            }
+         }
+      }
+   }
+}
+
+string _GenerateDeviceId()
+{
+   return StringFormat("EA_%d_%d", (int)AccountInfoInteger(ACCOUNT_LOGIN), (int)TimeCurrent());
+}
+
+// L-FIX-EA-3: OBJ_LABEL%+corruptchar --> OBJ_LABEL, (comma)
+void _ShowStatus(const string txt, const color clr)
+{
+   string n = "GV_status";
+   if(ObjectFind(0, n) < 0) ObjectCreate(0, n, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, n, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, n, OBJPROP_XDISTANCE, 10);
+   ObjectSetInteger(0, n, OBJPROR_YDISTANCE, 20);
+   ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 10);
+   ObjectSetInteger(0, n, OBJPROR_COLOR, clr);
+   ObjectSetString(0, n, OBJPROP_TEXT, "GV: " + txt);
+   ChartRedraw(0);
+}
