@@ -1,1 +1,155 @@
-IiIiCmJhY2tlbmQvb2JzZXJ2YWJpbGl0eS9tb25pdG9yaW5nLnB5CkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0g4oCUIFByb2R1Y3Rpb24gTW9uaXRvcmluZwoKZmF6IEk6CiAgSS04OiAgUHJvbWV0aGV1cyBtZXRyaWNzIGVuZHBvaW50IC9tZXRyaWNzCiAgSS05OiAgU2VudHJ5IGludGVncmF0aW9uIChhZ2FyIFNFTlRSWV9EU04gdGFueWltIGJhc2hhZCkKICBJLTEwOiBTdHJ1Y3R1cmVkIEpTT04gbG9nZ2luZyBiYXJheWUgcHJvZHVjdGlvbgogIEktMTE6IEFsZXJ0IHRocmVzaG9sZHMgYmFyYXllIGRyYXdkb3duIHZhIGVycm9yIHJhdGUKICBJLTEyOiBVcHRpbWUgdHJhY2tlcgoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IG9zCmltcG9ydCB0aW1lCmZyb20gZGF0YWNsYXNzZXMgaW1wb3J0IGRhdGFjbGFzcywgZmllbGQKZnJvbSB0eXBpbmcgaW1wb3J0IENhbGxhYmxlLCBPcHRpb25hbAoKbG9nID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgpfU0VOVFJZX0RTTiA9IG9zLmVudmlyb24uZ2V0KCJTRU5UUllfRFNOIiwgIiIpCl9FTlYgPSBvcy5lbnZpcm9uLmdldCgiQVBQX0VOViIsICJkZXZlbG9wbWVudCIpCl9JU19QUk9EID0gX0VOViA9PSAicHJvZHVjdGlvbiIKCkRSQVdET1dOX0FMRVJUX1BDVCA9IGZsb2F0KG9zLmVudmlyb24uZ2V0KCJERUFSV0RPV05fQUxFUlRfUENUIiwgIjUuMCIpKQpFUlJPUl9SQVRFX0FMRVJUX1BDVCA9IGZsb2F0KG9zLmVudmlyb24uZ2V0KCJFUlJPUl9SQVRFX0FMRVJUX1BDVCIsICIxMC4wIikpCkxBVEVOQ1lfQUxFUlRfTVMgPSBmbG9hdChvcy5lbnZpcm9uLmdldCgiTEFURU5DWV9BTEVSVF9NUyIsICIzMDAwLjAiKSkKCl9zdGFydHVwX3RpbWUgPSB0aW1lLnRpbWUoKQoKCmRlZiBpbml0X3NlbnRyeSgpIC0+IGJvb2w6CiAgICBpZiBub3QgX1NFTlRSWV9EU046CiAgICAgICAgbG9nLmluZm8oIlNlbnRyeSBkaXNhYmxlZCDigJQgU0VOVFJZX0RTTiBub3Qgc2V0IikKICAgICAgICByZXR1cm4gRmFsc2UKICAgIHRyeToKICAgICAgICBpbXBvcnQgc2VudHJ5X3NkawogICAgICAgIGZyb20gc2VudHJ5X3Nkay5pbnRlZ3JhdGlvbnMuZmFzdGFwaSBpbXBvcnQgRmFzdEFwaUludGVncmF0aW9uCiAgICAgICAgZnJvbSBzZW50cnlfc2RrLmludGVncmF0aW9ucy5hc3luY2lvIGltcG9ydCBBc3luY2lvSW50ZWdyYXRpb24KICAgICAgICBzZW50cnlfc2RrLmluaXQoCiAgICAgICAgICAgIGRzbj1fU0VOVFJZX0RTTiwKICAgICAgICAgICAgZW52aXJvbm1lbnQ9X0VOViwKICAgICAgICAgICAgdHJhY2VzX3NhbXBsZV9yYXRlPTAuMSBpZiBfSVNfUFJPRCBlbHNlIDEuMCwKICAgICAgICAgICAgaW50ZWdyYXRpb25zPVsKICAgICAgICAgICAgICAgIEZhc3RBcGlJbnRlZ3JhdGlvbih0cmFuc2FjdGlvbl9zdHlsZT0idXJsIiksCiAgICAgICAgICAgICAgICBBc3luY2lvSW50ZWdyYXRpb24oKSwKICAgICAgICAgICAgXSwKICAgICAgICAgICAgYmVmb3JlX3NlbmQ9X2JlZm9yZV9zZW5kX3NlbnRyeSwKICAgICAgICApCiAgICAgICAgbG9nLmluZm8oIlNlbnRyeSBpbml0aWFsaXplZCB8IGVudj0lcyIsIF9FTlYpCiAgICAgICAgcmV0dXJuIFRydWUKICAgIGV4Y2VwdCBJbXBvcnRFcnJvcjoKICAgICAgICBsb2cud2FybmluZygic2VudHJ5LXNkayBub3QgaW5zdGFsbGVkIOKAlCBwaXAgaW5zdGFsbCBzZW50cnktc2RrW2Zhc3RhcGldIikKICAgICAgICByZXR1cm4gRmFsc2UKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICBsb2cuZXJyb3IoIlNlbnRyeSBpbml0IGZhaWxlZDogJXMiLCBlKQogICAgICAgIHJldHVybiBGYWxzZQoKCmRlZiBfYmVmb3JlX3NlbmRfc2VudHJ5KGV2ZW50OiBkaWN0LCBoaW50OiBkaWN0KSAtPiBPcHRpb25hbFtkaWN0XToKICAgIGlmICJyZXF1ZXN0IiBpbiBldmVudCBhbmQgImhlYWRlcnMiIGluIGV2ZW50LmdldCgicmVxdWVzdCIsIHt9KToKICAgICAgICBoZHJzID0gZXZlbnRbInJlcXVlc3QiXVsiaGVhZGVycyJdCiAgICAgICAgaWYgIkF1dGhvcml6YXRpb24iIGluIGhkcnM6CiAgICAgICAgICAgIGhkcnNbIkF1dGhvcml6YXRpb24iXSA9ICJbUkVEQUNURURdIgogICAgICAgIGlmICJhdXRob3JpemF0aW9uIiBpbiBoZHJzOgogICAgICAgICAgICBoZHJzWyJhdXRob3JpemF0aW9uIl0gPSAiW1JFREFDVEVEXSIKCXB0dXJuIGV2ZW50CgoKY2xhc3MgSlNPTkZvcm1hdHRlcihsb2dnaW5nLkZvcm1hdHRlcik6CiAgICBkZWYgZm9ybWF0KHNlbGYsIHJlY29yZDogbG9nZ2luZy5Mb2dSZWNvcmQpIC0+IHN0cjoKICAgICAgICBpbXBvcnQganNvbgogICAgICAgIGRvYyA9IHsKICAgICAgICAgICAgInRzIjogc2VsZi5mb3JtYXRUaW1lKHJlY29yZCwgIiVZLSVtLSVkVCVIOiVNOiVTIiksCiAgICAgICAgICAgICJsZXZlbCI6IHJlY29yZC5sZXZlbG5hbWUsCiAgICAgICAgICAgICJsb2dnZXIiOiByZWNvcmQubmFtZSwKICAgICAgICAgICAgIm1zZyI6IHJlY29yZC5nZXRNZXNzYWdlKCksCiAgICAgICAgICAgICJlbnYiOiBfRU5WLAogICAgICAgIH0KICAgICAgICBpZiByZWNvcmQuZXhjX2luZm86CiAgICAgICAgICAgIGRvY1siZXhjIl0gPSBzZWxmLmZvcm1hdEV4Y2VwdGlvbihyZWNvcmQuZXhjX2luZm8pCiAgICAgICAgaWYgaGFzYXR0cihyZWNvcmQsICJyZXF1ZXN0X2lkIik6CiAgICAgICAgICAgIGRvY1sicmVxdWVzdF9pZCJdID0gcmVjb3JkLnJlcXVlc3RfaWQKICAgICAgICBpZiBoYXNhdHRyKHJlY29yZCwgInVzZXJfaWQiKToKICAgICAgICAgICAgZG9jWyJ1c2VyX2lkIl0gPSByZWNvcmQudXNlcl9pZAogICAgICAgIHJldHVybiBqc29uLmR1bXBzKGRvYywgZW5zdXJlX2FzY2lpPUZhbHNlKQoKCmRlZiBzZXR1cF9sb2dnaW5nKGxldmVsOiBzdHIgPSAiSU5GTyIpIC0+IE5vbmU6CiAgICByb290ID0gbG9nZ2luZy5nZXRMb2dnZXIoKQogICAgcm9vdC5zZXRMZXZlbChnZXRhdHRyKGxvZ2dpbmcsIGxldmVsLnVwcGVyKCksIGxvZ2dpbmcuSU5GTykpCiAgICBmb3IgaCBpbiByb290LmhhbmRsZXJzWzpdOgogICAgICAgIHJvb3QucmVtb3ZlSGFuZGxlcihoKQogICAgaGFuZGxlciA9IGxvZ2dpbmcuU3RyZWFtSGFuZGxlcigpCiAgICBpZiBfSVNfUFJPRDoKICAgICAgICBoYW5kbGVyLnNldEZvcm1hdHRlcihKU09ORm9ybWF0dGVyKCkpCiAgICBlbHNlOgogICAgICAgIGhhbmRsZXIuc2V0Rm9ybWF0dGVyKAogICAgICAgICAgICBsb2dnaW5nLkZvcm1hdHRlcigKICAgICAgICAgICAgICAgICIlKGFzY3RpbWUpcyB8ICUobGV2ZWxuYW1lKS04cyB8ICUobmFtZSlzIHwgJShtZXNzYWdlKXMiLAogICAgICAgICAgICAgICAgZGF0ZWZtdD0iJUg6JU06JVMiLAogICAgICAgICAgICApCiAgICAgICAgKQogICAgcm9vdC5hZGRIYW5kbGVyKGhhbmRsZXIpCiAgICBsb2cuaW5mbygiTG9nZ2luZyBjb25maWd1cmVkIHwgZW52PSVzIHwgbGV2ZWw9JXMiLCBfRU5WLCBsZXZlbCkKCgpAZGF0YWNsYXNzCmNsYXNzIEFsZXJ0U3RhdGU6CiAgICBsYXN0X2RyYXdkb3duX2FsZXJ0OiBmbG9hdCA9IDAuMAogICAgbGFzdF9lcnJvcl9yYXRlX2FsZXJ0OiBmbG9hdCA9IDAuMAogICAgbGFzdF9sYXRlbmN5X2FsZXJ0OiBmbG9hdCA9IDAuMAogICAgX2hvb2tzOiBsaXN0W0NhbGxhYmxlXSA9IGZpZWxkKGRlZmF1bHRfZmFjdG9yeT1saXN0KQoKICAgIGRlZiBhZGRfaG9vayhzZWxmLCBmbjogQ2FsbGFibGUpIC0+IE5vbmU6CiAgICAgICAgc2VsZi5faG9va3MuYXBwZW5kKGZuKQoKICAgIGRlZiBfZmlyZShzZWxmLCBhbGVydF90eXBlOiBzdHIsIG1lc3NhZ2U6IHN0ciwgdmFsdWU6IGZsb2F0KSAtPiBOb25lOgogICAgICAgIGZvciBob29rIGluIHNlbGYuX2hvb2tzOgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBob29rKGFsZXJ0X3R5cGUsIG1lc3NhZ2UsIHZhbHVlKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgICAgICBsb2cuZGVidWcoIkFsZXJ0IGhvb2sgZXJyb3I6ICVzIiwgZSkKCgpfYWxlcnRfc3RhdGUgPSBBbGVydFN0YXRlKCkKCgpkZWYgY2hlY2tfZHJhd2Rvd25fYWxlcnQoY3VycmVudF9wY3Q6IGZsb2F0KSAtPiBOb25lOgogICAgbm93ID0gdGltZS5tb25vdG9uaWMoKQogICAgaWYgY3VycmVudF9wY3QgPj0gRFJBV0RPV05fQUxFUlRfUENUOgogICAgICAgIGlmIG5vdyAtIF9hbGVydF9zdGF0ZS5sYXN0X2RyYXdkb3duX2FsZXJ0ID4gMzAwOgogICAgICAgICAgICBfYWxlcnRfc3RhdGUubGFzdF9kcmF3ZG93bl9hbGVydCA9IG5vdwogICAgICAgICAgICBtc2cgPSBmIuKao+KaoSBEUkFXRE9XTiBBTEVSVDoge2N1cnJlbnRfcGN0Oi4xZn0lID49IHtEUkFXRE9XTl9BTEVSVF9QQ1Q6LjFmfSUiCiAgICAgICAgICAgIGxvZy5jcml0aWNhbChtc2cpCiAgICAgICAgICAgIF9hbGVydF9zdGF0ZS5fZmlyZSgiRFJBV0RPV04iLCBtc2csIGN1cnJlbnRfcGN0KQoKCmRlZiBjaGVja19lcnJvcl9yYXRlX2FsZXJ0KGVycm9yX3BjdDogZmxvYXQpIC0+IE5vbmU6CiAgICBub3cgPSB0aW1lLm1vbm90b25pYygpCiAgICBpZiBlcnJvcl9wY3QgPj0gRVJST1JfUkFURV9BTEVSVF9QQ1Q6CiAgICAgICAgaWYgbm93IC0gX2FsZXJ0X3N0YXRlLmxhc3RfZXJyb3JfcmF0ZV9hbGVydCA+IDMwMDoKICAgICAgICAgICAgX2FsZXJ0X3N0YXRlLmxhc3RfZXJyb3JfcmF0ZV9hbGVydCA9IG5vdwogICAgICAgICAgICBtc2cgPSBmIvCflLQgRVJST1IgUkFURSBBTEVSVDoge2Vycm9yX3BjdDouMWZ9JSA+PSB7RVJST1JfUkFURV9BTEVSVF9QQ1Q6LjFmfSUiCiAgICAgICAgICAgIGxvZy5jcml0aWNhbChtc2cpCiAgICAgICAgICAgIF9hbGVydF9zdGF0ZS5fZmlyZSgiRVJST1JfUkFURSIsIG1zZywgZXJyb3JfcGN0KQoKCmRlZiBjaGVja19sYXRlbmN5X2FsZXJ0KGxhdGVuY3lfbXM6IGZsb2F0LCBlbmRwb2ludDogc3RyKSAtPiBOb25lOgogICAgbm93ID0gdGltZS5tb25vdG9uaWMoKQogICAgaWYgbGF0ZW5jeV9tcyA+PSBMQVRFQ1lfQUxFUlRfTVM6CiAgICAgICAgaWYgbm93IC0gX2FsZXJ0X3N0YXRlLmxhc3RfbGF0ZW5jeV9hbGVydCA+IDYwOgogICAgICAgICAgICBfYWxlcnRfc3RhdGUubGFzdF9sYXRlbmN5X2FsZXJ0ID0gbm93CiAgICAgICAgICAgIG1zZyA9IGYi8J+QjCBMQVRFTkNZIEFMRVJUOiB7ZW5kcG9pbnR9ID0ge2xhdGVuY3lfbXM6LjBmfW1zID49IHtMQVRFTkNZX0FMRVJUX01TOi4wZn1tcyIKICAgICAgICAgICAgbG9nLndhcm5pbmcobXNnKQogICAgICAgICAgICBfYWxlcnRfc3RhdGUuX2ZpcmUoIkxBVEVOQ1kiLCBtc2csIGxhdGVuY3lfbXMpCgoKZGVmIGFkZF9hbGVydF9ob29rKGZuOiBDYWxsYWJsZSkgLT4gTm9uZToKICAgIF9hbGVydF9zdGF0ZS5hZGRfaG9vayhmbikKCgpkZWYgZ2V0X3VwdGltZV9zZWNvbmRzKCkgLT4gZmxvYXQ6CiAgICByZXR1cm4gdGltZS50aW1lKCkgLSBfc3RhcnR1cF90aW1lCgoKZGVmIGdldF91cHRpbWVfaHVtYW4oKSAtPiBzdHI6CiAgICBzZWNzID0gaW50KGdldF91cHRpbWVfc2Vjb25kcygpKQogICAgZCwgcmVtID0gZGl2bW9kKHNlY3MsIDg2NDAwKQogICAgaCwgcmVtID0gZGl2bW9kKHJlbSwgMzYwMCkKICAgIG0sIHMgPSBkaXZtb2QocmVtLCA2MCkKICAgIGlmIGQ6CiAgICAgICAgcmV0dXJuIGYie2R9ZCB7aH1oIHttfW0ge3N9cyIKICAgIGlmIGg6CiAgICAgICAgcmV0dXJuIGYie2h9aCB7bX1tIHtzfXMiCiAgICByZXR1cm4gZiJ7bX1tIHtzfXMiCgoKZGVmIGdldF9wcm9tZXRoZXVzX2FwcCgpOgogICAgdHJ5OgogICAgICAgIGZyb20gcHJvbWV0aGV1c19jbGllbnQgaW1wb3J0IG1ha2VfYXNnaV9hcHAKICAgICAgICByZXR1cm4gbWFrZV9hc2dpX2FwcCgpCiAgICBleGNlcHQgSW1wb3J0RXJyb3I6CiAgICAgICAgbG9nLndhcm5pbmcoInByb21ldGhldXNfY2xpZW50IG5vdCBpbnN0YWxsZWQg4oCUIHBpcCBpbnN0YWxsIHByb21ldGhldXMtY2xpZW50IikKICAgICAgICByZXR1cm4gTm9uZQoKCmRlZiBpbml0X21vbml0b3JpbmcobG9nX2xldmVsOiBzdHIgPSAiSU5GTyIpIC0+IE5vbmU6CiAgICBzZXR1cF9sb2dnaW5nKGxvZ19sZXZlbCkKICAgIGluaXRfc2VudHJ5KCkKICAgIGxvZy5pbmZvKAogICAgICAgICJNb25pdG9yaW5nIGluaXRpYWxpemVkIHwgZW52PSVzIHwgZHJhd2Rvd25fYWxlcnQ9JS4xZiUlIHwgIgogICAgICAgICJlcnJvcl9yYXRlX2FsZXJ0PSUuMWYlJSB8IGxhdGVuY3lfYWxlcnQ9JS4wZm1zIiwKICAgICAgICBfRU5WLAogICAgICAgIERSQVdET1dOX0FMRVJUX1BDVCwKICAgICAgICBFUlJPUl9SQVRFX0FMRVJUX1BDVCwKICAgICAgICBMQVRFTkNZX0FMRVJUX01TLAogICAgKQo=
+"""
+backend/observability/monitoring.py
+Galaxy Vast AI Trading Platform - Production Monitoring
+"""
+from __future__ import annotations
+
+import logging
+import os
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+log = logging.getLogger(__name__)
+
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+_ENV = os.environ.get("APP_ENV", "development")
+_IS_PROD = _ENV == "production"
+
+DRAWDOWN_ALERT_PCT = float(os.environ.get("DRAWDOWN_ALERT_PCT", "5.0"))
+ERROR_RATE_ALERT_PCT = float(os.environ.get("ERROR_RATE_ALERT_PCT", "10.0"))
+LATENCY_ALERT_MS = float(os.environ.get("LATENCY_ALERT_MS", "3000.0"))
+
+_startup_time = time.time()
+
+
+def init_sentry() -> bool:
+    if not _SENTRY_DSN:
+        log.info("Sentry disabled - SENTRY_DSN not set")
+        return False
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.asyncio import AsyncioIntegration
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            environment=_ENV,
+            traces_sample_rate=0.1 if _IS_PROD else 1.0,
+            integrations=[
+                FastApiIntegration(transaction_style="url"),
+                AsyncioIntegration(),
+            ],
+            before_send=_before_send_sentry,
+        )
+        log.info("Sentry initialized | env=%s", _ENV)
+        return True
+    except ImportError:
+        log.warning("sentry-sdk not installed")
+        return False
+    except Exception as exc:
+        log.error("Sentry init failed: %s", exc)
+        return False
+
+
+def _before_send_sentry(event: dict, hint: dict) -> Optional[dict]:
+    if "request" in event and "headers" in event.get("request", {}):
+        hdrs = event["request"]["headers"]
+        if "Authorization" in hdrs:
+            hdrs["Authorization"] = "[REDACTED]"
+        if "authorization" in hdrs:
+            hdrs["authorization"] = "[REDACTED]"
+    return event
+
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        doc = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+            "env": _ENV,
+        }
+        if record.exc_info:
+            doc["exc"] = self.formatException(record.exc_info)
+        if hasattr(record, "request_id"):
+            doc["request_id"] = record.request_id  # type: ignore
+        if hasattr(record, "user_id"):
+            doc["user_id"] = record.user_id  # type: ignore
+        return json.dumps(doc, ensure_ascii=False)
+
+
+def setup_logging(level: str = "INFO") -> None:
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
+    for h in root.handlers[:]:
+        root.removeHandler(h)
+    handler = logging.StreamHandler()
+    if _IS_PROD:
+        handler.setFormatter(JSONFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+                datefmt="%H:%M:%S",
+            )
+        )
+    root.addHandler(handler)
+    log.info("Logging configured | level=%s env=%s", level, _ENV)
+
+
+@dataclass
+class MetricsSnapshot:
+    uptime_s: float = 0.0
+    latency_alert_ms: float = LATENCY_ALERT_MS
+    error_rate_alert_pct: float = ERROR_RATE_ALERT_PCT
+    drawdown_alert_pct: float = DRAWDOWN_ALERT_PCT
+    is_prod: bool = _IS_PROD
+
+
+def get_uptime() -> float:
+    return time.time() - _startup_time
+
+
+def check_drawdown_alert(drawdown_pct: float) -> bool:
+    return drawdown_pct >= DRAWDOWN_ALERT_PCT
+
+
+def check_error_rate_alert(error_rate_pct: float) -> bool:
+    return error_rate_pct >= ERROR_RATE_ALERT_PCT
+
+
+def check_latency_alert(latency_ms: float) -> bool:
+    return latency_ms >= LATENCY_ALERT_MS
+
+
+class ProductionMonitor:
+    """Central production monitoring coordinator."""
+
+    def __init__(self):
+        self._sentry_ok = False
+        self._metrics = MetricsSnapshot()
+
+    def initialize(self) -> None:
+        self._sentry_ok = init_sentry()
+        log.info("[monitor] initialized | sentry=%s env=%s", self._sentry_ok, _ENV)
+
+    def snapshot(self) -> MetricsSnapshot:
+        self._metrics.uptime_s = get_uptime()
+        return self._metrics
+
+    def alert_drawdown(self, drawdown_pct: float) -> None:
+        if check_drawdown_alert(drawdown_pct):
+            log.warning("[monitor] DRAWDOWN ALERT: %.2f%% >= %.2f%%",
+                        drawdown_pct, DRAWDOWN_ALERT_PCT)
+
+    def alert_error_rate(self, error_rate_pct: float) -> None:
+        if check_error_rate_alert(error_rate_pct):
+            log.warning("[monitor] ERROR RATE ALERT: %.2f%% >= %.2f%%",
+                        error_rate_pct, ERROR_RATE_ALERT_PCT)
+
+    def alert_latency(self, latency_ms: float) -> None:
+        if check_latency_alert(latency_ms):
+            log.warning("[monitor] LATENCY ALERT: %.0fms >= %.0fms",
+                        latency_ms, LATENCY_ALERT_MS)
