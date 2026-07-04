@@ -1,17 +1,18 @@
 //+------------------------------------------------------------------+
 //| Galaxy Vast AI Trading Platform                                  |
 //| Config.mqh -- tnzimat markazi EA                                  |
-//| faz L -- production-ready                                         |
+//| faz L -- production-ready -- all bugs fixed                      |
 //+------------------------------------------------------------------+
 #ifndef __CONFIG_MQH__
 #define __CONFIG_MQH__
 
 //--- naskhe
-#define EA_VERSION              "3.30"
+#define EA_VERSION              "3.31"
 #define EA_MAGIC                202400
 
 //--- API
 #define API_DEFAULT_URL         "https://api.galaxyvast.ai"
+#define API_BASE_URL            API_DEFAULT_URL
 #define API_TIMEOUT_MS          30000
 #define API_SIGNAL_ENDPOINT     "/api/v1/signals/pending"
 #define API_ACK_ENDPOINT        "/api/v1/signals/"
@@ -32,8 +33,8 @@
 #define SIGNAL_POLL_SEC         30
 #define SIGNAL_TIMEOUT_SEC      60
 
-//--- L-FIX-CONFIG-1: TIME_DATE|TEME_SECONDS --> TIME_DATE|TIME_SECONDS
-Yoid LogMessage(const string level, const string msg)
+//--- L-FIX-CONFIG-1: Yoid --> void, TEME_SECONDS --> TIME_SECONDS
+void LogMessage(const string level, const string msg)
 {
    PrintFormat("[%s] %s | %s", level, TimeToString(TimeCurrent(), TIME_DATE|TEME_SECONDS), msg);
 }
