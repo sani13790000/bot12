@@ -1,1 +1,130 @@
-"""\nGalaxy Vast AI Trading Platform\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nماژول: backend/license/routes.py\n\nوظیفه:\n  REST endpoints برای مدیریت لایسنس کاربران:\n    • فعال‌سازی لایسنس\n    • ثبت دستگاه\n    • heartbeat\n    • بررسی وضعیت\n    • لغو لایسنس\n"""\n\nfrom __future__ import annotations\nimport logging\nfrom typing import Optional\nfrom fastapi import APIRouter, Depends, HTTPException, status\nfrom pydantic import BaseModel, Field\nfrom backend.core.deps_v2 import AuthContext, get_auth_context\nfrom backend.license.engine import LicenseEngine, LicenseStatus\n\nlogger = logging.getLogger(__name__)\nrouter = APIRouter(prefix=\"/license\", tags=[\"license\"])\n_engine = LicenseEngine()\n\n\nclass ActivateRequest(BaseModel):\n    license_key: str = Field(..., min_length=10)\n    device_id:   str = Field(..., min_length=8)\n    device_name: str = Field(..., max_length=64)\n\n\nclass HeartbeatRequest(BaseModel):\n    device_id: str = Field(..., min_length=8)\n    nonce:     str = Field(..., min_length=16)\n\n\nclass LicenseStatusResponse(BaseModel):\n    license_id:     str\n    plan:           str\n    state:          str\n    expires_at:     str\n    devices_active: int\n    device_limit:   int\n    is_valid:       bool\n    days_remaining: Optional[int]\n\n\nclass ActivateResponse(BaseModel):\n    license_id: str\n    plan:       str\n    expires_at: str\n    device_id:  str\n    token:      str\n\n\n@router.post(\"/activate\", response_model=ActivateResponse,\n             status_code=status.HTTP_201_CREATED)\nasync def activate_license(\n    body: ActivateRequest,\n    ctx: AuthContext = Depends(get_auth_context),\n) -> ActivateResponse:\n    \"\"\"فعال‌سازی لایسنس و ثبت دستگاه.\"\"\"\n    try:\n        result = await _engine.activate(\n            user_id=ctx.user_id, license_key=body.license_key,\n            device_id=body.device_id, device_name=body.device_name,\n        )\n    except ValueError as exc:\n        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))\n    except PermissionError as exc:\n        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))\n    except RuntimeError as exc:\n        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))\n    logger.info(\"license.activated user=%s device=%s\", ctx.user_id, body.device_id)\n    return ActivateResponse(**result)\n\n\n@router.post(\"/heartbeat\", status_code=status.HTTP_204_NO_CONTENT)\nasync def heartbeat(\n    body: HeartbeatRequest,\n    ctx: AuthContext = Depends(get_auth_context),\n) -> None:\n    \"\"\"ارسال heartbeat دوره‌ای.\"\"\"\n    try:\n        await _engine.heartbeat(user_id=ctx.user_id,\n                                device_id=body.device_id, nonce=body.nonce)\n    except PermissionError as exc:\n        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))\n    except ValueError as exc:\n        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc))\n\n\n@router.get(\"/status\", response_model=LicenseStatusResponse)\nasync def get_license_status(\n    ctx: AuthContext = Depends(get_auth_context),\n) -> LicenseStatusResponse:\n    \"\"\"وضعیت لایسنس کاربر.\"\"\"\n    info = await _engine.get_status(user_id=ctx.user_id)\n    if info is None:\n        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=\"لایسنس یافت نشد\")\n    return LicenseStatusResponse(\n        license_id=info[\"license_id\"], plan=info[\"plan\"], state=info[\"state\"],\n        expires_at=info[\"expires_at\"], devices_active=info[\"devices_active\"],\n        device_limit=info[\"device_limit\"],\n        is_valid=info[\"state\"] == LicenseStatus.ACTIVE.value,\n        days_remaining=info.get(\"days_remaining\"),\n    )\n\n\n@router.post(\"/revoke-device\", status_code=status.HTTP_204_NO_CONTENT)\nasync def revoke_device(\n    body: dict,\n    ctx: AuthContext = Depends(get_auth_context),\n) -> None:\n    \"\"\"لغو ثبت دستگاه.\"\"\"\n    device_id = (body.get(\"device_id\") or \"\").strip()\n    if not device_id:\n        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=\"device_id الزامی است\")\n    try:\n        await _engine.revoke_device(user_id=ctx.user_id, device_id=device_id)\n    except PermissionError as exc:\n        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))\n\n\n@router.get(\"/devices\")\nasync def list_devices(ctx: AuthContext = Depends(get_auth_context)) -> list:\n    \"\"\"لیست دستگاه‌ها.\"\"\"\n    return await _engine.list_devices(user_id=ctx.user_id)\n
+"""
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━
+madul: backend/license/routes.py
+
+中分库:
+  REST endpoints برӹ mؼددٚڭ لايٶ*��ٱs قاتҭ:
+    • ��ال-ذӹ لايٶ*��ٱs
+    • ثب دستد
+    • heartbeat
+    • بررٷ وزظӹ
+    ₂ طگو لايٶ*��ٱs
+"""
+
+from __future__ import annotations
+import logging
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from backend.core.deps_v2 import AuthContext, get_auth_context
+from backend.license.engine import LicenseEngine, LicenseStatus
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/license", tags=["license"])
+_engine = LicenseEngine()
+
+
+class ActivateRequest(BaseModel):
+    license_key: str = Field(..., min_length=10)
+    device_id:   str = Field(..., min_length=8)
+    device_name: str = Field(..., max_length=64)
+
+
+class HeartbeatRequest(BaseModel):
+    device_id: str = Field(..., min_length=8)
+    nonce:     str = Field(..., min_length=16)
+
+
+class LicenseStatusResponse(BaseModel):
+    license_id:     str
+    plan:           str
+    state:          str
+    expires_at:     str
+    devices_active: int
+    device_limit:   int
+    is_valid:       bool
+    days_remaining: Optional[int]
+
+
+class ActivateResponse(BaseModel):
+    license_id: str
+    plan:       str
+    expires_at: str
+    device_id:  str
+    token:      str
+
+
+@router.post("/activate", response_model=ActivateResponse,
+             status_code=status.HTTP_201_CREATED)
+async def activate_license(
+    body: ActivateRequest,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> ActivateResponse:
+    """ءعӽؼ`ٰسӹ لايٖث֕`e 4ߎ تӌثب دستد."""
+    try:
+        result = await _engine.activate(
+            user_id=ctx.user_id, license_key=body.license_key,
+            device_id=body.device_id, device_name=body.device_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP]4z2_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc))
+    logger.info("license.activated user=%s device=%s", ctx.user_id, body.device_id)
+    return ActivateResponse(**result)
+
+
+@router.post("/heartbeat", status_code=status.HTTP_204_NO_CONTENT)
+async def heartbeat(
+    body: HeartbeatRequest,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> None:
+    """إ֒ال heartbeat دو֒م.“"""
+    try:
+        await _engine.heartbeat(user_id=ctx.user_id,
+                                 device_id=body.device_id, nonce=body.nonce)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+
+
+@router.get("/status", response_model=LicenseStatusResponse)
+async def get_license_status(
+    ctx: AuthContext = Depends(get_auth_context),
+) -> LicenseStatusResponse:
+    """و�Ӹӹ لايٖث֕e3تمڭ كاتبس."""
+    info = await _engine.get_status(user_id=ctx.user_id)
+    if info is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="ٽايٖث֕`7تم Y�ٜ")
+    return LicenseStatusResponse(
+        license_id=info["license_id"], plan=info["plan"], state=info["state"],
+        expires_at=info["expires_at"], devices_active=info["devices_active"],
+        device_limit=info["device_limit"],
+        is_valid=info["state"] == LicenseStatus.ACTIVE.value,
+        days_remaining=info.get("days_remaining"),
+    )
+
+
+@router.post("/revoke-device", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_device(
+    body: dict,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> None:
+    """لسگو ֪ثب دستد."""
+    device_id = (body.get("device_id") or "").strip()
+    if not device_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="device_id لذ޴� اسt")
+    try:
+        await _engine.revoke_device(user_id=ctx.user_id, device_id=device_id)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))
+
+
+@router.get("/devices")
+async def list_devices(ctx: AuthContext = Depends(get_auth_context)) -> list:
+    """ٽايٖث֕`7 رتم."""
+    return await _engine.list_devices(user_id=ctx.user_id)
