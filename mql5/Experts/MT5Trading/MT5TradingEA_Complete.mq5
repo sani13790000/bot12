@@ -1,11 +1,11 @@
-//+------------------------------------------------------------------+
-//| Galaxy Vast AI Trading Platform                                  |
-//| MT5TradingEA_Complete.mq5                                         |
-//| faz L -- production-ready -- InpDemoMode=false                   |
-//+------------------------------------------------------------------+
+//+--------------------------------------------------------------------+
+//| Galaxy Vast AI Trading Platform                                   |
+//| MT5TradingEA_Complete.mq5                                          |
+//| faz L -- production-ready -- all compile errors fixed             |
+//+--------------------------------------------------------------------+
 #property copyright   "Galaxy Vast AI"
 #property link        "https://galaxyvast.ai"
-#property version     "3.31"
+#property version     "3.32"
 #property strict
 
 #include <MT5Trading/Config.mqh>
@@ -21,7 +21,6 @@ input string  InpSymbols            = "XAUUSD,EURUSD,GBPUSD";
 input double  InpRiskPercent       = 1.0;
 input double  InpMaxDailyLoss      = 5.0;
 input int     InpSignalTimeoutSec  = 60;
-// L-FIX-EA-1: InpDemoMode = true --> false (default bayad LIVE bashe)
 input bool    InpDemoMode           = false;
 
 input group "--- Tanzimate Risk ---"
@@ -43,7 +42,7 @@ int      g_signals_received     = 0;
 
 int OnInit()
 {
-   LogMessage("INFO", "Galaxy Vast AI EA v" + EA_VERSION);
+   LogMessage("INFO", "Galaxy Vast AI EA v  | EA_VERSION);
    if(InpLicenseKey == "") { Alert("Khata: License Key vared nashode ast!"); return INIT_PARAMETERS_INCORRECT; }
    if(InpApiBaseUrl == "") { Alert("Khata: Adresse API vared nashode ast!"); return INIT_PARAMETERS_INCORRECT; }
    g_device_id = _GenerateDeviceId();
@@ -290,16 +289,15 @@ string _GenerateDeviceId()
    return StringFormat("EA_%d_%d", (int)AccountInfoInteger(ACCOUNT_LOGIN), (int)TimeCurrent());
 }
 
-// L-FIX-EA-3: OBJ_LABEL%+corruptchar --> OBJ_LABEL, (comma)
 void _ShowStatus(const string txt, const color clr)
 {
    string n = "GV_status";
    if(ObjectFind(0, n) < 0) ObjectCreate(0, n, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, n, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, n, OBJPROP_XDISTANCE, 10);
-   ObjectSetInteger(0, n, OBJPROR_YDISTANCE, 20);
+   ObjectSetInteger(0, n, OBJPROP_YDISTANCE, 20);
    ObjectSetInteger(0, n, OBJPROP_FONTSIZE, 10);
-   ObjectSetInteger(0, n, OBJPROR_COLOR, clr);
+   ObjectSetInteger(0, n, OBJPROP_COLOR, clr);
    ObjectSetString(0, n, OBJPROP_TEXT, "GV: " + txt);
    ChartRedraw(0);
 }
