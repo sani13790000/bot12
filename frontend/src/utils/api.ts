@@ -76,7 +76,7 @@ export const signalsApi = {
   list:    (status?: string) => request<Array<{ id: string; symbol: string; direction: string; confidence: number; entry_price: number; stop_loss: number; take_profit: number; lot_size: number; status: string; source: string; reasoning?: string; created_at: string }>>(`/api/v1/signals${status ? `?status=${status}` : ""}`),
   get:     (id: string) => request<{ id: string }>(`/api/v1/signals/${id}`),
   approve: (id: string) => request<{ id: string }>(`/api/v1/signals/${id}/approve`, { method: "POST" }),
-  reject:  (id: string) => request<{ id: string }>(`/api/v1/signals/${id}/reject",  { method: "POST" }),
+  reject:  (id: string) => request<{ id: string }>(`/api/v1/signals/${id}/reject`, { method: "POST" }),
 };
 
 export const analysisApi = {
