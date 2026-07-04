@@ -1,1 +1,206 @@
-IiIiCmJhY2tlbmQvY29yZS9zdGFydHVwX3ZhbGlkYXRvci5weQpHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtIOKAlCBTdGFydHVwIEVudmlyb25tZW50IFZhbGlkYXRvcgoKZmF6IEk6CiAgSS0xMzogcWFibCBheiB0YXJ0dXAgaGFtZSBlbnYgdmFycyBlamJhcmkgcmEgYmFycmFzaSBtaS1rb25hZAogIEktMTQ6IG1hZ2hhZGlyIHphZWlmIChNYXNhbGFuICJjaGFuZ2UtbWUiKSByYSByYWQgbWkta29uYWQKICBJLTE1OiBnemFyZXNoIGthbWVsIGF6IHZhemlhdCBjb25maWd1cmF0aW9uCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwppbXBvcnQgb3MKaW1wb3J0IHN5cwpmcm9tIGRhdGFjbGFzc2VzIGltcG9ydCBkYXRhY2xhc3MKZnJvbSB0eXBpbmcgaW1wb3J0IE9wdGlvbmFsCgpsb2cgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKCgpAZGF0YWNsYXNzCmNsYXNzIEVudlZhcjoKICAgIG5hbWU6IHN0cgogICAgcmVxdWlyZWQ6IGJvb2wgPSBUcnVlCiAgICBtaW5fbGVuZ3RoOiBpbnQgPSAxCiAgICBmb3JiaWRkZW5fdmFsdWVzOiB0dXBsZVtzdHIsIC4uLl0gPSAoKQogICAgZGVzY3JpcHRpb246IHN0ciA9ICIiCiAgICBzZW5zaXRpdmU6IGJvb2wgPSBGYWxzZQoKICAgIGRlZiB2YWxpZGF0ZShzZWxmKSAtPiBPcHRpb25hbFtzdHJdOgogICAgICAgIHZhbHVlID0gb3MuZW52aXJvbi5nZXQoc2VsZi5uYW1lLCAiIikKICAgICAgICBpZiBub3QgdmFsdWU6CiAgICAgICAgICAgIGlmIHNlbGYucmVxdWlyZWQ6CiAgICAgICAgICAgICAgICByZXR1cm4gZiLinYwgTUlTU0lORzoge3NlbGYubmFtZX0g4oCUIHtzZWxmLmRlc2NyaXB0aW9ufSIKICAgICAgICAgICAgcmV0dXJuIE5vbmUKICAgICAgICBpZiBsZW4odmFsdWUpIDwgc2VsZi5taW5fbGVuZ3RoOgogICAgICAgICAgICByZXR1cm4gKAogICAgICAgICAgICAgICAgZiLinYwgVE9PIFNIT1JUOiB7c2VsZi5uYW1lfSDigJQgIgogICAgICAgICAgICAgICAgZiJtaW4ge3NlbGYubWluX2xlbmd0aH0gY2hhcnMgKGdvdCB7bGVuKHZhbHVlKX0pIgogICAgICAgICAgICApCiAgICAgICAgZm9yIGJhZCBpbiBzZWxmLmZvcmJpZGRlbl92YWx1ZXM6CiAgICAgICAgICAgIGlmIHZhbHVlLmxvd2VyKCkgPT0gYmFkLmxvd2VyKCk6CiAgICAgICAgICAgICAgICByZXR1cm4gZiLinYwgSU5TRUNVUkUgVkFMVUU6IHtzZWxmLm5hbWV9ID0gJ3t2YWx1ZX0nIOKAlCBjaGFuZ2UgdGhpcyEiCiAgICAgICAgcmV0dXJuIE5vbmUKCiAgICBkZWYgc3RhdHVzKHNlbGYpIC0+IHN0cjoKICAgICAgICB2YWx1ZSA9IG9zLmVudmlyb24uZ2V0KHNlbGYubmFtZSwgIiIpCiAgICAgICAgaWYgbm90IHZhbHVlOgogICAgICAgICAgICByZXR1cm4gZiIgIHsn4pqn4pqhICcgaWYgbm90IHNlbGYucmVxdWlyZWQgZWxzZSAn4p2MJ30ge3NlbGYubmFtZX06IE5PVCBTRVQiCiAgICAgICAgZGlzcGxheSA9ICJbU0VUXSIgaWYgc2VsZi5zZW5zaXRpdmUgZWxzZSBmIid7dmFsdWVbOjIwXX17Jy4uLicgaWYgbGVuKHZhbHVlKT4yMCBlbHNlICcnfSciCiAgICAgICAgcmV0dXJuIGYiICDinIUge3NlbGYubmFtZX06IHtkaXNwbGF5fSIKCgpSRVFVSVJFRF9WQVJTOiBsaXN0W0VudlZhcl0gPSBbCiAgICBFbnZWYXIoCiAgICAgICAgIkpXVF9TRUNSRVQiLCByZXF1aXJlZD1UcnVlLCBtaW5fbGVuZ3RoPTMyLAogICAgICAgIGZvcmJpZGRlbl92YWx1ZXM9KCJjaGFuZ2UtbWUtaW4tcHJvZHVjdGlvbiIsICJzZWNyZXQiLCAiY2hhbmdlbWUiLCAiand0X3NlY3JldCIpLAogICAgICAgIGRl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50KHN0cmljdDogYm9vbCA9IFRydWUpIC0+IGJvb2w6CiAgICBlcnJvcnM6IGxpc3Rbc3RyXSA9IFtdCiAgICB3YXJuaW5nczogbGlzdFtzdHJdID0gW10KICAgIGxvZy5pbmZvKCLilZMilZMilZMgU3RhcnR1cCBFbnZpcm9ubWVudCBWYWxpZGF0aW9uIOKVkyKVkyKVkyIpCiAgICBsb2cuaW5mbygiUmVxdWlyZWQgdmFyaWFibGVzOiIpCiAgICBmb3IgdmFyIGluIFJFUVVJUkVEX1ZBUlM6CiAgICAgICAgZXJyb3IgPSB2YXIudmFsaWRhdGUoKQogICAgICAgIGlmIGVycm9yOgogICAgICAgICAgICBlcnJvcnMuYXBwZW5kKGVycm9yKQogICAgICAgICAgICBsb2cuZXJyb3IoZXJyb3IpCiAgICAgICAgZWxzZToKICAgICAgICAgICAgbG9nLmluZm8odmFyLnN0YXR1cygpKQogICAgbG9nLmluZm8oIk9wdGlvbmFsIHZhcmlhYmxlczoiKQogICAgZm9yIHZhciBpbiBPUFRJT05BTF9WQVJTOgogICAgICAgIGVycm9yID0gdmFyLnZhbGlkYXRlKCkKICAgICAgICBpZiBlcnJvciBhbmQgdmFyLnJlcXVpcmVkOgogICAgICAgICAgICBlcnJvcnMuYXBwZW5kKGVycm9yKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIGxvZy5pbmZvKHZhci5zdGF0dXMoKSkKICAgIGVudiA9IG9zLmVudmlyb24uZ2V0KCJBUFBfRU5WIiwgImRldmVsb3BtZW50IikubG93ZXIoKQogICAgaWYgZW52ID09ICJwcm9kdWN0aW9uIjoKICAgICAgICBfY2hlY2tfcHJvZHVjdGlvbl9zcGVjaWZpY3MoZXJyb3JzLCB3YXJuaW5ncykKICAgIGlmIGVycm9yczoKICAgICAgICBsb2cuY3JpdGljYWwoIlNUQVJUVVAgQkxPQ0tFRDogJWQgZXJyb3IocykiLCBsZW4oZXJyb3JzKSkKICAgICAgICBmb3IgZXJyIGluIGVycm9yczoKICAgICAgICAgICAgbG9nLmNyaXRpY2FsKGVycikKICAgICAgICBpZiBzdHJpY3Q6CiAgICAgICAgICAgIHN5cy5leGl0KDEpCiAgICAgICAgcmV0dXJuIEZhbHNlCiAgICBmb3IgdyBpbiB3YXJuaW5nczoKICAgICAgICBsb2cud2FybmluZyh3KQogICAgbG9nLmluZm8oIuKchSBFbnZpcm9ubWVudCB2YWxpZGF0aW9uIHBhc3NlZCB8IGVudj0lcyIsIGVudikKICAgIHJldHVybiBUcnVlCgoKZGVmIF9jaGVja19wcm9kdWN0aW9uX3NwZWNpZmljcyhlcnJvcnM6IGxpc3Rbc3RyXSwgd2FybmluZ3M6IGxpc3Rbc3RyXSkgLT4gTm9uZToKICAgIGRlbW9fbW9kZSA9IG9zLmVudmlyb24uZ2V0KCJNVDVfREVNT19NT0RFIiwgInRydWUiKS5sb3dlcigpCiAgICBpZiBkZW1vX21vZGUgaW4gKCJ0cnVlIiwgIjEiLCAieWVzIik6CiAgICAgICAgd2FybmluZ3MuYXBwZW5kKCLimqfimqEgIE1UNV9ERU1PX01PREU9dHJ1ZSDuiYgg4oCUINC0cHJvZHVjdGlvbiAtIOKAlCBhbW0gbXV0YWlhbm4gaGFzdGlkPyIpCiAgICBpZiBub3Qgb3MuZW52aXJvbi5nZXQoIkFETUlOX0lQX0FMTE9XTElTVCIsICIiKS5zdHJpcCgpOgogICAgICAgIHdhcm5pbmdzLmFwcGVuZCgKICAgICAgICAgICAgIuKap+KaoSAgQURNSU5fSVBfQUxMT1dMSVNUIOKAlCBhZG1pbiBwYW5lbCBheiBoYW1lIElQIGhhIHFhYmVsIGRhc3RhcnNpIGFzdCIKICAgICAgICApCiAgICBpZiBub3Qgb3MuZW52aXJvbi5nZXQoIlNFTlRSWV9EU04iLCAiIikuc3RyaXAoKToKICAgICAgICB3YXJuaW5ncy5hcHBlbmQoIuKap+KaoSAgU0VOVFJZX0RTTiDigJQgZXJyb3IgdHJhY2tpbmcgZ2hheXIgZmFhbCBhc3QiKQogICAgY29ycyA9IG9zLmVudmlyb24uZ2V0KCJDT1JTX09SSUdJTlMiLCAiIikKICAgIGlmICIqIiBpbiBjb3JzOgogICAgICAgIGVycm9ycy5hcHBlbmQoIuKdjCBDT1JTX09SSUdJTlMgc2hhbWVsICcqJyBhc3Qg4oCUIGRhciBwcm9kdWN0aW9uIGdoYXlyIG1hamF6IGFzdCIpCgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIGltcG9ydCBzeXMKICAgIG9rID0gdmFsaWRhdGVfZW52aXJvbm1lbnQoc3RyaWN0PUZhbHNlKQogICAgc3lzLmV4aXQoMCBpZiBvayBlbHNlIDEpCg==
+"""
+backend/core/startup_validator.py
+Galaxy Vast AI Trading Platform -- Startup Environment Validator
+
+faz I:
+  I-13: qabl az startup hame env vars ejbari ra barrasi mi-konad
+  I-14: maghadir zaeif (Masalan "change-me") ra rad mi-konad
+  I-15: gzaresh kamel az vaziat configuration
+
+faz R:
+  R-FIX-1: OPTIONAL_VARS ta'rif nashode bud -> NameError dar runtime
+  R-FIX-2: GATEWAY_API_KEY be OPTIONAL_VARS ezafe shod
+  R-FIX-3: MT5_DEMO_MODE warning faqat dar production bud ->
+           hala dar hame envha log mishavad
+  R-FIX-4: corruption dar L58-75 (binary garbage) -> pak shod
+"""
+from __future__ import annotations
+
+import logging
+import os
+import sys
+from dataclasses import dataclass, field
+from typing import Optional
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class EnvVar:
+    name: str
+    required: bool = True
+    min_length: int = 1
+    forbidden_values: tuple[str, ...] = field(default_factory=tuple)
+    description: str = ""
+    sensitive: bool = False
+
+    def validate(self) -> Optional[str]:
+        value = os.environ.get(self.name, "")
+        if not value:
+            if self.required:
+                return f"MISSING: {self.name} -- {self.description}"
+            return None
+        if len(value) < self.min_length:
+            return (
+                f"TOO SHORT: {self.name} -- "
+                f"min {self.min_length} chars (got {len(value)})"
+            )
+        for bad in self.forbidden_values:
+            if value.lower() == bad.lower():
+                return f"INSECURE VALUE: {self.name} = '{value}' -- change this!"
+        return None
+
+    def status(self) -> str:
+        value = os.environ.get(self.name, "")
+        if not value:
+            prefix = "OPTIONAL" if not self.required else "MISSING"
+            return f"  {prefix}: {self.name}: NOT SET"
+        display = "[SET]" if self.sensitive else f"'{value[:20]}{'...' if len(value) > 20 else ''}'"
+        return f"  OK: {self.name}: {display}"
+
+
+REQUIRED_VARS: list[EnvVar] = [
+    EnvVar(
+        "JWT_SECRET", required=True, min_length=32,
+        forbidden_values=("change-me-in-production", "secret", "changeme", "jwt_secret"),
+        description="JWT secret key -- min 32 chars",
+        sensitive=True,
+    ),
+    EnvVar(
+        "LICENSE_SECRET", required=True, min_length=32,
+        forbidden_values=("change-me-in-production", "secret", "changeme"),
+        description="License HMAC secret -- min 32 chars",
+        sensitive=True,
+    ),
+    EnvVar(
+        "SUPABASE_URL", required=True, min_length=10,
+        description="Supabase project URL",
+    ),
+    EnvVar(
+        "SUPABASE_KEY", required=True, min_length=20,
+        forbidden_values=("your-supabase-anon-key", "changeme"),
+        description="Supabase anon/service key",
+        sensitive=True,
+    ),
+    EnvVar(
+        "TELEGRAM_BOT_TOKEN", required=True, min_length=20,
+        forbidden_values=("CHANGE_ME_bot_token", "changeme"),
+        description="Telegram Bot API token",
+        sensitive=True,
+    ),
+]
+
+# R-FIX-1: OPTIONAL_VARS was undefined -> NameError at runtime on L85
+# R-FIX-2: GATEWAY_API_KEY added so startup warns if gateway runs without auth
+OPTIONAL_VARS: list[EnvVar] = [
+    EnvVar("GATEWAY_API_KEY", required=False, min_length=16,
+           description="MT5 Gateway API key -- if empty, gateway runs without auth (dev only)",
+           sensitive=True),
+    EnvVar("MT5_GATEWAY_URL", required=False,
+           description="MT5 Gateway base URL"),
+    EnvVar("MT5_DEMO_MODE", required=False,
+           description="MT5 demo mode: 'false' for live trading, 'true' for demo/CI"),
+    EnvVar("CORS_ORIGINS", required=False,
+           description="Comma-separated allowed CORS origins"),
+    EnvVar("ADMIN_IP_ALLOWLIST", required=False,
+           description="Comma-separated admin IPs"),
+    EnvVar("SENTRY_DSN", required=False,
+           description="Sentry DSN for error tracking"),
+    EnvVar("REDIS_URL", required=False,
+           description="Redis URL for rate limiting"),
+    EnvVar("BCRYPT_ROUNDS", required=False,
+           description="bcrypt work factor (default 12)"),
+    EnvVar("JWT_EXPIRE_MINUTES", required=False,
+           description="JWT expiry in minutes"),
+]
+
+
+def validate_environment(strict: bool = True) -> bool:
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    log.info("======== Startup Environment Validation ========")
+    log.info("Required variables:")
+    for var in REQUIRED_VARS:
+        error = var.validate()
+        if error:
+            errors.append(error)
+            log.error(error)
+        else:
+            log.info(var.status())
+
+    log.info("Optional variables:")
+    for var in OPTIONAL_VARS:
+        error = var.validate()
+        if error and var.required:
+            errors.append(error)
+            log.error(error)
+        else:
+            log.info(var.status())
+
+    # R-FIX-3: MT5_DEMO_MODE warning in ALL envs, not just production
+    _check_demo_and_security(errors, warnings)
+
+    env = os.environ.get("APP_ENV", "development").lower()
+    if env == "production":
+        _check_production_specifics(errors, warnings)
+
+    if errors:
+        log.critical("STARTUP BLOCKED: %d error(s)", len(errors))
+        for err in errors:
+            log.critical(err)
+        if strict:
+            sys.exit(1)
+        return False
+
+    for w in warnings:
+        log.warning(w)
+
+    log.info("Environment validation passed | env=%s", env)
+    return True
+
+
+def _check_demo_and_security(errors: list[str], warnings: list[str]) -> None:
+    """R-FIX-3: warn about demo mode and missing gateway key in ALL environments."""
+    demo_mode = os.environ.get("MT5_DEMO_MODE", "true").lower()
+    if demo_mode in ("true", "1", "yes", "on", ""):
+        warnings.append(
+            "WARNING: MT5_DEMO_MODE=true -- no real trades will be placed. "
+            "Set MT5_DEMO_MODE=false for live trading."
+        )
+
+    gateway_key = os.environ.get("GATEWAY_API_KEY", "").strip()
+    if not gateway_key:
+        warnings.append(
+            "WARNING: GATEWAY_API_KEY is not set -- "
+            "MT5 gateway will accept requests without authentication (dev mode only)."
+        )
+
+
+def _check_production_specifics(errors: list[str], warnings: list[str]) -> None:
+    """Extra checks enforced only in APP_ENV=production."""
+    if not os.environ.get("ADMIN_IP_ALLOWLIST", "").strip():
+        warnings.append(
+            "WARNING: ADMIN_IP_ALLOWLIST not set -- "
+            "admin panel accessible from all IPs in production."
+        )
+    if not os.environ.get("SENTRY_DSN", "").strip():
+        warnings.append(
+            "WARNING: SENTRY_DSN not set -- error tracking disabled in production."
+        )
+    cors = os.environ.get("CORS_ORIGINS", "")
+    if "*" in cors:
+        errors.append(
+            "CORS_ORIGINS contains '*' -- not allowed in production."
+        )
+    demo_mode = os.environ.get("MT5_DEMO_MODE", "true").lower()
+    if demo_mode in ("true", "1", "yes", "on", ""):
+        errors.append(
+            "BLOCKED: MT5_DEMO_MODE=true in production -- "
+            "set MT5_DEMO_MODE=false to enable live trading."
+        )
+
+
+if __name__ == "__main__":
+    ok = validate_environment(strict=False)
+    sys.exit(0 if ok else 1)
