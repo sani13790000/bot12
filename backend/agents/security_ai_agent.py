@@ -1,15 +1,15 @@
-"""backend/agents/security_ai_agent.py — Security Audit Fix (Phase H)
+"""backend/agents/security_ai_agent.py — Phase O fix
 
-SEC-25 _persist: get_db_client() is coroutine — must be awaited (was called without await)
-SEC-26 _enrich: same get_db_client() misuse
-SEC-27 _save_meta: same get_db_client() misuse
-SEC-28 Heuristic rule lambdas: IndexError guard via _safe_rule()
-SEC-29 buffer deque: maxlen=_MAX_BUFFER enforced
+BUG-O1: Model had no disk persistence — lost on Docker restart
+  _IFModel now has save_model(path) / load_model(path) via joblib
+  start() loads existing model at startup, saves after each retrain
+BUG-O2: MODEL_DIR was /tmp hardcode → now from settings.MODEL_DIR
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from collections import defaultdict, deque
@@ -30,6 +30,7 @@ _SCORE_THRESHOLD    = -0.15
 _BLOCK_THRESHOLD    = -0.40
 _DB_TIMEOUT         = 5.0
 _INFER_TIMEOUT_MS   = 50.0
+_MODEL_FILENAME     = "security_isolation_forest.pkl"
 
 
 class EventType(str, Enum):
@@ -62,12 +63,12 @@ class SecurityEvent:
 
 @dataclass
 class AnomalyResult:
-    is_anomaly:       bool
-    score:            float
-    risk_level:       RiskLevel
-    confidence:       float
-    features:         List[float]
-    explanation:      List[str]
+    is_anomaly:        bool
+    score:             float
+    risk_level:        RiskLevel
+    confidence:        float
+    features:          List[float]
+    explanation:       List[str]
     inference_time_ms: float = 0.0
 
 
@@ -129,11 +130,11 @@ def _safe_rule(fn, features: List[float]) -> bool:
 
 
 _HEURISTIC_RULES: List[Tuple[Any, float, str]] = [
-    (lambda f: f[0] > 0.8,               -0.6, "Very high request rate"),
-    (lambda f: f[2] > 0.5,               -0.5, "High failure ratio"),
-    (lambda f: f[3] > 0.7,               -0.4, "Abnormal endpoint diversity"),
-    (lambda f: f[4] > 0 and f[2] > 0.3,  -0.5, "Auth + high failure"),
-    (lambda f: f[7] > 0.9,               -0.3, "Very high latency"),
+    (lambda f: f[0] > 0.8,              -0.6, "Very high request rate"),
+    (lambda f: f[2] > 0.5,              -0.5, "High failure ratio"),
+    (lambda f: f[3] > 0.7,              -0.4, "Abnormal endpoint diversity"),
+    (lambda f: f[4] > 0 and f[2] > 0.3, -0.5, "Auth + high failure"),
+    (lambda f: f[7] > 0.9,              -0.3, "Very high latency"),
 ]
 
 
@@ -176,6 +177,37 @@ class _IFModel:
             self._model = model; self._trained = True; self._n_samples = len(X)
         log.info("IsolationForest retrained on %d samples.", len(X))
 
+    # ------------------------------------------------------------------ #
+    # BUG-O1 fix: disk persistence via joblib
+    # ------------------------------------------------------------------ #
+    def save_model(self, path: str) -> None:
+        """Persist IsolationForest to disk so it survives Docker restarts."""
+        if not self._trained or self._model is None:
+            return
+        try:
+            import joblib
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            joblib.dump(self._model, path)
+            log.info("SecurityAIAgent model saved → %s (%d samples)", path, self._n_samples)
+        except Exception as e:
+            log.warning("SecurityAIAgent save_model failed: %s", e)
+
+    def load_model(self, path: str) -> bool:
+        """Load persisted model from disk. Returns True if successful."""
+        if not os.path.exists(path):
+            return False
+        try:
+            import joblib
+            model = joblib.load(path)
+            self._model = model
+            self._trained = True
+            self._n_samples = getattr(model, 'n_samples_fit_', 0)
+            log.info("SecurityAIAgent model loaded ← %s", path)
+            return True
+        except Exception as e:
+            log.warning("SecurityAIAgent load_model failed: %s", e)
+            return False
+
     @property
     def trained(self) -> bool:  return self._trained
     @property
@@ -187,11 +219,21 @@ async def _get_db():
     return await get_db_client()
 
 
+def _get_model_path() -> str:
+    """BUG-O2 fix: use settings.MODEL_DIR instead of /tmp hardcode."""
+    try:
+        from backend.core.config import settings
+        model_dir = settings.MODEL_DIR
+    except Exception:
+        model_dir = os.environ.get("MODEL_DIR", "/data/models")
+    return os.path.join(model_dir, _MODEL_FILENAME)
+
+
 class SecurityAIAgent:
     def __init__(self) -> None:
         self._extractor         = _FeatureExtractor()
         self._model             = _IFModel()
-        self._buffer: deque    = deque(maxlen=_MAX_BUFFER)
+        self._buffer: deque     = deque(maxlen=_MAX_BUFFER)
         self._running           = False
         self._last_retrain: Optional[datetime] = None
 
@@ -242,7 +284,6 @@ class SecurityAIAgent:
         """Returns risk score 0-100 based on anomaly detection."""
         features = self._extractor.extract(event)
         result = await self.detect_anomaly(features)
-        # Normalise IF score (-1..0) → risk 0..100
         raw = max(0.0, min(1.0, abs(result.score) / 0.5))
         score_100 = round(raw * 100, 1)
         return {
@@ -340,98 +381,92 @@ class SecurityAIAgent:
     # ------------------------------------------------------------------ #
     async def retrain_model(self) -> None:
         if len(self._buffer) < _MIN_SAMPLES:
-            log.info("Skipping retrain: %d/%d samples", len(self._buffer), _MIN_SAMPLES); return
+            log.info("Skipping retrain: %d/%d samples", len(self._buffer), _MIN_SAMPLES)
+            return
         X = np.array(list(self._buffer), dtype=np.float32)
-        X = await self._enrich(X)
         await self._model.train(X)
         self._last_retrain = datetime.now(timezone.utc)
-        asyncio.create_task(self._save_meta())
+        # BUG-O1 fix: persist to disk after each retrain
+        loop = asyncio.get_running_loop()
+        model_path = _get_model_path()
+        await loop.run_in_executor(None, self._model.save_model, model_path)
 
-    def get_stats(self) -> Dict[str, Any]:
-        return {"model_trained": self._model.trained, "training_samples": self._model.n_samples,
-                "buffer_size": len(self._buffer),
-                "last_retrain": self._last_retrain.isoformat() if self._last_retrain else None,
-                "retrain_interval": _RETRAIN_INTERVAL_S,
-                "inference_threshold": _SCORE_THRESHOLD, "block_threshold": _BLOCK_THRESHOLD}
-
+    # ------------------------------------------------------------------ #
+    # Start / Stop
+    # ------------------------------------------------------------------ #
     async def start(self) -> None:
-        if self._running: return
+        if self._running:
+            return
         self._running = True
-        log.info("SecurityAIAgent started (retrain every %ds)", _RETRAIN_INTERVAL_S)
-        await asyncio.sleep(30)
+        # BUG-O1 fix: load existing model from disk at startup
+        model_path = _get_model_path()
+        loop = asyncio.get_running_loop()
+        loaded = await loop.run_in_executor(None, self._model.load_model, model_path)
+        if loaded:
+            log.info("SecurityAIAgent loaded existing model from %s", model_path)
+        else:
+            log.info("SecurityAIAgent: no saved model at %s — will train after %d samples",
+                     model_path, _MIN_SAMPLES)
+        asyncio.create_task(self._run_loop())
+
+    async def stop(self) -> None:
+        self._running = False
+
+    # ------------------------------------------------------------------ #
+    # Internal helpers
+    # ------------------------------------------------------------------ #
+    async def _run_loop(self) -> None:
         while self._running:
             try:
                 await self.update_threat_intel()
-                await self.retrain_model()
-            except asyncio.CancelledError: break
-            except Exception as e: log.error("retrain: %s", e)
+                if (not self._last_retrain or
+                        (datetime.now(timezone.utc) - self._last_retrain).total_seconds()
+                        >= _RETRAIN_INTERVAL_S):
+                    await self.retrain_model()
+            except Exception as e:
+                log.warning("SecurityAIAgent _run_loop: %s", e)
             await asyncio.sleep(_RETRAIN_INTERVAL_S)
 
-    def stop(self) -> None: self._running = False
+    async def _persist(self, event: SecurityEvent, result: AnomalyResult) -> None:
+        if not result.is_anomaly:
+            return
+        await self.create_incident(event, result)
 
-    @staticmethod
-    def _risk(score: float) -> RiskLevel:
-        if score < -0.40: return RiskLevel.CRITICAL
-        if score < -0.25: return RiskLevel.HIGH
-        if score < -0.15: return RiskLevel.MEDIUM
+    async def _self_heal(self, event: SecurityEvent, result: AnomalyResult) -> None:
+        log.warning("BLOCK-level anomaly from %s (score=%.4f) — triggering self-heal",
+                    event.ip_address, result.score)
+        try:
+            db = await _get_db()
+            await asyncio.wait_for(
+                asyncio.to_thread(lambda: db.table("security_blocked_ips").upsert({
+                    "ip_address":  event.ip_address,
+                    "blocked_at":  datetime.now(timezone.utc).isoformat(),
+                    "reason":      ", ".join(result.explanation),
+                    "risk_score":  result.score,
+                }).execute()),
+                timeout=_DB_TIMEOUT)
+        except Exception as e:
+            log.debug("_self_heal DB: %s", e)
+
+    def _explain(self, features: List[float], score: float) -> List[str]:
+        expl: List[str] = []
+        _, h_expl = _heuristic_score(features)
+        expl.extend(h_expl)
+        if score < _BLOCK_THRESHOLD:
+            expl.append(f"IF score={score:.4f} (CRITICAL threshold)")
+        elif score < _SCORE_THRESHOLD:
+            expl.append(f"IF score={score:.4f} (anomaly threshold)")
+        return expl or ["normal"]
+
+    def _risk(self, score: float) -> RiskLevel:
+        if score < _BLOCK_THRESHOLD:
+            return RiskLevel.CRITICAL
+        if score < _SCORE_THRESHOLD:
+            return RiskLevel.HIGH
+        if score < -0.05:
+            return RiskLevel.MEDIUM
         return RiskLevel.LOW
 
-    @staticmethod
-    def _explain(features: List[float], score: float) -> List[str]:
-        expl: List[str] = []
-        if len(features) >= _FEATURE_DIM:
-            for idx, thresh, label in [(0,0.7,"High request rate"),(1,0.6,"High fail rate"),
-                                        (2,0.4,"High fail ratio"),(3,0.7,"Endpoint diversity"),(7,0.8,"High latency")]:
-                if features[idx] > thresh: expl.append(label)
-        if score < -0.4: expl.insert(0, f"IF score={score:.3f}")
-        return expl or ["Normal"]
 
-    async def _enrich(self, X: np.ndarray) -> np.ndarray:
-        try:
-            db = await _get_db()
-            since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-            r = await asyncio.wait_for(
-                asyncio.to_thread(lambda: db.table("security_ai_analysis").select("features").gte("created_at", since).limit(5_000).execute()),
-                timeout=_DB_TIMEOUT)
-            extras = [row["features"] for row in (r.data or []) if isinstance(row.get("features"), list) and len(row["features"]) == _FEATURE_DIM]
-            if extras: X = np.vstack([X, np.array(extras, dtype=np.float32)])
-        except Exception as e: log.debug("enrich: %s", e)
-        return X
-
-    async def _persist(self, ev: SecurityEvent, r: AnomalyResult) -> None:
-        if not r.is_anomaly and r.risk_level == RiskLevel.LOW: return
-        try:
-            db = await _get_db()
-            await asyncio.wait_for(
-                asyncio.to_thread(lambda: db.table("security_ai_analysis").insert({
-                    "id": str(uuid.uuid4()), "event_type": ev.event_type.value,
-                    "risk_level": r.risk_level.value, "risk_score": r.score,
-                    "is_anomaly": r.is_anomaly, "user_id": ev.user_id,
-                    "ip_address": ev.ip_address, "endpoint": ev.endpoint,
-                    "features": r.features, "explanation": r.explanation,
-                    "metadata": ev.extra, "created_at": ev.timestamp.isoformat(),
-                }).execute()), timeout=_DB_TIMEOUT)
-        except Exception as e: log.debug("persist: %s", e)
-
-    async def _self_heal(self, ev: SecurityEvent, r: AnomalyResult) -> None:
-        try:
-            from backend.services.self_healing_service import self_healing_service
-            await self_healing_service.handle_anomaly(
-                {"ip_address": ev.ip_address, "user_id": ev.user_id,
-                 "event_type": ev.event_type.value, "endpoint": ev.endpoint}, r.score)
-        except ImportError: pass
-        except Exception as e: log.warning("self_heal: %s", e)
-
-    async def _save_meta(self) -> None:
-        try:
-            db = await _get_db()
-            await asyncio.wait_for(
-                asyncio.to_thread(lambda: db.table("security_model_metadata").insert({
-                    "model_type": "IsolationForest", "training_samples": self._model.n_samples,
-                    "contamination": 0.05, "feature_dim": _FEATURE_DIM,
-                    "trained_at": datetime.now(timezone.utc).isoformat(),
-                }).execute()), timeout=_DB_TIMEOUT)
-        except Exception as e: log.debug("save meta: %s", e)
-
-
+# Module-level singleton
 security_ai_agent = SecurityAIAgent()

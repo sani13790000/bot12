@@ -1,15 +1,9 @@
-"""backend/core/config.py v8 - Phase C Extended
+"""backend/core/config.py v9 - Phase O Extended
 
-Phase C additions over v7:
-  - SESSION_COOKIE_SECURE, SESSION_COOKIE_SAMESITE, SESSION_COOKIE_HTTPONLY
-  - CSP_ENABLED, CSP_REPORT_ONLY, CSP_REPORT_URI
-  - LICENSE_REPLAY_WINDOW_SECONDS for LicenseEngine
-  - BACKTEST_MAX_WORKERS, BACKTEST_JOB_TIMEOUT
-  - ENABLE_METRICS, API_BASE_URL
-  - ADMIN_IP_ALLOWLIST field_validator (parse comma-separated string)
-  - TELEGRAM_WEBHOOK_SECRET
-  - production warnings for missing LICENSE_SECRET, FIELD_ENCRYPTION_KEY,
-    SECRETS_MASTER_KEY, and wildcard ALLOWED_ORIGINS
+Phase O additions over v8:
+  - MODEL_DIR: path for SecurityAIAgent IsolationForest persistence (BUG-O2)
+  - METRICS_MIN_TRADES_FOR_SHARPE: configurable minimum trades for Sharpe ratio
+  - SECURITY_MODEL_RETRAIN_INTERVAL_S: configurable retrain interval
 """
 from __future__ import annotations
 
@@ -63,10 +57,10 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Core
-    APP_NAME: str = "Galaxy Vast AI"
+    APP_NAME:    str = "Galaxy Vast AI"
     APP_VERSION: str = "3.0.0"
-    DEBUG: bool = False
-    API_PREFIX: str = "/api/v1"
+    DEBUG:       bool = False
+    API_PREFIX:  str = "/api/v1"
     ENVIRONMENT: str = Field(default_factory=_detect_environment)
 
     @property
@@ -74,39 +68,39 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT
 
     # Security / JWT
-    JWT_SECRET_KEY: str = "changeme"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, ge=1, le=90)
-    BCRYPT_ROUNDS: int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
+    JWT_SECRET_KEY:               str = "changeme"
+    JWT_ALGORITHM:                str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES:  int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
+    REFRESH_TOKEN_EXPIRE_DAYS:    int = Field(default=30, ge=1, le=90)
+    BCRYPT_ROUNDS:                int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
 
     # Cookie Security (Phase C)
-    SESSION_COOKIE_SECURE: bool = True
-    SESSION_COOKIE_SAMESITE: str = "strict"
+    SESSION_COOKIE_SECURE:   bool = True
+    SESSION_COOKIE_SAMESITE: str  = "strict"
     SESSION_COOKIE_HTTPONLY: bool = True
 
     # Content Security Policy (Phase C)
-    CSP_ENABLED: bool = True
+    CSP_ENABLED:     bool = True
     CSP_REPORT_ONLY: bool = False
-    CSP_REPORT_URI: str = "/api/v1/csp-report"
+    CSP_REPORT_URI:  str  = "/api/v1/csp-report"
 
     # CORS & Hosts
     ALLOWED_ORIGINS: List[str] = ["*"]
-    TRUSTED_HOSTS: List[str] = []
+    TRUSTED_HOSTS:   List[str] = []
 
     # Rate limiting
     RATE_LIMIT_API_PER_MINUTE: int = Field(default=60, ge=1, le=10000)
 
     # Database
-    DATABASE_URL: str = ""
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
-    SUPABASE_SERVICE_KEY: str = ""
-    SUPABASE_JWT_SECRET: str = ""
+    DATABASE_URL:           str = ""
+    SUPABASE_URL:           str = ""
+    SUPABASE_KEY:           str = ""
+    SUPABASE_SERVICE_KEY:   str = ""
+    SUPABASE_JWT_SECRET:    str = ""
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_PASSWORD: str = ""
+    REDIS_URL:             str = "redis://localhost:6379/0"
+    REDIS_PASSWORD:        str = ""
     REDIS_MAX_CONNECTIONS: int = Field(default=10, ge=1, le=100)
 
     @property
@@ -121,48 +115,48 @@ class Settings(BaseSettings):
         return url
 
     # MT5
-    MT5_LOGIN: Optional[int] = None
-    MT5_PASSWORD: Optional[str] = None
-    MT5_SERVER: Optional[str] = None
-    MT5_GATEWAY_URL: str = "http://localhost:8080"
-    MT5_DEMO_MODE: bool = True
-    GATEWAY_API_KEY: str = ""
+    MT5_LOGIN:       Optional[int] = None
+    MT5_PASSWORD:    Optional[str] = None
+    MT5_SERVER:      Optional[str] = None
+    MT5_GATEWAY_URL: str           = "http://localhost:8080"
+    MT5_DEMO_MODE:   bool          = True
+    GATEWAY_API_KEY: str           = ""
 
     # Telegram
-    TELEGRAM_BOT_TOKEN: Optional[str] = None
-    TELEGRAM_CHAT_ID: Optional[str] = None
-    TELEGRAM_ADMIN_IDS: List[int] = []
-    TELEGRAM_WEBHOOK_SECRET: str = ""
+    TELEGRAM_BOT_TOKEN:      Optional[str] = None
+    TELEGRAM_CHAT_ID:        Optional[str] = None
+    TELEGRAM_ADMIN_IDS:      List[int]     = []
+    TELEGRAM_WEBHOOK_SECRET: str           = ""
 
     # Admin
     ADMIN_IP_ALLOWLIST: List[str] = []
 
     # Encryption & Secrets
-    SECRETS_MASTER_KEY: str = ""
-    FIELD_ENCRYPTION_KEY: str = ""
+    SECRETS_MASTER_KEY:    str = ""
+    FIELD_ENCRYPTION_KEY:  str = ""
 
     # License
-    LICENSE_SECRET: str = ""
-    LICENSE_SALT: str = ""
-    MQL5_API_TOKEN: str = ""
-    LICENSE_REPLAY_WINDOW_SECONDS: int = Field(default=3600, ge=60, le=86400)
+    LICENSE_SECRET:                 str = ""
+    LICENSE_SALT:                   str = ""
+    MQL5_API_TOKEN:                 str = ""
+    LICENSE_REPLAY_WINDOW_SECONDS:  int = Field(default=3600, ge=60, le=86400)
 
     # Payments
-    STRIPE_WEBHOOK_SECRET: str = ""
-    ZARINPAL_WEBHOOK_SECRET: str = ""
+    STRIPE_WEBHOOK_SECRET:    str = ""
+    ZARINPAL_WEBHOOK_SECRET:  str = ""
 
     # Logging
-    LOG_LEVEL: str = "INFO"
-    LOG_REDACTION_ENABLED: bool = True
+    LOG_LEVEL:              str  = "INFO"
+    LOG_REDACTION_ENABLED:  bool = True
 
     # Risk & Trading
-    MAX_DAILY_LOSS_PCT: float = Field(default=5.0, ge=0.1, le=50.0)
-    MAX_POSITION_SIZE_PCT: float = Field(default=2.0, ge=0.01, le=10.0)
-    MAX_OPEN_TRADES: int = Field(default=5, ge=1, le=50)
-    DEFAULT_RISK_PER_TRADE_PCT: float = Field(default=1.0, ge=0.01, le=5.0)
-    RECONCILE_INTERVAL_SECONDS: int = Field(default=30, ge=5, le=300)
-    SEMI_AUTO_PENDING_TTL_S: int = Field(default=300, ge=30, le=3600)
-    BROKER_INIT_TIMEOUT_S: float = Field(default=30.0, ge=5.0, le=120.0)
+    MAX_DAILY_LOSS_PCT:          float = Field(default=5.0, ge=0.1, le=50.0)
+    MAX_POSITION_SIZE_PCT:       float = Field(default=2.0, ge=0.01, le=10.0)
+    MAX_OPEN_TRADES:             int   = Field(default=5, ge=1, le=50)
+    DEFAULT_RISK_PER_TRADE_PCT:  float = Field(default=1.0, ge=0.01, le=5.0)
+    RECONCILE_INTERVAL_SECONDS:  int   = Field(default=30, ge=5, le=300)
+    SEMI_AUTO_PENDING_TTL_S:     int   = Field(default=300, ge=30, le=3600)
+    BROKER_INIT_TIMEOUT_S:       float = Field(default=30.0, ge=5.0, le=120.0)
 
     # Backtest (Phase C)
     BACKTEST_MAX_WORKERS: int = Field(default=4, ge=1, le=16)
@@ -170,12 +164,32 @@ class Settings(BaseSettings):
 
     # Observability (Phase C)
     ENABLE_METRICS: bool = True
-    API_BASE_URL: str = ""
+    API_BASE_URL:   str  = ""
+
+    # ML / Model Storage (Phase O — BUG-O2 fix)
+    MODEL_DIR: str = Field(
+        default="/data/models",
+        description="Directory for persisted ML models (SecurityAIAgent, XGBoost, etc.)"
+    )
+
+    # Metrics Thresholds (Phase O)
+    METRICS_MIN_TRADES_FOR_SHARPE: int = Field(
+        default=30,
+        ge=1,
+        le=1000,
+        description="Minimum closed trades required to calculate Sharpe ratio"
+    )
+    SECURITY_MODEL_RETRAIN_INTERVAL_S: int = Field(
+        default=3600,
+        ge=300,
+        le=86400,
+        description="Interval in seconds between SecurityAIAgent model retrains"
+    )
 
     # Feature flags
-    KILL_SWITCH_ENABLED: bool = True
+    KILL_SWITCH_ENABLED:   bool = True
     SELF_LEARNING_ENABLED: bool = True
-    TEST_MODE: bool = False
+    TEST_MODE:             bool = False
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
@@ -239,6 +253,8 @@ def validate_settings(s: Settings) -> None:
             log.error("[config] SECRETS_MASTER_KEY not set")
         if s.ALLOWED_ORIGINS == ["*"]:
             log.warning("[config] ALLOWED_ORIGINS is wildcard in production - restrict to your domains")
+        if not os.path.isdir(s.MODEL_DIR):
+            log.warning("[config] MODEL_DIR '%s' does not exist — models will not persist", s.MODEL_DIR)
 
 
 def patch_config_at_startup() -> None:
