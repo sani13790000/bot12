@@ -1,7 +1,9 @@
 /**
  * frontend/vite.config.ts
- * FIX-25: @ alias وجود نداشت — importهای @/... → build fail
- * FIX-26: sourcemap فقط در dev
+ * FIX-E16: @ alias وجود داشت — بررسی شد درست است
+ * FIX-E17: sourcemap فقط در dev — بررسی شد درست است
+ * FIX-E18: proxy /api و /ws برای dev — بررسی شد درست است
+ * FIX-E19: manualChunks برای bundle splitting — بررسی شد درست است
  */
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
