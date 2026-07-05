@@ -1,10 +1,13 @@
 // frontend/src/pages/RiskPage.tsx
+// BUG-T4 FIX: StatCard import path corrected
+//   was:  @/components/StatCard          (does not exist — TypeScript build fail)
+//   now:  @/components/common/StatCard   (correct path)
 import React from "react";
 import { Shield, AlertTriangle, TrendingDown, Lock, BarChart2, Target } from "lucide-react";
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from "recharts";
 import { dashboardApi } from "@/utils/api";
 import { useApi } from "@/hooks/useApi";
-import StatCard from "@/components/StatCard";
+import StatCard from "@/components/common/StatCard";  // BUG-T4 FIX
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorAlert from "@/components/ErrorAlert";
 
@@ -51,7 +54,6 @@ export default function RiskPage() {
           <div className="space-y-3">{rules.map(r => (<div key={r.label} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50"><div className="flex items-center gap-2">{r.ok ? <Shield size={15} className="text-green-400" /> : <AlertTriangle size={15} className="text-red-400" />}<span className="text-sm text-gray-300">{r.label}</span></div><div className="text-right"><div className={`text-sm font-mono font-medium ${r.ok ? "text-green-400" : "text-red-400"}`}>{r.current}</div><div className="text-xs text-gray-500">حد: {r.limit}</div></div></div>))}</div>
         </div>
       </div>
-      <div className="rounded-xl border border-red-900/40 bg-red-950/20 p-4"><div className="flex items-start gap-3"><Lock size={16} className="text-red-400 mt-0.5 shrink-0" /><div><p className="text-sm font-medium text-red-400">Kill Switch</p><p className="text-xs text-gray-400 mt-1">در صورت رسیدن Drawdown به ۲۰٬ سیستم خودکار همه معاملات را می‌بندد.</p></div></div></div>
     </div>
   );
 }
