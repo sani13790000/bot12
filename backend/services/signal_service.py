@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 logger = logging.getLogger("services.signal_service")
-_now_utc = lambda: datetime.now(timezone.utc)
+
+
+# Q2-FIX: lambda as function definition is an anti-pattern (PEP 8 E731).
+# Using def makes the function introspectable, testable, and properly named.
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class SignalService:
