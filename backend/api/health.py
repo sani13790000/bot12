@@ -1,11 +1,9 @@
-"""
-backend/api/health.py — FIXED
-Fixes:
-  CB-2: from ..core.config_v11 import Settings → REMOVED (config_v11 deleted)
-        Now uses get_settings() from config.py
-  CB-3: db.ping() → get_db_client() (no ping method exists)
-  AI-2: KillSwitch.is_active() unified to sync interface
-  CB-7: mt5_ok dict evaluated as result.get('ok') not bool(result)
+"""backend/api/health.py — Phase P fix
+
+BUG-P5 FIX: _check_ml_model() added — ML model loaded status exposed in /health
+  - If model not loaded: status=DEGRADED, not UNHEALTHY (non-blocking)
+  - /ready only checks DB + MT5 (critical path)
+  - /health checks all 5 components: DB, MT5, KillSwitch, Redis, MLModel
 """
 from __future__ import annotations
 
@@ -47,7 +45,7 @@ async def _check_database() -> ComponentHealth:
     t0 = time.monotonic()
     try:
         from backend.database.connection import get_db_client
-        client = await asyncio.wait_for(get_db_client(), timeout=2.0)
+        client  = await asyncio.wait_for(get_db_client(), timeout=2.0)
         latency = time.monotonic() - t0
         if client:
             return ComponentHealth(
@@ -70,9 +68,8 @@ async def _check_mt5() -> ComponentHealth:
     t0 = time.monotonic()
     try:
         from backend.execution.mt5_connector import mt5_connector
-        result = await asyncio.wait_for(mt5_connector.health_check(), timeout=5.0)
+        result  = await asyncio.wait_for(mt5_connector.health_check(), timeout=5.0)
         latency = time.monotonic() - t0
-        # CB-7 FIX: result is dict — check result.get("ok") not bool(result)
         ok = result.get("ok", False) if isinstance(result, dict) else bool(result)
         return ComponentHealth(
             name="mt5_gateway",
@@ -91,7 +88,6 @@ async def _check_kill_switch() -> ComponentHealth:
     """Check Kill Switch state."""
     try:
         from backend.risk.kill_switch import kill_switch
-        # AI-2 FIX: use sync is_active() consistently
         active = kill_switch.is_active()
         return ComponentHealth(
             name="kill_switch",
@@ -106,7 +102,7 @@ async def _check_redis() -> ComponentHealth:
     """Check Redis connectivity."""
     try:
         from backend.middleware.rate_limit import get_rate_limiter
-        rl = await get_rate_limiter()
+        rl   = await get_rate_limiter()
         mode = getattr(rl, "mode", "unknown")
         return ComponentHealth(
             name="redis",
@@ -117,15 +113,51 @@ async def _check_redis() -> ComponentHealth:
         return ComponentHealth(name="redis", status=HealthStatus.UNHEALTHY, error=str(e))
 
 
+async def _check_ml_model() -> ComponentHealth:
+    """BUG-P5 FIX: Check ML model loaded status.
+
+    - model loaded + auc > 0.5 → HEALTHY
+    - model not loaded yet    → DEGRADED (predictions use fallback, not crash)
+    - import error            → DEGRADED (same)
+    """
+    try:
+        from backend.ai_prediction.model_manager import ModelManager
+        manager = ModelManager()
+        info    = manager.get_model_info()  # returns dict with loaded, auc, path, etc.
+        if info and info.get("loaded"):
+            auc    = info.get("auc", 0.0)
+            status = HealthStatus.HEALTHY if auc >= 0.5 else HealthStatus.DEGRADED
+            return ComponentHealth(
+                name="ml_model", status=status,
+                detail={
+                    "loaded":     True,
+                    "auc":        round(auc, 4),
+                    "model_path": info.get("path", ""),
+                    "version":    info.get("version", "unknown"),
+                }
+            )
+        return ComponentHealth(
+            name="ml_model", status=HealthStatus.DEGRADED,
+            detail={"loaded": False, "note": "model not yet trained — predictions use fallback"}
+        )
+    except Exception as e:
+        return ComponentHealth(
+            name="ml_model", status=HealthStatus.DEGRADED,
+            error=str(e),
+            detail={"loaded": False, "note": "check MODEL_DIR and run initial training"}
+        )
+
+
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
-    """Full health check — all components."""
+    """Full health check — all 5 components."""
     t0 = time.monotonic()
     checks: List[ComponentHealth] = await asyncio.gather(
         _check_database(),
         _check_mt5(),
         _check_kill_switch(),
         _check_redis(),
+        _check_ml_model(),     # BUG-P5: ML model status added
         return_exceptions=False
     )
     overall = (
@@ -135,21 +167,21 @@ async def health_check() -> Dict[str, Any]:
     )
     _settings = get_settings()
     return {
-        "status": overall,
-        "uptime_seconds": round(time.monotonic() - _start_time),
-        "latency_ms": round((time.monotonic() - t0) * 1000, 1),
+        "status":          overall,
+        "uptime_seconds":  round(time.monotonic() - _start_time),
+        "latency_ms":      round((time.monotonic() - t0) * 1000, 1),
         "components": [
             {
-                "name": c.name,
-                "status": c.status,
+                "name":       c.name,
+                "status":     c.status,
                 "latency_ms": round((c.latency or 0) * 1000, 1),
-                "error": c.error,
-                "detail": c.detail,
+                "error":      c.error,
+                "detail":     c.detail,
             }
             for c in checks
         ],
         "environment": _settings.APP_ENV,
-        "version": _settings.APP_VERSION,
+        "version":     _settings.APP_VERSION,
     }
 
 
@@ -161,7 +193,7 @@ async def liveness_check() -> Dict[str, Any]:
 
 @router.get("/ready")
 async def readiness_check() -> Any:
-    """Kubernetes readiness probe."""
+    """Kubernetes readiness probe — checks only critical path (DB + MT5)."""
     from fastapi.responses import JSONResponse
     checks: List[ComponentHealth] = await asyncio.gather(
         _check_database(),

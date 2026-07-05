@@ -1,0 +1,26 @@
+# backend/Dockerfile.bot — Phase P
+# Telegram Bot as separate container (BUG-P7 fix)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install only bot dependencies (lighter than full API image)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    python-telegram-bot==20.* \
+    httpx \
+    supabase \
+    redis \
+    pydantic \
+    pydantic-settings \
+    python-dotenv
+
+COPY backend/ ./backend/
+COPY . .
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Run only the Telegram bot entrypoint
+CMD ["python", "-m", "backend.telegram.bot"]

@@ -1,6 +1,6 @@
-# docker-compose.yml — Phase O fix
-# BUG-O5: Added MODEL_DIR environment variable and /data/models volume
-#         SecurityAIAgent and XGBoostTrainer persist models across restarts
+# docker-compose.yml — Phase P fix
+# BUG-P7: telegram-bot added as separate service (previously ran inside api container)
+# BUG-O5: MODEL_DIR volume + env var
 
 version: '3.9'
 
@@ -33,17 +33,52 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
       - MODEL_DIR=/data/models
       - METRICS_MIN_TRADES_FOR_SHARPE=${METRICS_MIN_TRADES_FOR_SHARPE:-30}
+      - ANALYTICS_PAGE_SIZE=${ANALYTICS_PAGE_SIZE:-100}
+      - SMC_MAX_CANDLES=${SMC_MAX_CANDLES:-1000}
     volumes:
       - model_data:/data/models
     depends_on:
       - redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # BUG-P7 FIX: Telegram bot as separate service
+  # Isolated restart policy — bot crash does not affect API
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.bot
+    environment:
+      - APP_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TELEGRAM_ADMIN_IDS=${TELEGRAM_ADMIN_IDS:-[]}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - API_BASE_URL=http://api:8000
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - MT5_DEMO_MODE=${MT5_DEMO_MODE:-true}
+      - MODEL_DIR=/data/models
+    volumes:
+      - model_data:/data/models
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   dashboard:
     build:

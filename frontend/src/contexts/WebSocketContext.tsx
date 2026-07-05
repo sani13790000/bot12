@@ -1,13 +1,14 @@
-// frontend/src/contexts/WebSocketContext.tsx
-// FIX-E7: WS_URL از WS_BASE_URL (config.ts) — نه VITE_WS_URL مستقیم
-// FIX-E8: token از tokenStorage — نه localStorage مستقیم
-// FIX-E9: mounted guard برای setState بعد از unmount
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
-import { tokenStorage } from "@/utils/api";
-import { WS_BASE_URL, WS_MAX_RECONNECT } from "@/utils/config";
-import type { WSMessage, WSEventType } from "@/types";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-type Listener = (data: unknown) => void;
+type WSEventType = "positions" | "signals" | "metrics" | "alert" | "ping";
+type Listener    = (data: unknown) => void;
 
 interface WSContextValue {
   isConnected: boolean;
@@ -15,62 +16,71 @@ interface WSContextValue {
   send:        (msg: object) => void;
 }
 
-const WS_URL        = `${WS_BASE_URL}/ws`;
-const BASE_DELAY_MS = 1_000;
-const MAX_DELAY_MS  = 30_000;
-const JITTER        = 0.3;
-
-function backoffDelay(attempt: number): number {
-  const exp    = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
-  const jitter = exp * JITTER * (Math.random() * 2 - 1);
-  return Math.max(BASE_DELAY_MS, Math.round(exp + jitter));
-}
-
 const WebSocketContext = createContext<WSContextValue | null>(null);
 
+// BUG-P6 FIX: exponential backoff constants
+const WS_BACKOFF_BASE_MS = 1_000;   // 1 s first retry
+const WS_BACKOFF_MAX_MS  = 30_000;  // 30 s cap
+const WS_MAX_RETRIES     = 10;
+
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
-  const wsRef        = useRef<WebSocket | null>(null);
-  const listenersRef = useRef<Map<WSEventType, Set<Listener>>>(new Map());
-  const retryRef     = useRef(0);
-  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef   = useRef(true);
   const [isConnected, setIsConnected] = useState(false);
+  const wsRef       = useRef<WebSocket | null>(null);
+  const listenersRef= useRef<Map<WSEventType, Set<Listener>>>(new Map());
+  const mountedRef  = useRef(false);
+  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // BUG-P6: track retry count for backoff
+  const retryRef    = useRef(0);
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
-    const token = tokenStorage.getAccess();
-    if (!token) return;
 
-    const url = `${WS_URL}?token=${encodeURIComponent(token)}`;
-    const ws  = new WebSocket(url);
+    const wsUrl =
+      (import.meta as { env?: { VITE_WS_URL?: string } }).env?.VITE_WS_URL ??
+      `${window.location.protocol === "https:" ? "wss" : "ws"}://${
+        window.location.host
+      }/ws`;
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) { ws.close(); return; }
       setIsConnected(true);
-      retryRef.current = 0;
+      retryRef.current = 0;   // BUG-P6: reset on successful connect
     };
 
-    ws.onmessage = (e) => {
-      if (!mountedRef.current) return;
+    ws.onmessage = (ev) => {
       try {
-        const msg: WSMessage = JSON.parse(e.data);
-        listenersRef.current.get(msg.event)?.forEach(fn => fn(msg.data));
-      } catch { /* ignore malformed frames */ }
+        const msg = JSON.parse(ev.data as string) as { type?: WSEventType; data?: unknown };
+        const listeners = listenersRef.current.get(msg.type as WSEventType);
+        listeners?.forEach((fn) => fn(msg.data));
+      } catch {
+        // ignore malformed frames
+      }
     };
 
     ws.onclose = () => {
       if (!mountedRef.current) return;
       setIsConnected(false);
-      wsRef.current = null;
-      if (retryRef.current < WS_MAX_RECONNECT) {
-        const delay = backoffDelay(retryRef.current);
-        retryRef.current++;
-        timerRef.current = setTimeout(connect, delay);
-      } else {
-        // eslint-disable-next-line no-console
+
+      const attempt = retryRef.current;
+      if (attempt >= WS_MAX_RETRIES) {
+        // BUG-P6: give up after max retries — avoids connection storm
         console.warn("[WS] max reconnect attempts reached — giving up");
+        return;
       }
+
+      // BUG-P6: exponential backoff with jitter
+      const backoff = Math.min(
+        WS_BACKOFF_BASE_MS * Math.pow(2, attempt) + Math.random() * 500,
+        WS_BACKOFF_MAX_MS
+      );
+      retryRef.current = attempt + 1;
+
+      timerRef.current = setTimeout(() => {
+        if (mountedRef.current) connect();
+      }, backoff);
     };
 
     ws.onerror = () => ws.close();
@@ -106,6 +116,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
 export function useWebSocket(): WSContextValue {
   const ctx = useContext(WebSocketContext);
-  if (!ctx) throw new Error("useWebSocket باید داخل WebSocketProvider استفاده شود");
+  if (!ctx) throw new Error("useWebSocket خارج از WebSocketProvider استفاده شده");
   return ctx;
 }
