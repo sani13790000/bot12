@@ -1,8 +1,8 @@
-"""backend/core/config.py v6 - Phase 2 Architecture Fix
+"""backend/core/config.py v7 — Phase 3 Security Fix (S2)
 
-A1-FIX: APP_VERSION, APP_ENV, TRUSTED_HOSTS, RATE_LIMIT_API_PER_MINUTE added
-        so main.py can access settings.APP_VERSION / settings.APP_ENV / etc.
-        without AttributeError at startup.
+A1-FIX: APP_VERSION, APP_ENV, TRUSTED_HOSTS, RATE_LIMIT_API_PER_MINUTE
+S2-FIX: JWT_SECRET_KEY weak secret now raises ValueError in ALL environments
+        UNLESS the env var TEST_MODE=true is set (for CI/unit-test pipelines).
 """
 from __future__ import annotations
 
@@ -44,6 +44,10 @@ def is_production() -> bool:
     return _detect_environment() == "production"
 
 
+def _is_test_mode() -> bool:
+    return os.environ.get("TEST_MODE", "").lower() in ("true", "1", "yes")
+
+
 def get_bcrypt_rounds() -> int:
     try:
         rounds = int(os.environ.get("BCRYPT_ROUNDS", str(_BCRYPT_ROUNDS_DEFAULT)))
@@ -53,65 +57,55 @@ def get_bcrypt_rounds() -> int:
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
-
-    # Core
     APP_NAME: str = "Galaxy Vast AI"
-    APP_VERSION: str = "3.0.0"                    # A1-FIX
+    APP_VERSION: str = "3.0.0"
     DEBUG: bool = False
     API_PREFIX: str = "/api/v1"
     ENVIRONMENT: str = Field(default_factory=_detect_environment)
 
     @property
-    def APP_ENV(self) -> str:                      # A1-FIX: alias for main.py
+    def APP_ENV(self) -> str:
         return self.ENVIRONMENT
 
-    # Security
     JWT_SECRET_KEY: str = "changeme"
     JWT_ALGORITHM: str = "HS256"
+    SECRET_KEY: str = ""
+    ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, ge=1, le=90)
-    BCRYPT_ROUNDS: int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
+    BCRYPT_ROUNDS: int = Field(
+        default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX
+    )
 
-    # Database
     DATABASE_URL: str = ""
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_KEY: str = ""
 
-    # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # MT5
     MT5_LOGIN: Optional[int] = None
     MT5_PASSWORD: Optional[str] = None
     MT5_SERVER: Optional[str] = None
 
-    # Telegram
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_CHAT_ID: Optional[str] = None
 
-    # Risk
     MAX_RISK_PCT: float = Field(default=1.0, ge=0.1, le=10.0)
     MAX_DAILY_DRAWDOWN_PCT: float = Field(default=5.0, ge=0.5, le=20.0)
     INITIAL_ACCOUNT_BALANCE: float = Field(default=10_000.0, ge=100.0)
     MAX_OPEN_TRADES: int = Field(default=5, ge=1, le=50)
 
-    # ML
     DRIFT_THRESHOLD: float = Field(default=0.05, ge=0.01, le=0.5)
     ML_RETRAIN_INTERVAL_HOURS: int = Field(default=24, ge=1, le=168)
 
-    # Execution
     RECONCILE_INTERVAL_SECONDS: int = Field(default=30, ge=5, le=300)
     SEMI_AUTO_PENDING_TTL_S: int = Field(default=300, ge=30, le=3600)
     BROKER_INIT_TIMEOUT_S: float = Field(default=30.0, ge=5.0, le=120.0)
 
-    # CORS
     ALLOWED_ORIGINS: List[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
     )
-
-    # A1-FIX: missing from original
     TRUSTED_HOSTS: List[str] = Field(default_factory=list)
     RATE_LIMIT_API_PER_MINUTE: int = Field(default=60, ge=1, le=10000)
 
@@ -124,20 +118,26 @@ class Settings(BaseSettings):
     @field_validator("JWT_SECRET_KEY")
     @classmethod
     def _validate_jwt_secret(cls, v: str) -> str:
-        if v.lower() in _DANGEROUS_SECRETS:
-            if is_production():
-                raise ValueError(
-                    f"JWT_SECRET_KEY={v!r} is a known-dangerous default. "
-                    "Set a strong secret in production."
+        if v.lower() in _DANGEROUS_SECRETS or len(v) < 32:
+            if _is_test_mode():
+                log.warning(
+                    "[config] JWT_SECRET_KEY is weak — allowed because TEST_MODE=true"
                 )
-            log.warning("[config] JWT_SECRET_KEY is a known-dangerous default")
+                return v
+            raise ValueError(
+                f"JWT_SECRET_KEY={v!r} is too weak or a known-dangerous default. "
+                "Set a strong secret (>=32 chars) via JWT_SECRET_KEY env var. "
+                "For tests/CI set TEST_MODE=true to bypass."
+            )
         return v
 
     @field_validator("ACCESS_TOKEN_EXPIRE_MINUTES")
     @classmethod
     def _cap_token_expiry(cls, v: int) -> int:
         if v > _ACCESS_TOKEN_MAX_MINUTES:
-            log.warning("[config] ACCESS_TOKEN_EXPIRE_MINUTES capped to %d", _ACCESS_TOKEN_MAX_MINUTES)
+            log.warning(
+                "[config] ACCESS_TOKEN_EXPIRE_MINUTES capped to %d", _ACCESS_TOKEN_MAX_MINUTES
+            )
             return _ACCESS_TOKEN_MAX_MINUTES
         return v
 
@@ -154,6 +154,8 @@ def validate_settings(s: Settings) -> None:
         log.warning("[config] Neither DATABASE_URL nor SUPABASE_URL is set")
     if s.DATABASE_URL and not s.DATABASE_URL.startswith(("postgresql", "postgres", "sqlite")):
         log.warning("[config] DATABASE_URL has unexpected scheme: %s", s.DATABASE_URL[:30])
+    if not s.SECRET_KEY:
+        log.warning("[config] SECRET_KEY not set — refresh token signing will use JWT_SECRET_KEY")
 
 
 def patch_config_at_startup() -> None:
@@ -167,5 +169,4 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# A1-FIX: module-level singleton for `from .config import settings`
 settings = get_settings()
