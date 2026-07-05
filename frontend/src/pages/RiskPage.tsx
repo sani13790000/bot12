@@ -2,12 +2,15 @@
 // BUG-T4 FIX: StatCard import path corrected
 //   was:  @/components/StatCard          (does not exist — TypeScript build fail)
 //   now:  @/components/common/StatCard   (correct path)
+// BUG-Z1 FIX: StatCard import style corrected
+//   was:  import StatCard from "..."     (default import — StatCard has no default export)
+//   now:  import { StatCard } from "..." (named import — matches export function StatCard)
 import React from "react";
 import { Shield, AlertTriangle, TrendingDown, Lock, BarChart2, Target } from "lucide-react";
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from "recharts";
 import { dashboardApi } from "@/utils/api";
 import { useApi } from "@/hooks/useApi";
-import StatCard from "@/components/common/StatCard";  // BUG-T4 FIX
+import { StatCard } from "@/components/common/StatCard";  // BUG-Z1 FIX: named import
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorAlert from "@/components/ErrorAlert";
 
@@ -25,7 +28,7 @@ export default function RiskPage() {
   const gaugeData = [{ name: "Drawdown", value: Math.min(drawdown, 30), fill: drawdown < 10 ? "#22c55e" : drawdown < 20 ? "#eab308" : "#ef4444" }];
   const rules = [
     { label: "حداکثر Drawdown", limit: "20%", current: `${drawdown.toFixed(2)}%`, ok: drawdown < 20 },
-    { label: "حداقل Sharpe",      limit: "0.5", current: sharpe.toFixed(2),         ok: sharpe > 0.5 },
+    { label: "حداقل Sharpe",      limit: "0.5", current: sharpe.toFixed(2),           ok: sharpe > 0.5 },
     { label: "حداقل Profit Factor", limit: "1.0", current: pf.toFixed(2),             ok: pf > 1.0 },
     { label: "حداقل Win Rate",     limit: "50%", current: `${winRate.toFixed(1)}%`,  ok: winRate > 50 },
   ];
@@ -33,10 +36,10 @@ export default function RiskPage() {
     <div className="p-6 space-y-6">
       <div><h1 className="text-xl font-bold text-white flex items-center gap-2"><Shield size={20} className="text-red-400" /> مدیریت ریسک</h1><p className="text-sm text-gray-400 mt-1">وضعیت ریسک و محدودیت‌ها</p></div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="سطح ریسک" value={riskLevel} icon={Shield} color={riskColor} />
-        <StatCard title="Max Drawdown" value={`${drawdown.toFixed(2)}%`} icon={TrendingDown} color={riskColor} />
-        <StatCard title="Sharpe Ratio" value={sharpe.toFixed(2)} icon={Target} color={sharpe > 1 ? "green" : sharpe > 0 ? "yellow" : "red"} />
-        <StatCard title="Profit Factor" value={pf.toFixed(2)} icon={BarChart2} color={pf > 1.5 ? "green" : pf > 1 ? "yellow" : "red"} />
+        <StatCard title="سطح ریسک" value={riskLevel} icon={<Shield size={15} />} color={riskColor} />
+        <StatCard title="Max Drawdown" value={`${drawdown.toFixed(2)}%`} icon={<TrendingDown size={15} />} color={riskColor} />
+        <StatCard title="Sharpe Ratio" value={sharpe.toFixed(2)} icon={<Target size={15} />} color={sharpe > 1 ? "green" : sharpe > 0 ? "yellow" : "red"} />
+        <StatCard title="Profit Factor" value={pf.toFixed(2)} icon={<BarChart2 size={15} />} color={pf > 1.5 ? "green" : pf > 1 ? "yellow" : "red"} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">

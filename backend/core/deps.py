@@ -5,6 +5,7 @@ Fixes:
   A2-FIX:      get_circuit_breaker() correctly async
   A3-FIX:      get_execution_service() returns lazy singleton
   CB-NEW-5:    get_db() uses get_db_client() not AsyncSessionLocal (does not exist)
+  BUG-Z2-FIX:  except ImportError: pass → logger.warning() in all permission gates
 """
 from __future__ import annotations
 
@@ -132,8 +133,9 @@ def require_perm(perm: str) -> Callable:
             if not rbac_v2.check(ctx, perm):
                 raise HTTPException(status_code=403,
                                     detail=f"Permission '{perm}' required (role: {ctx.role})")
-        except ImportError:
-            pass
+        except ImportError as exc:
+            # BUG-Z2 FIX: was bare pass — now logs warning so operators know gate is disabled
+            logger.warning("[deps] rbac_v2 unavailable — require_perm('%s') gate DISABLED: %s", perm, exc)
         return ctx
     _check.__name__ = f"perm_{perm.replace(':', '_')}"
     return _check
@@ -145,8 +147,9 @@ def require_any_perm(*perms: str) -> Callable:
             if not ctx.has_any_perm(*perms):
                 raise HTTPException(status_code=403,
                                     detail=f"One of {perms} required (role: {ctx.role})")
-        except (ImportError, AttributeError):
-            pass
+        except (ImportError, AttributeError) as exc:
+            # BUG-Z2 FIX: was bare pass — now logs warning
+            logger.warning("[deps] require_any_perm%s gate DISABLED: %s", perms, exc)
         return ctx
     _check.__name__ = "any_perm"
     return _check
@@ -160,8 +163,9 @@ def require_all_perms(*perms: str) -> Callable:
             if missing:
                 raise HTTPException(status_code=403,
                                     detail=f"Missing permissions: {missing} (role: {ctx.role})")
-        except ImportError:
-            pass
+        except ImportError as exc:
+            # BUG-Z2 FIX: was bare pass — now logs warning
+            logger.warning("[deps] rbac_v2 unavailable — require_all_perms%s gate DISABLED: %s", perms, exc)
         return ctx
     _check.__name__ = "all_perms"
     return _check
@@ -174,8 +178,9 @@ def require_rank(min_role: str) -> Callable:
             if ROLE_RANK.get(ctx.role, 0) < ROLE_RANK.get(normalize_role(min_role), 0):
                 raise HTTPException(status_code=403,
                                     detail=f"Role '{min_role}' or higher required (current: {ctx.role})")
-        except ImportError:
-            pass
+        except ImportError as exc:
+            # BUG-Z2 FIX: was bare pass — now logs warning
+            logger.warning("[deps] ROLE_RANK unavailable — require_rank('%s') gate DISABLED: %s", min_role, exc)
         return ctx
     _check.__name__ = f"rank_{min_role}"
     return _check
@@ -186,8 +191,9 @@ def require_no_escalation_dep(target_role: str) -> Callable:
         try:
             from .permissions import assert_no_escalation
             assert_no_escalation(ctx.role, target_role)
-        except ImportError:
-            pass
+        except ImportError as exc:
+            # BUG-Z2 FIX: was bare pass — now logs warning
+            logger.warning("[deps] assert_no_escalation unavailable — no_escalation('%s') gate DISABLED: %s", target_role, exc)
         except Exception as exc:
             raise HTTPException(status_code=403, detail=str(exc))
         return ctx
