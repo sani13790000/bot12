@@ -7,11 +7,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 
 
+# BUG-T2 FIX: was importing from backend.trading.trade_service (does not exist)
+# Correct path: backend.services.trade_service (exists with U-1..U-5 fixes)
+
 @router.get("/summary")
 async def get_portfolio_summary() -> Dict[str, Any]:
-    """P-19 FIX: real data from trade_service."""
+    """BUG-T2 FIX: real data from backend.services.trade_service."""
     try:
-        from backend.trading.trade_service import TradeService
+        from backend.services.trade_service import TradeService  # BUG-T2 FIX
         svc    = TradeService()
         trades = await svc.get_open_trades()
         equity = await svc.get_equity_state()
@@ -40,9 +43,9 @@ async def get_portfolio_summary() -> Dict[str, Any]:
 
 @router.get("/positions")
 async def get_positions() -> Dict[str, Any]:
-    """P-19 FIX: real positions from MT5."""
+    """BUG-T2 FIX: real positions from backend.services.trade_service."""
     try:
-        from backend.trading.trade_service import TradeService
+        from backend.services.trade_service import TradeService  # BUG-T2 FIX
         trades = await TradeService().get_open_trades()
         return {"ok": True, "positions": trades, "count": len(trades)}
     except Exception as exc:
@@ -51,9 +54,9 @@ async def get_positions() -> Dict[str, Any]:
 
 @router.get("/exposure")
 async def get_exposure() -> Dict[str, Any]:
-    """P-21 FIX: real exposure calculation per symbol and direction."""
+    """BUG-T2 FIX: real exposure from backend.services.trade_service."""
     try:
-        from backend.trading.trade_service import TradeService
+        from backend.services.trade_service import TradeService  # BUG-T2 FIX
         trades = await TradeService().get_open_trades()
         by_symbol: Dict[str, Dict[str, Any]] = {}
         for t in trades:
@@ -80,7 +83,7 @@ async def get_exposure() -> Dict[str, Any]:
 
 @router.get("/correlation")
 async def get_correlation() -> Dict[str, Any]:
-    """P-20 FIX: rolling correlation instead of hardcoded table."""
+    """Rolling correlation matrix."""
     try:
         from backend.trading.correlation_filter import RollingCorrelationEngine
         engine = RollingCorrelationEngine()
@@ -94,8 +97,10 @@ async def get_correlation() -> Dict[str, Any]:
 @router.get("/risk-breakdown")
 async def get_risk_breakdown() -> Dict[str, Any]:
     try:
-        from backend.trading.risk_orchestrator import RiskOrchestrator
-        status = await RiskOrchestrator().get_full_status()
-        return {"ok": True, "breakdown": status}
+        from backend.risk.risk_orchestrator import RiskOrchestrator
+        orch   = RiskOrchestrator()
+        status = await orch.get_risk_status()
+        return {"ok": True, "risk": status}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("[Portfolio] risk-breakdown error: %s", exc)
+        return {"ok": True, "risk": {}, "error": str(exc)}
