@@ -1,18 +1,12 @@
 """
 backend/execution/execution_service.py
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 High-level trade execution service.
 
-Responsibilities
---------------------
-- Accept a TradeSignal from the decision layer.
-- Run pre-flight risk checks kill-switch, lot sizing.
-- Delegate the actual order placement to MT5Connector.
-- Advance the order through OrderStateMachine.
-- Persist results to Supabase via the database client.
-- Retry with exponential backoff on transient failures.
-- Alert via Telegram if order fails permanently.
+A3-FIX: Replaced eager module-level singleton `execution_service = ExecutionService()`
+         with a lazy proxy. The old pattern triggered MT5 connection on every import.
+         New pattern: connection is established only on first actual use.
 
 FIX K-1: open_position() alias for routes/trades.py compatibility.
 FIX K-2: retry with exponential backoff max 3 attempts.
@@ -29,18 +23,15 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_MAX_RETRIES   = 3        # hadakassar tedade retry
-_BASE_DELAY    = 1.0      # thaniyeh -- exponential: 1, 2, 4
-
-
-# ── Data types ──────────────────────────────────────────────────────#
+_MAX_RETRIES   = 3
+_BASE_DELAY    = 1.0   # exponential: 1, 2, 4
 
 
 @dataclass
 class TradeSignal:
     """Minimal signal that ExecutionService needs to place a trade."""
     symbol:     str
-    direction:  str           # "BUY" | "SELL"
+    direction:  str            # "BUY" | "SELL"
     volume:     float
     entry:      Optional[float] = None
     sl:         Optional[float] = None
@@ -54,23 +45,20 @@ class TradeSignal:
 class ExecutionResult:
     """Outcome of an execution attempt."""
     success:    bool
-    ticket:     Optional[int]  = None
+    ticket:     Optional[int]   = None
     open_price: Optional[float] = None
-    error:      Optional[str]  = None
+    error:      Optional[str]   = None
     executed_at: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
-
-
-# ── Service ────────────────────────────────────────────────────────────────#
 
 
 class ExecutionService:
     """
     Orchestrates the full life-cycle of a trade order.
 
-    The service is intentionally dependency-light so it can be unit-tested
-    without a live MT5 connection.  Pass custom connector / state-machine
+    The service is dependency-light so it can be unit-tested
+    without a live MT5 connection. Pass custom connector / state-machine
     instances for testing.
     """
 
@@ -160,7 +148,7 @@ class ExecutionService:
         )
 
     async def open_position(self, signal: TradeSignal) -> ExecutionResult:
-        """FIX K-1: alias baraye execute() -- used by API routes."""
+        """FIX K-1: alias for execute() used by API routes."""
         return await self.execute(signal)
 
     async def close(self, ticket: int) -> ExecutionResult:
@@ -187,11 +175,11 @@ class ExecutionService:
         return ExecutionResult(success=False, error="max_retries_exceeded")
 
     async def close_position(self, ticket: int) -> ExecutionResult:
-        """Alias for close() -- used by API routes."""
+        """Alias for close() — used by API routes."""
         return await self.close(ticket)
 
     async def _persist(self, signal: TradeSignal, order: Any) -> None:
-        """Write execution record to the database failure is non-fatal."""
+        """Write execution record to the database; failure is non-fatal."""
         if self._db is None:
             return
         try:
@@ -207,7 +195,7 @@ class ExecutionService:
             logger.warning("[ExecutionService] DB persist failed non-fatal: %s", exc)
 
     async def _send_failure_alert(self, signal: TradeSignal, error: str) -> None:
-        """FIX K-4: ersale Telegram alert agar error be tawre kamel fail shavad."""
+        """FIX K-4: send Telegram alert if order fails permanently."""
         if self._notifier is None:
             try:
                 from backend.telegram.notifier import get_notifier
@@ -229,5 +217,23 @@ class ExecutionService:
             logger.warning("[ExecutionService] Telegram alert failed: %s", exc)
 
 
-# ── Module-level singleton ────────────────────────────────────────────────── #
-execution_service = ExecutionService()
+# A3-FIX: lazy singleton — avoids MT5 connect on every import
+_execution_service_instance: "ExecutionService | None" = None
+
+
+class _LazyProxy:
+    """Transparent proxy; initialises ExecutionService on first attribute access."""
+    def __getattr__(self, name: str):  # type: ignore[override]
+        global _execution_service_instance
+        if _execution_service_instance is None:
+            _execution_service_instance = ExecutionService()
+        return getattr(_execution_service_instance, name)
+
+    def __repr__(self) -> str:
+        global _execution_service_instance
+        if _execution_service_instance is None:
+            return "<ExecutionService: not yet initialised>"
+        return repr(_execution_service_instance)
+
+
+execution_service = _LazyProxy()  # type: ignore[assignment]
