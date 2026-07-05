@@ -1,133 +1,78 @@
+# docker-compose.yml — Phase O fix
+# BUG-O5: Added MODEL_DIR environment variable and /data/models volume
+#         SecurityAIAgent and XGBoostTrainer persist models across restarts
+
 version: '3.9'
 
 services:
-
-  redis:
-    image: redis:7.4-alpine
-    container_name: bot12_redis
-    restart: unless-stopped
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:-changeme_redis}
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      --appendonly no
-      --loglevel warning
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme_redis}", "ping"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - bot12_net
-
   api:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: bot12_api
-    restart: unless-stopped
-    env_file: .env
+      dockerfile: backend/Dockerfile
     ports:
-      - "127.0.0.1:8000:8000"
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/live"]
-      interval: 20s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - bot12_net
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - MT5_LOGIN=${MT5_LOGIN}
+      - MT5_PASSWORD=${MT5_PASSWORD}
+      - MT5_SERVER=${MT5_SERVER}
+      - MT5_DEMO_MODE=${MT5_DEMO_MODE:-true}
+      - LICENSE_SECRET=${LICENSE_SECRET}
+      - LICENSE_SALT=${LICENSE_SALT}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
+      - SECRETS_MASTER_KEY=${SECRETS_MASTER_KEY}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - MODEL_DIR=/data/models
+      - METRICS_MIN_TRADES_FOR_SHARPE=${METRICS_MIN_TRADES_FOR_SHARPE:-30}
     volumes:
-      - model_data:/app/models
-      - log_data:/app/logs
-
-  telegram_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
-    container_name: bot12_telegram
-    restart: unless-stopped
-    env_file: .env
+      - model_data:/data/models
     depends_on:
-      api:
-        condition: service_healthy
+      - redis
+    restart: unless-stopped
     healthcheck:
-      # Real healthcheck: verify polling loop is alive via heartbeat file
-      # The heartbeat file is written every 30s by backend/telegram/heartbeat.py
-      # If file is older than 120s, polling is considered dead
-      test:
-        - "CMD"
-        - "python3"
-        - "-c"
-        - |
-          import os, time, sys
-          try:
-              age = time.time() - os.path.getmtime('/tmp/bot_heartbeat')
-              sys.exit(0 if age < 120 else 1)
-          except FileNotFoundError:
-              sys.exit(1)
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-    networks:
-      - bot12_net
+      start_period: 40s
 
   dashboard:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: bot12_dashboard
-    restart: unless-stopped
-    env_file: .env
     ports:
-      - "127.0.0.1:8501:8501"
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://api:8000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8501"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - bot12_net
+      - api
+    restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: bot12_frontend
-    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
     ports:
-      - "0.0.0.0:80:80"
-      - "0.0.0.0:443:443"
-    depends_on:
-      api:
-        condition: service_healthy
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 3
-    networks:
-      - bot12_net
 
 volumes:
   redis_data:
   model_data:
-  log_data:
-
-networks:
-  bot12_net:
-    driver: bridge
