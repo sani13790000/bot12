@@ -17,9 +17,9 @@ _last_healthy: float = 0.0
 
 # Q3-FIX: TTL increased from 10.0 to 30.0 seconds.
 # Under high traffic, a 10-second TTL causes a DB probe + potential
-# reconnect every 10 seconds per worker — unacceptable overhead.
+# reconnect every 10 seconds per worker -- unacceptable overhead.
 # 30 seconds provides a good balance: stale connections are caught
-# quickly enough for health checks, but probes don't dominate CPU.
+# quickly enough for health checks, but probes do not dominate CPU.
 _HEALTH_TTL = 30.0
 
 
