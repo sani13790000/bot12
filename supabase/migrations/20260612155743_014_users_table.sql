@@ -1,34 +1,35 @@
 -- Migration 014: Users table (canonical)
--- Renamed from 014_users_table.sql to 20260610_014_users_table.sql
--- to ensure correct sort order after timestamp-prefixed migrations.
+-- BUG-U3a FIX: renamed from 20260610_014_users_table.sql
+-- timestamp 20260612155743 = 1 second after 001 (20260612155742)
+-- ensures users table is created AFTER initial_schema
 
 BEGIN;
 
--- ==========================================================================
+-- ====================================================================
 -- 1. Users table
--- ==========================================================================
+-- ====================================================================
 CREATE TABLE IF NOT EXISTS public.users (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    username    TEXT        NOT NULL UNIQUE,
-    email       TEXT        NOT NULL UNIQUE,
-    role        TEXT        NOT NULL DEFAULT 'viewer'
-                CHECK (role IN ('admin','trader','viewer','readonly')),
-    is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    username     TEXT        NOT NULL UNIQUE,
+    email        TEXT        NOT NULL UNIQUE,
+    role         TEXT        NOT NULL DEFAULT 'viewer'
+                 CHECK (role IN ('admin','trader','viewer','readonly')),
+    is_active    BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ==========================================================================
+-- ====================================================================
 -- 2. Indexes
--- ==========================================================================
+-- ====================================================================
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users (username);
 CREATE INDEX IF NOT EXISTS idx_users_email    ON public.users (email);
 CREATE INDEX IF NOT EXISTS idx_users_role     ON public.users (role);
 CREATE INDEX IF NOT EXISTS idx_users_active   ON public.users (is_active) WHERE is_active = TRUE;
 
--- ==========================================================================
+-- ====================================================================
 -- 3. updated_at auto-update trigger
--- ==========================================================================
+-- ====================================================================
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -42,9 +43,9 @@ CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON public.users
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ==========================================================================
+-- ====================================================================
 -- 4. Row Level Security
--- ==========================================================================
+-- ====================================================================
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS users_service_all ON public.users;
@@ -62,15 +63,15 @@ CREATE POLICY users_self_update ON public.users
     USING (id::TEXT = auth.uid()::TEXT)
     WITH CHECK (id::TEXT = auth.uid()::TEXT);
 
--- ==========================================================================
+-- ====================================================================
 -- 5. refresh_tokens table for revocation list
--- ==========================================================================
+-- ====================================================================
 CREATE TABLE IF NOT EXISTS public.refresh_tokens (
-    jti         TEXT     PRIMARY KEY,
-    user_id     UUID     NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    revoked     BOOLEAN  NOT NULL DEFAULT FALSE,
-    issued_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at  TIMESTAMPTZ NOT NULL
+    jti          TEXT     PRIMARY KEY,
+    user_id      UUID     NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    revoked      BOOLEAN  NOT NULL DEFAULT FALSE,
+    issued_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at   TIMESTAMPTZ NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id  ON public.refresh_tokens (user_id);

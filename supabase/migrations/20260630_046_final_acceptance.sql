@@ -1,5 +1,10 @@
 -- Migration 046: Final Acceptance & Optimization
--- BUG-N3 FIX: was trivial SELECT 'final acceptance' — now adds final production indexes
+-- BUG-U3b FIX: renamed from 20260628_046 to 20260630_046
+-- 20260629_045b creates agent_vote_log table
+-- 20260628_046 was trying to INDEX agent_vote_log BEFORE it was created
+-- 20260630_046 runs AFTER 20260629_045b — agent_vote_log exists
+-- Result: INDEX creation succeeds
+
 BEGIN;
 
 -- 1. Final composite indexes for production query performance
@@ -16,7 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_signal_audit_smc_score
 -- 2. Mark schema_migrations_complete gate as passed
 UPDATE deployment_gates
    SET status = 'passed', checked_at = NOW(),
-       details = jsonb_build_object('migration_count', 46, 'completed_at', NOW())
+       details = jsonb_build_object('migration_count', 47, 'completed_at', NOW())
  WHERE gate_name = 'schema_migrations_complete';
 
 -- 3. Verify pg_stat_statements is available (non-fatal)
@@ -30,8 +35,8 @@ END $$;
 
 -- 4. Final system health check
 DO $$ BEGIN
-    RAISE NOTICE 'Migration 046 complete - system ready for production';
-    RAISE NOTICE 'Total tables: signal_audit_log, agent_vote_log, performance_snapshots, deployment_gates + all prior';
+    RAISE NOTICE 'Migration 046 complete (BUG-U3b: now runs after 045b) - system ready for production';
+    RAISE NOTICE 'agent_vote_log index created successfully after table creation in 045b';
 END $$;
 
 COMMIT;
