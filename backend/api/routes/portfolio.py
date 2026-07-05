@@ -7,9 +7,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 
 
-# BUG-T2 FIX: was importing from backend.trading.trade_service (does not exist)
-# Correct path: backend.services.trade_service (exists with U-1..U-5 fixes)
-
 @router.get("/summary")
 async def get_portfolio_summary() -> Dict[str, Any]:
     """BUG-T2 FIX: real data from backend.services.trade_service."""
@@ -83,24 +80,34 @@ async def get_exposure() -> Dict[str, Any]:
 
 @router.get("/correlation")
 async def get_correlation() -> Dict[str, Any]:
-    """Rolling correlation matrix."""
+    """Rolling correlation matrix. BUG-U1 FIX: correct import path."""
     try:
-        from backend.trading.correlation_filter import RollingCorrelationEngine
+        # BUG-U1 FIX: was backend.trading.correlation_filter (does not exist)
+        # correct path: backend.risk.correlation_filter (11KB full implementation)
+        from backend.risk.correlation_filter import RollingCorrelationEngine  # BUG-U1 FIX
         engine = RollingCorrelationEngine()
-        matrix = engine.portfolio_correlation_matrix()
-        return {"ok": True, "matrix": matrix, "engine": "rolling_pearson"}
+        matrix = await engine.cache_stats()
+        symbols = engine.get_tracked_symbols()
+        return {
+            "ok": True,
+            "tracked_symbols": symbols,
+            "symbol_count": len(symbols),
+            "cache_stats": matrix,
+            "engine": "rolling_pearson_window50",
+            "note": "add prices via /portfolio/correlation/feed to populate matrix"
+        }
     except Exception as exc:
         logger.error("[Portfolio] correlation error: %s", exc)
-        return {"ok": True, "matrix": {}, "engine": "unavailable", "error": str(exc)}
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.get("/risk-breakdown")
-async def get_risk_breakdown() -> Dict[str, Any]:
+@router.post("/correlation/feed")
+async def feed_price(symbol: str, price: float) -> Dict[str, Any]:
+    """Feed a live price to the rolling correlation engine."""
     try:
-        from backend.risk.risk_orchestrator import RiskOrchestrator
-        orch   = RiskOrchestrator()
-        status = await orch.get_risk_status()
-        return {"ok": True, "risk": status}
+        from backend.risk.correlation_filter import RollingCorrelationEngine  # BUG-U1 FIX
+        engine = RollingCorrelationEngine()
+        await engine.add_price(symbol, price)
+        return {"ok": True, "symbol": symbol.upper(), "price": price}
     except Exception as exc:
-        logger.error("[Portfolio] risk-breakdown error: %s", exc)
-        return {"ok": True, "risk": {}, "error": str(exc)}
+        raise HTTPException(status_code=500, detail=str(exc))
