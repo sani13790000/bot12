@@ -1,0 +1,24 @@
+# ML-specific requirements — فقط در ml-worker داکر image نصب شود
+# برای کاهش image size در API و bot workers
+
+# Core ML
+xgboost>=2.0.0,<3.0.0
+scikit-learn>=1.4.0,<2.0.0
+numpy>=1.26.0,<2.0.0
+pandas>=2.1.0,<3.0.0
+joblib>=1.3.0
+
+# Deep Learning (optional — فقط اگر RL agent نیاز باشد)
+# torch>=2.1.0
+# stable-baselines3>=2.2.0
+
+# Feature Engineering
+ta-lib>=0.4.0; sys_platform != "win32"  # نصب با apt-get libta-lib-dev
+statsmodels>=0.14.0
+scipy>=1.11.0
+
+# Anomaly Detection (SecurityAIAgent)
+isolation-forest-sklearn  # alias sklearn.ensemble.IsolationForest
+
+# Model tracking
+mlflow>=2.10.0  # optional: برای experiment tracking
