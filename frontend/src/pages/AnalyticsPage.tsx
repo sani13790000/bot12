@@ -1,95 +1,91 @@
-// frontend/src/pages/AnalyticsPage.tsx
-import React from "react";
-import { LineChart, TrendingUp, Target, BarChart2, Award } from "lucide-react";
-import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  Tooltip, ResponsiveContainer, CartesianGrid, Legend,
-} from "recharts";
-import { dashboardApi } from "@/utils/api";
-import { useApi } from "@/hooks/useApi";
-import StatCard from "@/components/StatCard";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import ErrorAlert from "@/components/ErrorAlert";
+import React, { useEffect, useState, useCallback } from 'react';
+import { apiClient } from '../utils/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
-export default function AnalyticsPage() {
-  const { data, isLoading, error, refetch } = useApi(dashboardApi.getStats);
+interface PerformanceKPIs {
+  win_rate: number;
+  profit_factor: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  total_trades: number;
+  avg_rr: number;
+  total_pnl: number;
+  avg_holding_minutes: number;
+}
 
-  if (isLoading) return <LoadingSpinner text="در حال بارگذاری آنالیتیکس..." />;
-  if (error)     return <div className="p-6"><ErrorAlert message={error} onRetry={refetch} /></div>;
+interface EquityPoint {
+  timestamp: string;
+  equity: number;
+}
 
-  const monthlyData = [
-    { month: "فروردین", profit: 1200, loss: -400, trades: 42 },
-    { month: "اردیبهشت", profit: 1800, loss: -600, trades: 58 },
-    { month: "خرداد", profit: 900, loss: -300, trades: 35 },
-    { month: "تیر", profit: 2100, loss: -500, trades: 67 },
-    { month: "مرداد", profit: 1600, loss: -700, trades: 51 },
-    { month: "شهریور", profit: 2400, loss: -400, trades: 73 },
-  ];
+const AnalyticsPage: React.FC = () => {
+  const [kpis, setKpis] = useState<PerformanceKPIs | null>(null);
+  const [equity, setEquity] = useState<EquityPoint[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const winrateData = [
-    { session: "آسیا", win: 62, lose: 38 },
-    { session: "لندن", win: 71, lose: 29 },
-    { session: "نیویورک", win: 68, lose: 32 },
-    { session: "اورلپ", win: 74, lose: 26 },
-  ];
+  const fetchData = useCallback(async () => {
+    try {
+      const [k, eq] = await Promise.allSettled([
+        apiClient.get<PerformanceKPIs>('/metrics/performance'),
+        apiClient.get<{ curve: EquityPoint[] }>('/metrics/equity?days=30'),
+      ]);
+      if (k.status === 'fulfilled') setKpis(k.value);
+      if (eq.status === 'fulfilled' && eq.value?.curve) setEquity(eq.value.curve);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          <LineChart size={20} className="text-blue-400" /> آنالیتیکس
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">تحلیل آماری عملکرد معاملاتی</p>
-      </div>
-      {data && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="نرخ موفقیت" value={`${data.win_rate?.toFixed(1) ?? 0}%`} icon={Target} color="green" />
-          <StatCard title="Sharpe Ratio" value={data.sharpe_ratio?.toFixed(2) ?? "—"} icon={Award} color="blue" />
-          <StatCard title="Profit Factor" value={data.profit_factor?.toFixed(2) ?? "—"} icon={TrendingUp} color="purple" />
-          <StatCard title="کل معاملات" value={data.total_trades ?? 0} icon={BarChart2} color="yellow" />
+      <h1 className="text-2xl font-bold text-white">📈 Analytics</h1>
+
+      {kpis ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Win Rate', value: `${(kpis.win_rate * 100).toFixed(1)}%`, good: kpis.win_rate > 0.5 },
+            { label: 'Profit Factor', value: kpis.profit_factor.toFixed(2), good: kpis.profit_factor > 1.5 },
+            { label: 'Sharpe Ratio', value: kpis.sharpe_ratio.toFixed(2), good: kpis.sharpe_ratio > 1 },
+            { label: 'Max Drawdown', value: `${(kpis.max_drawdown * 100).toFixed(1)}%`, good: kpis.max_drawdown < 0.15 },
+            { label: 'Total Trades', value: String(kpis.total_trades), good: true },
+            { label: 'Avg R:R', value: kpis.avg_rr.toFixed(2), good: kpis.avg_rr > 1.5 },
+            { label: 'Total PnL', value: `$${kpis.total_pnl.toLocaleString('en', { minimumFractionDigits: 2 })}`, good: kpis.total_pnl > 0 },
+            { label: 'Avg Hold (min)', value: kpis.avg_holding_minutes.toFixed(0), good: true },
+          ].map(m => (
+            <div key={m.label} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <p className="text-gray-400 text-sm">{m.label}</p>
+              <p className={`text-xl font-bold ${m.good ? 'text-green-400' : 'text-red-400'}`}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-gray-400">No performance data yet — complete some trades first.</p>
+      )}
+
+      {equity.length > 0 && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <h2 className="text-lg font-semibold text-white mb-3">📊 Equity Curve (30 days)</h2>
+          <div className="space-y-1">
+            {equity.slice(-10).map((pt, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-gray-400">{new Date(pt.timestamp).toLocaleDateString()}</span>
+                <span className="text-white font-mono">${pt.equity.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-gray-500 text-xs mt-2">Showing last 10 data points. Full chart in Streamlit dashboard.</p>
         </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">سود/زیان ماهانه</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8 }} />
-              <Legend />
-              <Bar dataKey="profit" name="سود" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="loss" name="زیان" fill="#ef4444" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">نرخ موفقیت به تفکیک سشن</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={winrateData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 11 }} domain={[0, 100]} />
-              <YAxis type="category" dataKey="session" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8 }} />
-              <Bar dataKey="win" name="برد%" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-              <Bar dataKey="lose" name="باخت%" fill="#6b7280" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-        <h2 className="text-sm font-semibold text-white mb-4">تعداد معاملات ماهانه</h2>
-        <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={monthlyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-            <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-            <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8 }} />
-            <Area type="monotone" dataKey="trades" name="تعداد معاملات" stroke="#8b5cf6" fill="#8b5cf620" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
     </div>
   );
-}
+};
+
+export default AnalyticsPage;

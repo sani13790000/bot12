@@ -1,171 +1,143 @@
-"""backend/api/routes/websocket_routes.py — Security Audit Fix (Phase H)
-
-SEC-20 Token never logged in plaintext
-SEC-21 JTI revocation check before accept
-SEC-22 Per-IP connection limit (max 10)
-SEC-23 Message size enforced (64 KB)
-SEC-24 Origin header validated against ALLOWED_ORIGINS
-"""
+"""WebSocket routes — Phase I: broadcast positions + signals to all connected clients."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-import time
-from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, List, Set
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
-from starlette.websockets import WebSocketState
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from backend.core.security import validate_access_token
-from backend.core.config import get_settings
+from backend.execution.mt5_connector import mt5_connector
+from backend.risk.kill_switch import get_kill_switch
 
-log = logging.getLogger(__name__)
-router = APIRouter(tags=["WebSocket"])
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/ws", tags=["websocket"])
 
-_MAX_CONNS_PER_IP: int  = 10
-_MAX_MSG_BYTES:    int  = 64 * 1024
-_REVOKE_CACHE_TTL: float = 30.0
+# ── Connection manager ────────────────────────────────────────
 
-_ip_conns:     Dict[str, int]   = defaultdict(int)
-_ip_conn_lock: asyncio.Lock     = asyncio.Lock()
-_revoked_cache: Dict[str, float] = {}
+class _ConnectionManager:
+    """Thread-safe WebSocket connection manager."""
 
-
-async def _check_revoked(jti: str, db) -> bool:
-    now = time.monotonic()
-    last_check = _revoked_cache.get(jti)
-    if last_check and now - last_check < _REVOKE_CACHE_TTL:
-        return False
-    try:
-        row = await db.select_one("revoked_tokens", {"jti": jti}, columns="jti")
-        if row:
-            return True
-        _revoked_cache[jti] = now
-        return False
-    except Exception:
-        return False
-
-
-class ConnectionManager:
     def __init__(self) -> None:
-        self._conns: Dict[str, WebSocket] = {}
-        self._lock = asyncio.Lock()
+        self._clients: Dict[str, Set[WebSocket]] = {}  # channel -> clients
 
-    async def connect(self, user_id: str, ws: WebSocket) -> None:
-        async with self._lock:
-            old = self._conns.get(user_id)
-            if old and old.client_state == WebSocketState.CONNECTED:
-                try:
-                    await old.close(code=4000)
-                except Exception:
-                    pass
-            self._conns[user_id] = ws
+    async def connect(self, channel: str, ws: WebSocket) -> None:
+        await ws.accept()
+        self._clients.setdefault(channel, set()).add(ws)
+        logger.info("WS client connected to channel=%s total=%d", channel, len(self._clients[channel]))
 
-    async def disconnect(self, user_id: str) -> None:
-        async with self._lock:
-            self._conns.pop(user_id, None)
+    def disconnect(self, channel: str, ws: WebSocket) -> None:
+        if channel in self._clients:
+            self._clients[channel].discard(ws)
+        logger.info("WS client disconnected from channel=%s", channel)
 
-    async def send(self, user_id: str, data: dict) -> bool:
-        ws = self._conns.get(user_id)
-        if ws and ws.client_state == WebSocketState.CONNECTED:
+    async def broadcast(self, channel: str, data: dict) -> None:
+        """Broadcast JSON data to all clients on a channel."""
+        dead: List[WebSocket] = []
+        for ws in list(self._clients.get(channel, [])):
             try:
                 await ws.send_json(data)
-                return True
-            except Exception:
-                await self.disconnect(user_id)
-        return False
+            except Exception:  # noqa: BLE001
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(channel, ws)
 
-    async def broadcast(self, data: dict) -> int:
-        sent = 0
-        async with self._lock:
-            user_ids = list(self._conns.keys())
-        for uid in user_ids:
-            if await self.send(uid, data):
-                sent += 1
-        return sent
+    def client_count(self, channel: str) -> int:
+        return len(self._clients.get(channel, set()))
 
 
-manager = ConnectionManager()
+_manager = _ConnectionManager()
 
 
-def _validate_origin(ws: WebSocket) -> bool:
-    settings = get_settings()
-    origin = ws.headers.get("origin", "")
-    if not origin:
-        return settings.ENVIRONMENT != "production"
-    return origin in settings.ALLOWED_ORIGINS
+# ── Background broadcaster ────────────────────────────────────
+
+async def _positions_broadcaster() -> None:
+    """Push positions to all /ws/positions clients every 2 seconds."""
+    while True:
+        try:
+            if _manager.client_count("positions") > 0:
+                positions = await mt5_connector.get_positions()
+                ks = get_kill_switch()
+                payload = {
+                    "type": "positions",
+                    "positions": [p if isinstance(p, dict) else p.__dict__ for p in (positions or [])],
+                    "kill_switch_active": ks.is_active,
+                }
+                await _manager.broadcast("positions", payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("positions broadcaster error: %s", exc)
+        await asyncio.sleep(2)
 
 
-@router.websocket("/ws/{user_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,
-    token: Optional[str] = Query(None),
-):
-    if not _validate_origin(websocket):
-        await websocket.close(code=4003)
-        return
+async def _signals_broadcaster() -> None:
+    """Push latest signal to all /ws/signals clients every 5 seconds."""
+    from backend.database.redis_client import get_redis  # lazy import
+    while True:
+        try:
+            if _manager.client_count("signals") > 0:
+                r = await get_redis()
+                if r:
+                    raw = await r.lrange("recent_signals", 0, 4)
+                    signals = [json.loads(s) for s in (raw or [])]
+                    await _manager.broadcast("signals", {"type": "signals", "signals": signals})
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("signals broadcaster error: %s", exc)
+        await asyncio.sleep(5)
 
-    if not token:
-        log.warning("WS: missing token for user_id=%s", user_id)
-        await websocket.close(code=4001)
-        return
 
+def start_broadcasters() -> None:
+    """Start background broadcast tasks. Called from lifespan()."""
+    loop = asyncio.get_event_loop()
+    loop.create_task(_positions_broadcaster())
+    loop.create_task(_signals_broadcaster())
+    logger.info("WebSocket broadcasters started")
+
+
+# ── WebSocket endpoints ───────────────────────────────────────
+
+@router.websocket("/positions")
+async def ws_positions(websocket: WebSocket) -> None:
+    """Real-time position updates (push every 2s from broadcaster)."""
+    await _manager.connect("positions", websocket)
     try:
-        payload = validate_access_token(token)
-    except ValueError:
-        log.warning("WS: invalid token for user_id=%s", user_id)
-        await websocket.close(code=4001)
-        return
-
-    token_user_id = payload.get("sub")
-    if token_user_id != user_id:
-        log.warning("WS: user_id mismatch token_sub=%s path=%s", token_user_id, user_id)
-        await websocket.close(code=4003)
-        return
-
-    jti = payload.get("jti", "")
-    from backend.database import db as _db
-    if jti and await _check_revoked(jti, _db):
-        log.warning("WS: revoked token jti=%s", jti)
-        await websocket.close(code=4001)
-        return
-
-    client_ip = websocket.client.host if websocket.client else "unknown"
-    async with _ip_conn_lock:
-        current = _ip_conns[client_ip]
-        if current >= _MAX_CONNS_PER_IP:
-            log.warning("WS: connection limit exceeded ip=%s", client_ip)
-            await websocket.close(code=4029)
-            return
-        _ip_conns[client_ip] = current + 1
-
-    await websocket.accept()
-    await manager.connect(user_id, websocket)
-    log.info("WS: connected user_id=%s", user_id)
-
-    try:
-        await websocket.send_json({"type": "connected", "user_id": user_id})
         while True:
-            try:
-                raw = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
-                if len(raw.encode()) > _MAX_MSG_BYTES:
-                    await websocket.send_json({"error": "Message too large"})
-                    continue
-                if raw == "ping":
-                    await websocket.send_json({"type": "pong"})
-            except asyncio.TimeoutError:
-                try:
-                    await websocket.send_json({"type": "ping"})
-                except Exception:
-                    break
+            # Keep alive — client can send ping
+            await asyncio.sleep(30)
+            await websocket.send_json({"type": "ping"})
+    except WebSocketDisconnect:
+        _manager.disconnect("positions", websocket)
+    except Exception:  # noqa: BLE001
+        _manager.disconnect("positions", websocket)
+
+
+@router.websocket("/signals")
+async def ws_signals(websocket: WebSocket) -> None:
+    """Real-time signal feed."""
+    await _manager.connect("signals", websocket)
+    try:
+        while True:
+            await asyncio.sleep(30)
+            await websocket.send_json({"type": "ping"})
+    except WebSocketDisconnect:
+        _manager.disconnect("signals", websocket)
+    except Exception:  # noqa: BLE001
+        _manager.disconnect("signals", websocket)
+
+
+@router.websocket("/health")
+async def ws_health(websocket: WebSocket) -> None:
+    """Health stream — useful for monitoring dashboards."""
+    await websocket.accept()
+    try:
+        while True:
+            ks = get_kill_switch()
+            await websocket.send_json({
+                "type": "health",
+                "kill_switch": ks.is_active,
+                "positions_clients": _manager.client_count("positions"),
+                "signals_clients": _manager.client_count("signals"),
+            })
+            await asyncio.sleep(10)
     except WebSocketDisconnect:
         pass
-    except Exception as exc:
-        log.error("WS: error user_id=%s: %s", user_id, type(exc).__name__)
-    finally:
-        await manager.disconnect(user_id)
-        async with _ip_conn_lock:
-            _ip_conns[client_ip] = max(0, _ip_conns.get(client_ip, 1) - 1)
-        log.info("WS: disconnected user_id=%s", user_id)

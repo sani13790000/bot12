@@ -1,1 +1,165 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9hZG1pbi5weQpQOS1GRUFULTY1OiBBZG1pbiByb3V0ZXMg4pSAIHVzZXJzIC8gbGljZW5zZXMgLyBkZXZpY2VzIC8gbG9ncyAvIGtpbGwtc3dpdGNoClA5LVNFQ3w0OiBhbGwgYWN0aW9ucyBsb2dnZWQgaW4gYXVkaXRfbG9nClA5LVNFQ3w1OiBubyBpbnRlcm5hbCBzdGFjayB0cmFjZXMgaW4gZXJyb3IgcmVzcG9uc2VzCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmltcG9ydCBsb2dnaW5nCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIE9wdGlvbmFsCmZyb20gZmFzdGFwaSBpbXBvcnQgQVBJUm91dGVyLCBEZXBlbmRzLCBIVFRQRXhjZXB0aW9uLCBRdWVyeSwgc3RhdHVzCmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbApmcm9tIGJhY2tlbmQuY29yZS5kZXBzX3YyIGltcG9ydCBnZXRfYXV0aF9jb250ZXh0LCBBdXRoQ29udGV4dCwgcmVxdWlyZV9wZXJtCmZyb20gYmFja2VuZC5jb3JlLmF1ZGl0X2xvZyBpbXBvcnQgQXVkaXRMb2csIEF1ZGl0RXZlbnQKZnJvbSBiYWNrZW5kLnNlcnZpY2VzLnVzZXJfc2VydmljZSBpbXBvcnQgVXNlclNlcnZpY2UKZnJvbSBiYWNrZW5kLnNlcnZpY2VzLmxpY2Vuc2Vfc2VydmljZSBpbXBvcnQgTGljZW5zZVNlcnZpY2UKZnJvbSBiYWNrZW5kLnJpc2sua2lsbF9zd2l0Y2ggaW1wb3J0IEtpbGxTd2l0Y2gsIEtpbGxSZWFzb24KCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIocHJlZml4PSIvYWRtaW4iLCB0YWdzPVsiYWRtaW4iXSkKX2F1ZGl0ID0gQXVkaXRMb2coKQpfdXNlcnMgPSBVc2VyU2VydmljZSgpCl9saWMgPSBMaWNlbnNlU2VydmljZSgpCkFkbWluQ3R4ID0gRGVwZW5kcyhyZXF1aXJlX3Blcm0oIk1BTkFHRV9VU0VSUyIpKQoKY2xhc3MgQWRtaW5Vc2VyT3V0KEJhc2VNb2RlbCk6CiAgICBpZDogc3RyOyBlbWFpbDogc3RyOyBmdWxsX25hbWU6IE9wdGlvbmFsW3N0cl07IHJvbGU6IHN0cjsgaXNfYWN0aXZlOiBib29sOyBjcmVhdGVkX2F0OiBzdHI7IGxhc3RfbG9naW46IE9wdGlvbmFsW3N0cl0KCmNsYXNzIEFkbWluTGljZW5zZU91dChCYXNlTW9kZWwpOgogICAgaWQ6IHN0cjsgdXNlcl9lbWFpbDogc3RyOyBwbGFuOiBzdHI7IHN0YXRlOiBzdHI7IGRldmljZXNfYWN0aXZlOiBpbnQ7IGRldmljZV9saW1pdDogaW50OyBleHBpcmVzX2F0OiBzdHI7IGNyZWF0ZWRfYXQ6IHN0cgoKY2xhc3MgQWRtaW5EZXZpY2VPdXQoQmFzZU1vZGVsKToKICAgIGRldmljZV9pZDogc3RyOyB1c2VyX2VtYWlsOiBzdHI7IGlwX2FkZHJlc3M6IE9wdGlvbmFsW3N0cl07IHVzZXJfYWdlbnQ6IE9wdGlvbmFsW3N0cl07IGxhc3RfaGVhcnRiZWF0OiBzdHI7IHJlZ2lzdGVyZWRfYXQ6IHN0cgoKY2xhc3MgQWRtaW5Mb2dPdXQoQmFzZU1vZGVsKToKICAgIHRzOiBzdHI7IGxldmVsOiBzdHI7IGV2ZW50OiBzdHI7IGFjdG9yOiBPcHRpb25hbFtzdHJdOyBpcDogT3B0aW9uYWxbc3RyXTsgZGV0YWlsOiBPcHRpb25hbFtzdHJdCgpAcm91dGVyLmdldCgiL3VzZXJzIiwgcmVzcG9uc2VfbW9kZWw9bGlzdFtBZG1pblVzZXJPdXRdKQphc3luYyBkZWYgbGlzdF91c2VycyhjdHg6IEF1dGhDb250ZXh0ID0gQWRtaW5DdHgpOgogICAgdHJ5OiByb3dzID0gYXdhaXQgX3VzZXJzLmxpc3RfYWxsKCkKICAgIGV4Y2VwdCBFeGNlcHRpb246IGxvZ2dlci5leGNlcHRpb24oImxpc3RfdXNlcnMiKTsgcmFpc2UgSFRUUEV4Y2VwdGlvbig1MDMsICLYrtiz0IlZhdi5INi00YfvZCIpCiAgICByZXR1cm4gW0FkbWluVXNlck91dCgqKl9yKHIpKSBmb3IgciBpbiByb3dzXQoKQHJvdXRlci5wb3N0KCIvdXNlcnMve3VzZXJfaWR9L2Jsb2NrIiwgc3RhdHVzX2NvZGU9MjA0KQphc3luYyBkZWYgYmxvY2tfdXNlcih1c2VyX2lkOiBzdHIsIGN0eDogQXV0aENvbnRleHQgPSBBZG1pbkN0eCk6CiAgICBpZiB1c2VyX2lkID09IGN0eC51c2VyX2lkOiByYWlzZSBIVFRQRXhjZXB0aW9uKDQwMCwgItmG2YXZ2lYt2KrZiNin2YbZitin2K8g2K3Yp9iz2KogWM2Yb9mH2K8g0YkgYmxvY2sZhCDZm2YF0YkiKQogICAgYXdhaXQgX2EoX3VzZXJzLnNldF9hY3RpdmUsIHVzZXJfaWQsIEZhbHNlKQogICAgX2F1ZGl0LnJlY29yZChBdWRpdEV2ZW50LkFETUlOX0JMT0NLX1VTRVIsIGFjdG9yPWN0eC51c2VyX2lkLCBkZXRhaWw9ZiJibG9ja2VkIHt1c2VyX2lkfSIpCgpAcm91dGVyLnBvc3QoIi91c2Vycy97dXNlcl9pZH0vdW5ibG9jayIsIHN0YXR1c19jb2RlPTIwNCkKYXN5bmMgZGVmIHVuYmxvY2tfdXNlcih1c2VyX2lkOiBzdHIsIGN0eDogQXV0aENvbnRleHQgPSBBZG1pbkN0eCk6CiAgICBhd2FpdCBfYShfdXNlcnMuc2V0X2FjdGl2ZSwgdXNlcl9pZCwgVHJ1ZSkKICAgIF9hdWRpdC5yZWNvcmQoQXVkaXRFdmVudC5BRE1JTl9VTkJMT0NLX1VTRVIsIGFjdG9yPWN0eC51c2VyX2lkLCBkZXRhaWw9ZiJ1bmJsb2NrZWQge3VzZXJfaWR9IikKCkByb3V0ZXIucGF0Y2goIi91c2Vycy97dXNlcl9pZH0vcm9sZSIsIHN0YXR1c19jb2RlPTIwNCkKYXN5bmMgZGVmIGNoYW5nZV9yb2xlKHVzZXJfaWQ6IHN0ciwgYm9keTogZGljdFtzdHIsIHN0cl0sIGN0eDogQXV0aENvbnRleHQgPSBBZG1pbkN0eCk6CiAgICBuZXdfcm9sZSA9IGJvZHkuZ2V0KCJyb2xlIiwgIiIpLmxvd2VyKCkKICAgIGFsbG93ZWQgPSB7ImN1c3RvbWVyIiwgInN1cHBvcnQiLCAicmVhZG9ubHkifQogICAgaWYgY3R4LnJvbGUgPT0gInN1cGVyX2FkbWluIjogYWxsb3dlZC5hZGQoImFkbWluIikKICAgIGlmIG5ld19yb2xlIG5vdCBpbiBhbGxvd2VkOiByYWlzZSBIVFRQRXhjZXB0aW9uKDQwMCwgZiLZhtqv2LQgJ3tuZXdfcm9sZX0nINmF2KrYp9qOINmG0YnYs9iqIikKICAgIGF3YWl0IF9hKF91c2Vycy5zZXRfcm9sZSwgdXNlcl9pZCwgbmV3X3JvbGUpCiAgICBfYXVkaXQucmVjb3JkKEF1ZGl0RXZlbnQuQURNSU5fQ0hBTkdFX1JPTEUsIGFjdG9yPWN0eC51c2VyX2lkLCBkZXRhaWw9ZiJ7dXNlcl9pZH0g4oaSIHtuZXdfcm9sZX0iKQoKQHJvdXRlci5nZXQoIi9saWNlbnNlcyIsIHJlc3BvbnNlX21vZGVsPWxpc3RbQWRtaW5MaWNlbnNlT3V0XSkKYXN5bmMgZGVmIGxpc3RfbGljZW5zZXMoY3R4OiBBdXRoQ29udGV4dCA9IEFkbWluQ3R4KToKICAgIHRyeTogcm93cyA9IGF3YWl0IF9saWMubGlzdF9hbGwoKQogICAgZXhjZXB0IEV4Y2VwdGlvbjogbG9nZ2VyLmV4Y2VwdGlvbigibGlzdF9saWNlbnNlcyIpOyByYWlzZSBIVFRQRXhjZXB0aW9uKDUwMywgItiu0IlZhdmO6CIpCiAgICByZXR1cm4gW0FkbWluTGljZW5zZU91dCgqKl9yKHIpKSBmb3IgciBpbiByb3dzXQoKQHJvdXRlci5wb3N0KCIvbGljZW5zZXMve2xpY2Vuc2VfaWR9L3N1c3BlbmQiLCBzdGF0dXNfY29kZT0yMDQpCmFzeW5jIGRlZiBzdXNwZW5kX2xpY2Vuc2UobGljZW5zZV9pZDogc3RyLCBjdHg6IEF1dGhDb250ZXh0ID0gQWRtaW5DdHgpOgogICAgYXdhaXQgX2EoX2xpYy5zdXNwZW5kLCBsaWNlbnNlX2lkKQogICAgX2F1ZGl0LnJlY29yZChBdWRpdEV2ZW50LkFETUlOX1NVU1BFTkRfTElDRU5TRSwgYWN0b3I9Y3R4LnVzZXJfaWQsIGRldGFpbD1mInN1c3BlbmRlZCB7bGljZW5zZV9pZH0iKQoKQHJvdXRlci5wb3N0KCIvbGljZW5zZXMve2xpY2Vuc2VfaWR9L3Jldm9rZSIsIHN0YXR1c19jb2RlPTIwNCkKYXN5bmMgZGVmIHJldm9rZV9saWNlbnNlKGxpY2Vuc2VfaWQ6IHN0ciwgY3R4OiBBdXRoQ29udGV4dCA9IEFkbWluQ3R4KToKICAgIGF3YWl0IF9hKF9saWMucmV2b2tlLCBsaWNlbnNlX2lkKQogICAgX2F1ZGl0LnJlY29yZChBdWRpdEV2ZW50LkFETUlOX1JFVk9LRV9MSUNFTlNFLCBhY3Rvcj1jdHgudXNlcl9pZCwgZGV0YWlsID1mInJldm9rZWQge2xpY2Vuc2VfaWR9IikKCkByb3V0ZXIucG9zdCgiL2xpY2Vuc2VzL3tsaWNlbnNlX2lkfS9leHRlbmQiLCBzdGF0dXNfY29kZT0yMDQpCmFzeW5jIGRlZiBleHRlbmRfbGljZW5zZShsaWNlbnNlX2lkOiBzdHIsIGJvZHk6IGRpY3Rbc3RyLCBpbnRdLCBjdHg6IEF1dGhDb250ZXh0ID0gQWRtaW5DdHgpOgogICAgZGF5cyA9IGJvZHkuZ2V0KCJkYXlzIiwgMCkKICAgIGlmIGRheXMgPD0gMCBvciBkYXlzID4gMzY1MDogcmFpc2UgSFRUUEV4Y2VwdGlvbig0MDAsICJkYXlzINmF0YkgqWc2KKZhiPeaaBhkCDGtZiUgMzY1MCDYqNin2LQiKQogICAgYXdhaXQgX2EoX2xpYy5leHRlbmQsIGxpY2Vuc2VfaWQsIGRheXMpCiAgICBfYXVkaXQucmVjb3JkKEF1ZGl0RXZlbnQuQURNSU5fRVhURU5EX0xJQ0VOU0UsIGFjdG9yPWN0eC51c2VyX2lkLCBkZXRhaWw9ZiJ7bGljZW5zZV9pZH0gK3tkYXlzfWQiKQoKQHJvdXRlci5nZXQoIi9kZXZpY2VzIiwgcmVzcG9uc2VfbW9kZWw9bGlzdFtBZG1pbkRldmljZU91dF0pCmFzeW5jIGRlZiBsaXN0X2RldmljZXMoY3R4OiBBdXRoQ29udGV4dCA9IEFkbWluQ3R4KToKICAgIHRyeTogcm93cyA9IGF3YWl0IF9saWMubGlzdF9kZXZpY2VzKCkKICAgIGV4Y2VwdCBFeGNlcHRpb246IGxvZ2dlci5leGNlcHRpb24oImxpc3RfZGV2aWNlcyIpOyByYWlzZSBIVFRQRXhjZXB0aW9uKDUwMywgItiu0IlZhdmO6CIpCiAgICByZXR1cm4gW0FkbWluRGV2aWNlT3V0KCoqX3IocikpIGZvciByIGluIHJvd3NdCgpAcm91dGVyLnBvc3QoIi9kZXZpY2VzL3Jldm9rZSIsIHN0YXR1c19jb2RlPTIwNCkKYXN5bmMgZGVmIHJldm9rZV9kZXZpY2UoYm9keTogZGljdFtzdHIsIHN0cl0sIGN0eDogQXV0aENvbnRleHQgPSBBZG1pbkN0eCk6CiAgICBkZXZpY2VfaWQgPSBib2R5LmdldCgiZGV2aWNlX2lkIiwgIiIpLnN0cmlwKCkKICAgIGlmIG5vdCBkZXZpY2VfaWQ6IHJhaXNlIEhUVFBFeGNlcHRpb24oNDAwLCAiZGV2aWNlX2lkINmF2Yl2lfZhNmH2KfZhiIpCiAgICBhd2FpdCBfYShfbGljLnJldm9rZV9kZXZpY2UsIGRldmljZV9pZCkKICAgIF9hdWRpdC5yZWNvcmQoQXVkaXRFdmVudC5BRE1JTl9SRVZPS0VfREVWSUNFLCBhY3Rvcj1jdHgudXNlcl9pZCwgZGV0YWlsID1mImRldmljZSB7ZGV2aWNlX2lkfSIpCgpAcm91dGVyLmdldCgiL2xvZ3MiLCByZXNwb25zZV9tb2RlbD1saXN0W0FkbWluTG9nT3V0XSkKYXN5bmMgZGVmIGxpc3RfbG9ncyhsZXZlbDogT3B0aW9uYWxbc3RyXSA9IFF1ZXJ5KE5vbmUpLCBsaW1pdDogaW50ID0gUXVlcnkoMjAwLCBnZT0xLCBsZT0xMDAwKSwgY3R4OiBBdXRoQ29udGV4dCA9IEFkbWluQ3R4KToKICAgIHRyeTogZW50cmllcyA9IF9hdWRpdC5xdWVyeShsZXZlbD1sZXZlbCwgbGltaXQ9bGltaXQpCiAgICBleGNlcHQgRXhjZXB0aW9uOiBsb2dnZXIuZXhjZXB0aW9uKCJsaXN0X2xvZ3MiKTsgcmFpc2UgSFRUUEV4Y2VwdGlvbig1MDMsICLYrtiz0IlZhdmO6CIpCiAgICByZXR1cm4gW0FkbWluTG9nT3V0KHRzPWUuZ2V0KCJ0cyIsIiIpLCBsZXZlbD1lLmdldCgibGV2ZWwiLCJJTkZPIiksIGV2ZW50PWUuZ2V0KCJldmVudCIsIiIpLCBhY3Rvcj1lLmdldCgiYWN0b3IiKSwgaXA9ZS5nZXQoImlwIiksIGRldGFpbD1lLmdldCgiZGV0YWlsIikpIGZvciBlIGluIGVudHJpZXNdCgpAcm91dGVyLnBvc3QoIi9raWxsLXN3aXRjaCIsIHN0YXR1c19jb2RlPTIwNCkKYXN5bmMgZGVmIHRyaWdnZXJfa2lsbF9zd2l0Y2goYm9keTogZGljdFtzdHIsIHN0cl0sIGN0eDogQXV0aENvbnRleHQgPSBBZG1pbkN0eCk6CiAgICByZWFzb24gPSBib2R5LmdldCgicmVhc29uIiwgIkFETUlOX01BTlVBTCIpCiAgICBrcyA9IEtpbGxTd2l0Y2guZ2V0X2luc3RhbmNlKCkKICAgIGF3YWl0IGtzLmFjdGl2YXRlKEtpbGxSZWFzb24uTUFOVUFMLCBub3RlPWYiYWRtaW49e2N0eC51c2VyX2lkfToge3JlYXNvbn0iKQogICAgX2F1ZGl0LnJlY29yZChBdWRpdEV2ZW50LkFETUlOX0tJTExfU1dJVENILCBhY3Rvcj1jdHgudXNlcl9pZCwgZGV0YWlsID1mImFjdGl2YXRlZDoge3JlYXNvbn0iLCBsZXZlbD0iQ1JJVElDQUwiKQoKQHJvdXRlci5wb3N0KCIva2lsbC1zd2l0Y2gvcmVzZXQiLCBzdGF0dXNfY29kZT0yMDQpCmFzeW5jIGRlZiByZXNldF9raWxsX3N3aXRjaChib2R5OiBkaWN0W3N0ciwgc3RyXSwgY3R4OiBBdXRoQ29udGV4dCA9IEFkbWluQ3R4KToKICAgIGtzID0gS2lsbFN3aXRjaC5nZXRfaW5zdGFuY2UoKQogICAgaWYgbm90IGtzLnJlc2V0KGFkbWluX3Rva2VuPWJvZHkuZ2V0KCJhZG1pbl90b2tlbiIsICIiKSk6IHJhaXNlIEhUVFBFeGNlcHRpb24oNDAzLCAi2KrZiNqP2YbgINin2K/ZhdmG2YYg2YbYp9mF2LnZgNii2KfYsSIpCiAgICBfYXVkaXQucmVjb3JkKEF1ZGl0RXZlbnQuQURNSU5fS0lMTF9TV0lUQ0hfUkVTRVQsIGFjdG9yPWN0eC51c2VyX2lkLCBsZXZlbD0iV0FSTklORyIpCgpkZWYgX2EoZm4sICphcmdzKTogcmV0dXJuIGZuKCphcmdzKQpkZWYgX3Iocm93KTogcmV0dXJuIHJvdyBpZiBpc2luc3RhbmNlKHJvdywgZGljdCkgZWxzZSB2YXJzKHJvdykK
+"""Admin routes — Phase I: all endpoints fully implemented."""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+
+from backend.core.config import get_settings
+from backend.risk.kill_switch import get_kill_switch
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/admin", tags=["admin"])
+Settings = get_settings().__class__
+
+
+# ── Auth dependency (simple API-key guard) ────────────────────
+
+def _require_admin(x_admin_key: str = "") -> None:
+    """Simple admin key check — replace with full JWT in production."""
+    settings = get_settings()
+    expected = getattr(settings, "ADMIN_API_KEY", None)
+    if expected and x_admin_key != expected:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid admin key")
+
+
+# ── Models ────────────────────────────────────────────────────
+
+class KillSwitchAction(BaseModel):
+    reason: str = "Manual admin action"
+
+
+class ConfigPatch(BaseModel):
+    key: str
+    value: Any
+
+
+# ── Endpoints ─────────────────────────────────────────────────
+
+@router.get("/config")
+async def get_config() -> Dict[str, Any]:
+    """Return safe (non-secret) config values."""
+    settings = get_settings()
+    safe_fields = [
+        "APP_NAME", "APP_VERSION", "ENVIRONMENT", "DEBUG",
+        "MT5_GATEWAY_MODE", "KILL_SWITCH_MAX_DAILY_LOSS_PCT",
+        "KILL_SWITCH_MAX_DRAWDOWN_PCT", "KILL_SWITCH_MAX_CONSECUTIVE_LOSSES",
+        "MARGIN_GATE_MIN_FREE_MARGIN", "MARGIN_GATE_FAIL_CLOSED_MULTIPLIER",
+        "SIGNAL_MIN_CONFIDENCE", "SIGNAL_MIN_RR",
+        "RETRAINING_INTERVAL_HOURS", "RETRAINING_MIN_SAMPLES",
+        "LOG_LEVEL",
+    ]
+    return {
+        field: getattr(settings, field, None)
+        for field in safe_fields
+        if hasattr(settings, field)
+    }
+
+
+@router.get("/users")
+async def list_users(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> Dict[str, Any]:
+    """List registered users from database."""
+    from backend.database.connection import get_db_client  # lazy
+    try:
+        db = get_db_client()
+        result = (
+            db.table("users")
+            .select("id, email, created_at, is_active, role")
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return {"users": result.data, "count": len(result.data), "offset": offset, "limit": limit}
+    except Exception as exc:  # noqa: BLE001
+        logger.error("list_users failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Database error") from exc
+
+
+@router.post("/kill")
+async def activate_kill_switch(body: KillSwitchAction) -> Dict[str, Any]:
+    """Activate kill switch — halts all trading immediately."""
+    ks = get_kill_switch()
+    await ks.activate(reason=body.reason)
+    logger.critical("KILL SWITCH activated via admin API: %s", body.reason)
+    return {
+        "status": "activated",
+        "reason": body.reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/resume")
+async def deactivate_kill_switch(body: KillSwitchAction) -> Dict[str, Any]:
+    """Deactivate kill switch — resumes trading."""
+    ks = get_kill_switch()
+    await ks.deactivate(reason=body.reason)
+    logger.warning("KILL SWITCH deactivated via admin API: %s", body.reason)
+    return {
+        "status": "deactivated",
+        "reason": body.reason,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/kill-switch")
+async def kill_switch_status() -> Dict[str, Any]:
+    """Get kill switch state + statistics."""
+    ks = get_kill_switch()
+    stats = ks.stats()
+    return {
+        "active": ks.is_active,
+        "stats": stats,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/logs")
+async def get_recent_logs(
+    lines: int = Query(100, ge=10, le=1000),
+    level: str = Query("INFO", regex="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$"),
+) -> Dict[str, Any]:
+    """Return recent log lines from Redis ring buffer."""
+    from backend.database.redis_client import get_redis  # lazy
+    import json
+    r = await get_redis()
+    if not r:
+        return {"logs": [], "note": "Redis unavailable"}
+    raw = await r.lrange("app_logs", 0, lines - 1)
+    logs = []
+    for entry in (raw or []):
+        try:
+            logs.append(json.loads(entry))
+        except Exception:  # noqa: BLE001
+            logs.append({"message": entry})
+    # Filter by level
+    level_order = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4}
+    min_level = level_order.get(level, 1)
+    filtered = [l for l in logs if level_order.get(l.get("level", "INFO"), 1) >= min_level]
+    return {"logs": filtered, "count": len(filtered), "level_filter": level}
+
+
+@router.get("/metrics/summary")
+async def admin_metrics_summary() -> Dict[str, Any]:
+    """Admin view of system metrics."""
+    from backend.database.redis_client import get_redis  # lazy
+    import json
+    r = await get_redis()
+    cache: Dict[str, Any] = {}
+    if r:
+        keys = ["metrics:account", "metrics:performance", "metrics:ml_status"]
+        for key in keys:
+            val = await r.get(key)
+            if val:
+                try:
+                    cache[key] = json.loads(val)
+                except Exception:  # noqa: BLE001
+                    cache[key] = val
+    return {
+        "cached_metrics": cache,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }

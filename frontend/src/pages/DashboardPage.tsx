@@ -1,53 +1,126 @@
-// frontend/src/pages/DashboardPage.tsx
-import React from "react";
-import { TrendingUp, TrendingDown, Activity, DollarSign, BarChart2, Shield, Target, Zap, AlertTriangle } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { format } from "date-fns";
-import { dashboardApi, tradesApi, signalsApi } from "@/utils/api";
-import { usePoll, useApi } from "@/hooks/useApi";
-import StatCard from "@/components/StatCard";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import ErrorAlert from "@/components/ErrorAlert";
-import Badge from "@/components/Badge";
+import React, { useEffect, useState, useCallback } from 'react';
+import { apiClient } from '../utils/api';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorAlert from '../components/ErrorAlert';
 
-export default function DashboardPage() {
-  const { data: stats, isLoading: sl, error: se, refetch: sr } = usePoll(dashboardApi.getStats, 15_000);
-  const { data: equity }      = usePoll(() => dashboardApi.getEquity(30), 60_000);
-  const { data: openTrades }  = useApi(() => tradesApi.listOpen(1, 5).then((r: any) => r.items));
-  const { data: recentSignals } = useApi(() => signalsApi.list(1, 4).then((r: any) => r.items));
-  if (sl) return <LoadingSpinner text="در حال بارگذاری داشبورد..." />;
-  if (se) return <div className="p-6"><ErrorAlert message={se} onRetry={sr} /></div>;
+interface AccountMetrics {
+  equity: number;
+  balance: number;
+  free_margin: number;
+  margin_level: number;
+  equity_change_pct: number;
+}
+
+interface SystemHealth {
+  status: string;
+  kill_switch_active: boolean;
+  redis: boolean;
+  mt5: boolean;
+}
+
+const DashboardPage: React.FC = () => {
+  const [account, setAccount] = useState<AccountMetrics | null>(null);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [performance, setPerformance] = useState<Record<string, number> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const [acc, hlth, perf] = await Promise.allSettled([
+        apiClient.get<AccountMetrics>('/metrics/account'),
+        apiClient.get<SystemHealth>('/health/ready'),
+        apiClient.get<Record<string, number>>('/metrics/performance'),
+      ]);
+      if (acc.status === 'fulfilled') setAccount(acc.value);
+      if (hlth.status === 'fulfilled') setHealth(hlth.value);
+      if (perf.status === 'fulfilled') setPerformance(perf.value);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    // Poll every 5 seconds
+    const interval = setInterval(fetchAll, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  if (loading) return <LoadingSpinner />;
+
   return (
     <div className="p-6 space-y-6">
-      <div><h1 className="text-xl font-bold text-white">داشبورد</h1><p className="text-sm text-gray-400 mt-1">خلاصه وضعیت حساب و معاملات</p></div>
-      {stats && (<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="موجودی" value={`$${stats.equity?.toLocaleString()}`} subtitle={`بالانس: $${stats.balance?.toLocaleString()}`} icon={DollarSign} color="blue" />
-        <StatCard title="سود/زیان روز" value={`$${stats.daily_pnl?.toFixed(2)}`} subtitle={stats.daily_pnl >= 0 ? "▲ مثبت" : "▼ منفی"} icon={stats.daily_pnl >= 0 ? TrendingUp : TrendingDown} trend={stats.daily_pnl >= 0 ? "up" : "down"} color={stats.daily_pnl >= 0 ? "green" : "red"} />
-        <StatCard title="نرخ موفقیت" value={`${stats.win_rate?.toFixed(1)}%`} subtitle={`${stats.total_trades} معامله کل`} icon={Target} color="purple" />
-        <StatCard title="Drawdown" value={`${stats.drawdown?.toFixed(2)}%`} subtitle={stats.drawdown < 10 ? "ریسک پایین" : "⚠️ هشدار"} icon={Shield} color={stats.drawdown < 10 ? "green" : stats.drawdown < 20 ? "yellow" : "red"} />
-      </div>)}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {equity && (<div className="lg:col-span-2 rounded-xl border border-gray-800 bg-gray-900 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">منحنی سرمایه — ۳۰ روز</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={equity as any}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis dataKey="date" tick={{ fill: "#9ca3af", fontSize: 10 }} tickFormatter={(d: string) => format(new Date(d), "MM/dd")} />
-              <YAxis tick={{ fill: "#9ca3af", fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: "#111827", border: "1px solid #1f2937", borderRadius: 8 }} formatter={(v: number) => [`$${v.toLocaleString()}`, "موجودی"]} />
-              <Area type="monotone" dataKey="equity" stroke="#3b82f6" fill="#3b82f620" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>)}
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Zap size={15} className="text-yellow-400" /> سیگنال‌های اخیر</h2>
-          {(recentSignals as any)?.length ? (<div className="space-y-2">{(recentSignals as any).map((s: any) => (<div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-800/50"><div><p className="text-xs font-mono text-white">{s.symbol}</p><p className="text-xs text-gray-500">{s.timeframe}</p></div><div className="text-right"><Badge label={s.direction === "buy" ? "خرید" : "فروش"} color={s.direction === "buy" ? "green" : "red"} /><p className="text-xs text-gray-500 mt-0.5">{(s.confidence * 100).toFixed(0)}%</p></div></div>))}</div>) : (<div className="text-center py-6"><Activity size={32} className="mx-auto mb-2 text-gray-600" /><p className="text-xs text-gray-500">سیگنالی موجود نیست</p></div>)}
+      <h1 className="text-2xl font-bold text-white">🌌 Galaxy Vast AI Trading</h1>
+
+      {error && <ErrorAlert message={error} />}
+
+      {/* System Status */}
+      {health && (
+        <div className={`p-4 rounded-lg border ${
+          health.kill_switch_active
+            ? 'bg-red-900 border-red-500'
+            : 'bg-green-900 border-green-500'
+        }`}>
+          <p className="font-semibold text-white">
+            {health.kill_switch_active
+              ? '🚨 KILL SWITCH ACTIVE — Trading Halted'
+              : '✅ System Online — Trading Active'}
+          </p>
+          <div className="flex gap-4 mt-2 text-sm">
+            <span className={health.redis ? 'text-green-400' : 'text-red-400'}>
+              Redis: {health.redis ? '✅' : '❌'}
+            </span>
+            <span className={health.mt5 ? 'text-green-400' : 'text-red-400'}>
+              MT5: {health.mt5 ? '✅' : '❌'}
+            </span>
+          </div>
         </div>
-      </div>
-      <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-800"><h2 className="text-sm font-semibold text-white flex items-center gap-2"><BarChart2 size={15} className="text-blue-400" /> معاملات باز</h2></div>
-        {(openTrades as any)?.length ? (<table className="w-full text-sm"><thead><tr className="border-b border-gray-800 text-gray-400 text-xs">{["نماد","جهت","حجم","قیمت ورود","P&L"].map(h => <th key={h} className="text-right px-4 py-3 font-medium">{h}</th>)}</tr></thead><tbody className="divide-y divide-gray-800">{(openTrades as any).map((t: any) => { const pnl = t.pnl ?? 0; return (<tr key={t.id} className="hover:bg-gray-800/50"><td className="px-4 py-3 font-mono text-white">{t.symbol}</td><td className="px-4 py-3"><Badge label={t.direction === "buy" ? "خرید" : "فروش"} color={t.direction === "buy" ? "green" : "red"} /></td><td className="px-4 py-3 text-gray-300">{t.lot_size}</td><td className="px-4 py-3 font-mono text-gray-300 text-xs">{t.entry_price?.toFixed(5)}</td><td className={`px-4 py-3 font-mono font-medium ${pnl >= 0 ? "text-green-400" : "text-red-400"}`}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}</td></tr>); })}</tbody></table>) : (<div className="text-center py-8"><AlertTriangle size={32} className="mx-auto mb-2 text-gray-600" /><p className="text-sm text-gray-500">هیچ معامله بازی وجود ندارد</p></div>)}
-      </div>
+      )}
+
+      {/* Account Metrics */}
+      {account && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {([
+            { label: 'Equity', value: `$${account.equity.toLocaleString('en', { minimumFractionDigits: 2 })}`,
+              delta: `${account.equity_change_pct >= 0 ? '+' : ''}${account.equity_change_pct.toFixed(2)}%`,
+              positive: account.equity_change_pct >= 0 },
+            { label: 'Balance', value: `$${account.balance.toLocaleString('en', { minimumFractionDigits: 2 })}` },
+            { label: 'Free Margin', value: `$${account.free_margin.toLocaleString('en', { minimumFractionDigits: 2 })}` },
+            { label: 'Margin Level', value: `${account.margin_level.toFixed(1)}%` },
+          ] as Array<{ label: string; value: string; delta?: string; positive?: boolean }>).map(m => (
+            <div key={m.label} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <p className="text-gray-400 text-sm">{m.label}</p>
+              <p className="text-white text-xl font-bold">{m.value}</p>
+              {m.delta && (
+                <p className={`text-sm ${m.positive ? 'text-green-400' : 'text-red-400'}`}>{m.delta}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Performance KPIs */}
+      {performance && (
+        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+          <h2 className="text-lg font-semibold text-white mb-3">📊 Performance</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div><p className="text-gray-400 text-sm">Win Rate</p>
+              <p className="text-white font-bold">{((performance.win_rate ?? 0) * 100).toFixed(1)}%</p></div>
+            <div><p className="text-gray-400 text-sm">Profit Factor</p>
+              <p className="text-white font-bold">{(performance.profit_factor ?? 0).toFixed(2)}</p></div>
+            <div><p className="text-gray-400 text-sm">Sharpe Ratio</p>
+              <p className="text-white font-bold">{(performance.sharpe_ratio ?? 0).toFixed(2)}</p></div>
+            <div><p className="text-gray-400 text-sm">Max Drawdown</p>
+              <p className="text-red-400 font-bold">{((performance.max_drawdown ?? 0) * 100).toFixed(1)}%</p></div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default DashboardPage;
