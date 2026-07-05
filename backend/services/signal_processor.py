@@ -1,149 +1,211 @@
-"""
-backend/services/signal_processor.py
-Galaxy Vast AI Trading Platform
+"""Signal Processor with Context Enrichment — Phase F.
 
-FIX: Was placeholder string 'SIGNAL_PROCESSOR_CONTENT' -- not Python code.
-     Full SignalProcessor with VotingEngine integration.
-
-BUG-3 FIX: vote(signal) wrong signature -> vote(agents, context) correct.
+Fixes BUG-F2: Context is now enriched with SMC, ML, and Session data
+before being passed to VotingEngine. Agents receive real data.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from backend.agents.voting_engine import (
+    VotingEngine,
+    VotingConfig,
+    FinalVote,
+    VoteSignal,
+    BaseAgent,
+)
+from backend.services.context_enricher import ContextEnricher, get_context_enricher
 
 logger = logging.getLogger(__name__)
 
-_MIN_CONFIDENCE = float(__import__("os").environ.get("SIGNAL_MIN_CONFIDENCE", "0.55"))
-_MIN_RR = float(__import__("os").environ.get("SIGNAL_MIN_RR", "1.5"))
 
-
-@dataclass
 class TradingSignal:
-    symbol:      str
-    direction:   str
-    confidence:  float
-    risk_reward: float
-    entry_price: float
-    sl:          float
-    tp:          float
-    timeframe:   str = "H1"
-    source:      str = "unknown"
-    equity:      float = 0.0
-    free_margin: float = 0.0
-    volume:      float = 0.01
-    metadata:    Dict[str, Any] = field(default_factory=dict)
-    created_at:  str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    """Lightweight signal produced by a route or strategy."""
 
+    def __init__(
+        self,
+        symbol: str,
+        direction: str,         # BUY | SELL | NEUTRAL
+        confidence: float = 0.5,
+        entry: Optional[float] = None,
+        sl: Optional[float] = None,
+        tp: Optional[float] = None,
+        rr: float = 0.0,
+        source: str = "unknown",
+        extra: Optional[Dict[str, Any]] = None,
+        candles: Optional[List[Dict]] = None,
+    ) -> None:
+        self.symbol     = symbol
+        self.direction  = direction.upper()
+        self.confidence = float(confidence)
+        self.entry      = entry
+        self.sl         = sl
+        self.tp         = tp
+        self.rr         = float(rr)
+        self.source     = source
+        self.extra      = extra or {}
+        self.candles    = candles or []   # raw OHLCV list for SMCEngine
 
-@dataclass
-class ProcessedSignal:
-    approved:         bool
-    signal:           Optional[TradingSignal]
-    rejection_reason: Optional[str] = None
-    vote_result:      Optional[Any] = None
+    def to_base_context(self) -> Dict[str, Any]:
+        """Return minimal context dict — ContextEnricher will enrich it."""
+        return {
+            "symbol":     self.symbol,
+            "direction":  self.direction,
+            "confidence": self.confidence,
+            "entry":      self.entry,
+            "sl":         self.sl,
+            "tp":         self.tp,
+            "rr":         self.rr,
+            "source":     self.source,
+            **self.extra,
+        }
 
 
 class SignalProcessor:
-    """
-    Validates and routes trading signals through multi-agent voting.
+    """Orchestrates context enrichment and multi-agent voting."""
 
-    Usage:
-        processor = SignalProcessor()
-        processor.register_agents([smc_agent, ml_agent, news_agent])
-        result = await processor.process(signal)
-    """
+    def __init__(
+        self,
+        voting_config: Optional[VotingConfig] = None,
+    ) -> None:
+        self._voting_engine = VotingEngine(config=voting_config or VotingConfig())
+        self._agents: List[BaseAgent] = []
+        self._enricher: ContextEnricher = get_context_enricher()
+        logger.info("[SignalProcessor] initialized")
 
-    def __init__(self) -> None:
-        self._agents: List[Any] = []
-        self._voting_engine: Optional[Any] = None
-        self._processed = self._approved = self._rejected = 0
+    # ------------------------------------------------------------------
+    # Engine injection (called from main.py lifespan)
+    # ------------------------------------------------------------------
 
     def register_agents(self, agents: List[Any]) -> None:
+        """Register agent instances with the VotingEngine."""
         self._agents = list(agents)
-        logger.info("[SignalProcessor] registered %d agent(s)", len(self._agents))
+        logger.info(
+            "[SignalProcessor] registered %d agents: %s",
+            len(self._agents),
+            [type(a).__name__ for a in self._agents],
+        )
 
-    def _get_voting_engine(self) -> Optional[Any]:
-        if self._voting_engine is None:
-            try:
-                from backend.agents.voting_engine import VotingEngine
-                self._voting_engine = VotingEngine()
-            except ImportError:
-                logger.warning("[SignalProcessor] VotingEngine not available")
-        return self._voting_engine
+    def register_engines(
+        self,
+        smc_engine: Optional[Any] = None,
+        ml_engine:  Optional[Any] = None,
+    ) -> None:
+        """Inject real SMC and ML engines into the ContextEnricher.
 
-    async def process(self, signal: TradingSignal) -> ProcessedSignal:
-        self._processed += 1
+        Call from lifespan() after startup:
+            signal_processor.register_engines(
+                smc_engine=smc_engine_instance,
+                ml_engine=xgboost_trainer_instance,
+            )
+        """
+        if smc_engine is not None:
+            self._enricher.set_smc_engine(smc_engine)
+        if ml_engine is not None:
+            self._enricher.set_ml_engine(ml_engine)
+        logger.info(
+            "[SignalProcessor] engines registered smc=%s ml=%s",
+            smc_engine is not None,
+            ml_engine is not None,
+        )
 
-        reject = self._validate(signal)
-        if reject:
-            self._rejected += 1
-            return ProcessedSignal(approved=False, signal=signal, rejection_reason=reject)
+    # ------------------------------------------------------------------
+    # Main processing pipeline
+    # ------------------------------------------------------------------
 
-        vote_result = await self._run_vote(signal)
+    def process(
+        self,
+        signal: TradingSignal,
+        candles: Optional[List[Dict]] = None,
+    ) -> FinalVote:
+        """Full pipeline: signal → enrich → vote → FinalVote.
 
-        if vote_result is None:
-            logger.warning("[SignalProcessor] VotingEngine unavailable, approving by confidence")
-            self._approved += 1
-            return ProcessedSignal(approved=True, signal=signal)
+        Args:
+            signal:  The incoming trading signal.
+            candles: Optional OHLCV list for SMCEngine analysis.
+                     If not provided, signal.candles is used.
 
-        vote_name = str(getattr(vote_result, "signal", "ABSTAIN")).upper()
-        if vote_name in ("BUY", "SELL") and vote_name == signal.direction.upper():
-            self._approved += 1
-            return ProcessedSignal(approved=True, signal=signal, vote_result=vote_result)
-
-        self._rejected += 1
-        return ProcessedSignal(approved=False, signal=signal,
-                               rejection_reason=f"voting_rejected:{vote_name}",
-                               vote_result=vote_result)
-
-    def _validate(self, signal: TradingSignal) -> Optional[str]:
-        if signal.confidence < _MIN_CONFIDENCE:
-            return f"low_confidence:{signal.confidence:.2f}"
-        if signal.risk_reward < _MIN_RR:
-            return f"low_rr:{signal.risk_reward:.2f}"
-        if signal.direction.upper() not in ("BUY", "SELL"):
-            return f"invalid_direction:{signal.direction}"
-        if signal.sl <= 0 or signal.tp <= 0 or signal.entry_price <= 0:
-            return "invalid_prices"
-        if signal.direction.upper() == "BUY" and signal.sl >= signal.entry_price:
-            return f"sl_above_entry_buy:sl={signal.sl},entry={signal.entry_price}"
-        if signal.direction.upper() == "SELL" and signal.sl <= signal.entry_price:
-            return f"sl_below_entry_sell:sl={signal.sl},entry={signal.entry_price}"
-        return None
-
-    async def _run_vote(self, signal: TradingSignal) -> Optional[Any]:
-        """BUG-3 FIX: vote(agents, context) not vote(signal)."""
-        ve = self._get_voting_engine()
-        if ve is None:
-            return None
+        Returns:
+            FinalVote with signal (BUY/SELL/ABSTAIN), confidence, reason.
+        """
         if not self._agents:
-            logger.warning("[SignalProcessor] no agents -- call register_agents() first")
-            return None
-        context: Dict[str, Any] = {
-            "symbol": signal.symbol, "direction": signal.direction,
-            "confidence": signal.confidence, "risk_reward": signal.risk_reward,
-            "entry_price": signal.entry_price, "sl": signal.sl, "tp": signal.tp,
-            "timeframe": signal.timeframe, "source": signal.source,
-        }
-        try:
-            return await asyncio.wait_for(ve.vote(self._agents, context), timeout=5.0)
-        except asyncio.TimeoutError:
-            logger.error("[SignalProcessor] VotingEngine timeout for %s", signal.symbol)
-            return None
-        except Exception as exc:
-            logger.error("[SignalProcessor] VotingEngine error: %s", exc)
-            return None
+            logger.error(
+                "[SignalProcessor] no agents registered — call register_agents() first"
+            )
+            return FinalVote(
+                signal=VoteSignal.ABSTAIN,
+                confidence=0.0,
+                reason="no agents registered",
+            )
 
-    def stats(self) -> Dict[str, Any]:
-        return {
-            "processed": self._processed, "approved": self._approved,
-            "rejected": self._rejected, "agents": len(self._agents),
-            "approval_rate": self._approved / self._processed if self._processed else 0.0,
-        }
+        # Step 1: base context from signal
+        base_ctx = signal.to_base_context()
+
+        # Step 2: enrich — SMC, ML, Session
+        raw_candles = candles or signal.candles
+        enriched_ctx = self._enricher.enrich(base_ctx, candles=raw_candles)
+
+        logger.debug(
+            "[SignalProcessor] context enriched for %s/%s: "
+            "session=%s bos=%s ml_prob=%.3f obs=%d",
+            signal.symbol, signal.direction,
+            enriched_ctx.get("session"),
+            enriched_ctx.get("bos_detected"),
+            enriched_ctx.get("ai_prediction", {}).get("probability", 0.0),
+            len(enriched_ctx.get("order_blocks", [])),
+        )
+
+        # Step 3: vote
+        final_vote = self._voting_engine.vote(self._agents, enriched_ctx)
+
+        logger.info(
+            "[SignalProcessor] %s/%s → %s (conf=%.2f) reason=%s",
+            signal.symbol, signal.direction,
+            final_vote.signal.value if hasattr(final_vote.signal, 'value')
+                else str(final_vote.signal),
+            final_vote.confidence,
+            final_vote.reason,
+        )
+
+        return final_vote
+
+    # ------------------------------------------------------------------
+    # Convenience: validate + process
+    # ------------------------------------------------------------------
+
+    def validate_and_process(
+        self,
+        signal: TradingSignal,
+        candles: Optional[List[Dict]] = None,
+    ) -> FinalVote:
+        """Validate signal fields then process."""
+        if not signal.symbol:
+            return FinalVote(
+                signal=VoteSignal.ABSTAIN,
+                confidence=0.0,
+                reason="invalid signal: missing symbol",
+            )
+        if signal.direction not in ("BUY", "SELL", "NEUTRAL"):
+            return FinalVote(
+                signal=VoteSignal.ABSTAIN,
+                confidence=0.0,
+                reason=f"invalid direction: {signal.direction}",
+            )
+        if not (0.0 <= signal.confidence <= 1.0):
+            signal.confidence = max(0.0, min(1.0, signal.confidence))
+        return self.process(signal, candles=candles)
 
 
-signal_processor = SignalProcessor()
+# Module-level singleton
+_processor: Optional[SignalProcessor] = None
+
+
+def get_signal_processor() -> SignalProcessor:
+    global _processor
+    if _processor is None:
+        _processor = SignalProcessor()
+    return _processor
+
+
+signal_processor: SignalProcessor = get_signal_processor()

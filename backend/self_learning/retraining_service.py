@@ -1,142 +1,156 @@
-"""
-backend/self_learning/retraining_service.py
-Galaxy Vast AI Trading Platform
+"""Retraining Service — Phase F fix.
 
-FIXES APPLIED:
-  ARCH-R4-3: asyncio.get_event_loop() -> asyncio.get_running_loop()
-             Deprecated in Python 3.10+, may raise RuntimeError in 3.12.
+Fixes BUG-F4: import path was `backend.intelligence.xgboost_trainer`
+(module does NOT exist) — corrected to `backend.ai_prediction.xgboost_trainer`.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_MIN_SAMPLES   = 100
-_WINRATE_FLOOR = 0.45
+# BUG-F4 FIX: correct import path
+from backend.ai_prediction.xgboost_trainer import XGBoostTrainer  # noqa: E402
 
-
-@dataclass
-class RetrainingResult:
-    triggered:      bool
-    trigger_reason: str
-    samples_used:   int
-    old_accuracy:   float
-    new_accuracy:   float
-    improvement:    float
-    duration_s:     float
-    completed_at:   str
+_RETRAIN_INTERVAL_SECONDS = 6 * 60 * 60   # 6 hours
+_MIN_SAMPLES_TO_RETRAIN   = 50
+_MIN_ACCURACY_IMPROVEMENT = 0.01          # 1% improvement threshold
 
 
 class RetrainingService:
-    def __init__(self, model_manager: Any = None, trade_store: Any = None) -> None:
-        self._mm = model_manager
-        self._ts = trade_store
-        self._last_retrain: Optional[str] = None
+    """Background service that periodically retrains the XGBoost model."""
 
-    async def check_and_retrain(self) -> Optional[RetrainingResult]:
-        if self._mm is None or self._ts is None:
-            return None
-        samples  = await self._ts.count_unlabelled()
-        win_rate = await self._ts.get_recent_win_rate()
-        should_retrain = False
-        reason = ""
-        if samples >= _MIN_SAMPLES:
-            should_retrain = True
-            reason = f"enough_samples:{samples}"
-        elif win_rate is not None and win_rate < _WINRATE_FLOOR:
-            should_retrain = True
-            reason = f"low_winrate:{win_rate:.2%}"
-        if not should_retrain:
-            return None
-        return await self._retrain(reason, samples)
+    def __init__(self, trainer: Optional[XGBoostTrainer] = None) -> None:
+        self._trainer: Optional[XGBoostTrainer] = trainer or XGBoostTrainer()
+        self._task:    Optional[asyncio.Task]    = None
+        self._running: bool                      = False
+        self._last_run: Optional[datetime]       = None
+        self._last_metrics: Dict[str, Any]       = {}
+        logger.info("[RetrainingService] initialized")
 
-    async def force_retrain(self, reason: str = "manual") -> RetrainingResult:
-        samples = 0
-        if self._ts:
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def set_trainer(self, trainer: XGBoostTrainer) -> None:
+        self._trainer = trainer
+        logger.info("[RetrainingService] trainer set: %s", type(trainer).__name__)
+
+    async def start(self) -> None:
+        """Start background retraining loop."""
+        if self._running:
+            logger.warning("[RetrainingService] already running")
+            return
+        self._running = True
+        self._task = asyncio.create_task(self._loop(), name="retraining_loop")
+        logger.info(
+            "[RetrainingService] started — interval=%ds", _RETRAIN_INTERVAL_SECONDS
+        )
+
+    async def stop(self) -> None:
+        """Stop background loop gracefully."""
+        self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
             try:
-                samples = await self._ts.count_unlabelled()
-            except Exception:
+                await self._task
+            except asyncio.CancelledError:
                 pass
-        return await self._retrain(reason, samples)
+        logger.info("[RetrainingService] stopped")
 
-    async def _retrain(self, reason: str, samples: int) -> RetrainingResult:
-        """
-        ARCH-R4-3 FIX: asyncio.get_event_loop() replaced with asyncio.get_running_loop().
-        get_event_loop() in async context:
-          - Python 3.10: DeprecationWarning
-          - Python 3.12: may raise RuntimeError
-        get_running_loop() is the correct API inside an async function.
-        """
-        start   = datetime.now(timezone.utc)
-        old_acc = 0.0
-        new_acc = 0.0
+    async def retrain_now(self) -> Dict[str, Any]:
+        """Trigger an immediate retraining cycle and return metrics."""
+        return await self._retrain()
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "running":      self._running,
+            "last_run":     self._last_run.isoformat() if self._last_run else None,
+            "last_metrics": self._last_metrics,
+            "trainer_ok":   self._trainer is not None,
+        }
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+
+    async def _loop(self) -> None:
+        """Background loop: wait interval then retrain."""
+        # Initial delay: 5 minutes after startup to let system warm up
+        await asyncio.sleep(5 * 60)
+        while self._running:
+            try:
+                await self._retrain()
+            except Exception as exc:
+                logger.error("[RetrainingService] loop error: %s", exc, exc_info=True)
+            await asyncio.sleep(_RETRAIN_INTERVAL_SECONDS)
+
+    async def _retrain(self) -> Dict[str, Any]:
+        """Run one retraining cycle in a thread pool."""
+        if self._trainer is None:
+            logger.error("[RetrainingService] no trainer — skipping")
+            return {"error": "no trainer"}
+
+        logger.info("[RetrainingService] starting retraining cycle")
+        start_ts = datetime.now(timezone.utc)
 
         try:
-            logger.info("[Retraining] starting: reason=%s samples=%d", reason, samples)
+            # train_latest() reads from DB, trains, saves model
+            loop    = asyncio.get_running_loop()     # Python 3.10+ safe
+            metrics = await loop.run_in_executor(
+                None, self._trainer.train_latest
+            )
 
-            if self._mm:
-                try:
-                    current = self._mm.load_active("xgboost")
-                    if current is not None and hasattr(current, "metadata"):
-                        old_acc = float(current.metadata.get("accuracy", 0.0))
-                    elif current is not None and hasattr(current, "accuracy"):
-                        old_acc = float(current.accuracy or 0.0)
-                except Exception as load_exc:
-                    logger.warning("[Retraining] could not load current model: %s", load_exc)
+            if metrics is None:
+                metrics = {}
 
-                try:
-                    from backend.intelligence.xgboost_trainer import XGBoostTrainer
-                    trainer = XGBoostTrainer()
-                    # ARCH-R4-3 FIX: get_running_loop() not get_event_loop()
-                    loop = asyncio.get_running_loop()
-                    train_result = await loop.run_in_executor(None, trainer.train_latest)
-                    if train_result is not None:
-                        new_acc = float(getattr(train_result, "accuracy", old_acc))
-                        if new_acc > old_acc:
-                            await loop.run_in_executor(
-                                None, lambda: self._mm.save(train_result, "xgboost")
-                            )
-                            logger.info("[Retraining] improved %.3f -> %.3f saved", old_acc, new_acc)
-                        else:
-                            logger.info("[Retraining] no improvement %.3f -> %.3f", old_acc, new_acc)
-                    else:
-                        new_acc = old_acc
-                except ImportError:
-                    logger.warning("[Retraining] XGBoostTrainer not available")
-                    new_acc = old_acc
-                except Exception as train_exc:
-                    logger.error("[Retraining] training failed: %s", train_exc)
-                    new_acc = old_acc
-            else:
-                logger.warning("[Retraining] no model_manager")
+            elapsed = (datetime.now(timezone.utc) - start_ts).total_seconds()
+            new_acc = float(metrics.get("accuracy", 0.0))
+            old_acc = float(self._last_metrics.get("accuracy", 0.0))
+            improved = new_acc >= old_acc + _MIN_ACCURACY_IMPROVEMENT
+
+            result = {
+                "success":   True,
+                "elapsed_s": round(elapsed, 1),
+                "improved":  improved,
+                "new_acc":   round(new_acc, 4),
+                "old_acc":   round(old_acc, 4),
+                "metrics":   metrics,
+                "timestamp": start_ts.isoformat(),
+            }
+
+            self._last_run     = datetime.now(timezone.utc)
+            self._last_metrics = metrics
+
+            logger.info(
+                "[RetrainingService] done: acc=%.4f improved=%s elapsed=%.1fs",
+                new_acc, improved, elapsed,
+            )
+            return result
 
         except Exception as exc:
-            logger.error("[Retraining] failed: %s", exc)
+            logger.error(
+                "[RetrainingService] retraining failed: %s", exc, exc_info=True
+            )
+            return {
+                "success":  False,
+                "error":    str(exc),
+                "timestamp": start_ts.isoformat(),
+            }
 
-        duration = (datetime.now(timezone.utc) - start).total_seconds()
-        now_str  = datetime.now(timezone.utc).isoformat()
-        self._last_retrain = now_str
-        result = RetrainingResult(
-            triggered=True, trigger_reason=reason, samples_used=samples,
-            old_accuracy=old_acc, new_accuracy=new_acc,
-            improvement=new_acc - old_acc, duration_s=duration, completed_at=now_str,
-        )
-        logger.info("[Retraining] done: %.3f->%.3f in %.1fs", old_acc, new_acc, duration)
-        return result
 
-    def last_retrain_time(self) -> Optional[str]:
-        return self._last_retrain
+# Module-level singleton
+_service: Optional[RetrainingService] = None
 
-    def is_due(self, interval_hours: float = 24.0) -> bool:
-        if self._last_retrain is None:
-            return True
-        try:
-            last = datetime.fromisoformat(self._last_retrain)
-            return (datetime.now(timezone.utc) - last).total_seconds() >= interval_hours * 3600
-        except Exception:
-            return True
+
+def get_retraining_service() -> RetrainingService:
+    global _service
+    if _service is None:
+        _service = RetrainingService()
+    return _service
+
+
+retraining_service: RetrainingService = get_retraining_service()
