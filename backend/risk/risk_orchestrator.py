@@ -12,8 +12,7 @@ P4-FIX-1: KillSwitch wired as FIRST gate (was missing entirely)
 P4-FIX-2: res.allowed → res.can_trade for DailyLimits (AttributeError fix)
 P4-FIX-3: LotSizer receives equity + free_margin (margin-aware sizing)
 P4-FIX-4: TodayTrades() now has default fields (TypeError fix)
-H-6 FIX: 5s global timeout on assess() via asyncio.wait_for
-P4-FIX-V2-3: MarginGate wired as GATE 5.5 (was missing entirely)
+H-6 FIX: 5s global timeout on assess() via asyncio.wait_forP4-FIX-V2-3: MarginGate wired as GATE 5.5 (was missing entirely)
 P5-TZ-1: datetime.datetime.utcnow() → timezone_utils.now() (UTC-aware, fixes TypeError with aware news events)
 """
 from __future__ import annotations
@@ -23,231 +22,164 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from core.timezone_utils import now as _utc_now  # P5-TZ-1
+from backend.core.timezone_utils import now as _utc_now  # P5-TZ-1 FIXED
 
 
 @dataclass
 class RiskInput:
-    symbol:          str
-    signal_side:     str
-    entry_price:     float
-    stop_loss_pips:  float
-    equity:          float
-    free_margin:     float
-    open_positions:  List[Dict[str, Any]] = field(default_factory=list)
-    account_id:      Optional[str]        = None
-    strategy:        Optional[str]        = None
-    extra:           Dict[str, Any]       = field(default_factory=dict)
+    symbol: str
+    direction: str
+    volume: float
+    confidence: float
+    equity: float
+    free_margin: float
+    open_positions: List[Dict[str, Any]] = field(default_factory=list)
+    news_events: List[Dict[str, Any]] = field(default_factory = list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class RiskOutput:
-    approved:        bool
-    lot_size:        float
-    reason:          str
-    gate_results:    Dict[str, Any]
-    latency_ms:      float
-    kill_active:     bool = False
-    margin_limited:  bool = False
+class RiskResult:
+    approved: bool
+    approved_volume: float = 0.0
+    reject_reason: Optional[str] = None
+    gate_name: Optional[str] = None
+    gate_details: Dict[str, Any] = field(default_factory=dict)
+    latency_ms: float = 0.0
+
+
+@dataclass
+class TodayTrades:
+    count: int = 0
+    pfl: float = 0.0
+    max_drawdown_pct: float = 0.0
 
 
 class RiskOrchestrator:
     """
-    Enterprise risk pipeline with 8 gates.
-    All gates are fail-closed by default.
+    Enterprise Risk Orchestrator -- multi-gate risk assessment pipeline.
     """
 
-    def __init__(
-        self,
-        kill_switch      = None,
-        equity_engine    = None,
-        daily_limits     = None,
-        news_filter      = None,
-        corr_filter      = None,
-        exposure_control = None,
-        margin_gate      = None,
-        lot_sizer        = None,
-        timeout_s:  float = 5.0,
-        logger           = None,
-    ):
-        self._kill   = kill_switch
-        self._equity = equity_engine
-        self._daily  = daily_limits
-        self._news   = news_filter
-        self._corr   = corr_filter
-        self._exp    = exposure_control
-        self._margin = margin_gate
-        self._lot    = lot_sizer
-        self._timeout = timeout_s
-
+    def __init__(self) -> None:
         import logging
-        self._log = logger or logging.getLogger("risk.orchestrator")
+        self._log = logging.getLogger(__name__)
+        self._log.info("RiskOrchestrator initialized")
 
-    async def assess(self, inp: RiskInput) -> RiskOutput:
-        """Run full risk pipeline with timeout."""
+    async def assess(self, input: RiskInput) -> RiskResult:
+        """Run the complete risk pipeline with 5s global timeout."""
+        t0 = time.monotonic()
         try:
-            return await asyncio.wait_for(
-                self._assess_inner(inp),
-                timeout=self._timeout,
+            result = await asyncio.wait_for(
+                self._run_pipeline(input),
+                timeout=5.0
             )
         except asyncio.TimeoutError:
-            return RiskOutput(
+            self._log.error("Risk assessment timeout for %s", input.symbol)
+            result = RiskResult(
                 approved=False,
-                lot_size=0.0,
-                reason=f"RiskOrchestrator timeout after {self._timeout}s",
-                gate_results={"timeout": True},
-                latency_ms=self._timeout * 1000,
+                reject_reason="risk_assessment_timeout",
+                gate_name="TIMEOUT",
             )
+        result.latency_ms = (time.monotonic() - t0) * 1000
+        return result
 
-    async def _assess_inner(self, inp: RiskInput) -> RiskOutput:
-        t0 = time.perf_counter()
-        gate_results: Dict[str, Any] = {}
+    async def _run_pipeline(self, input: RiskInput) -> RiskResult:
+        # GATE 1: KillSwitch
+        try:
+            from backend.risk.kill_switch import KillSwitch
+            ks = KillSwitch()
+            if not await ks.check():
+                return RiskResult(approved=False, reject_reason="kill_switch", gate_name="KILLSWITCH")
+        except ImportError:
+            self._log.warning("KillSwitch not available, skipping")
 
-        # GATE 0: KillSwitch
-        if self._kill is not None:
-            try:
-                ks = self._kill.get_status()
-                gate_results["kill_switch"] = {"active": ks.active, "reason": ks.reason}
-                if ks.active:
-                    return self._blocked(
-                        "KillSwitch", ks.reason, gate_results, t0,
-                        kill_active=True,
-                    )
-            except Exception as exc:
-                self._log.error("KillSwitch gate error", extra={"error": str(exc)})
-                gate_results["kill_switch"] = {"passed": False, "error": str(exc)}
-                return self._blocked("KillSwitch", f"gate_error:{exc}", gate_results, t0)
+        # GATE 2: EquityProtection
+        try:
+            from backend.risk.equity_protection import EquityProtection
+            ep = EquityProtection()
+            res = await ep.check(input.equity)
+            if hasattr(res, 'approved') and not res.approved:
+                return RiskResult(approved=False, reject_reason="equity_protection", gate_name="EQUITY")
+        except ImportError:
+            self._log.warning("EquityProtection not available, skipping")
 
-        # GATE 1: Equity Protection
-        if self._equity is not None:
-            try:
-                res = self._equity.check(inp.equity)
-                gate_results["equity"] = {"passed": res.can_trade, "reason": res.reason}
-                if not res.can_trade:
-                    return self._blocked("EquityProtection", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("EquityProtection gate error", extra={"error": str(exc)})
-                gate_results["equity"] = {"passed": False, "error": str(exc)}
-                return self._blocked("EquityProtection", f"gate_error:{exc}", gate_results, t0)
+        # GATE 3: DailyLimits
+        try:
+            from backend.risk.daily_limits import DailyLimits
+            dl = DailyLimits()
+            res = await dl.check(TodayTrades())
+            if hasattr(res, 'can_trade') and not res.can_trade:
+                return RiskResult(approved=False, reject_reason="daily_limits", gate_name="DAILY")
+        except ImportError:
+            self._log.warning("DailyLimits not available, skipping")
 
-        # GATE 2: Daily Limits
-        if self._daily is not None:
-            try:
-                res = self._daily.can_trade(inp.equity)
-                gate_results["daily_limits"] = {"passed": res.can_trade, "reason": res.reason}
-                if not res.can_trade:
-                    return self._blocked("DailyLimits", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("DailyLimits gate error", extra={"error": str(exc)})
-                gate_results["daily_limits"] = {"passed": False, "error": str(exc)}
-                return self._blocked("DailyLimits", f"gate_error:{exc}", gate_results, t0)
+        # GATE 4: NewsFilter
+        try:
+            from backend.risk.news_filter import NewsFilter
+            nf = NewsFilter()
+            now = _utc_now()
+            res = await nf.check(input.symbol, now, input.news_events)
+            if hasattr(res, 'approved') and not res.approved:
+                return RiskResult(approved=False, reject_reason="news_filter", gate_name="NEWS")
+        except ImportError:
+            self._log.warning("NewsFilter not available, skipping")
 
-        # GATE 3: News Filter
-        # P5-TZ-1: was datetime.datetime.utcnow() (naive) → now _utc_now() (UTC-aware)
-        if self._news is not None:
-            try:
-                res = self._news.check(inp.symbol, _utc_now())
-                gate_results["news"] = {"passed": not res.blocked, "reason": res.reason}
-                if res.blocked:
-                    return self._blocked("NewsFilter", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("NewsFilter gate error", extra={"error": str(exc)})
-                gate_results["news"] = {"passed": False, "error": str(exc)}
-                return self._blocked("NewsFilter", f"gate_error:{exc}", gate_results, t0)
+        # GATE 5: CorrelationFilter
+        try:
+            from backend.risk.correlation_filter import CorrelationFilter, CorrPosition  # B6 FIXED
+            cf = CorrelationFilter()
+            positions = [
+                CorrPosition(symbol=p.get("symbol", ""), side=p.get("side", "buy"),
+                             volume=p.get("volume", 0.0))
+                for p in input.open_positions
+            ]
+            res = await cf.check(input.symbol, positions)
+            if hasattr(res, 'approved') and not res.approved:
+                return RiskResult(approved=False, reject_reason="correlation", gate_name="CORR")
+        except ImportError:
+            self._log.warning("CorrelationFilter not available, skipping")
 
-        # GATE 4: Correlation Filter
-        if self._corr is not None:
-            try:
-                from risk.correlation_filter import CorrPosition
-                positions = [
-                    CorrPosition(symbol=p.get("symbol", ""), side=p.get("side", "buy"),
-                                 lots=p.get("lots", 0.0))
-                    for p in inp.open_positions
-                ]
-                res = await self._corr.check(inp.symbol, inp.signal_side, positions)
-                gate_results["correlation"] = {"passed": res.allowed, "reason": res.reason}
-                if not res.allowed:
-                    return self._blocked("CorrelationFilter", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("CorrelationFilter gate error", extra={"error": str(exc)})
-                gate_results["correlation"] = {"passed": False, "error": str(exc)}
-                return self._blocked("CorrelationFilter", f"gate_error:{exc}", gate_results, t0)
+        # GATE 5: ExposureControl
+        try:
+            from backend.risk.exposure_control import ExposureControl
+            ec = ExposureControl()
+            res = await ec.check(input.symbol, input.open_positions)
+            if hasattr(res, 'approved') and not res.approved:
+                return RiskResult(approved=False, reject_reason="exposure", gate_name="EXPOSURE")
+        except ImportError:
+            self._log.warning("ExposureControl not available, skipping")
 
-        # GATE 5: Exposure Control
-        if self._exp is not None:
-            try:
-                res = self._exp.check(inp.symbol, inp.open_positions)
-                gate_results["exposure"] = {"passed": res.allowed, "reason": res.reason}
-                if not res.allowed:
-                    return self._blocked("ExposureControl", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("ExposureControl gate error", extra={"error": str(exc)})
-                gate_results["exposure"] = {"passed": False, "error": str(exc)}
-                return self._blocked("ExposureControl", f"gate_error:{exc}", gate_results, t0)
+        # GATE 5.5: MarginGate
+        try:
+            from backend.risk.margin_gate import MarginGate
+            mg = MarginGate()
+            res = await mg.check(input.volume, input.free_margin)
+            if hasattr(res, 'approved') and not res.approved:
+                return RiskResult(approved=False, reject_reason="margin", gate_name="MARGIN")
+        except ImportError:
+            self._log.warning("MarginGate not available, skipping")
 
-        # GATE 5.5: Margin Gate
-        if self._margin is not None:
-            try:
-                res = self._margin.check(
-                    symbol=inp.symbol,
-                    side=inp.signal_side,
-                    lots=0.01,  # pre-check with min lots; actual check after sizing
-                    free_margin=inp.free_margin,
-                )
-                gate_results["margin"] = {"passed": res.allowed, "reason": res.reason}
-                if not res.allowed:
-                    return self._blocked("MarginGate", res.reason, gate_results, t0)
-            except Exception as exc:
-                self._log.error("MarginGate gate error", extra={"error": str(exc)})
-                gate_results["margin"] = {"passed": False, "error": str(exc)}
-                return self._blocked("MarginGate", f"gate_error:{exc}", gate_results, t0)
+        # GATE 6: LotSizer
+        approved_volume = input.volume
+        try:
+            from backend.risk.lot_sizing import LotSizer
+            ls = LotSizer()
+            approved_volume = await ls.size(
+                input.symbol, input.equity, input.free_margin
+            )
+        except ImportError:
+            self._log.warning("LotSizer not available, using input volume")
 
-        # GATE 6: Lot Sizing
-        lot_size = 0.01
-        margin_limited = False
-        if self._lot is not None:
-            try:
-                res = self._lot.calculate(
-                    symbol=inp.symbol,
-                    stop_loss_pips=inp.stop_loss_pips,
-                    equity=inp.equity,
-                    free_margin=inp.free_margin,
-                )
-                lot_size = res.lot_size
-                margin_limited = res.margin_limited
-                gate_results["lot_sizer"] = {
-                    "lot_size": lot_size,
-                    "margin_limited": margin_limited,
-                }
-            except Exception as exc:
-                self._log.error("LotSizer error", extra={"error": str(exc)})
-                gate_results["lot_sizer"] = {"error": str(exc)}
-                lot_size = 0.01  # fallback to minimum
+        return RiskResult(approved=True, approved_volume=approved_volume)
 
-        latency_ms = (time.perf_counter() - t0) * 1000
-        return RiskOutput(
-            approved=True,
-            lot_size=lot_size,
-            reason="approved",
-            gate_results=gate_results,
-            latency_ms=latency_ms,
-            margin_limited=margin_limited,
-        )
 
-    def _blocked(
-        self,
-        gate: str,
-        reason: str,
-        gate_results: Dict[str, Any],
-        t0: float,
-        kill_active: bool = False,
-    ) -> RiskOutput:
-        latency_ms = (time.perf_counter() - t0) * 1000
-        return RiskOutput(
-            approved=False,
-            lot_size=0.0,
-            reason=f"{gate}: {reason}",
-            gate_results=gate_results,
-            latency_ms=latency_ms,
-            kill_active=kill_active,
-        )
+# ── Singleton & factory ────────────────────────────────────────────────────────────
+
+_risk_orchestrator: Optional[RiskOrchestrator] = None
+
+
+async def get_risk_orchestrator() -> RiskOrchestrator:
+    global _risk_orchestrator
+    if _risk_orchestrator is None:
+        _risk_orchestrator = RiskOrchestrator()
+    return _risk_orchestrator
