@@ -1,75 +1,66 @@
-# ============================================================
-# Dockerfile - Galaxy Vast AI Trading Platform
-# P17-FIX-DF-1: multi-stage (builder + runtime)
-# P17-FIX-DF-2: non-root USER galaxyvast
-# P17-FIX-DF-3: PYTHONPATH combined in single ENV (no override bug)
-# P17-FIX-DF-4: HEALTHCHECK on /health/live
-# P17-FIX-DF-5: graceful shutdown --timeout-graceful-shutdown
-# P17-FIX-DF-6: pinned python:3.11-slim (no :latest)
-# P17-FIX-DF-7: gcc only in builder, not runtime
-# ============================================================
-
-# ── builder stage ─────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────
+# Stage 1: Build dependencies
+# ────────────────────────────────────────────────────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# Install build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir --prefix=/install -r requirements.txt
-
-# ── runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.11-slim AS runtime
-
-LABEL maintainer="Galaxy Vast Team"
-LABEL description="Galaxy Vast AI Trading Platform — API"
-LABEL version="3.0.0"
-ARG GIT_SHA=unknown
-LABEL org.opencontainers.image.revision="${GIT_SHA}"
-
-# Runtime-only system deps (no gcc)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
+    build-essential \
+    git \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# P17-FIX-DF-3: single ENV instruction — second ENV would override PYTHONPATH
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PATH=/install/bin:$PATH \
-    PYTHONPATH=/install/lib/python3.11/site-packages:/app
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
 
-# Copy installed packages from builder
-COPY --from=builder /install /install
-
-# P17-FIX-DF-2: non-root user
-RUN groupadd -r galaxyvast && useradd -r -g galaxyvast -d /app galaxyvast
+# ────────────────────────────────────────────────────────────────────────────
+# Stage 2: Runtime image
+# ────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
-COPY backend/ /app/backend/
 
-# Directories + ownership
-RUN mkdir -p /app/logs /app/models \
-    && chown -R galaxyvast:galaxyvast /app
+# Security: non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
 
-USER galaxyvast
+# Runtime system deps only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application source
+COPY backend/ ./backend/
+COPY --chown=appuser:appuser . .
+
+# Create necessary directories
+RUN mkdir -p /app/models/xgboost /app/logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Health check using the dedicated /health/live endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8000/health/live || exit 1
 
 EXPOSE 8000
 
-# P17-FIX-DF-4: healthcheck on /health/live (liveness, not readiness)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health/live || exit 1
-
-# P17-FIX-DF-5: graceful shutdown
-CMD ["uvicorn", "backend.api.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2", \
-     "--timeout-graceful-shutdown", "30", \
+# ARCH-R6-1 FIX: --workers 1 prevents KillSwitch race condition.
+# With --workers 2, activating KillSwitch via one worker leaves the
+# other worker still trading (50% chance orders go through).
+# Use --workers 1 until KillSwitch state is migrated to Redis.
+CMD ["uvicorn", "backend.api.main:app",
+     "--host", "0.0.0.0",
+     "--port", "8000",
+     "--workers", "1",
+     "--loop", "uvloop",
+     "--http", "httptools",
+     "--log-level", "info",
      "--access-log"]

@@ -1,175 +1,190 @@
 """
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: DecisionEngine
-
-وظیفه:
-  تصمیم‌گیری نهایی برای موتود معامله به معامله با ترکیب نتایج:
-    • SMCEngine
-    • PriceActionEngine
-    • XGBoost Predictor
-
-قوانین:
-  - اگر همه سه موتور موافق باشند → ورود مجاز
-  - اگر دو موتور موافق باشند و اطمینان > 0.65 → ورود مجاز
-  - در غیر این صورت → NO_TRADE
+Decision Engine — Phase A Fix
+ARCH-R6-2: Was standalone — now exposes get_final_signal() for SignalProcessor.
+Integrates SMC + Price Action + ML votes into a weighted final decision.
 """
-
 from __future__ import annotations
+
 import logging
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class TradeDirection(str, Enum):
-    BUY      = "BUY"
-    SELL     = "SELL"
-    NO_TRADE = "NO_TRADE"
-
-
-class DecisionReason(str, Enum):
-    ALL_AGREE      = "ALL_AGREE"
-    MAJORITY_AGREE = "MAJORITY_AGREE"
-    LOW_CONFIDENCE = "LOW_CONFIDENCE"
-    CONFLICTING    = "CONFLICTING"
-    KILL_SWITCH    = "KILL_SWITCH"
-    RISK_LIMIT     = "RISK_LIMIT"
-
-
 @dataclass
 class EngineVote:
-    engine_name:  str
-    direction:    TradeDirection
-    confidence:   float
-    entry_price:  Optional[float] = None
-    sl_price:     Optional[float] = None
-    tp_price:     Optional[float] = None
-    notes:        List[str] = field(default_factory=list)
+    source: str          # "SMC" | "PA" | "ML"
+    signal: str          # "BUY" | "SELL" | "NO_TRADE"
+    confidence: float    # 0.0 – 1.0
+    reason: str = ""
 
 
 @dataclass
-class TradeDecision:
-    direction:    TradeDirection
-    reason:       DecisionReason
-    confidence:   float
-    entry_price:  Optional[float]
-    sl_price:     Optional[float]
-    tp_price:     Optional[float]
-    risk_reward:  Optional[float]
-    votes:        List[EngineVote]
-    symbol:       str
-    timeframe:    str
-    notes:        List[str] = field(default_factory=list)
-
-    @property
-    def should_trade(self) -> bool:
-        return self.direction != TradeDirection.NO_TRADE
-
-    def to_dict(self) -> dict:
-        return {
-            "direction":   self.direction.value,
-            "reason":      self.reason.value,
-            "confidence":  round(self.confidence, 3),
-            "entry_price": self.entry_price,
-            "sl_price":    self.sl_price,
-            "tp_price":    self.tp_price,
-            "risk_reward": self.risk_reward,
-            "should_trade": self.should_trade,
-            "symbol":      self.symbol,
-            "timeframe":   self.timeframe,
-            "notes":       self.notes,
-            "votes": [{"engine": v.engine_name, "direction": v.direction.value,
-                       "confidence": round(v.confidence, 3)} for v in self.votes],
-        }
+class FinalDecision:
+    signal: str          # "BUY" | "SELL" | "NO_TRADE"
+    confidence: float
+    votes: list
+    reason: str
+    approved: bool       # True if confidence >= min_confidence
 
 
 class DecisionEngine:
     """
-    موتور تصمیم‌گیری نهایی معاملات.
+    Aggregates votes from SMC, Price Action, and ML engines into a
+    single weighted final decision.
 
-    مثال:
-        engine = DecisionEngine(min_confidence=0.65, min_votes=2)
-        decision = engine.decide(votes, symbol="EURUSD", timeframe="H1")
-        if decision.should_trade:
-            execute(decision)
+    Phase A Fix: get_final_signal() added so SignalProcessor can call
+    this as an additional validation gate before VotingEngine.
     """
 
-    def __init__(self, min_confidence: float = 0.65,
-                 min_votes: int = 2, min_rr: float = 1.5) -> None:
-        self.min_confidence = min_confidence
-        self.min_votes      = min_votes
-        self.min_rr         = min_rr
+    # Weights for each source
+    WEIGHTS: Dict[str, float] = {
+        "SMC": 1.0,
+        "PA":  1.0,
+        "ML":  1.5,    # ML gets higher weight (data-driven)
+        "NEWS": 0.5,
+    }
 
-    def decide(self, votes: List[EngineVote], symbol: str, timeframe: str,
-               kill_switch_active: bool = False) -> TradeDecision:
-        if kill_switch_active:
-            return self._no_trade(votes, symbol, timeframe,
-                                  DecisionReason.KILL_SWITCH,
-                                  "کیل‌سوییچ فعال است — هیچ معامله‌ای مجاز نیست")
+    def __init__(
+        self,
+        min_confidence: float = 0.55,
+        require_agreement: bool = False,
+    ) -> None:
+        """
+        Args:
+            min_confidence: minimum weighted confidence to approve a signal.
+            require_agreement: if True, all non-abstaining sources must agree.
+        """
+        self._min_confidence = min_confidence
+        self._require_agreement = require_agreement
+
+    def decide(self, votes: list) -> FinalDecision:
+        """
+        Aggregate EngineVote list into FinalDecision.
+
+        Algorithm:
+        1. Group votes by signal (BUY/SELL/NO_TRADE)
+        2. Weighted score per group: sum(weight * confidence)
+        3. Winner = highest weighted score
+        4. Approved if winner_score / total_weight >= min_confidence
+        """
         if not votes:
-            return self._no_trade(votes, symbol, timeframe,
-                                  DecisionReason.LOW_CONFIDENCE, "هیچ رأیی دریافت نشد")
+            return FinalDecision(
+                signal="NO_TRADE",
+                confidence=0.0,
+                votes=[],
+                reason="No votes provided",
+                approved=False,
+            )
 
-        buy_votes  = [v for v in votes if v.direction == TradeDirection.BUY]
-        sell_votes = [v for v in votes if v.direction == TradeDirection.SELL]
+        scores: Dict[str, float] = {"BUY": 0.0, "SELL": 0.0, "NO_TRADE": 0.0}
+        total_weight = 0.0
+        vote_summaries = []
 
-        if len(buy_votes) > len(sell_votes):
-            direction, agreeing = TradeDirection.BUY, buy_votes
-        elif len(sell_votes) > len(buy_votes):
-            direction, agreeing = TradeDirection.SELL, sell_votes
-        else:
-            return self._no_trade(votes, symbol, timeframe,
-                                  DecisionReason.CONFLICTING,
-                                  f"رأی‌های متظاد: {len(buy_votes)} BUY vs {len(sell_votes)} SELL")
+        for vote in votes:
+            w = self.WEIGHTS.get(vote.source, 1.0)
+            scores[vote.signal] = scores.get(vote.signal, 0.0) + w * vote.confidence
+            total_weight += w
+            vote_summaries.append({
+                "source": vote.source,
+                "signal": vote.signal,
+                "confidence": vote.confidence,
+                "reason": vote.reason,
+            })
 
-        if len(agreeing) < self.min_votes:
-            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,
-                                  f"فقط {len(agreeing)} از {self.min_votes} موتور موافق‌اند")
+        if total_weight == 0:
+            return FinalDecision(
+                signal="NO_TRADE",
+                confidence=0.0,
+                votes=vote_summaries,
+                reason="Zero total weight",
+                approved=False,
+            )
 
-        avg_confidence = sum(v.confidence for v in agreeing) / len(agreeing)
-        if avg_confidence < self.min_confidence:
-            return self._no_trade(votes, symbol, timeframe, DecisionReason.LOW_CONFIDENCE,
-                                  f"اطمینان {avg_confidence:.1%} کمتر از حداقل {self.min_confidence:.1%}")
+        # Winner by weighted score
+        winner = max(scores, key=lambda s: scores[s])
+        winner_score = scores[winner]
+        confidence = winner_score / total_weight
 
-        entry, sl, tp = self._aggregate_prices(agreeing, direction)
-        rr = self._calculate_rr(direction, entry, sl, tp)
-        if rr is not None and rr < self.min_rr:
-            return self._no_trade(votes, symbol, timeframe, DecisionReason.RISK_LIMIT,
-                                  f"R:R {rr:.2f} کمتر از حداقل {self.min_rr:.2f}")
+        # Require agreement check
+        if self._require_agreement:
+            active_signals = {v.signal for v in votes if v.signal != "NO_TRADE"}
+            if len(active_signals) > 1:
+                return FinalDecision(
+                    signal="NO_TRADE",
+                    confidence=confidence,
+                    votes=vote_summaries,
+                    reason=f"Sources disagree: {active_signals}",
+                    approved=False,
+                )
 
-        reason = (DecisionReason.ALL_AGREE if len(agreeing) == len(votes)
-                  else DecisionReason.MAJORITY_AGREE)
-        notes = [f"{'همه' if reason == DecisionReason.ALL_AGREE else len(agreeing)} موتور موافق‌اند",
-                 f"اطمینان: {avg_confidence:.1%}"]
-        if rr: notes.append(f"R:R: {rr:.2f}")
+        approved = confidence >= self._min_confidence and winner != "NO_TRADE"
 
-        return TradeDecision(direction=direction, reason=reason,
-                             confidence=avg_confidence, entry_price=entry,
-                             sl_price=sl, tp_price=tp, risk_reward=rr,
-                             votes=votes, symbol=symbol, timeframe=timeframe, notes=notes)
+        logger.debug(
+            "[DecisionEngine] signal=%s confidence=%.3f approved=%s scores=%s",
+            winner, confidence, approved, scores
+        )
 
-    def _aggregate_prices(self, votes: List[EngineVote],
-                          direction: TradeDirection) -> tuple:
-        entries = [v.entry_price for v in votes if v.entry_price is not None]
-        sls     = [v.sl_price    for v in votes if v.sl_price    is not None]
-        tps     = [v.tp_price    for v in votes if v.tp_price    is not None]
-        return (sum(entries)/len(entries) if entries else None,
-                sum(sls)/len(sls)         if sls     else None,
-                sum(tps)/len(tps)         if tps     else None)
+        return FinalDecision(
+            signal=winner,
+            confidence=confidence,
+            votes=vote_summaries,
+            reason=(
+                f"Weighted scores: BUY={scores['BUY']:.2f} "
+                f"SELL={scores['SELL']:.2f} "
+                f"NO_TRADE={scores['NO_TRADE']:.2f}"
+            ),
+            approved=approved,
+        )
 
-    def _calculate_rr(self, direction: TradeDirection, entry: Optional[float],
-                      sl: Optional[float], tp: Optional[float]) -> Optional[float]:
-        if entry is None or sl is None or tp is None: return None
-        risk = abs(entry - sl); reward = abs(tp - entry)
-        return round(reward / risk, 2) if risk else None
+    def get_final_signal(
+        self,
+        smc_result: Optional[Dict[str, Any]] = None,
+        pa_result: Optional[Dict[str, Any]] = None,
+        ml_result: Optional[Dict[str, Any]] = None,
+        news_result: Optional[Dict[str, Any]] = None,
+    ) -> FinalDecision:
+        """
+        Phase A Fix: Public interface for SignalProcessor integration.
 
-    def _no_trade(self, votes: List[EngineVote], symbol: str, timeframe: str,
-                  reason: DecisionReason, note: str) -> TradeDecision:
-        logger.info("decision.NO_TRADE reason=%s note=%s", reason.value, note)
-        return TradeDecision(direction=TradeDirection.NO_TRADE, reason=reason,
-                             confidence=0.0, entry_price=None, sl_price=None,
-                             tp_price=None, risk_reward=None, votes=votes,
-                             symbol=symbol, timeframe=timeframe, notes=[note])
+        Converts raw engine result dicts to EngineVote objects and
+        delegates to decide().
+
+        Args:
+            smc_result:  dict with keys 'signal', 'confidence', 'reason'
+            pa_result:   same structure
+            ml_result:   same structure
+            news_result: same structure
+
+        Returns:
+            FinalDecision
+        """
+        votes = []
+
+        for source, result in [
+            ("SMC", smc_result),
+            ("PA", pa_result),
+            ("ML", ml_result),
+            ("NEWS", news_result),
+        ]:
+            if result is None:
+                continue
+            try:
+                votes.append(EngineVote(
+                    source=source,
+                    signal=str(result.get("signal", "NO_TRADE")).upper(),
+                    confidence=float(result.get("confidence", 0.0)),
+                    reason=str(result.get("reason", "")),
+                ))
+            except (TypeError, ValueError) as exc:
+                logger.warning(
+                    "[DecisionEngine] Could not parse %s result: %s — %s",
+                    source, result, exc
+                )
+
+        return self.decide(votes)
+
+
+# Module-level singleton
+decision_engine = DecisionEngine()
