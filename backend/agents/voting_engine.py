@@ -8,6 +8,7 @@ FIX: Import AgentStatus, AgentResult, VoteResult from base_agent (not core modul
 MS-4: Sequential fallback when gather fails.
 MS-5: Per-agent error isolation (gather return_exceptions=True).
 Note: results lists are bounded (one entry per agent, max ~8).
+Phase L: record_vote hook — fire-and-forget to AgentPerformanceTracker.
 """
 from __future__ import annotations
 
@@ -34,7 +35,7 @@ _DEFAULT_TIMEOUT = 10.0
 @dataclass
 class VotingConfig:
     timeout_s:           float = _DEFAULT_TIMEOUT
-    min_agents:           int   = 3
+    min_agents:              int   = 3
     quorum_pct:          float = 0.6
     confidence_floor:    float = 55.0
     sequential_fallback: bool  = True
@@ -80,15 +81,18 @@ class VotingEngine:
     Fallback (MS-4):
         If gather() raises (e.g. timeout), fall back to sequential
         agent calls so a single bad agent does not kill the whole cycle.
+
+    Phase L:
+        After tally, fire-and-forget record_vote() for each VoteResult.
     """
 
     def __init__(self, config: Optional[VotingConfig] = None) -> None:
         self._cfg = config or VotingConfig()
         self._log = _LOG
 
-    # ------------------------------------------------------------------ #
+    # ----------------------------------------------------------------------- #
     # Public API
-    # ------------------------------------------------------------------ #
+    # ----------------------------------------------------------------------- #
 
     async def vote(
         self,
@@ -109,6 +113,7 @@ class VotingEngine:
         # 2. Risk veto
         veto = self._check_risk_veto(raw_votes)
         if veto:
+            asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
             return FinalVote(
                 signal=VoteSignal.ABSTAIN,
                 confidence=0.0,
@@ -121,6 +126,7 @@ class VotingEngine:
         # 3. Quorum check
         active = [v for v in raw_votes if v.signal != VoteSignal.ABSTAIN]
         if len(active) < self._cfg.min_agents:
+            asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
             return FinalVote(
                 signal=VoteSignal.ABSTAIN,
                 confidence=0.0,
@@ -129,11 +135,13 @@ class VotingEngine:
             )
 
         # 4. Weighted tally
-        return self._tally(raw_votes)
+        final = self._tally(raw_votes)
+        asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
+        return final
 
-    # ------------------------------------------------------------------ #
+    # ----------------------------------------------------------------------- #
     # Internal helpers
-    # ------------------------------------------------------------------ #
+    # ----------------------------------------------------------------------- #
 
     async def _gather_votes(
         self,
@@ -268,6 +276,25 @@ class VotingEngine:
             reason=f"no quorum (buy={buy_w/total_w:.0%} sell={sell_w/total_w:.0%})",
             votes=votes,
         )
+
+    # ----------------------------------------------------------------------- #
+    # Phase L: record votes for AgentPerformanceTracker
+    # ----------------------------------------------------------------------- #
+
+    async def _record_votes(self, votes: List[VoteResult], symbol: str) -> None:
+        """Fire-and-forget: persist each vote to AgentPerformanceTracker."""
+        try:
+            from backend.analytics.agent_performance_tracker import agent_tracker
+            for v in votes:
+                await agent_tracker.record_vote(
+                    agent_id=v.agent_id,
+                    signal=v.signal.value if hasattr(v.signal, "value") else str(v.signal),
+                    confidence=v.confidence,
+                    correct=None,   # updated later when trade closes
+                    symbol=symbol,
+                )
+        except Exception as e:
+            _LOG.debug("_record_votes: %s", e)
 
 
 # Module-level singleton
