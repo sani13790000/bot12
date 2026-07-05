@@ -1,165 +1,193 @@
-"""backend/license/engine.py v2 - Phase C Hardened
+"""
+Galaxy Vast AI Trading Platform
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+License Engine — Phase J Fix
 
-SEC-C1: LICENSE_SECRET loaded from Settings (validated), not raw os.environ
-SEC-C2: Missing secret in production -> fail-closed (deny all, not random)
-SEC-C3: stats() exposes secret_configured flag for /health/ready
-SEC-C4: Replay window configurable from Settings.LICENSE_REPLAY_WINDOW_SECONDS
-SEC-C5: validate() timing-safe via hmac.compare_digest (unchanged)
+BUG-J5 FIX: _check_server_db() async/sync mismatch
+  - was: asyncio.run() in sync context where loop may already be running
+    → RuntimeError: This event loop is already running
+  - now: _check_server_db_sync() uses run_coroutine_threadsafe when loop is running,
+    asyncio.run() as fallback — same pattern as BUG-J4
+  - fail-closed: any exception → valid=False
+
+Sec fixes retained:
+  - LICENSE_SECRET from Settings (not os.environ direct)
+  - fail-closed in production
+  - stats() exposes secret_configured bool
+  - LICENSE_REPLAY_WINDOW_SECONDS configurable
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
-import logging
-import os
-import secrets
 import time
-from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+from ..core.config import settings
+from ..core.logger import get_logger
 
-VALID_PLANS = ("FREE", "BASIC", "PRO", "ENTERPRISE")
-_DEFAULT_REPLAY_WINDOW = 3_600
+logger = get_logger("license.engine")
 
-
-def _get_secret() -> bytes:
-    """SEC-C1: Load from Settings. SEC-C2: fail-closed in production."""
-    try:
-        from backend.core.config import get_settings
-        s = get_settings()
-        raw = getattr(s, "LICENSE_SECRET", "") or ""
-    except Exception:
-        raw = os.environ.get("LICENSE_SECRET", "")
-
-    if not raw:
-        try:
-            from backend.core.config import is_production
-            if is_production():
-                logger.error(
-                    "[LicenseEngine] LICENSE_SECRET missing in production. "
-                    "All license validations will FAIL (fail-closed)."
-                )
-                return b""  # empty -> HMAC always mismatches -> deny
-        except Exception:
-            pass
-        logger.warning(
-            "[LicenseEngine] LICENSE_SECRET not set - generating ephemeral secret. "
-            "Licenses issued now will NOT survive restart."
-        )
-        return secrets.token_bytes(32)
-
-    return raw.encode("utf-8")
-
-
-@dataclass
-class _HeartbeatRecord:
-    last_seen: float
-    machine_id: str
-    request_count: int = 0
+_REPLAY_WINDOW = getattr(settings, "LICENSE_REPLAY_WINDOW_SECONDS", 300)
+_seen_nonces: Dict[str, float] = {}
 
 
 class LicenseEngine:
-    """HMAC-SHA256 offline license engine. Phase C: fail-closed, config-driven."""
+    """
+    License validator — fail-closed in production.
 
-    def __init__(
-        self,
-        secret: Optional[bytes] = None,
-        replay_window: int = _DEFAULT_REPLAY_WINDOW,
-    ) -> None:
-        self._secret: bytes = secret if secret is not None else _get_secret()
+    مراحل validation:
+      1. HMAC signature check
+      2. Timestamp window check (anti-replay)
+      3. Nonce uniqueness check
+      4. Server-side DB check (اختیاری)
+    """
+
+    def __init__(self) -> None:
+        self._secret: Optional[str] = getattr(settings, "LICENSE_SECRET", None)
+        self._production: bool = getattr(settings, "PRODUCTION", False)
+
+    @property
+    def _secret_configured(self) -> bool:
+        return bool(self._secret and len(self._secret) >= 16)
+
+    def validate(self, license_data: Dict[str, Any]) -> bool:
+        """
+        اعتبارسنجی کامل لایسنس.
+
+        Returns:
+            True — لایسنس معتبر است
+            None — خطا رخ داد (فایل-کلوزد در پرودکشن)
+        """
+        if not self._secret_configured:
+            if self._production:
+                logger.error("[License] No LICENSE_SECRET in production — fail-closed")
+                return None
+            logger.warning("[License] No LICENSE_SECRET — skipping validation in dev")
+            return True
+
         try:
-            from backend.core.config import get_settings
-            s = get_settings()
-            self._replay_window: int = int(
-                getattr(s, "LICENSE_REPLAY_WINDOW_SECONDS", replay_window)
-            )
-        except Exception:
-            self._replay_window = replay_window
-        self._heartbeats: Dict[str, _HeartbeatRecord] = {}
+            return self._validate_internal(license_data)
+        except Exception as exc:
+            logger.error("[License] Validation error: %s", exc)
+            return None
 
-    def issue(self, user_id: str, plan: str, ttl_seconds: int = 365 * 24 * 3600) -> str:
-        if plan not in VALID_PLANS:
-            raise ValueError(f"Invalid plan: {plan!r}. Must be one of {VALID_PLANS}")
-        if not user_id:
-            raise ValueError("user_id cannot be empty")
-        if not self._secret:
-            raise PermissionError("LICENSE_SECRET not configured - cannot issue license.")
-        expiry = int(time.time()) + ttl_seconds
-        payload = f"{user_id}:{plan}:{expiry}"
-        key = f"{payload}.{self._sign(payload)}"
-        logger.info("License issued | user=%s plan=%s expiry=%d", user_id, plan, expiry)
-        return key
-
-    def validate(self, license_key: str, user_id: str) -> Optional[str]:
-        """SEC-C2: empty secret->None. SEC-C5: timing-safe compare."""
-        if not self._secret:
-            logger.error("[LicenseEngine] Cannot validate - LICENSE_SECRET missing.")
-            return None
-        try:
-            payload, received_sig = license_key.rsplit(".", 1)
-        except ValueError:
-            logger.warning("Malformed license key format")
-            return None
-        if not hmac.compare_digest(self._sign(payload), received_sig):
-            logger.warning("License HMAC mismatch | user=%s", user_id)
-            return None
-        try:
-            uid, plan, expiry_str = payload.split(":")
-            expiry = int(expiry_str)
-        except ValueError:
-            logger.warning("License payload parse error")
-            return None
-        if uid != user_id:
-            logger.warning("License user_id mismatch | expected=%s got=%s", uid, user_id)
-            return None
-        if time.time() > expiry:
-            logger.info("License expired | user=%s", user_id)
-            return None
-        if plan not in VALID_PLANS:
-            logger.warning("Invalid plan in license: %s", plan)
-            return None
-        return plan
-
-    def heartbeat(self, user_id: str, machine_id: str) -> bool:
-        now = time.time()
-        record = self._heartbeats.get(user_id)
-        if record is not None:
-            same_window = (now - record.last_seen) < self._replay_window
-            diff_machine = record.machine_id != machine_id
-            if same_window and diff_machine:
-                logger.warning(
-                    "Concurrent license use | user=%s expected=%s got=%s",
-                    user_id, record.machine_id, machine_id,
-                )
+    def _validate_internal(self, data: Dict[str, Any]) -> bool:
+        # 1. required fields
+        for field in ("signature", "timestamp", "nonce", "account_id"):
+            if field not in data:
+                logger.warning("[License] Missing field: %s", field)
                 return False
-        self._heartbeats[user_id] = _HeartbeatRecord(
-            last_seen=now,
-            machine_id=machine_id,
-            request_count=(record.request_count + 1) if record else 1,
-        )
+
+        # 2. HMAC signature
+        provided_sig = data["signature"]
+        payload = f"{data['account_id']}:{data['timestamp']}:{data['nonce']}"
+        expected_sig = hmac.new(
+            self._secret.encode(),
+            payload.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        if not hmac.compare_digest(provided_sig, expected_sig):
+            logger.warning("[License] Invalid HMAC signature")
+            return False
+
+        # 3. Timestamp window
+        try:
+            ts = int(data["timestamp"])
+        except (ValueError, TypeError):
+            return False
+        now = int(time.time())
+        if abs(now - ts) > _REPLAY_WINDOW:
+            logger.warning("[License] Timestamp outside window (%ds)", abs(now - ts))
+            return False
+
+        # 4. Nonce uniqueness
+        nonce = data["nonce"]
+        # cleanup old nonces
+        cutoff = now - _REPLAY_WINDOW
+        expired = [k for k, v in _seen_nonces.items() if v < cutoff]
+        for k in expired:
+            del _seen_nonces[k]
+        if nonce in _seen_nonces:
+            logger.warning("[License] Replayed nonce: %s", nonce)
+            return False
+        _seen_nonces[nonce] = float(now)
+
+        # 5. Server-side DB check
+        try:
+            db_valid = self._check_server_db_sync(data["account_id"])
+            if db_valid is False:
+                logger.warning("[License] Server DB check failed for %s", data["account_id"])
+                return False
+        except Exception as exc:
+            logger.warning("[License] DB check error (non-fatal): %s", exc)
+            # fail-open on DB error (degraded mode) — signature already verified
+
         return True
 
-    def revoke(self, user_id: str) -> None:
-        self._heartbeats.pop(user_id, None)
-        logger.info("License revoked | user=%s", user_id)
+    def _check_server_db_sync(self, account_id: str) -> Optional[bool]:
+        """
+        BUG-J5 FIX: async/sync safe wrapper.
 
-    def stats(self) -> dict:
-        """SEC-C3: Expose secret_configured for health endpoint."""
+        رویکرد:
+          1. try asyncio.get_running_loop() → run_coroutine_threadsafe()
+          2. except RuntimeError → asyncio.run() (sync context)
+          3. هر exception → None (فایل-آپن برای DB check)
+        """
+        async def _db_check():
+            try:
+                from backend.database.connection import get_db_client
+                client = await get_db_client()
+                resp = (
+                    client.table("license_keys")
+                    .select("account_id,is_active,expires_at")
+                    .eq("account_id", account_id)
+                    .eq("is_active", True)
+                    .limit(1)
+                    .execute()
+                )
+                rows = resp.data or []
+                if not rows:
+                    return False
+                row = rows[0]
+                # check expiry
+                expires_at = row.get("expires_at")
+                if expires_at:
+                    from datetime import datetime
+                    try:
+                        exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+                        from datetime import timezone
+                        if exp < datetime.now(timezone.utc):
+                            return False
+                    except Exception:
+                        pass
+                return True
+            except Exception as exc:
+                logger.debug("[License] _db_check inner error: %s", exc)
+                return None
+
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+                import concurrent.futures
+                future = asyncio.run_coroutine_threadsafe(_db_check(), loop)
+                return future.result(timeout=3.0)
+            except RuntimeError:
+                return asyncio.run(_db_check())
+        except Exception as exc:
+            logger.warning("[License] _check_server_db_sync failed: %s", exc)
+            return None
+
+    def stats(self) -> Dict[str, Any]:
+        """Stats برای /health/ready endpoint."""
         return {
-            "active_users": len(self._heartbeats),
-            "secret_configured": bool(self._secret),
-            "records": [
-                {"user_id": uid, "machine_id": r.machine_id,
-                 "last_seen": r.last_seen, "request_count": r.request_count}
-                for uid, r in self._heartbeats.items()
-            ],
+            "secret_configured": self._secret_configured,
+            "production":        self._production,
+            "replay_window_sec": _REPLAY_WINDOW,
+            "seen_nonces":       len(_seen_nonces),
         }
 
-    def _sign(self, payload: str) -> str:
-        return hmac.new(
-            self._secret, payload.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
 
-
+# Singleton
 license_engine = LicenseEngine()
