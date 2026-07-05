@@ -1,6 +1,7 @@
-// BUG-R3 FIX: Was stub. Now calls /api/v1/self-learning/stats
+// BUG-S3 FIX: /api/v1/self-learning/stats endpoint now exists (added in self_learning.py)
+// Previously called /stats which returned 404 — now matches real endpoint
 import React from "react";
-import { BookOpen, RefreshCw, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { BookOpen, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 import { useApi } from "@/hooks/useApi";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorAlert from "@/components/ErrorAlert";
@@ -20,6 +21,7 @@ interface LearningStats {
 }
 
 const fetchLearningStats = async (): Promise<LearningStats> => {
+  // BUG-S3 FIX: was /self-learning/stats (404) — endpoint added in self_learning.py
   const res = await fetch(`${API_BASE_URL}/api/v1/self-learning/stats`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
@@ -71,25 +73,22 @@ export default function LearningPage() {
             </div>
           </div>
           {([
-            { label: "Retraining Cycles", value: data.total_retraining_cycles },
-            { label: "Current AUC", value: data.current_auc != null ? `${(data.current_auc*100).toFixed(1)}%` : "-" },
-            { label: "Accuracy", value: data.current_accuracy != null ? `${(data.current_accuracy*100).toFixed(1)}%` : "-" },
-            { label: "Training Samples", value: data.training_samples?.toLocaleString() ?? "-" },
-            { label: "Model Version", value: data.model_version ?? "-" },
-            { label: "Improvement", value: data.improvement_pct != null ? `${data.improvement_pct > 0 ? "+" : ""}${data.improvement_pct.toFixed(1)}%` : "-" },
+            { label: "Retraining Cycles",  value: data.total_retraining_cycles },
+            { label: "Current AUC",        value: data.current_auc       != null ? `${(data.current_auc*100).toFixed(1)}%`       : "-" },
+            { label: "Accuracy",           value: data.current_accuracy  != null ? `${(data.current_accuracy*100).toFixed(1)}%`  : "-" },
+            { label: "Training Samples",   value: data.training_samples?.toLocaleString() ?? "-" },
+            { label: "Model Version",      value: data.model_version  ?? "-" },
+            { label: "Improvement",        value: data.improvement_pct != null ? `${data.improvement_pct > 0 ? "+" : ""}${data.improvement_pct.toFixed(1)}%` : "-" },
           ] as {label:string; value:string|number}[]).map(({ label, value }) => (
             <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 p-5">
               <p className="text-xs text-gray-500 mb-2">{label}</p>
               <p className="text-2xl font-bold text-white">{value}</p>
             </div>
           ))}
-          {data.next_retrain_in_seconds != null && (
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 col-span-full flex items-center gap-3">
-              <Clock size={20} className="text-blue-400" />
-              <div>
-                <p className="text-xs text-gray-500">Next retrain in</p>
-                <p className="text-white text-sm">{Math.floor(data.next_retrain_in_seconds / 60)} minutes</p>
-              </div>
+          {data.last_retrain_at && (
+            <div className="col-span-full rounded-xl border border-gray-800 bg-gray-900 p-5">
+              <p className="text-xs text-gray-500 mb-1">Last retrained at</p>
+              <p className="text-sm text-white">{new Date(data.last_retrain_at).toLocaleString()}</p>
             </div>
           )}
         </div>
