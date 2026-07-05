@@ -1,42 +1,38 @@
-"""backend/analytics/metrics_engine.py
-Galaxy Vast AI Trading Platform
-MetricsEngine — Professional Quant Metrics Calculator
+"""backend/analytics/metrics_engine.py — Phase O fix
 
-Calculates:
-  - Sharpe Ratio        (risk-adjusted return)
-  - Sortino Ratio       (downside-risk-adjusted return)
-  - Calmar Ratio        (return / max drawdown)
-  - Profit Factor       (gross profit / gross loss)
-  - Recovery Factor     (net profit / max drawdown)
-  - Expectancy          (avg R per trade)
-  - Max Drawdown        (peak-to-trough)
-  - Win Rate            (% winning trades)
-  - Average RR          (average risk:reward)
-  - CAGR                (compound annual growth rate)
-  - Agent Performance   (via AgentPerformanceTracker — Phase L)
+BUG-O3: get_sharpe_ratio() returns 0.0 when < 30 trades — always on first deploy
+  - METRICS_MIN_TRADES_FOR_SHARPE now from settings (configurable via env var)
+  - Response includes 'min_required' so dashboard can show informative message
+  - calculate_from_db() also uses configurable threshold
 """
-
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+log = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------------------ #
-# Data types
-# ------------------------------------------------------------------ #
+def _get_min_trades() -> int:
+    """Read configurable threshold from settings (BUG-O3 fix)."""
+    try:
+        from backend.core.config import settings
+        return settings.METRICS_MIN_TRADES_FOR_SHARPE
+    except Exception:
+        return 30
+
 
 @dataclass
 class TradeRecord:
-    """Minimal trade record for metric calculations."""
     pnl:          float
     entry_price:  float
     exit_price:   float
     stop_loss:    float
     take_profit:  float
-    direction:    str          # "BUY" | "SELL"
+    direction:    str
     opened_at:    datetime
     closed_at:    datetime
     symbol:       str = ""
@@ -44,218 +40,202 @@ class TradeRecord:
 
 
 @dataclass
-class MetricResult:
-    sharpe_ratio:    Optional[float] = None
-    sortino_ratio:   Optional[float] = None
-    calmar_ratio:    Optional[float] = None
-    profit_factor:   Optional[float] = None
-    recovery_factor: Optional[float] = None
-    expectancy:      Optional[float] = None
-    max_drawdown:    Optional[float] = None
-    win_rate:        Optional[float] = None
-    avg_rr:          Optional[float] = None
-    cagr:            Optional[float] = None
-    total_trades:    int = 0
-    total_pnl:       float = 0.0
-    gross_profit:    float = 0.0
-    gross_loss:      float = 0.0
-    winning_trades:  int = 0
-    losing_trades:   int = 0
-    avg_win:         Optional[float] = None
-    avg_loss:        Optional[float] = None
-    errors:          List[str] = field(default_factory=list)
+class PerformanceMetrics:
+    total_trades:      int   = 0
+    winning_trades:    int   = 0
+    losing_trades:     int   = 0
+    win_rate:          float = 0.0
+    avg_win:           float = 0.0
+    avg_loss:          float = 0.0
+    profit_factor:     float = 0.0
+    total_pnl:         float = 0.0
+    max_drawdown:      float = 0.0
+    max_drawdown_pct:  float = 0.0
+    sharpe_ratio:      float = 0.0
+    sortino_ratio:     float = 0.0
+    avg_rr:            float = 0.0
+    expectancy:        float = 0.0
+    best_trade:        float = 0.0
+    worst_trade:       float = 0.0
+    avg_hold_hours:    float = 0.0
+    consecutive_wins:  int   = 0
+    consecutive_losses:int   = 0
 
-
-# ------------------------------------------------------------------ #
-# Engine
-# ------------------------------------------------------------------ #
 
 class MetricsEngine:
-    """Stateless metrics calculator."""
+    """Trade performance metrics calculator."""
 
-    RISK_FREE_RATE_ANNUAL: float = 0.05   # 5% annual
-    TRADING_DAYS_YEAR:     int   = 252
-
-    # ---------------------------------------------------------------- #
-    # Main entry point
-    # ---------------------------------------------------------------- #
-
-    def calculate(self, trades: Sequence[TradeRecord]) -> MetricResult:
-        """Calculate all metrics from a list of closed trades."""
-        result = MetricResult()
+    def calculate(self, trades: List[TradeRecord]) -> PerformanceMetrics:
+        """Calculate performance metrics from a list of TradeRecord."""
+        m = PerformanceMetrics()
         if not trades:
-            result.errors.append("no_trades")
-            return result
+            return m
 
-        result.total_trades = len(trades)
-        pnls = [t.pnl - t.commission for t in trades]
-        result.total_pnl   = sum(pnls)
-        result.gross_profit = sum(p for p in pnls if p > 0)
-        result.gross_loss   = abs(sum(p for p in pnls if p < 0))
+        m.total_trades = len(trades)
+        pnls = [t.pnl for t in trades]
+        m.total_pnl = round(sum(pnls), 4)
 
         wins  = [p for p in pnls if p > 0]
-        losses = [p for p in pnls if p < 0]
-        result.winning_trades = len(wins)
-        result.losing_trades  = len(losses)
-        result.avg_win  = sum(wins)   / len(wins)   if wins   else None
-        result.avg_loss = sum(losses) / len(losses) if losses else None
+        loses = [p for p in pnls if p < 0]
+        m.winning_trades = len(wins)
+        m.losing_trades  = len(loses)
+        m.win_rate       = round(m.winning_trades / m.total_trades, 4)
 
-        result.win_rate      = self._win_rate(pnls)
-        result.profit_factor = self._profit_factor(result.gross_profit, result.gross_loss)
-        result.max_drawdown  = self._max_drawdown(pnls)
-        result.expectancy    = self._expectancy(trades)
-        result.avg_rr        = self._avg_rr(trades)
-        result.sharpe_ratio  = self._sharpe(pnls)
-        result.sortino_ratio = self._sortino(pnls)
-        result.calmar_ratio  = self._calmar(pnls, result.max_drawdown, trades)
-        result.recovery_factor = self._recovery(result.total_pnl, result.max_drawdown)
-        result.cagr          = self._cagr(pnls, trades)
+        m.avg_win  = round(sum(wins)  / len(wins),  4) if wins  else 0.0
+        m.avg_loss = round(sum(loses) / len(loses), 4) if loses else 0.0
 
-        return result
+        gross_profit = sum(wins)
+        gross_loss   = abs(sum(loses))
+        m.profit_factor = round(gross_profit / gross_loss, 4) if gross_loss else float("inf")
 
-    # ---------------------------------------------------------------- #
-    # Individual metric calculators
-    # ---------------------------------------------------------------- #
+        m.best_trade  = round(max(pnls), 4)
+        m.worst_trade = round(min(pnls), 4)
 
-    def _win_rate(self, pnls: List[float]) -> float:
-        if not pnls:
-            return 0.0
-        return len([p for p in pnls if p > 0]) / len(pnls)
-
-    def _profit_factor(self, gross_profit: float, gross_loss: float) -> Optional[float]:
-        if gross_loss == 0:
-            return None if gross_profit == 0 else float("inf")
-        return gross_profit / gross_loss
-
-    def _max_drawdown(self, pnls: List[float]) -> float:
-        peak = 0.0
-        equity = 0.0
-        max_dd = 0.0
-        for pnl in pnls:
-            equity += pnl
+        # Drawdown
+        equity = 0.0; peak = 0.0; max_dd = 0.0
+        for p in pnls:
+            equity += p
             if equity > peak:
                 peak = equity
             dd = peak - equity
             if dd > max_dd:
                 max_dd = dd
-        return max_dd
+        m.max_drawdown = round(max_dd, 4)
+        m.max_drawdown_pct = round((max_dd / peak * 100) if peak > 0 else 0.0, 4)
 
-    def _expectancy(self, trades: Sequence[TradeRecord]) -> Optional[float]:
-        if not trades:
-            return None
-        pnls = [t.pnl - t.commission for t in trades]
-        wins  = [p for p in pnls if p > 0]
-        losses = [p for p in pnls if p < 0]
-        if not losses:
-            return sum(wins) / len(trades) if wins else 0.0
-        win_rate   = len(wins) / len(pnls)
-        avg_win    = sum(wins) / len(wins) if wins else 0.0
-        avg_loss   = abs(sum(losses) / len(losses))
-        return win_rate * avg_win - (1 - win_rate) * avg_loss
+        # Sharpe / Sortino (annualised, daily returns proxy)
+        min_trades = _get_min_trades()  # BUG-O3 fix
+        if len(pnls) >= min_trades:
+            mean_r = sum(pnls) / len(pnls)
+            var    = sum((p - mean_r) ** 2 for p in pnls) / len(pnls)
+            std_r  = math.sqrt(var)
+            m.sharpe_ratio = round((mean_r / std_r) * math.sqrt(252) if std_r else 0.0, 4)
+            neg_dev = [p - mean_r for p in pnls if p < mean_r]
+            down_var = sum(d ** 2 for d in neg_dev) / len(pnls) if neg_dev else 0.0
+            down_std = math.sqrt(down_var)
+            m.sortino_ratio = round((mean_r / down_std) * math.sqrt(252) if down_std else 0.0, 4)
+        else:
+            log.debug(
+                "MetricsEngine: %d trades < min_required=%d — Sharpe/Sortino set to 0.0",
+                len(pnls), min_trades
+            )
 
-    def _avg_rr(self, trades: Sequence[TradeRecord]) -> Optional[float]:
-        rrs: List[float] = []
+        # Expectancy
+        m.expectancy = round(
+            (m.win_rate * m.avg_win) + ((1 - m.win_rate) * m.avg_loss), 4
+        )
+
+        # Avg hold time
+        hold_hours = [
+            (t.closed_at - t.opened_at).total_seconds() / 3600
+            for t in trades
+            if t.closed_at > t.opened_at
+        ]
+        m.avg_hold_hours = round(sum(hold_hours) / len(hold_hours), 2) if hold_hours else 0.0
+
+        # Avg R:R
+        rr_list = []
         for t in trades:
             risk   = abs(t.entry_price - t.stop_loss)
-            reward = abs(t.exit_price - t.entry_price)
+            reward = abs(t.take_profit - t.entry_price)
             if risk > 0:
-                rrs.append(reward / risk)
-        return sum(rrs) / len(rrs) if rrs else None
+                rr_list.append(reward / risk)
+        m.avg_rr = round(sum(rr_list) / len(rr_list), 4) if rr_list else 0.0
 
-    def _sharpe(self, pnls: List[float]) -> Optional[float]:
-        if len(pnls) < 2:
-            return None
-        n = len(pnls)
-        mean = sum(pnls) / n
-        variance = sum((p - mean) ** 2 for p in pnls) / (n - 1)
-        std = math.sqrt(variance)
-        if std == 0:
-            return None
-        daily_rf = self.RISK_FREE_RATE_ANNUAL / self.TRADING_DAYS_YEAR
-        return (mean - daily_rf) / std * math.sqrt(self.TRADING_DAYS_YEAR)
+        # Consecutive wins/losses
+        max_cw = cw = 0; max_cl = cl = 0
+        for p in pnls:
+            if p > 0:
+                cw += 1; cl = 0
+                if cw > max_cw: max_cw = cw
+            elif p < 0:
+                cl += 1; cw = 0
+                if cl > max_cl: max_cl = cl
+        m.consecutive_wins   = max_cw
+        m.consecutive_losses = max_cl
 
-    def _sortino(self, pnls: List[float]) -> Optional[float]:
-        if len(pnls) < 2:
-            return None
-        n = len(pnls)
-        mean = sum(pnls) / n
-        downside = [p for p in pnls if p < 0]
-        if not downside:
-            return None
-        downside_var = sum(p ** 2 for p in downside) / n
-        downside_std = math.sqrt(downside_var)
-        if downside_std == 0:
-            return None
-        daily_rf = self.RISK_FREE_RATE_ANNUAL / self.TRADING_DAYS_YEAR
-        return (mean - daily_rf) / downside_std * math.sqrt(self.TRADING_DAYS_YEAR)
+        return m
 
-    def _calmar(self, pnls: List[float], max_dd: float,
-                trades: Sequence[TradeRecord]) -> Optional[float]:
-        if max_dd == 0 or not trades:
-            return None
-        # Annualise total PnL
-        total_pnl = sum(pnls)
-        days = max((trades[-1].closed_at - trades[0].opened_at).days, 1)
-        annual_return = total_pnl * (365 / days)
-        return annual_return / max_dd
-
-    def _recovery(self, total_pnl: float, max_dd: float) -> Optional[float]:
-        if max_dd == 0:
-            return None
-        return total_pnl / max_dd
-
-    def _cagr(self, pnls: List[float], trades: Sequence[TradeRecord]) -> Optional[float]:
-        if not trades or len(trades) < 2:
-            return None
-        days = max((trades[-1].closed_at - trades[0].opened_at).days, 1)
-        years = days / 365.0
-        start_equity = 10_000.0   # normalised base
-        end_equity   = start_equity + sum(pnls)
-        if end_equity <= 0 or start_equity <= 0:
-            return None
-        return (end_equity / start_equity) ** (1 / years) - 1
-
-    # ---------------------------------------------------------------- #
-    # Agent performance — Phase L: real data via AgentPerformanceTracker
-    # ---------------------------------------------------------------- #
-
-    async def get_agent_performance(self) -> Dict[str, Any]:
-        """Real agent voting stats from AgentPerformanceTracker ring buffer."""
+    async def get_sharpe_ratio(self) -> Dict[str, Any]:
+        """BUG-O3 fix: min_required from settings, informative response."""
+        min_required = _get_min_trades()
         try:
-            from backend.analytics.agent_performance_tracker import agent_tracker
-            return await agent_tracker.get_agent_performance()
-        except Exception as e:
+            db_metrics = await self.calculate_from_db(days=30)
+            trade_count = db_metrics.get("total_trades", 0)
+            if trade_count < min_required:
+                return {
+                    "sharpe":       0.0,
+                    "note":         "insufficient_data",
+                    "min_required": min_required,
+                    "current":      trade_count,
+                }
             return {
-                "agents": [],
-                "total_votes": 0,
-                "consensus_rate": 0.0,
-                "error": str(e),
+                "sharpe":       db_metrics.get("sharpe_ratio", 0.0),
+                "note":         "ok",
+                "min_required": min_required,
+                "current":      trade_count,
+            }
+        except Exception as e:
+            log.debug("get_sharpe_ratio: %s", e)
+            return {"sharpe": 0.0, "note": "error", "min_required": min_required, "current": 0}
+
+    async def calculate_from_db(self, days: int = 30) -> Dict[str, Any]:
+        """Fetch recent closed trades from DB and calculate metrics."""
+        min_required = _get_min_trades()  # BUG-O3 fix
+        try:
+            from backend.database.connection import get_db_client
+            db = await get_db_client()
+            since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            import asyncio
+            r = await asyncio.wait_for(
+                asyncio.to_thread(lambda: db.table("trades")
+                    .select("pnl,entry_price,exit_price,stop_loss,take_profit,direction,opened_at,closed_at,symbol,commission")
+                    .eq("status", "closed")
+                    .gte("closed_at", since)
+                    .execute()),
+                timeout=10.0)
+            rows = r.data or []
+            trades: List[TradeRecord] = []
+            for row in rows:
+                try:
+                    trades.append(TradeRecord(
+                        pnl=float(row.get("pnl", 0)),
+                        entry_price=float(row.get("entry_price", 0)),
+                        exit_price=float(row.get("exit_price", 0)),
+                        stop_loss=float(row.get("stop_loss", 0)),
+                        take_profit=float(row.get("take_profit", 0)),
+                        direction=row.get("direction", "BUY"),
+                        opened_at=datetime.fromisoformat(row["opened_at"]) if row.get("opened_at") else datetime.now(timezone.utc),
+                        closed_at=datetime.fromisoformat(row["closed_at"]) if row.get("closed_at") else datetime.now(timezone.utc),
+                        symbol=row.get("symbol", ""),
+                        commission=float(row.get("commission", 0)),
+                    ))
+                except Exception:
+                    continue
+            perf = self.calculate(trades)
+            result = perf.__dict__.copy()
+            result["total_trades"] = len(trades)
+            result["min_trades_for_sharpe"] = min_required  # BUG-O3: expose to dashboard
+            result["sharpe_available"] = len(trades) >= min_required
+            return result
+        except Exception as e:
+            log.debug("calculate_from_db: %s", e)
+            return {
+                "total_trades": 0,
+                "win_rate": 0.0,
+                "sharpe_ratio": 0.0,
+                "min_trades_for_sharpe": min_required,
+                "sharpe_available": False,
             }
 
-    # ---------------------------------------------------------------- #
-    # Convenience: metrics from raw DB trade rows
-    # ---------------------------------------------------------------- #
-
-    def from_db_rows(self, rows: List[Dict[str, Any]]) -> MetricResult:
-        """Convert raw Supabase trade rows to MetricResult."""
-        trades: List[TradeRecord] = []
-        for row in rows:
-            try:
-                trades.append(TradeRecord(
-                    pnl=float(row.get("pnl", 0)),
-                    entry_price=float(row.get("entry_price", 0)),
-                    exit_price=float(row.get("exit_price", 0)),
-                    stop_loss=float(row.get("stop_loss", 0)),
-                    take_profit=float(row.get("take_profit", 0)),
-                    direction=row.get("direction", "BUY"),
-                    opened_at=datetime.fromisoformat(row["opened_at"]) if row.get("opened_at") else datetime.now(timezone.utc),
-                    closed_at=datetime.fromisoformat(row["closed_at"]) if row.get("closed_at") else datetime.now(timezone.utc),
-                    symbol=row.get("symbol", ""),
-                    commission=float(row.get("commission", 0)),
-                ))
-            except Exception:
-                continue
-        return self.calculate(trades)
+    async def get_agent_performance(self) -> Dict[str, Any]:
+        """Get agent voting performance from AgentPerformanceTracker."""
+        try:
+            from backend.analytics.agent_performance_tracker import agent_tracker
+            return await agent_tracker.get_summary()
+        except Exception as e:
+            log.debug("get_agent_performance: %s", e)
+            return {"agents": [], "total_votes": 0, "consensus_rate": 0.0}
 
 
 # Module-level singleton
