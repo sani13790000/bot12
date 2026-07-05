@@ -1,6 +1,6 @@
-"""backend/api/main.py — Phase I Production Hardening
+"""backend/api/main.py -- Phase I Production Hardening
 Fixes:
-  I-1: CORS from ALLOWED_ORIGINS (alias in config) — no more ["*"] fallback
+  I-1: CORS from ALLOWED_ORIGINS (alias in config)
   I-2: SecurityHardenedMiddleware added
   I-3: RateLimitMiddleware added as ASGI middleware
   I-4: TrustedHostMiddleware with TRUSTED_HOSTS from env
@@ -8,6 +8,8 @@ Fixes:
   I-6: /health endpoint with CB + DB + MT5
   I-7: GracefulDrain with docker-safe SIGTERM
   I-8: /metrics Prometheus endpoint
+  Q5-FIX: register_missing_routes now LOGS at ERROR level for failed routes
+           and exposes them in /health response (status=degraded)
 """
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ import logging
 import signal
 import time
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, AsyncGenerator, Dict, List
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,27 +32,30 @@ settings = get_settings()
 logger = get_logger("api.main")
 
 _STARTUP_T0: float = 0.0
+_FAILED_ROUTES: List[str] = []  # Q5-FIX: tracks failed route registrations
 
 
 def register_missing_routes(app: FastAPI) -> None:
-    """Idempotent route registration."""
+    """Idempotent route registration with visible error reporting."""
     _V1 = "/api/v1"
     already = {r.path for r in app.routes}  # type: ignore[attr-defined]
 
     _route_map = {
-        f"{_V1}/auth":      ("backend.api.routes.auth",      "router", ["Auth"]),
-        f"{_V1}/signals":   ("backend.api.routes.signals",   "router", ["Signals"]),
-        f"{_V1}/trades":    ("backend.api.routes.trades",    "router", ["Trades"]),
-        f"{_V1}/agents":    ("backend.api.routes.agents",    "router", ["Agents"]),
-        f"{_V1}/risk":      ("backend.api.routes.risk",      "router", ["Risk"]),
-        f"{_V1}/users":     ("backend.api.routes.users",     "router", ["Users"]),
-        f"{_V1}/health":    ("backend.api.routes.health",    "router", ["Health"]),
-        f"{_V1}/analytics": ("backend.api.routes.analytics", "router", ["Analytics"]),
-        f"{_V1}/license":   ("backend.api.routes.license",   "router", ["License"]),
-        f"{_V1}/learning":  ("backend.api.routes.learning",  "router", ["Learning"]),
-        f"{_V1}/portfolio": ("backend.api.routes.portfolio", "router", ["Portfolio"]),
-        f"{_V1}/admin":     ("backend.api.routes.admin",     "router", ["Admin"]),
+        f"{_V1}/auth":       ("backend.api.routes.auth",       "router", ["Auth"]),
+        f"{_V1}/signals":    ("backend.api.routes.signals",    "router", ["Signals"]),
+        f"{_V1}/trades":     ("backend.api.routes.trades",     "router", ["Trades"]),
+        f"{_V1}/agents":     ("backend.api.routes.agents",     "router", ["Agents"]),
+        f"{_V1}/risk":       ("backend.api.routes.risk",       "router", ["Risk"]),
+        f"{_V1}/users":      ("backend.api.routes.users",      "router", ["Users"]),
+        f"{_V1}/health":     ("backend.api.routes.health",     "router", ["Health"]),
+        f"{_V1}/analytics":  ("backend.api.routes.analytics",  "router", ["Analytics"]),
+        f"{_V1}/license":    ("backend.api.routes.license",    "router", ["License"]),
+        f"{_V1}/learning":   ("backend.api.routes.learning",   "router", ["Learning"]),
+        f"{_V1}/portfolio":  ("backend.api.routes.portfolio",  "router", ["Portfolio"]),
+        f"{_V1}/admin":      ("backend.api.routes.admin",      "router", ["Admin"]),
     }
+
+    _CRITICAL = {f"{_V1}/risk", f"{_V1}/trades", f"{_V1}/signals", f"{_V1}/auth"}
 
     for prefix, (module, attr, tags) in _route_map.items():
         if prefix not in already:
@@ -61,7 +66,17 @@ def register_missing_routes(app: FastAPI) -> None:
                 app.include_router(router, prefix=prefix, tags=tags)
                 logger.debug("route registered", prefix=prefix)
             except Exception as exc:
-                logger.debug("route not available", prefix=prefix, error=str(exc))
+                logger.error(  # Q5-FIX: ERROR not debug
+                    "ROUTE REGISTRATION FAILED",
+                    prefix=prefix,
+                    module=module,
+                    error=str(exc),
+                )
+                _FAILED_ROUTES.append(prefix)
+                if prefix in _CRITICAL and settings.APP_ENV == "production":
+                    raise RuntimeError(
+                        f"Critical route '{prefix}' failed: {exc}"
+                    ) from exc
 
 
 async def safe_startup_task(name: str, coro: Any) -> None:
@@ -83,7 +98,7 @@ def get_circuit_breaker_health() -> Dict[str, Any]:
 
 
 class GracefulDrain:
-    """Tracks in-flight requests; waits for drain on SIGTERM (docker-safe)."""
+    """Tracks in-flight requests; waits for drain on SIGTERM."""
 
     def __init__(self, drain_timeout: float = 10.0) -> None:
         self._count = 0
@@ -100,7 +115,6 @@ class GracefulDrain:
             self._count = max(0, self._count - 1)
 
     def register_sigterm(self) -> None:
-        """I-7: docker-safe SIGTERM via event loop."""
         try:
             loop = asyncio.get_event_loop()
             loop.add_signal_handler(signal.SIGTERM, self._handle_sigterm)
@@ -110,74 +124,43 @@ class GracefulDrain:
 
     def _handle_sigterm(self) -> None:
         self._shutting_down = True
-        logger.info("SIGTERM received — draining requests")
+        logger.info("[GracefulDrain] SIGTERM received -- draining requests")
 
-    async def drain(self) -> None:
+    async def wait_drain(self) -> None:
         deadline = time.monotonic() + self._drain_timeout
-        while time.monotonic() < deadline:
-            async with self._lock:
-                if self._count == 0:
-                    break
+        while self._count > 0 and time.monotonic() < deadline:
             await asyncio.sleep(0.1)
-        async with self._lock:
-            if self._count > 0:
-                logger.warning("drain timeout", remaining=self._count)
+        if self._count > 0:
+            logger.warning(
+                "[GracefulDrain] drain timeout -- %d requests still in-flight",
+                self._count,
+            )
 
 
-_drain = GracefulDrain(drain_timeout=10.0)
+_drain = GracefulDrain()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global _STARTUP_T0
     _STARTUP_T0 = time.monotonic()
-    logger.info("startup begin")
-
-    # I-5: init Redis for distributed rate limiting
-    try:
-        from backend.middleware.rate_limit import init_redis
-        if settings.REDIS_URL:
-            await safe_startup_task("redis", init_redis(settings.REDIS_URL))
-        else:
-            logger.debug("REDIS_URL not set — using in-memory rate limiting")
-    except Exception as exc:
-        logger.debug("Redis init skipped", error=str(exc))
-
-    # Pre-warm asyncio locks
-    try:
-        from backend.middleware.rate_limit import get_rate_limiter
-        await get_rate_limiter()
-    except Exception as exc:
-        logger.debug("rate limiter pre-warm skipped", error=str(exc))
+    logger.info("Galaxy Vast AI -- startup", version=settings.APP_VERSION, env=settings.APP_ENV)
+    _drain.register_sigterm()
 
     try:
-        from backend.circuit_breaker import get_circuit_breaker
-        await get_circuit_breaker("broker")
-    except Exception as exc:
-        logger.debug("circuit breaker pre-warm skipped", error=str(exc))
-
-    # I-7: docker-safe SIGTERM
-    try:
-        _drain.register_sigterm()
-    except Exception as exc:
-        logger.debug("SIGTERM handler skipped", error=str(exc))
+        from backend.database.redis_client import init_redis
+        await safe_startup_task("redis", init_redis())
+    except ImportError:
+        logger.debug("Redis not configured -- skipping")
 
     register_missing_routes(app)
+    if _FAILED_ROUTES:
+        logger.warning("Routes not registered at startup", failed=_FAILED_ROUTES)
 
-    elapsed = round((time.monotonic() - _STARTUP_T0) * 1000, 1)
-    logger.info("startup complete", elapsed_ms=elapsed)
     yield
 
-    logger.info("shutdown begin")
-    await _drain.drain()
-
-    try:
-        from backend.middleware.rate_limit import close_redis
-        await close_redis()
-    except Exception:
-        pass
-
-    logger.info("shutdown complete")
+    logger.info("Galaxy Vast AI -- shutting down")
+    await _drain.wait_drain()
 
 
 def create_app() -> FastAPI:
@@ -190,17 +173,12 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if settings.APP_ENV != "production" else None,
     )
 
-    # I-4: TrustedHostMiddleware
     if settings.APP_ENV == "production" and settings.TRUSTED_HOSTS:
-        app.add_middleware(
-            TrustedHostMiddleware,
-            allowed_hosts=settings.TRUSTED_HOSTS,
-        )
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
 
-    # I-1: CORS — uses ALLOWED_ORIGINS property (no ["*"] fallback)
     cors_origins = settings.ALLOWED_ORIGINS
     if settings.APP_ENV == "production" and "*" in cors_origins:
-        logger.warning("CORS wildcard (*) detected in production! Set CORS_ORIGINS env var.")
+        logger.warning("CORS wildcard (*) in production! Set CORS_ORIGINS env var.")
 
     app.add_middleware(
         CORSMiddleware,
@@ -214,7 +192,6 @@ def create_app() -> FastAPI:
         expose_headers=["X-Request-ID", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
     )
 
-    # I-2: Security Headers + WAF
     try:
         from backend.middleware.security_hardened import SecurityHardenedMiddleware
         app.add_middleware(SecurityHardenedMiddleware)
@@ -222,19 +199,13 @@ def create_app() -> FastAPI:
     except Exception as exc:
         logger.warning("SecurityHardenedMiddleware skipped", error=str(exc))
 
-    # I-3: Rate Limiting
     try:
         from backend.middleware.rate_limit import RateLimitMiddleware
-        app.add_middleware(
-            RateLimitMiddleware,
-            limit=settings.RATE_LIMIT_API_PER_MINUTE,
-            window=60,
-        )
+        app.add_middleware(RateLimitMiddleware, limit=settings.RATE_LIMIT_API_PER_MINUTE, window=60)
         logger.debug("RateLimitMiddleware registered")
     except Exception as exc:
         logger.warning("RateLimitMiddleware skipped", error=str(exc))
 
-    # I-6: /health endpoint
     @app.get("/health", tags=["System"])
     async def health_check() -> Dict[str, Any]:
         checks: Dict[str, Any] = {
@@ -245,10 +216,14 @@ def create_app() -> FastAPI:
         }
         checks["circuit_breakers"] = get_circuit_breaker_health()
 
+        if _FAILED_ROUTES:  # Q5-FIX: expose failed routes
+            checks["failed_routes"] = _FAILED_ROUTES
+            checks["status"] = "degraded"
+
         try:
-            from backend.database.connection import db
-            ping_ok = await asyncio.wait_for(db.ping(), timeout=2.0)
-            checks["database"] = "ok" if ping_ok else "degraded"
+            from backend.database.connection import get_db_client
+            client = await asyncio.wait_for(get_db_client(), timeout=2.0)
+            checks["database"] = "ok" if client else "degraded"
         except Exception as exc:
             checks["database"] = f"error: {str(exc)[:50]}"
 
@@ -268,14 +243,16 @@ def create_app() -> FastAPI:
         degraded = any(
             isinstance(v, str) and ("error" in v or "degraded" in v)
             for k, v in checks.items()
-            if k not in ("kill_switch", "circuit_breakers")
+            if k not in ("kill_switch", "circuit_breakers", "failed_routes")
         )
         if degraded:
             checks["status"] = "degraded"
 
-        return JSONResponse(content=checks, status_code=200 if checks["status"] == "ok" else 503)
+        return JSONResponse(
+            content=checks,
+            status_code=200 if checks["status"] == "ok" else 503,
+        )
 
-    # I-8: /metrics
     @app.get("/metrics", tags=["System"], include_in_schema=False)
     async def prometheus_metrics() -> Any:
         try:
