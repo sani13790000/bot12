@@ -1,9 +1,12 @@
 // frontend/src/pages/AdminDashboardPage.tsx
+// BUG-W2 fix: StatCard import — named import from correct path
+// BEFORE: import StatCard from "@/components/StatCard"  (default import, wrong path -> build fail)
+// AFTER:  import { StatCard } from "@/components/common/StatCard"  (named export, correct path)
 import React, { useState } from "react";
 import { Shield, Users, Activity, AlertTriangle, Power, Loader2 } from "lucide-react";
 import { adminApi } from "@/utils/api";
 import { useApi } from "@/hooks/useApi";
-import StatCard from "@/components/StatCard";
+import { StatCard } from "@/components/common/StatCard";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorAlert from "@/components/ErrorAlert";
 
@@ -40,22 +43,19 @@ export default function AdminDashboardPage() {
       )}
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="کل کاربران"   value={stats.total_users}        icon={Users}    color="blue" />
-          <StatCard title="کاربران فعال" value={stats.active_users}       icon={Activity} color="green" />
-          <StatCard title="معاملات امروز" value={stats.total_trades_today} icon={Activity} color="yellow" />
-          <StatCard title="سلامت سیستم"  value={stats.system_health} icon={Shield} color={stats.system_health==="healthy"?"green":stats.system_health==="degraded"?"yellow":"red"} />
+          <StatCard title="کل کاربران"   value={stats.total_users}        icon={<Users size={16} />}    color="accent" />
+          <StatCard title="کاربران فعال" value={stats.active_users}       icon={<Activity size={16} />} color="green" />
+          <StatCard title="معاملات امروز" value={stats.total_trades_today} icon={<Activity size={16} />} color="gold" />
+          <StatCard title="سلامت سیستم"  value={stats.system_health} icon={<Shield size={16} />} color={stats.system_health==="healthy"?"green":stats.system_health==="degraded"?"gold":"red"} />
         </div>
       )}
       {security && (
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">متریک‌های امنیتی</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            {[{ل:"ورود ناموفق ۲۴h",v:security.failed_logins_24h,d:security.failed_logins_24h>10},{ل:"IP مسدود",v:security.blocked_ips,d:false},{ل:"جلسات فعال",v:security.active_sessions,d:false},{ل:"نقض لایسنس",v:security.license_violations,d:security.license_violations>0}]
-              .map(({l,v,d}) => (
-                <div key={l} className={`rounded-lg p-3 ${d ? "bg-red-500/10 border border-red-500/20" : "bg-gray-800"}`}>
-                  <p className="text-xs text-gray-400">{l}</p><p className={`text-lg font-bold mt-1 ${d ? "text-red-400" : "text-white"}`}>{v}</p>
-                </div>
-              ))}
+        <div className="rounded-xl border border-[#1e2d3d] bg-[#0d1f2d] p-4">
+          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Shield size={16} className="text-purple-400" /> وضعیت امنیت</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <StatCard title="تهدیدات شناسایی‌شده" value={security.threats_detected ?? 0} icon={<AlertTriangle size={16} />} color="red" />
+            <StatCard title="IP مسدودشده"          value={security.ips_blocked ?? 0}      icon={<Shield size={16} />}        color="purple" />
+            <StatCard title="امتیاز امنیتی"         value={security.security_score ?? 0}   icon={<Activity size={16} />}      color="green" />
           </div>
         </div>
       )}

@@ -1,6 +1,8 @@
 """
 backend/api/routes/billing.py
-Phase 10 - Billing API Routes (BUG-V2 fix: removed router=None guard + MockProvider replaced)
+Phase 10 - Billing API Routes
+BUG-W1 fix: _get_billing_engine() now dispatches to real providers (zarinpal/stripe/manual)
+BUG-V2 fix: removed router=None guard
 
 Customer routes  (require JWT):
   POST /billing/checkout               -> initiate payment
@@ -69,24 +71,81 @@ class AdminRevokeRequest(BaseModel):
 
 
 def _get_billing_engine() -> BillingEngine:
-    """BUG-V2 fix: use real provider from settings, fallback to MockProvider in dev."""
+    """BUG-W1 fix: dispatch to real provider based on BILLING_PROVIDER setting.
+    
+    Providers:
+      mock     -> MockProvider (development / testing only)
+      zarinpal -> ZarinpalProvider (Iranian payment gateway)
+      stripe   -> StripeProvider (international payment)
+      manual   -> ManualProvider (admin-confirmed payments)
+    """
     try:
         from ...core.config import settings
         provider_name = getattr(settings, "BILLING_PROVIDER", "mock").lower()
     except Exception:
         provider_name = "mock"
 
+    # --- Development / Testing ---
     if provider_name == "mock":
         from ...billing.provider import MockProvider
         return BillingEngine(provider=MockProvider())
 
-    # Real provider support (zarinpal / stripe)
-    try:
-        from ...billing.provider import MockProvider
-        return BillingEngine(provider=MockProvider())
-    except Exception:
-        from ...billing.provider import MockProvider
-        return BillingEngine(provider=MockProvider())
+    # --- ZarinPal (IRR payments) ---
+    if provider_name == "zarinpal":
+        try:
+            from ...billing.provider import ZarinpalProvider
+            merchant_id = getattr(settings, "ZARINPAL_MERCHANT_ID", "")
+            sandbox     = getattr(settings, "ZARINPAL_SANDBOX", True)
+            return BillingEngine(provider=ZarinpalProvider(
+                merchant_id=merchant_id,
+                sandbox=sandbox,
+            ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                "ZarinpalProvider init failed, falling back to MockProvider: %s", exc
+            )
+            from ...billing.provider import MockProvider
+            return BillingEngine(provider=MockProvider())
+
+    # --- Stripe (international) ---
+    if provider_name == "stripe":
+        try:
+            from ...billing.provider import StripeProvider
+            secret_key      = getattr(settings, "STRIPE_SECRET_KEY", "")
+            webhook_secret  = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
+            return BillingEngine(provider=StripeProvider(
+                secret_key=secret_key,
+                webhook_secret=webhook_secret,
+            ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                "StripeProvider init failed, falling back to MockProvider: %s", exc
+            )
+            from ...billing.provider import MockProvider
+            return BillingEngine(provider=MockProvider())
+
+    # --- Manual (admin confirms payments directly) ---
+    if provider_name == "manual":
+        try:
+            from ...billing.provider import ManualProvider
+            return BillingEngine(provider=ManualProvider())
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                "ManualProvider init failed, falling back to MockProvider: %s", exc
+            )
+            from ...billing.provider import MockProvider
+            return BillingEngine(provider=MockProvider())
+
+    # --- Unknown provider: log warning and fallback ---
+    import logging
+    logging.getLogger(__name__).warning(
+        "Unknown BILLING_PROVIDER=%r, using MockProvider", provider_name
+    )
+    from ...billing.provider import MockProvider
+    return BillingEngine(provider=MockProvider())
 
 
 def _get_current_user_id(authorization: str = Header("")) -> str:
@@ -256,10 +315,14 @@ async def receive_webhook(
     payload = await request.body()
     ts = float(x_timestamp) if x_timestamp else None
 
-    from ...billing.provider import MockProvider
-    provider  = MockProvider()
+    # Use the engine's configured provider for webhook verification
+    provider  = engine._provider
     processor = WebhookProcessor(
-        engine=engine, provider=provider, webhook_secret="webhook-secret",
+        engine=engine, provider=provider,
+        webhook_secret=getattr(
+            __import__('backend.core.config', fromlist=['settings']).settings,
+            'WEBHOOK_SECRET', 'webhook-secret'
+        ),
     )
     try:
         result = processor.process(
