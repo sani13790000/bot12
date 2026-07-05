@@ -1,131 +1,198 @@
 """
-backend/ai_prediction/model_manager.py
-Galaxy Vast AI — ML Model Manager
+ModelManager v2 — Phase G Fix
 
-Manages versioned ML models: load, save, version tracking, hot-swap.
-Supports XGBoost and scikit-learn compatible models.
+Fixes:
+- BUG-G3: load_best_model() now scans /app/models/xgboost/ directory
+- BUG-G5: Model versioning with manifest file (best_model.json)
+- NEW: get_best_metadata() returns AUC and n_samples for confidence calculation
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import pickle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL_DIR = Path(os.getenv("MODEL_DIR", "/tmp/galaxy_models"))
+_MODEL_DIR = os.environ.get("MODEL_DIR", "/app/models/xgboost")
+_MANIFEST_FILE = "best_model.json"
 
 
 @dataclass
-class ModelVersion:
-    """Metadata for a saved model version."""
-    version:    str
-    model_type: str
-    path:       Path
-    metrics:    Dict[str, float] = field(default_factory=dict)
-    created_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    is_active:  bool = False
+class ModelMetadata:
+    """Metadata stored alongside each trained model."""
+    symbol:       str
+    trained_at:   str
+    n_samples:    int
+    accuracy:     float
+    precision:    float
+    recall:       float
+    f1:           float
+    auc_roc:      float = 0.60
+    model_path:   str = ""
+    feature_names: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "version":    self.version,
-            "model_type": self.model_type,
-            "path":       str(self.path),
-            "metrics":    self.metrics,
-            "created_at": self.created_at,
-            "is_active":  self.is_active,
+            "symbol":        self.symbol,
+            "trained_at":    self.trained_at,
+            "n_samples":     self.n_samples,
+            "accuracy":      round(self.accuracy, 4),
+            "precision":     round(self.precision, 4),
+            "recall":        round(self.recall, 4),
+            "f1":            round(self.f1, 4),
+            "auc_roc":       round(self.auc_roc, 4),
+            "model_path":    self.model_path,
+            "feature_names": self.feature_names,
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ModelMetadata":
+        return cls(
+            symbol=d.get("symbol", "UNKNOWN"),
+            trained_at=d.get("trained_at", ""),
+            n_samples=d.get("n_samples", 0),
+            accuracy=d.get("accuracy", 0.0),
+            precision=d.get("precision", 0.0),
+            recall=d.get("recall", 0.0),
+            f1=d.get("f1", 0.0),
+            auc_roc=d.get("auc_roc", 0.60),
+            model_path=d.get("model_path", ""),
+            feature_names=d.get("feature_names", []),
+        )
 
 
 class ModelManager:
     """
-    Manages ML model lifecycle: save, load, version, hot-swap.
-
-    Usage::
-
-        mm = ModelManager()
-        mm.save_model(model, "xgboost", {"accuracy": 0.87})
-        loaded = mm.load_active("xgboost")
+    Phase G: versioned model storage.
+    - Saves model_<timestamp>.pkl + updates best_model.json manifest
+    - load_best_model(symbol) returns the highest-AUC model for that symbol
+    - Falls back to latest model if no per-symbol model exists
     """
 
-    def __init__(self, model_dir: Optional[Path] = None) -> None:
-        self._dir = model_dir or _DEFAULT_MODEL_DIR
-        self._dir.mkdir(parents=True, exist_ok=True)
-        self._versions: Dict[str, List[ModelVersion]] = {}
-        logger.info("[ModelManager] model dir: %s", self._dir)
+    def __init__(self, model_dir: str = _MODEL_DIR) -> None:
+        self._model_dir = model_dir
+        os.makedirs(self._model_dir, exist_ok=True)
 
-    # ------------------------------------------------------------------ #
-    # Save / Load
-    # ------------------------------------------------------------------ #
+    # ── Saving ────────────────────────────────────────────────────────────────
 
     def save_model(
         self,
-        model:      Any,
-        model_type: str,
-        metrics:    Optional[Dict[str, float]] = None,
-    ) -> ModelVersion:
-        """Pickle a model and register it as the new active version."""
-        import time
-        version = f"{model_type}_{int(time.time())}"
-        path = self._dir / f"{version}.pkl"
+        model: Any,
+        meta: ModelMetadata,
+    ) -> str:
+        """Persist model + metadata. Returns saved path."""
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        filename = f"model_{meta.symbol}_{ts}.pkl"
+        path = os.path.join(self._model_dir, filename)
+        obj = {"model": model, "metadata": meta.to_dict()}
         with open(path, "wb") as fh:
-            pickle.dump(model, fh)
-        mv = ModelVersion(
-            version=version,
-            model_type=model_type,
-            path=path,
-            metrics=metrics or {},
-            is_active=True,
-        )
-        # deactivate old active
-        for old in self._versions.get(model_type, []):
-            old.is_active = False
-        self._versions.setdefault(model_type, []).append(mv)
-        logger.info("[ModelManager] saved %s v=%s metrics=%s", model_type, version, metrics)
-        return mv
+            pickle.dump(obj, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        meta.model_path = path
+        logger.info("[ModelManager] saved %s (auc=%.3f n=%d)", path, meta.auc_roc, meta.n_samples)
 
-    def load_active(self, model_type: str) -> Optional[Any]:
-        """Load the currently active model for model_type."""
-        versions = self._versions.get(model_type, [])
-        active = next((v for v in reversed(versions) if v.is_active), None)
-        if active is None:
-            logger.warning("[ModelManager] no active model for '%s'", model_type)
+        # Update manifest
+        self._update_manifest(meta)
+        return path
+
+    def _update_manifest(self, meta: ModelMetadata) -> None:
+        """Update best_model.json: keep only the entry per symbol with highest AUC."""
+        manifest_path = os.path.join(self._model_dir, _MANIFEST_FILE)
+        try:
+            if os.path.exists(manifest_path):
+                with open(manifest_path, "r") as fh:
+                    manifest: Dict[str, Any] = json.load(fh)
+            else:
+                manifest = {}
+
+            key = meta.symbol
+            existing = manifest.get(key)
+            if existing is None or meta.auc_roc >= existing.get("auc_roc", 0.0):
+                manifest[key] = meta.to_dict()
+                with open(manifest_path, "w") as fh:
+                    json.dump(manifest, fh, indent=2)
+                logger.info("[ModelManager] manifest updated for %s (auc=%.3f)", key, meta.auc_roc)
+        except Exception as exc:
+            logger.warning("[ModelManager] manifest update failed: %s", exc)
+
+    # ── Loading ───────────────────────────────────────────────────────────────
+
+    def load_best_model(self, symbol: str = "default") -> Optional[Any]:
+        """
+        BUG-G3 FIX: Load best model for given symbol.
+        1. Check manifest for symbol-specific best model
+        2. Fall back to any model in directory
+        3. Return None if no model found
+        """
+        # Try manifest first
+        manifest_path = os.path.join(self._model_dir, _MANIFEST_FILE)
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, "r") as fh:
+                    manifest = json.load(fh)
+                entry = manifest.get(symbol) or manifest.get("default") or next(iter(manifest.values()), None)
+                if entry and entry.get("model_path") and os.path.exists(entry["model_path"]):
+                    return self._load_pkl(entry["model_path"])
+            except Exception as exc:
+                logger.warning("[ModelManager] manifest read failed: %s", exc)
+
+        # Fallback: scan directory for latest pkl
+        return self._load_latest_pkl()
+
+    def get_best_metadata(self, symbol: str = "default") -> Optional[ModelMetadata]:
+        """Return metadata for best model of given symbol."""
+        manifest_path = os.path.join(self._model_dir, _MANIFEST_FILE)
+        if not os.path.exists(manifest_path):
             return None
-        if not active.path.exists():
-            logger.error("[ModelManager] model file missing: %s", active.path)
+        try:
+            with open(manifest_path, "r") as fh:
+                manifest = json.load(fh)
+            entry = manifest.get(symbol) or manifest.get("default") or next(iter(manifest.values()), None)
+            return ModelMetadata.from_dict(entry) if entry else None
+        except Exception as exc:
+            logger.warning("[ModelManager] metadata read failed: %s", exc)
             return None
-        with open(active.path, "rb") as fh:
-            model = pickle.load(fh)
-        logger.debug("[ModelManager] loaded %s v=%s", model_type, active.version)
-        return model
 
-    # ------------------------------------------------------------------ #
-    # Version management
-    # ------------------------------------------------------------------ #
+    def _load_pkl(self, path: str) -> Optional[Any]:
+        try:
+            with open(path, "rb") as fh:
+                obj = pickle.load(fh)
+            model = obj.get("model") if isinstance(obj, dict) else obj
+            logger.info("[ModelManager] loaded model from %s", path)
+            return model
+        except Exception as exc:
+            logger.error("[ModelManager] failed to load %s: %s", path, exc)
+            return None
 
-    def list_versions(self, model_type: str) -> List[Dict[str, Any]]:
-        """List all versions for a model type."""
-        return [v.to_dict() for v in self._versions.get(model_type, [])]
+    def _load_latest_pkl(self) -> Optional[Any]:
+        """Load most recently modified .pkl file in model_dir."""
+        try:
+            pkls = [
+                os.path.join(self._model_dir, f)
+                for f in os.listdir(self._model_dir)
+                if f.endswith(".pkl")
+            ]
+            if not pkls:
+                logger.info("[ModelManager] no .pkl files in %s", self._model_dir)
+                return None
+            latest = max(pkls, key=os.path.getmtime)
+            return self._load_pkl(latest)
+        except Exception as exc:
+            logger.warning("[ModelManager] directory scan failed: %s", exc)
+            return None
 
-    def rollback(self, model_type: str, version: str) -> bool:
-        """Set a specific version as active."""
-        versions = self._versions.get(model_type, [])
-        target = next((v for v in versions if v.version == version), None)
-        if target is None:
-            logger.warning("[ModelManager] rollback: version not found: %s", version)
-            return False
-        for v in versions:
-            v.is_active = False
-        target.is_active = True
-        logger.info("[ModelManager] rolled back %s to v=%s", model_type, version)
-        return True
-
-
-# Module-level singleton
-model_manager = ModelManager()
+    def list_models(self) -> List[ModelMetadata]:
+        """List all models from manifest."""
+        manifest_path = os.path.join(self._model_dir, _MANIFEST_FILE)
+        if not os.path.exists(manifest_path):
+            return []
+        try:
+            with open(manifest_path, "r") as fh:
+                manifest = json.load(fh)
+            return [ModelMetadata.from_dict(v) for v in manifest.values()]
+        except Exception:
+            return []
