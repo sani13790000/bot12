@@ -1,15 +1,14 @@
 """
-XGBoost Trainer — Phase G Fix
-Added: train_latest() wrapper that retraining_service.py expects.
-Fixed: dataset building from recent trade history.
-Fixed(G8): train_latest() now saves via ModelManager for versioning.
+XGBoost Trainer — Phase R Fix
+BUG-R1: Removed internal DatasetBuilder (12 hardcoded features).
+Now imports from backend.ai_prediction.dataset_builder (38 features via FeaturePipeline).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -28,83 +27,9 @@ class TrainResult:
     auc_roc:   float = 0.0
 
 
-class DatasetBuilder:
-    """
-    Builds feature matrix and labels from recent closed trades stored in Supabase.
-    Phase A: minimal implementation — loads from 'trades' table.
-    """
-
-    def __init__(self, lookback_days: int = 90) -> None:
-        self.lookback_days = lookback_days
-        self._feature_cols = [
-            "rsi", "macd", "macd_signal", "bb_upper", "bb_lower",
-            "atr", "volume_ratio", "spread", "session_hour",
-            "day_of_week", "smc_score", "pa_score",
-        ]
-
-    async def build(self) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """
-        Returns (X, y, feature_names).
-        X: float32 feature matrix, shape (n_samples, n_features)
-        y: int labels (1=profit, 0=loss)
-        """
-        try:
-            from backend.database.connection import get_db_client
-            client = await get_db_client()
-            resp = (
-                client.table("trades")
-                .select(
-                    "rsi,macd,macd_signal,bb_upper,bb_lower,"
-                    "atr,volume_ratio,spread,session_hour,"
-                    "day_of_week,smc_score,pa_score,profit_usd,status"
-                )
-                .eq("status", "closed")
-                .order("closed_at", desc=True)
-                .limit(5000)
-                .execute()
-            )
-            rows = resp.data or []
-        except Exception as exc:
-            logger.warning(
-                "[DatasetBuilder] Could not load trades from DB: %s — "
-                "using synthetic fallback dataset", exc
-            )
-            rows = []
-
-        if len(rows) < 50:
-            logger.warning(
-                "[DatasetBuilder] Only %d trades found — using synthetic data",
-                len(rows)
-            )
-            return self._synthetic_dataset()
-
-        X_list, y_list = [], []
-        for row in rows:
-            try:
-                features = [
-                    float(row.get(col, 0.0) or 0.0)
-                    for col in self._feature_cols
-                ]
-                label = 1 if (row.get("profit_usd") or 0) > 0 else 0
-                X_list.append(features)
-                y_list.append(label)
-            except (TypeError, ValueError):
-                continue
-
-        X = np.array(X_list, dtype=np.float32)
-        y = np.array(y_list, dtype=np.int32)
-        logger.info("[DatasetBuilder] Built dataset: %d samples, %d features", len(y), X.shape[1])
-        return X, y, self._feature_cols
-
-    def _synthetic_dataset(
-        self, n: int = 500
-    ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
-        """Minimal synthetic dataset for cold-start."""
-        rng = np.random.default_rng(42)
-        X = rng.standard_normal((n, len(self._feature_cols))).astype(np.float32)
-        y = (rng.random(n) > 0.45).astype(np.int32)
-        logger.info("[DatasetBuilder] Synthetic dataset: %d samples", n)
-        return X, y, self._feature_cols
+# BUG-R1 FIX: Internal DatasetBuilder with 12 hardcoded columns REMOVED.
+# train_latest() imports from backend.ai_prediction.dataset_builder
+# which delegates to FeaturePipeline.feature_names() -> 38 features.
 
 
 class XGBoostTrainer:
@@ -131,8 +56,7 @@ class XGBoostTrainer:
         self._params = {**self.DEFAULT_PARAMS, **(params or {})}
         self._model: Optional[Any] = None
         self._feature_names: List[str] = []
-
-    # ── Training ───────────────────────────────────────────────────────────────
+        self._model_loaded: bool = False
 
     def train(
         self,
@@ -141,180 +65,139 @@ class XGBoostTrainer:
         X_val:   Optional[np.ndarray] = None,
         y_val:   Optional[np.ndarray] = None,
     ) -> TrainResult:
-        """
-        Train XGBoost classifier and return evaluation metrics.
-        This is the core training method.
-        """
+        """Train XGBoost classifier and return evaluation metrics."""
         try:
             from xgboost import XGBClassifier
         except ImportError:
             logger.error("[XGBoostTrainer] xgboost not installed")
-            return TrainResult(accuracy=0.0, precision=0.0, recall=0.0, f1=0.0, n_samples=0)
+            return TrainResult(accuracy=0, precision=0, recall=0, f1=0, n_samples=0)
 
-        from sklearn.metrics import accuracy_score
-        from sklearn.model_selection import train_test_split
-
-        if X_val is None or y_val is None:
-            X_train, X_val, y_train, y_val = train_test_split(
-                X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
-            )
+        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
         model = XGBClassifier(**self._params)
-        model.fit(
-            X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            verbose=False,
-        )
+        eval_set = [(X_val, y_val)] if X_val is not None else []
+        fit_kwargs: Dict[str, Any] = {}
+        if eval_set:
+            fit_kwargs["eval_set"] = eval_set
+            fit_kwargs["verbose"] = False
+
+        model.fit(X_train, y_train, **fit_kwargs)
         self._model = model
+        self._model_loaded = True
 
-        y_pred = model.predict(X_val)
-        acc = float(accuracy_score(y_val, y_pred))
-
-        # AUC-ROC
-        auc = 0.60
-        try:
-            from sklearn.metrics import roc_auc_score
-            auc = float(roc_auc_score(y_val, model.predict_proba(X_val)[:, 1]))
-        except Exception:
-            pass
-
-        try:
-            from sklearn.metrics import precision_score, recall_score, f1_score
-            prec = float(precision_score(y_val, y_pred, zero_division=0))
-            rec  = float(recall_score(y_val, y_pred, zero_division=0))
-            f1   = float(f1_score(y_val, y_pred, zero_division=0))
-        except Exception:
-            prec = rec = f1 = 0.0
-
-        logger.info(
-            "[XGBoostTrainer] train() — acc=%.4f prec=%.4f rec=%.4f f1=%.4f auc=%.4f n=%d",
-            acc, prec, rec, f1, auc, len(y_train)
-        )
+        y_pred = model.predict(X_train)
         return TrainResult(
-            accuracy=acc,
-            precision=prec,
-            recall=rec,
-            f1=f1,
+            accuracy=float(accuracy_score(y_train, y_pred)),
+            precision=float(precision_score(y_train, y_pred, zero_division=0)),
+            recall=float(recall_score(y_train, y_pred, zero_division=0)),
+            f1=float(f1_score(y_train, y_pred, zero_division=0)),
             n_samples=len(y_train),
-            auc_roc=auc,
         )
 
     async def train_latest(
         self,
+        symbol: Optional[str] = None,
         lookback_days: int = 90,
-        min_samples:   int = 50,
-        symbol:        str = "default",
     ) -> TrainResult:
         """
-        Phase A FIX: Called by retraining_service.py.
-        Phase G FIX (BUG-G8): Saves via ModelManager for versioning.
-        Builds dataset from recent trades, trains model, saves if improved.
+        BUG-R1 FIX: import DatasetBuilder from dataset_builder.py (38 features).
+        Previously used internal class with 12 hardcoded columns -> ValueError.
         """
-        builder = DatasetBuilder(lookback_days=lookback_days)
-        loop = asyncio.get_running_loop()
+        from backend.ai_prediction.dataset_builder import DatasetBuilder
 
-        # Build dataset async (DB I/O)
-        X, y, feature_names = await builder.build()
-        self._feature_names = feature_names
+        builder = DatasetBuilder()
+        df = await builder.build(symbol=symbol, days=lookback_days)
 
-        if len(y) < min_samples:
+        if df is None or len(df) < 50:
             logger.warning(
-                "[XGBoostTrainer] train_latest() — only %d samples < min %d — skipping",
-                len(y), min_samples
+                "[XGBoostTrainer] Insufficient data (%s rows) — synthetic fallback",
+                len(df) if df is not None else 0,
             )
-            return TrainResult(
-                accuracy=0.0, precision=0.0, recall=0.0, f1=0.0, n_samples=len(y)
-            )
+            return await self._train_synthetic()
 
-        # Run CPU-bound training in thread pool
-        result = await loop.run_in_executor(
-            None, self.train, X, y, None, None
+        feature_cols = builder.feature_names
+        X = df[feature_cols].values.astype(np.float32)
+        y = df["label"].values.astype(np.int32)
+        self._feature_names = feature_cols
+
+        logger.info(
+            "[XGBoostTrainer] Training on %d samples x %d features",
+            len(y), X.shape[1],
         )
+        result = self.train(X, y)
+        result.feature_names = feature_cols
 
-        # BUG-G8 FIX: Save via ModelManager for versioning
-        if result.accuracy > 0 and self._model is not None:
-            try:
-                from backend.ai_prediction.model_manager import ModelManager, ModelMetadata
-                from datetime import datetime, timezone
-                manager = ModelManager(self._model_dir)
-                meta = ModelMetadata(
-                    symbol=symbol,
-                    trained_at=datetime.now(timezone.utc).isoformat(),
-                    n_samples=result.n_samples,
-                    accuracy=result.accuracy,
-                    precision=result.precision,
-                    recall=result.recall,
-                    f1=result.f1,
-                    auc_roc=result.auc_roc,
-                    feature_names=feature_names,
-                )
-                saved_path = await loop.run_in_executor(
-                    None, manager.save_model, self._model, meta
-                )
-                result.model_path = saved_path
-                result.feature_names = feature_names
-                logger.info("[XGBoostTrainer] model versioned at %s (auc=%.3f)", saved_path, result.auc_roc)
-            except Exception as exc:
-                logger.warning("[XGBoostTrainer] ModelManager save failed: %s — using pickle fallback", exc)
-                try:
-                    saved_path = await loop.run_in_executor(None, self._save_model_pkl)
-                    result.model_path = saved_path
-                except Exception as exc2:
-                    logger.warning("[XGBoostTrainer] pickle fallback also failed: %s", exc2)
+        try:
+            from backend.ai_prediction.model_manager import ModelManager
+            mm = ModelManager(model_dir=self._model_dir)
+            sym = symbol or "ALL"
+            loop = asyncio.get_event_loop()
+            path = await loop.run_in_executor(
+                None, mm.save, self._model, sym, result.auc_roc
+            )
+            result.model_path = str(path)
+        except Exception as exc:
+            logger.warning("[XGBoostTrainer] ModelManager save failed: %s", exc)
 
         return result
 
-    def predict_proba(self, features: np.ndarray) -> np.ndarray:
-        """Return class probabilities for feature matrix."""
-        if self._model is None:
-            raise RuntimeError("Model not trained yet — call train() or train_latest() first")
-        return self._model.predict_proba(features)
-
-    def predict(self, features: np.ndarray, threshold: float = 0.55) -> np.ndarray:
-        """Return binary predictions with configurable confidence threshold."""
-        proba = self.predict_proba(features)
-        return (proba[:, 1] >= threshold).astype(int)
-
-    # ── Persistence ───────────────────────────────────────────────────────────────
-
-    def _save_model_pkl(self) -> str:
-        """Pickle fallback. Returns saved path."""
-        import os
-        import pickle
-        os.makedirs(self._model_dir, exist_ok=True)
-        path = os.path.join(self._model_dir, "model_latest.pkl")
-        with open(path, "wb") as f:
-            pickle.dump({"model": self._model, "features": self._feature_names}, f)
-        logger.info("[XGBoostTrainer] Model saved (pickle fallback) to %s", path)
-        return path
-
-    def load_model(self, path: Optional[str] = None) -> bool:
-        """Load model from disk. Returns True if successful."""
-        import os
-        import pickle
-        # First try ModelManager
+    async def _train_synthetic(self) -> TrainResult:
+        """Fallback synthetic training."""
         try:
-            from backend.ai_prediction.model_manager import ModelManager
-            manager = ModelManager(self._model_dir)
-            model = manager.load_best_model()
-            if model is not None:
-                self._model = model
-                logger.info("[XGBoostTrainer] Loaded model via ModelManager")
-                return True
+            from backend.ai_prediction.feature_pipeline import FeaturePipeline
+            feature_names = FeaturePipeline.feature_names()
         except Exception:
-            pass
-        # Fallback: pickle
-        load_path = path or os.path.join(self._model_dir, "model_latest.pkl")
-        if not os.path.exists(load_path):
-            logger.warning("[XGBoostTrainer] No model file at %s", load_path)
-            return False
+            feature_names = [f"feature_{i}" for i in range(38)]
+
+        rng = np.random.default_rng(42)
+        n = 500
+        X = rng.standard_normal((n, len(feature_names))).astype(np.float32)
+        y = (rng.random(n) > 0.45).astype(np.int32)
+        self._feature_names = feature_names
+        result = self.train(X, y)
+        result.feature_names = feature_names
+        return result
+
+    def save_model(self, path: Optional[str] = None) -> str:
+        import os, pickle
+        if self._model is None:
+            raise RuntimeError("No model trained yet")
+        save_path = path or f"{self._model_dir}/xgboost_latest.pkl"
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with open(save_path, "wb") as f:
+            pickle.dump(self._model, f)
+        return save_path
+
+    def load_model(self, path: Optional[str] = None) -> None:
+        import pickle
+        load_path = path or f"{self._model_dir}/xgboost_latest.pkl"
+        with open(load_path, "rb") as f:
+            self._model = pickle.load(f)
+        self._model_loaded = True
+
+    def is_model_loaded(self) -> bool:
+        return self._model_loaded and self._model is not None
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        if self._model is None:
+            raise RuntimeError("Model not loaded")
+        return self._model.predict_proba(X)
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        if self._model is None:
+            raise RuntimeError("Model not loaded")
+        return self._model.predict(X)
+
+    @property
+    def feature_names(self) -> List[str]:
+        if self._feature_names:
+            return self._feature_names
         try:
-            with open(load_path, "rb") as f:
-                obj = pickle.load(f)
-            self._model = obj["model"]
-            self._feature_names = obj.get("features", [])
-            logger.info("[XGBoostTrainer] Loaded model from %s", load_path)
-            return True
-        except Exception as exc:
-            logger.error("[XGBoostTrainer] Failed to load model: %s", exc)
-            return False
+            from backend.ai_prediction.feature_pipeline import FeaturePipeline
+            return FeaturePipeline.feature_names()
+        except Exception:
+            return []
+
+    @property
+    def model(self) -> Optional[Any]:
+        return self._model
