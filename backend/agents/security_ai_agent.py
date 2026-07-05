@@ -62,12 +62,12 @@ class SecurityEvent:
 
 @dataclass
 class AnomalyResult:
-    is_anomaly:        bool
-    score:             float
-    risk_level:        RiskLevel
-    confidence:        float
-    features:          List[float]
-    explanation:       List[str]
+    is_anomaly:       bool
+    score:            float
+    risk_level:       RiskLevel
+    confidence:       float
+    features:         List[float]
+    explanation:      List[str]
     inference_time_ms: float = 0.0
 
 
@@ -189,12 +189,22 @@ async def _get_db():
 
 class SecurityAIAgent:
     def __init__(self) -> None:
-        self._extractor        = _FeatureExtractor()
-        self._model            = _IFModel()
+        self._extractor         = _FeatureExtractor()
+        self._model             = _IFModel()
         self._buffer: deque    = deque(maxlen=_MAX_BUFFER)
-        self._running          = False
+        self._running           = False
         self._last_retrain: Optional[datetime] = None
 
+    # ------------------------------------------------------------------ #
+    # Public API — analyze_threat (was stub)
+    # ------------------------------------------------------------------ #
+    async def analyze_threat(self, event: SecurityEvent) -> AnomalyResult:
+        """Full threat analysis: extract features → detect anomaly → persist."""
+        return await self.analyze_event(event)
+
+    # ------------------------------------------------------------------ #
+    # Public API — analyze_event (orchestrator)
+    # ------------------------------------------------------------------ #
     async def analyze_event(self, event: SecurityEvent) -> AnomalyResult:
         t0 = time.monotonic()
         features = self._extractor.extract(event)
@@ -208,7 +218,11 @@ class SecurityAIAgent:
             asyncio.create_task(self._self_heal(event, result))
         return result
 
+    # ------------------------------------------------------------------ #
+    # Public API — detect_anomaly (was stub → now real)
+    # ------------------------------------------------------------------ #
     async def detect_anomaly(self, features: List[float]) -> AnomalyResult:
+        """IsolationForest scoring with heuristic fallback when model untrained."""
         if self._model.trained:
             score = await self._model.score(features)
             explanation = self._explain(features, score)
@@ -221,6 +235,109 @@ class SecurityAIAgent:
                              risk_level=risk, confidence=round(confidence, 3),
                              features=features, explanation=explanation)
 
+    # ------------------------------------------------------------------ #
+    # Public API — assess_risk_score (was hardcoded 50 → now real)
+    # ------------------------------------------------------------------ #
+    async def assess_risk_score(self, event: SecurityEvent) -> Dict[str, Any]:
+        """Returns risk score 0-100 based on anomaly detection."""
+        features = self._extractor.extract(event)
+        result = await self.detect_anomaly(features)
+        # Normalise IF score (-1..0) → risk 0..100
+        raw = max(0.0, min(1.0, abs(result.score) / 0.5))
+        score_100 = round(raw * 100, 1)
+        return {
+            "score":       score_100,
+            "risk_level":  result.risk_level.value,
+            "is_anomaly":  result.is_anomaly,
+            "explanation": result.explanation,
+            "model_used":  "IsolationForest" if self._model.trained else "heuristic",
+        }
+
+    # ------------------------------------------------------------------ #
+    # Public API — generate_alert (was stub → Telegram)
+    # ------------------------------------------------------------------ #
+    async def generate_alert(self, result: AnomalyResult, event: SecurityEvent) -> None:
+        """Send Telegram alert for HIGH/CRITICAL anomalies."""
+        if result.risk_level not in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+            return
+        try:
+            from backend.telegram.bot import telegram_bot
+            msg = (
+                f"🚨 *Security Alert* — {result.risk_level.value.upper()}\n"
+                f"IP: `{event.ip_address}` | Endpoint: `{event.endpoint}`\n"
+                f"Score: `{result.score:.4f}` | Confidence: `{result.confidence:.1%}`\n"
+                f"Reasons: {', '.join(result.explanation)}"
+            )
+            await telegram_bot.send_alert(msg)
+        except Exception as e:
+            log.warning("generate_alert Telegram: %s", e)
+
+    # ------------------------------------------------------------------ #
+    # Public API — monitor_behavior (was stub → background loop)
+    # ------------------------------------------------------------------ #
+    async def monitor_behavior(self) -> None:
+        """Background monitoring loop — retrain model periodically."""
+        await self.start()
+
+    # ------------------------------------------------------------------ #
+    # Public API — create_incident (was stub → DB persist)
+    # ------------------------------------------------------------------ #
+    async def create_incident(self, event: SecurityEvent, result: AnomalyResult) -> Optional[str]:
+        """Persist security incident to DB. Returns incident UUID."""
+        if not result.is_anomaly:
+            return None
+        incident_id = str(uuid.uuid4())
+        try:
+            db = await _get_db()
+            await asyncio.wait_for(
+                asyncio.to_thread(lambda: db.table("security_incidents").insert({
+                    "id":           incident_id,
+                    "event_type":   event.event_type.value,
+                    "risk_level":   result.risk_level.value,
+                    "risk_score":   result.score,
+                    "is_anomaly":   result.is_anomaly,
+                    "user_id":      event.user_id,
+                    "ip_address":   event.ip_address,
+                    "endpoint":     event.endpoint,
+                    "features":     result.features,
+                    "explanation":  result.explanation,
+                    "metadata":     event.extra,
+                    "created_at":   event.timestamp.isoformat(),
+                }).execute()),
+                timeout=_DB_TIMEOUT)
+            log.info("Incident created: %s (%s)", incident_id, result.risk_level.value)
+            asyncio.create_task(self.generate_alert(result, event))
+        except Exception as e:
+            log.debug("create_incident: %s", e)
+        return incident_id
+
+    # ------------------------------------------------------------------ #
+    # Public API — update_threat_intel (was stub → DB enrichment)
+    # ------------------------------------------------------------------ #
+    async def update_threat_intel(self) -> int:
+        """Pull historical anomalies from DB into training buffer. Returns count added."""
+        added = 0
+        try:
+            db = await _get_db()
+            since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+            r = await asyncio.wait_for(
+                asyncio.to_thread(lambda: db.table("security_ai_analysis")
+                    .select("features").gte("created_at", since)
+                    .limit(5_000).execute()),
+                timeout=_DB_TIMEOUT)
+            for row in (r.data or []):
+                feat = row.get("features")
+                if isinstance(feat, list) and len(feat) == _FEATURE_DIM:
+                    self._buffer.append(feat)
+                    added += 1
+            log.info("update_threat_intel: +%d samples (buffer=%d)", added, len(self._buffer))
+        except Exception as e:
+            log.debug("update_threat_intel: %s", e)
+        return added
+
+    # ------------------------------------------------------------------ #
+    # Retrain
+    # ------------------------------------------------------------------ #
     async def retrain_model(self) -> None:
         if len(self._buffer) < _MIN_SAMPLES:
             log.info("Skipping retrain: %d/%d samples", len(self._buffer), _MIN_SAMPLES); return
@@ -244,6 +361,7 @@ class SecurityAIAgent:
         await asyncio.sleep(30)
         while self._running:
             try:
+                await self.update_threat_intel()
                 await self.retrain_model()
             except asyncio.CancelledError: break
             except Exception as e: log.error("retrain: %s", e)
