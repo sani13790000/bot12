@@ -41,8 +41,10 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        from .auth import verify_token  # type: ignore[attr-defined]
-        payload = verify_token(credentials.credentials)
+        from .auth import verify_jwt  # type: ignore[attr-defined]
+        from .config import get_settings as _gs
+        _secret = _gs().JWT_SECRET_KEY
+        payload = verify_jwt(credentials.credentials, _secret)
         if not payload:
             raise ValueError("Invalid token payload")
         return payload
@@ -99,8 +101,8 @@ async def get_risk_orchestrator_dep() -> Any:
 # ── Execution ─────────────────────────────────────────────────────────────────
 
 def get_execution_service() -> Any:
-    from ..execution.execution_service import get_execution_service as _ges
-    return _ges()
+    from ..execution.execution_service import execution_service as _es
+    return _es
 
 
 def get_mt5_connector() -> Any:
