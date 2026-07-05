@@ -12,15 +12,23 @@ from backend.core.config import get_settings as _get_settings
 logger = logging.getLogger(__name__)
 
 _client: Optional[Client] = None
-_lock = asyncio.Lock()
-_last_healthy: float = 0.0
 
-# Q3-FIX: TTL increased from 10.0 to 30.0 seconds.
-# Under high traffic, a 10-second TTL causes a DB probe + potential
-# reconnect every 10 seconds per worker -- unacceptable overhead.
-# 30 seconds provides a good balance: stale connections are caught
-# quickly enough for health checks, but probes do not dominate CPU.
+# CB-NEW-7 FIX: asyncio.Lock() at module level causes RuntimeError in Python 3.12+
+# when imported outside an async context. With --workers 2 each process has its
+# own lock providing no cross-process safety. Solution: lazy init inside the
+# running event loop using double-checked pattern.
+_lock: Optional[asyncio.Lock] = None
+
+_last_healthy: float = 0.0
 _HEALTH_TTL = 30.0
+
+
+def _get_lock() -> asyncio.Lock:
+    """Lazy-init the asyncio.Lock inside the running event loop."""
+    global _lock
+    if _lock is None:
+        _lock = asyncio.Lock()
+    return _lock
 
 
 def _probe_sync(client: Client) -> None:
@@ -61,10 +69,12 @@ async def get_db_client() -> Client:
     """Primary async getter - use in all async contexts."""
     global _client, _last_healthy
 
+    # Fast path
     if _client is not None and (time.monotonic() - _last_healthy) < _HEALTH_TTL:
         return _client
 
-    async with _lock:
+    # Slow path with lazy-init lock (CB-NEW-7 FIX)
+    async with _get_lock():
         if _client is not None and (time.monotonic() - _last_healthy) < _HEALTH_TTL:
             return _client
         if _client is None:
