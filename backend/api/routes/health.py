@@ -1,17 +1,19 @@
 """
-backend/api/routes/health.py — FIXED
-Fixes:
-  CB-3: db singleton + ping() removed → get_db_client() used correctly
-  CB-7: mt5_ok dict evaluated as .get("ok") not bool(dict)
-  AI-1: /live endpoint added here (Docker healthcheck target)
-  AI-2: KillSwitch.is_active() called as sync (consistent interface)
-  CB-1: /live liveness endpoint now present at /api/v1/health/live
+backend/api/routes/health.py
+Galaxy Vast AI Trading Platform
+
+FIXES APPLIED:
+  BUG-R4-2: kill_switch.is_active() with () -> TypeError
+             Fixed: kill_switch.is_active (no parentheses -- it is @property)
+  CB-3:     db.ping() -> get_db_client()
+  CB-7:     mt5_ok dict -> .get("ok", False)
+  AI-1:     /live endpoint for Docker HEALTHCHECK
 """
 from __future__ import annotations
 
 import asyncio
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -24,9 +26,8 @@ router = APIRouter(tags=["Health"])
 _start_time = time.time()
 
 
-@router.get("", summary="Full health check — all components")
+@router.get("", summary="Full health check -- all components")
 async def health_check() -> JSONResponse:
-    """Full health check with all components."""
     t0 = time.monotonic()
     result: Dict[str, Any] = {
         "status": "ok",
@@ -35,26 +36,19 @@ async def health_check() -> JSONResponse:
     }
     errors = []
 
-    # --- Database check (CB-3 FIX: use get_db_client, no db.ping()) ---
     try:
         from backend.database.connection import get_db_client
         client = await asyncio.wait_for(get_db_client(), timeout=2.0)
-        if client:
-            result["database"] = "ok"
-        else:
-            result["database"] = "degraded"
+        result["database"] = "ok" if client else "degraded"
+        if not client:
             errors.append("database")
     except Exception as exc:
         result["database"] = f"error: {str(exc)[:80]}"
         errors.append("database")
 
-    # --- MT5 check (CB-7 FIX: evaluate dict["ok"] not bool(dict)) ---
     try:
         from backend.execution.mt5_connector import mt5_connector
-        mt5_result = await asyncio.wait_for(
-            mt5_connector.health_check(), timeout=3.0
-        )
-        # CB-7 FIX: mt5_result is a dict — check .get("ok") explicitly
+        mt5_result = await asyncio.wait_for(mt5_connector.health_check(), timeout=3.0)
         mt5_ok = mt5_result.get("ok", False) if isinstance(mt5_result, dict) else bool(mt5_result)
         result["mt5_gateway"] = "ok" if mt5_ok else "degraded"
         result["mt5_mode"] = mt5_result.get("mode", "unknown") if isinstance(mt5_result, dict) else "unknown"
@@ -64,18 +58,26 @@ async def health_check() -> JSONResponse:
         result["mt5_gateway"] = f"error: {str(exc)[:80]}"
         errors.append("mt5_gateway")
 
-    # --- KillSwitch check (AI-2 FIX: consistent sync is_active()) ---
+    # BUG-R4-2 FIX: is_active is @property -- NO parentheses
     try:
         from backend.risk.kill_switch import kill_switch
-        # AI-2 FIX: use sync is_active() — single consistent interface
-        ks_active = kill_switch.is_active()
+        ks_active = kill_switch.is_active  # was kill_switch.is_active() -> TypeError
         result["kill_switch"] = "ACTIVE" if ks_active else "inactive"
         if ks_active:
             errors.append("kill_switch")
     except Exception as exc:
         result["kill_switch"] = f"error: {str(exc)[:80]}"
 
-    # --- Circuit breaker status ---
+    try:
+        from backend.database.redis_client import redis_ping
+        redis_ok = await asyncio.wait_for(redis_ping(), timeout=1.0)
+        result["redis"] = "ok" if redis_ok else "degraded"
+        if not redis_ok:
+            errors.append("redis")
+    except Exception as exc:
+        result["redis"] = f"error: {str(exc)[:80]}"
+        errors.append("redis")
+
     try:
         from backend.circuit_breaker import get_breaker_status
         result["circuit_breakers"] = get_breaker_status()
@@ -91,20 +93,19 @@ async def health_check() -> JSONResponse:
     return JSONResponse(content=result, status_code=status_code)
 
 
-# CB-1 + AI-1 FIX: /live endpoint so Docker HEALTHCHECK URL works
-@router.get("/live", summary="Liveness probe (Kubernetes / Docker)")
+@router.get("/live", summary="Liveness probe (Docker / Kubernetes)")
 async def liveness() -> Dict[str, str]:
-    """Kubernetes liveness probe — fast, no external calls."""
-    return {"status": "alive", "uptime_seconds": str(round(time.monotonic() - _start_time))}
+    """Fast liveness -- no external calls. Used by Docker HEALTHCHECK."""
+    return {
+        "status": "alive",
+        "uptime_seconds": str(round(time.monotonic() - _start_time)),
+    }
 
 
 @router.get("/ready", summary="Readiness probe (Kubernetes)")
 async def readiness() -> JSONResponse:
-    """Kubernetes readiness probe."""
     ready = True
     checks: Dict[str, str] = {}
-
-    # CB-3 FIX: use get_db_client() not db.ping()
     try:
         from backend.database.connection import get_db_client
         client = await asyncio.wait_for(get_db_client(), timeout=1.0)
@@ -114,7 +115,6 @@ async def readiness() -> JSONResponse:
     except Exception:
         checks["database"] = "not_ready"
         ready = False
-
     return JSONResponse(
         content={"ready": ready, "checks": checks},
         status_code=200 if ready else 503,
