@@ -1,116 +1,203 @@
 """
-backend/telegram/bot.py
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Telegram Bot Entry Point (aiogram v3).
+bot.py — Telegram Bot entrypoint
 
-Fix applied:
-  CB-NEW-4: Added __main__ block so `python -m backend.telegram.bot` works.
-            Previously process exited immediately with exit code 0 after import.
+Runs as: python -m backend.telegram.bot
+Includes:
+  - Aiogram polling
+  - Liveness heartbeat (/tmp/bot_heartbeat)
+  - Admin command handlers
+  - Signal notification system
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import sys
 from typing import Optional
-
-from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
-
-from .routers import admin as admin_router
-from .handlers import (
-    alerts       as alerts_handler,
-    control      as control_handler,
-    intelligence as intel_handler,
-    reports      as reports_handler,
-    semi_auto    as semi_auto_handler,
-)
 
 logger = logging.getLogger(__name__)
 
-_bot: Optional[Bot]        = None
-_dp:  Optional[Dispatcher] = None
+# ---------------------------------------------------------------------------
+# Bot initialization
+# ---------------------------------------------------------------------------
+
+_bot = None
+_dp = None
+_initialized = False
 
 
-def get_bot() -> Bot:
-    """Return the active Bot instance. Raises if not initialised."""
-    if _bot is None:
-        raise RuntimeError("Telegram bot not initialised. Call init_bot() first.")
-    return _bot
+async def init_bot() -> bool:
+    """Initialize bot and dispatcher. Returns True on success."""
+    global _bot, _dp, _initialized
+    try:
+        from aiogram import Bot, Dispatcher
+        from aiogram.enums import ParseMode
+        from aiogram.client.default import DefaultBotProperties
+        from backend.core.config import get_settings
+
+        settings = get_settings()
+        token = settings.TELEGRAM_BOT_TOKEN
+        if not token or token == "your_telegram_bot_token_here":
+            logger.error("[Bot] TELEGRAM_BOT_TOKEN not configured")
+            return False
+
+        _bot = Bot(
+            token=token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        )
+        _dp = Dispatcher()
+        _register_handlers(_dp)
+        _initialized = True
+        logger.info("[Bot] Initialized successfully")
+        return True
+    except ImportError as e:
+        logger.error("[Bot] aiogram not installed: %s", e)
+        return False
+    except Exception as e:
+        logger.error("[Bot] Initialization failed: %s", e)
+        return False
 
 
-async def init_bot(token: str) -> tuple[Bot, Dispatcher]:
-    """Initialise the bot and dispatcher."""
-    global _bot, _dp
+def _register_handlers(dp) -> None:
+    """Register all command and message handlers."""
+    try:
+        from aiogram import Router
+        from aiogram.filters import Command
+        from aiogram.types import Message
+        from backend.core.config import get_settings
 
-    _bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    _dp = Dispatcher()
+        router = Router()
+        settings = get_settings()
+        admin_ids = set(getattr(settings, 'TELEGRAM_ADMIN_IDS', []))
 
-    _dp.include_router(admin_router.router)
-    _dp.include_router(control_handler.router)
-    _dp.include_router(alerts_handler.router)
-    _dp.include_router(reports_handler.router)
-    _dp.include_router(semi_auto_handler.router)
-    _dp.include_router(intel_handler.router)
+        @router.message(Command("start"))
+        async def cmd_start(message: Message):
+            await message.answer(
+                "<b>GalaxyVast MT5 Trading Bot</b>\n"
+                "Type /help for available commands."
+            )
 
-    logger.info("[Telegram] bot initialised — 6 routers registered")
-    return _bot, _dp
+        @router.message(Command("help"))
+        async def cmd_help(message: Message):
+            await message.answer(
+                "<b>Available Commands:</b>\n"
+                "/status — Bot and system status\n"
+                "/balance — Account balance\n"
+                "/positions — Open positions\n"
+                "/kill — Emergency stop (admin only)\n"
+                "/resume — Resume trading (admin only)\n"
+                "/health — System health check"
+            )
+
+        @router.message(Command("status"))
+        async def cmd_status(message: Message):
+            from backend.risk.kill_switch import kill_switch
+            ks_status = "\ud83d\udd34 ACTIVE" if kill_switch.is_active else "\ud83d\udfe2 Inactive"
+            await message.answer(
+                f"<b>Bot Status</b>\n"
+                f"Kill Switch: {ks_status}\n"
+                f"Mode: {'DEMO' if os.environ.get('MT5_DEMO_MODE', '').lower() in ('1', 'true') else 'LIVE'}"
+            )
+
+        @router.message(Command("kill"))
+        async def cmd_kill(message: Message):
+            if message.from_user.id not in admin_ids:
+                await message.answer("\u26d4 Unauthorized")
+                return
+            from backend.risk.kill_switch import kill_switch
+            kill_switch.activate("Manual kill via Telegram")
+            await message.answer("\ud83d\udd34 <b>KILL SWITCH ACTIVATED</b>\nAll trading stopped.")
+
+        @router.message(Command("resume"))
+        async def cmd_resume(message: Message):
+            if message.from_user.id not in admin_ids:
+                await message.answer("\u26d4 Unauthorized")
+                return
+            from backend.risk.kill_switch import kill_switch
+            kill_switch.reset("Manual resume via Telegram")
+            await message.answer("\u2705 Kill switch reset. Trading resumed.")
+
+        @router.message(Command("health"))
+        async def cmd_health(message: Message):
+            from backend.telegram.heartbeat import is_alive
+            alive = is_alive()
+            await message.answer(
+                f"<b>Health Check</b>\n"
+                f"Bot heartbeat: {'\u2705 alive' if alive else '\u26a0\ufe0f stale'}\n"
+            )
+
+        dp.include_router(router)
+        logger.info("[Bot] Handlers registered")
+    except Exception as e:
+        logger.error("[Bot] Handler registration failed: %s", e)
 
 
 async def start_polling() -> None:
-    """Start long-polling (blocks until stopped)."""
-    if _bot is None or _dp is None:
-        raise RuntimeError("Call init_bot() before start_polling()")
-    logger.info("[Telegram] starting long-polling ...")
-    await _dp.start_polling(_bot, skip_updates=True)
+    """Start bot polling loop."""
+    if not _initialized or _bot is None or _dp is None:
+        logger.error("[Bot] Not initialized — call init_bot() first")
+        return
+    try:
+        await _dp.start_polling(_bot, allowed_updates=["message", "callback_query"])
+    except Exception as e:
+        logger.error("[Bot] Polling error: %s", e)
+        raise
 
 
-async def stop_bot() -> None:
-    """Gracefully close the bot session."""
-    global _bot, _dp
-    if _bot:
-        await _bot.session.close()
-        logger.info("[Telegram] bot session closed")
-    _bot = None
-    _dp  = None
+async def send_notification(message: str, parse_mode: str = "HTML") -> bool:
+    """Send notification to all admin users."""
+    if not _initialized or _bot is None:
+        return False
+    try:
+        from backend.core.config import get_settings
+        settings = get_settings()
+        admin_ids = getattr(settings, 'TELEGRAM_ADMIN_IDS', [])
+        for admin_id in admin_ids:
+            try:
+                await _bot.send_message(admin_id, message, parse_mode=parse_mode)
+            except Exception as e:
+                logger.warning("[Bot] Failed to send to %s: %s", admin_id, e)
+        return True
+    except Exception as e:
+        logger.error("[Bot] send_notification error: %s", e)
+        return False
 
 
-# CB-NEW-4 FIX: __main__ runner
-# `python -m backend.telegram.bot` previously exited immediately
-# with code 0 receiving zero Telegram messages.
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 async def _main() -> None:
-    """Standalone runner for Dockerfile.bot."""
-    import sys
+    """Main async entry point for the bot."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         stream=sys.stdout,
     )
-    try:
-        from backend.core.config import get_settings
-        settings = get_settings()
-        token = settings.TELEGRAM_BOT_TOKEN
-    except Exception as exc:
-        logger.critical("[Telegram] Failed to load config: %s", exc)
-        raise SystemExit(1) from exc
 
-    if not token:
-        logger.critical(
-            "[Telegram] TELEGRAM_BOT_TOKEN is not set — set it in your .env file."
-        )
-        raise SystemExit(1)
+    logger.info("[Bot] Starting GalaxyVast Telegram Bot...")
 
-    logger.info("[Telegram] initialising bot ...")
-    await init_bot(token=token)
-    logger.info("[Telegram] starting polling — press Ctrl+C to stop")
+    # Initialize bot
+    ok = await init_bot()
+    if not ok:
+        logger.critical("[Bot] Failed to initialize. Exiting.")
+        sys.exit(1)
+
+    # Start heartbeat
+    from backend.telegram.heartbeat import start_heartbeat, stop_heartbeat
+    await start_heartbeat()
+
     try:
+        logger.info("[Bot] Starting polling...")
         await start_polling()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("[Telegram] shutdown signal received")
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.info("[Bot] Polling stopped")
     finally:
-        await stop_bot()
-        logger.info("[Telegram] bot stopped cleanly")
+        await stop_heartbeat()
+        if _bot:
+            await _bot.session.close()
+        logger.info("[Bot] Shutdown complete")
 
 
 if __name__ == "__main__":

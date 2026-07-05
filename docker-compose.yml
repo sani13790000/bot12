@@ -1,186 +1,133 @@
-# ============================================================
-# docker-compose.yml — Galaxy Vast (dev / staging)
-# P17-FIX-DC-1: all ports bound to 127.0.0.1 only
-# P17-FIX-DC-2: Redis password from ${VAR} only
-# P17-FIX-DC-3: healthcheck on /health/live for api
-# P17-FIX-DC-4: dashboard healthcheck on _stcore/health
-# P17-FIX-DC-5: frontend healthcheck on nginx-health
-# P17-FIX-DC-6: memory + cpu limits on every service
-# P17-FIX-DC-7: json-file logging with max-size on every service
-# ============================================================
-networks:
-  galaxyvast_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/24
+version: '3.9'
 
 services:
+
   redis:
     image: redis:7.4-alpine
-    restart: on-failure:3
+    container_name: bot12_redis
+    restart: unless-stopped
     command: >
       redis-server
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --save 900 1
-      --appendonly no
       --requirepass ${REDIS_PASSWORD:-changeme_redis}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly no
+      --loglevel warning
     ports:
       - "127.0.0.1:6379:6379"
-    networks:
-      - galaxyvast_net
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme_redis}", "ping"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 3
       start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-          cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "3"
+    networks:
+      - bot12_net
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: on-failure:3
+    container_name: bot12_api
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "127.0.0.1:8000:8000"
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
-    networks:
-      - galaxyvast_net
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
-      interval: 30s
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/live"]
+      interval: 20s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '2.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
+      start_period: 30s
+    networks:
+      - bot12_net
+    volumes:
+      - model_data:/app/models
+      - log_data:/app/logs
 
   telegram_bot:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    restart: on-failure:3
+    container_name: bot12_telegram
+    restart: unless-stopped
     env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - galaxyvast_net
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
-      interval: 60s
+      # Real healthcheck: verify polling loop is alive via heartbeat file
+      # The heartbeat file is written every 30s by backend/telegram/heartbeat.py
+      # If file is older than 120s, polling is considered dead
+      test:
+        - "CMD"
+        - "python3"
+        - "-c"
+        - |
+          import os, time, sys
+          try:
+              age = time.time() - os.path.getmtime('/tmp/bot_heartbeat')
+              sys.exit(0 if age < 120 else 1)
+          except FileNotFoundError:
+              sys.exit(1)
+      interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '1.0'
-        reservations:
-          memory: 128M
-          cpus: '0.25'
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "3"
+      start_period: 60s
+    networks:
+      - bot12_net
 
   dashboard:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    restart: on-failure:3
+    container_name: bot12_dashboard
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "127.0.0.1:8501:8501"
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/app
-    networks:
-      - galaxyvast_net
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8501"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "3"
+    networks:
+      - bot12_net
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    restart: on-failure:3
+    container_name: bot12_frontend
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:80"
-    networks:
-      - galaxyvast_net
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/nginx-health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    networks:
+      - bot12_net
+
+volumes:
+  redis_data:
+  model_data:
+  log_data:
+
+networks:
+  bot12_net:
+    driver: bridge
