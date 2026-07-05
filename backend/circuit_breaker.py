@@ -1,12 +1,7 @@
-"""circuit_breaker.py - Hedge-Fund Grade Circuit Breaker v2 (HF-1)
+"""circuit_breaker.py - Hedge-Fund Grade Circuit Breaker v3
 
-HF-1: 5 failure states tracked per window
-HF-2: HALF_OPEN probing with configurable call limit
-HF-3: async context manager (__aenter__/__aexit__)
-HF-4: global HALT flag (halt_trading / resume_trading)
-HF-5: per-instance callback hooks (on_open/on_close/on_half_open)
-C-3 FIX: callback dedup + remove_on_* methods to prevent memory leak
-CONFLICT-FIX-1: lazy asyncio.Lock init (no module-level event-loop dependency)
+A5-FIX: Race condition in lazy Lock init resolved via double-checked locking.
+A2-FIX: get_mt5_breaker(), get_circuit_breaker(), get_breaker_status() added.
 """
 from __future__ import annotations
 
@@ -19,40 +14,44 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger("circuit_breaker")
 
-# ── Lazy global lock helpers ──────────────────────────────────────────────────
+# Bootstrap lock — safe to create at import time (no event loop needed)
+_BOOTSTRAP_LOCK = asyncio.Lock()
 _HALT_LOCK: Optional[asyncio.Lock] = None
 _REGISTRY_LOCK: Optional[asyncio.Lock] = None
 
 
-def _get_halt_lock() -> asyncio.Lock:
+async def _get_halt_lock() -> asyncio.Lock:
     global _HALT_LOCK
     if _HALT_LOCK is None:
-        _HALT_LOCK = asyncio.Lock()
+        async with _BOOTSTRAP_LOCK:
+            if _HALT_LOCK is None:        # double-checked
+                _HALT_LOCK = asyncio.Lock()
     return _HALT_LOCK
 
 
-def _get_registry_lock() -> asyncio.Lock:
+async def _get_registry_lock() -> asyncio.Lock:
     global _REGISTRY_LOCK
     if _REGISTRY_LOCK is None:
-        _REGISTRY_LOCK = asyncio.Lock()
+        async with _BOOTSTRAP_LOCK:
+            if _REGISTRY_LOCK is None:    # double-checked
+                _REGISTRY_LOCK = asyncio.Lock()
     return _REGISTRY_LOCK
 
 
-# ── Global halt flag ──────────────────────────────────────────────────────────
 _HALT: bool = False
 _REGISTRY: Dict[str, "CircuitBreaker"] = {}
 
 
 async def halt_trading(reason: str = "") -> None:
     global _HALT
-    async with _get_halt_lock():
+    async with await _get_halt_lock():
         _HALT = True
     logger.critical("[CB] TRADING HALTED — %s", reason)
 
 
 async def resume_trading(reason: str = "") -> None:
     global _HALT
-    async with _get_halt_lock():
+    async with await _get_halt_lock():
         _HALT = False
     logger.info("[CB] Trading resumed — %s", reason)
 
@@ -62,18 +61,32 @@ def is_halted() -> bool:
 
 
 async def get_breaker(name: str, config: Optional["BreakerConfig"] = None) -> "CircuitBreaker":
-    async with _get_registry_lock():
+    async with await _get_registry_lock():
         if name not in _REGISTRY:
             _REGISTRY[name] = CircuitBreaker(name, config)
         return _REGISTRY[name]
 
 
+async def get_mt5_breaker() -> "CircuitBreaker":
+    """A2-FIX: helper expected by deps.py."""
+    return await get_breaker("mt5")
+
+
 async def get_all_breakers() -> Dict[str, "CircuitBreaker"]:
-    async with _get_registry_lock():
+    async with await _get_registry_lock():
         return dict(_REGISTRY)
 
 
-# ── Models ────────────────────────────────────────────────────────────────────
+def get_breaker_status() -> Dict[str, Any]:
+    """A2-FIX: sync snapshot of all breakers — used by main.py health check."""
+    return {name: cb.status() for name, cb in _REGISTRY.items()}
+
+
+async def get_circuit_breaker(name: str, config: Optional["BreakerConfig"] = None) -> "CircuitBreaker":
+    """A2-FIX: alias used by main.py lifespan pre-warm."""
+    return await get_breaker(name, config)
+
+
 class BreakerState(str, Enum):
     CLOSED    = "closed"
     OPEN      = "open"
@@ -95,7 +108,7 @@ class BreakerConfig:
     recovery_timeout_s:   float = 30.0
     success_threshold:    int   = 2
     half_open_max_calls:  int   = 3
-    timeout_s:            float = 0.0   # 0 = no per-call timeout
+    timeout_s:            float = 0.0
 
 
 @dataclass
@@ -125,9 +138,8 @@ class BreakerStats:
         return sum(1 for t in self.failure_times if now - t < window_s)
 
 
-# ── CircuitBreaker ────────────────────────────────────────────────────────────
 class CircuitBreaker:
-    """Async circuit breaker with CLOSED → OPEN → HALF_OPEN FSM."""
+    """Async circuit breaker CLOSED → OPEN → HALF_OPEN FSM."""
 
     def __init__(self, name: str, config: Optional[BreakerConfig] = None,
                  alert_callback: Optional[Callable] = None) -> None:
@@ -171,7 +183,6 @@ class CircuitBreaker:
                 await self._transition(BreakerState.HALF_OPEN)
                 return True
             return False
-        # HALF_OPEN
         if self._stats.half_open_calls >= self.config.half_open_max_calls:
             return False
         self._stats.half_open_calls += 1
@@ -228,35 +239,27 @@ class CircuitBreaker:
             },
         }
 
-    # ── Callback registration (C-3 FIX: dedup + remove) ──────────────────────
     def add_on_open(self, cb: Callable) -> None:
-        """Register callback for OPEN transition. Dedup to prevent memory leak."""
         if cb not in self._on_open:
             self._on_open.append(cb)
 
     def add_on_close(self, cb: Callable) -> None:
-        """Register callback for CLOSED transition. Dedup to prevent memory leak."""
         if cb not in self._on_close:
             self._on_close.append(cb)
 
     def add_on_half_open(self, cb: Callable) -> None:
-        """Register callback for HALF_OPEN transition. Dedup to prevent memory leak."""
         if cb not in self._on_half_open:
             self._on_half_open.append(cb)
 
     def remove_on_open(self, cb: Callable) -> None:
-        """Unregister open callback. Call on component teardown."""
         self._on_open = [x for x in self._on_open if x is not cb]
 
     def remove_on_close(self, cb: Callable) -> None:
-        """Unregister close callback. Call on component teardown."""
         self._on_close = [x for x in self._on_close if x is not cb]
 
     def remove_on_half_open(self, cb: Callable) -> None:
-        """Unregister half-open callback. Call on component teardown."""
         self._on_half_open = [x for x in self._on_half_open if x is not cb]
 
-    # ── Context manager ───────────────────────────────────────────────────────
     async def __aenter__(self) -> "CircuitBreaker":
         if not await self.can_execute():
             raise CircuitOpenError(self.name, self._stats.state, self._stats.last_failure_reason)
