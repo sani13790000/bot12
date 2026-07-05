@@ -1,6 +1,7 @@
 """
-FastAPI Application — Phase K Final
+FastAPI Application — Phase Q Final
 All engines registered; 5-layer context enrichment active.
+trade_history router registered (BUG-Q1 fix)
 """
 from __future__ import annotations
 
@@ -20,21 +21,21 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-# ────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 class GracefulDrain:
  """Reject new requests during shutdown while in-flight requests finish."""
  def __init__(self):
- self.shutting_down = False
+  self.shutting_down = False
 
  async def __call__(self, request: Request, call_next):
- if self.shutting_down and request.url.path not in ("/health", "/health/live"):
- return JSONResponse(status_code=503, content={"detail": "shutting down"})
- return await call_next(request)
+  if self.shutting_down and request.url.path not in ("/health", "/health/live"):
+   return JSONResponse(status_code=503, content={"detail": "shutting down"})
+  return await call_next(request)
 
 _drain = GracefulDrain()
 
 
-# ────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
  """Startup: initialise all engines and register with enricher + signal processor."""
@@ -43,105 +44,105 @@ async def lifespan(app: FastAPI):
 
  # ── Redis ──
  try:
- from backend.database.redis_client import get_redis
- await get_redis()
- logger.info("Redis connected")
+  from backend.database.redis_client import get_redis
+  await get_redis()
+  logger.info("Redis connected")
  except Exception as exc:
- logger.warning("Redis unavailable: %s", exc)
+  logger.warning("Redis unavailable: %s", exc)
 
  # ── SMC Engine ──
  smc_engine = None
  try:
- from backend.analysis.smc_engine import SMCEngine
- smc_engine = SMCEngine()
- logger.info("SMCEngine ready")
+  from backend.analysis.smc_engine import SMCEngine
+  smc_engine = SMCEngine()
+  logger.info("SMCEngine ready")
  except Exception as exc:
- logger.warning("SMCEngine init failed: %s", exc)
+  logger.warning("SMCEngine init failed: %s", exc)
 
  # ── Price Action Engine ──
  pa_engine = None
  try:
- from backend.analysis.price_action_engine import PriceActionEngine
- pa_engine = PriceActionEngine()
- logger.info("PriceActionEngine ready")
+  from backend.analysis.price_action_engine import PriceActionEngine
+  pa_engine = PriceActionEngine()
+  logger.info("PriceActionEngine ready")
  except Exception as exc:
- logger.warning("PriceActionEngine init failed: %s", exc)
+  logger.warning("PriceActionEngine init failed: %s", exc)
 
  # ── SMC Scoring Engine ──
  smc_scoring_engine = None
  try:
- from backend.analysis.smc_scoring import SMCScoringEngine
- smc_scoring_engine = SMCScoringEngine()
- logger.info("SMCScoringEngine ready")
+  from backend.analysis.smc_scoring import SMCScoringEngine
+  smc_scoring_engine = SMCScoringEngine()
+  logger.info("SMCScoringEngine ready")
  except Exception as exc:
- logger.warning("SMCScoringEngine init failed: %s", exc)
+  logger.warning("SMCScoringEngine init failed: %s", exc)
 
  # ── ML Trainer / Prediction ──
  trainer = None
  try:
- from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
- trainer = XGBoostTrainer()
- try:
- trainer.load_model()
- logger.info("XGBoost model loaded")
- except FileNotFoundError:
- logger.warning("No saved XGBoost model — will train on first cycle")
+  from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
+  trainer = XGBoostTrainer()
+  try:
+   trainer.load_model()
+   logger.info("XGBoost model loaded")
+  except FileNotFoundError:
+   logger.warning("No saved XGBoost model — will train on first cycle")
  except Exception as exc:
- logger.warning("XGBoostTrainer init failed: %s", exc)
+  logger.warning("XGBoostTrainer init failed: %s", exc)
 
  # ── MLAgent ──
  try:
- from backend.agents.ml_agent import ml_agent
- if trainer is not None:
- ml_agent.set_engine(trainer)
- logger.info("MLAgent engine set")
+  from backend.agents.ml_agent import ml_agent
+  if trainer is not None:
+   ml_agent.set_engine(trainer)
+   logger.info("MLAgent engine set")
  except Exception as exc:
- logger.warning("MLAgent.set_engine failed: %s", exc)
+  logger.warning("MLAgent.set_engine failed: %s", exc)
 
  # ── Context Enricher (5 engines) ──
  try:
- from backend.services.context_enricher import register_engines
- register_engines(
- smc_engine=smc_engine,
- ml_engine=trainer,
- pa_engine=pa_engine,
- smc_scoring_engine=smc_scoring_engine,
- )
- logger.info("ContextEnricher: all 5 engines registered")
+  from backend.services.context_enricher import register_engines
+  register_engines(
+   smc_engine=smc_engine,
+   ml_engine=trainer,
+   pa_engine=pa_engine,
+   smc_scoring_engine=smc_scoring_engine,
+  )
+  logger.info("ContextEnricher: all 5 engines registered")
  except Exception as exc:
- logger.warning("ContextEnricher registration failed: %s", exc)
+  logger.warning("ContextEnricher registration failed: %s", exc)
 
  # ── Signal Processor engines ──
  try:
- from backend.services.signal_processor import signal_processor
- signal_processor.register_engines(
- smc_engine=smc_engine,
- ml_engine=trainer,
- pa_engine=pa_engine,
- smc_scoring_engine=smc_scoring_engine,
- )
- logger.info("SignalProcessor engines registered")
+  from backend.services.signal_processor import signal_processor
+  signal_processor.register_engines(
+   smc_engine=smc_engine,
+   ml_engine=trainer,
+   pa_engine=pa_engine,
+   smc_scoring_engine=smc_scoring_engine,
+  )
+  logger.info("SignalProcessor engines registered")
  except Exception as exc:
- logger.warning("SignalProcessor.register_engines failed: %s", exc)
+  logger.warning("SignalProcessor.register_engines failed: %s", exc)
 
  # ── Retraining Service ──
  try:
- from backend.self_learning.retraining_service import retraining_service
- retraining_service.start()
- logger.info("RetrainingService started")
+  from backend.self_learning.retraining_service import retraining_service
+  retraining_service.start()
+  logger.info("RetrainingService started")
  except Exception as exc:
- logger.warning("RetrainingService start failed: %s", exc)
+  logger.warning("RetrainingService start failed: %s", exc)
 
  # ── Position reconciler ──
  reconciler_task = asyncio.create_task(_position_reconciler())
 
  # ── WS broadcasters ──
  try:
- from backend.api.routes.websocket_routes import start_broadcasters
- await start_broadcasters()
- logger.info("WS broadcasters started")
+  from backend.api.routes.websocket_routes import start_broadcasters
+  await start_broadcasters()
+  logger.info("WS broadcasters started")
  except Exception as exc:
- logger.warning("WS broadcasters failed: %s", exc)
+  logger.warning("WS broadcasters failed: %s", exc)
 
  logger.info("=== API startup complete ===")
  yield
@@ -150,35 +151,35 @@ async def lifespan(app: FastAPI):
  _drain.shutting_down = True
  reconciler_task.cancel()
  try:
- from backend.self_learning.retraining_service import retraining_service
- retraining_service.stop()
+  from backend.self_learning.retraining_service import retraining_service
+  retraining_service.stop()
  except Exception:
- pass
+  pass
  try:
- from backend.database.redis_client import get_redis
- redis = await get_redis()
- await redis.close()
+  from backend.database.redis_client import get_redis
+  redis = await get_redis()
+  await redis.close()
  except Exception:
- pass
+  pass
  logger.info("=== API shutdown complete ===")
 
 
 async def _position_reconciler():
  """Background task: reconcile open positions every 30 s."""
  while True:
- try:
- await asyncio.sleep(30)
- from backend.execution.mt5_connector import get_mt5_connector
- connector = get_mt5_connector()
- positions = await connector.get_positions()
- logger.debug("Reconciler: %d open positions", len(positions))
- except asyncio.CancelledError:
- break
- except Exception as exc:
- logger.warning("Reconciler error: %s", exc)
+  try:
+   await asyncio.sleep(30)
+   from backend.execution.mt5_connector import get_mt5_connector
+   connector = get_mt5_connector()
+   positions = await connector.get_positions()
+   logger.debug("Reconciler: %d open positions", len(positions))
+  except asyncio.CancelledError:
+   break
+  except Exception as exc:
+   logger.warning("Reconciler error: %s", exc)
 
 
-# ── App factory ───────────────────────────────────────────────────────────────
+# ── App factory ──────────────────────────────────────────────────────────────
 app = FastAPI(
  title="Galaxy Vast MT5 Trading API",
  version="2.0.0",
@@ -200,27 +201,27 @@ app.add_middleware(
 # CSP
 if getattr(settings, "CSP_ENABLED", False):
  _csp_value = (
- "default-src 'self'; "
- "script-src 'self' 'unsafe-inline'; "
- "style-src 'self' 'unsafe-inline'; "
- "img-src 'self' data:;"
+  "default-src 'self'; "
+  "script-src 'self' 'unsafe-inline'; "
+  "style-src 'self' 'unsafe-inline'; "
+  "img-src 'self' data:;"
  )
  @app.middleware("http")
  async def csp_middleware(request: Request, call_next):
- response = await call_next(request)
- header_name = (
- "Content-Security-Policy-Report-Only"
- if getattr(settings, "CSP_REPORT_ONLY", False)
- else "Content-Security-Policy"
- )
- response.headers[header_name] = _csp_value
- return response
+  response = await call_next(request)
+  header_name = (
+   "Content-Security-Policy-Report-Only"
+   if getattr(settings, "CSP_REPORT_ONLY", False)
+   else "Content-Security-Policy"
+  )
+  response.headers[header_name] = _csp_value
+  return response
 
 # Routers
 try:
  from backend.api.routes import (
- auth, signals, trades, metrics, analysis,
- ai_prediction, admin, backtest,
+  auth, signals, trades, metrics, analysis,
+  ai_prediction, admin, backtest,
  )
  app.include_router(auth.router, prefix="/auth", tags=["auth"])
  app.include_router(signals.router, prefix="/signals", tags=["signals"])
@@ -233,6 +234,14 @@ try:
 except Exception as exc:
  logger.warning("Router import error: %s", exc)
 
+# BUG-Q1 FIX: trade_history router was missing — GET /trades/history returned 404
+try:
+ from backend.api.routes.trade_history import router as trade_history_router
+ app.include_router(trade_history_router, prefix="/trades", tags=["trades"])
+ logger.info("trade_history router registered — GET /trades/history now available")
+except Exception as exc:
+ logger.warning("trade_history router import error: %s", exc)
+
 try:
  from backend.api.routes.websocket_routes import ws_router
  app.include_router(ws_router)
@@ -240,7 +249,7 @@ except Exception as exc:
  logger.warning("WS router import error: %s", exc)
 
 
-# ── Health endpoints ───────────────────────────────────────────────────────────────
+# ── Health endpoints ──────────────────────────────────────────────────────────
 @app.get("/health", tags=["health"])
 async def health_live():
  return {"status": "ok", "timestamp": time.time()}
@@ -257,40 +266,44 @@ async def health_ready():
 
  # Redis
  try:
- from backend.database.redis_client import get_redis
- redis = await get_redis()
- await redis.ping()
- checks["redis"] = "ok"
+  from backend.database.redis_client import get_redis
+  redis = await get_redis()
+  await redis.ping()
+  checks["redis"] = "ok"
  except Exception:
- checks["redis"] = "unavailable"
+  checks["redis"] = "unavailable"
 
  # DB
  try:
- from backend.database.connection import get_db_connection
- conn = await get_db_connection()
- checks["database"] = "ok" if conn else "unavailable"
+  from backend.database.connection import get_db_connection
+  conn = await get_db_connection()
+  checks["database"] = "ok" if conn else "unavailable"
  except Exception:
- checks["database"] = "unavailable"
+  checks["database"] = "unavailable"
 
  # MT5
  try:
- from backend.execution.mt5_connector import get_mt5_connector
- mt5 = get_mt5_connector()
- checks["mt5"] = "connected" if mt5.is_connected() else "disconnected"
+  from backend.execution.mt5_connector import get_mt5_connector
+  mt5 = get_mt5_connector()
+  checks["mt5"] = "connected" if mt5.is_connected() else "disconnected"
  except Exception:
- checks["mt5"] = "unavailable"
+  checks["mt5"] = "unavailable"
 
  # License
  try:
- from backend.license.engine import license_engine
- stats = license_engine.stats()
- checks["license"] = "ok" if stats.get("secret_configured") else "no_secret"
+  from backend.license.engine import license_engine
+  stats = license_engine.stats()
+  checks["license"] = "ok" if stats.get("secret_configured") else "no_secret"
  except Exception:
- checks["license"] = "unavailable"
+  checks["license"] = "unavailable"
 
- # Engines
- checks["smc_engine"] = "ok" if smc_engine is not None else "unavailable" # noqa
- checks["pa_engine"] = "ok" if pa_engine is not None else "unavailable" # noqa
+ # ML model status (BUG-P5 from Phase P)
+ try:
+  from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
+  t = XGBoostTrainer()
+  checks["ml_model"] = "loaded" if t.is_model_loaded() else "degraded_not_loaded"
+ except Exception:
+  checks["ml_model"] = "unavailable"
 
  overall = "ready" if checks.get("database") == "ok" else "degraded"
  return {"status": overall, "checks": checks, "timestamp": time.time()}

@@ -1,9 +1,12 @@
 """
 backend/analytics/analytics_service.py
 Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+────────────────────────────────────────────────────────────────────────────────
 Analytics service: aggregates trade history and computes
 performance statistics for the dashboard and Telegram reports.
+
+BUG-Q2 FIX: get_analytics_summary() was returning static zero dict.
+Now queries real DB data with cache TTL=60s.
 
 Usage::
 
@@ -15,6 +18,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -34,7 +38,7 @@ class AnalyticsService:
         self._cache:     Dict[str, Any] = {}
         self._cache_ts:  Dict[str, float] = {}
 
-    # ── Public API ───────────────────────────────────────────────────────── #
+    # ── Public API ──────────────────────────────────────────────────────────── #
 
     async def get_performance_stats(self, days: int = 30) -> Dict[str, Any]:
         """
@@ -77,7 +81,59 @@ class AnalyticsService:
         result.sort(key=lambda x: x["net_pnl"], reverse=True)
         return result
 
-    # ── Computation ───────────────────────────────────────────────────────── #
+    async def get_analytics_summary(self) -> Dict[str, Any]:
+        """
+        BUG-Q2 FIX: was returning static zeros.
+        Now queries real DB data for dashboard analytics tab.
+
+        Returns compact summary dict for dashboard cards.
+        Cache TTL = 60 seconds.
+        """
+        cache_key = "analytics_summary"
+        if self._is_cached(cache_key):
+            return self._cache[cache_key]
+
+        try:
+            # Fetch last 30 days performance
+            stats = await self.get_performance_stats(days=30)
+
+            # Fetch active signals count from DB
+            active_signals = await self._count_active_signals()
+
+            summary = {
+                "total_trades":   stats.get("total_trades", 0),
+                "win_rate":       round(stats.get("win_rate", 0.0), 4),
+                "total_pnl":      round(stats.get("net_pnl", 0.0), 2),
+                "avg_rr":         round(stats.get("avg_rr", 0.0), 3),
+                "active_signals": active_signals,
+                "max_drawdown":   round(stats.get("max_drawdown", 0.0), 4),
+                "best_trade":     round(stats.get("best_trade", 0.0), 2),
+                "worst_trade":    round(stats.get("worst_trade", 0.0), 2),
+                "data_source":    "live_db",
+                "period_days":    30,
+                "as_of":          datetime.now(timezone.utc).isoformat(),
+            }
+            self._set_cache(cache_key, summary)
+            return summary
+
+        except Exception as exc:
+            logger.warning("get_analytics_summary DB error: %s — returning zeros", exc)
+            # Graceful fallback — never crash dashboard
+            return {
+                "total_trades":   0,
+                "win_rate":       0.0,
+                "total_pnl":      0.0,
+                "avg_rr":         0.0,
+                "active_signals": 0,
+                "max_drawdown":   0.0,
+                "best_trade":     0.0,
+                "worst_trade":    0.0,
+                "data_source":    "fallback_db_error",
+                "period_days":    30,
+                "as_of":          datetime.now(timezone.utc).isoformat(),
+            }
+
+    # ── Computation ──────────────────────────────────────────────────────────── #
 
     @staticmethod
     def _compute_stats(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -123,49 +179,66 @@ class AnalyticsService:
             "net_pnl":        round(net, 2),
             "gross_pnl":      round(gross, 2),
             "max_drawdown":   round(max_dd, 4),
-            "avg_rr":         round(sum(rrs) / len(rrs), 2) if rrs else 0.0,
-            "best_trade":     round(max(pnls), 2),
-            "worst_trade":    round(min(pnls), 2),
+            "avg_rr":         round(sum(rrs) / len(rrs), 3) if rrs else 0.0,
+            "best_trade":     round(max(pnls), 2) if pnls else 0.0,
+            "worst_trade":    round(min(pnls), 2) if pnls else 0.0,
         }
 
-    # ── Data access ───────────────────────────────────────────────────────── #
+    # ── DB helpers ───────────────────────────────────────────────────────────── #
 
-    async def _fetch_closed_trades(self, days: int) -> List[Dict[str, Any]]:
-        """Fetch closed trades from the database."""
+    async def _fetch_closed_trades(
+        self, days: int
+    ) -> List[Dict[str, Any]]:
+        """Fetch closed trades from Supabase for the last *days* days."""
         try:
-            from backend.database.client import db_client
-            if days > 0:
-                since = (
-                    datetime.now(timezone.utc) - timedelta(days=days)
-                ).isoformat()
-                rows = await db_client.select(
-                    "trades",
-                    filters={"status": "closed", "closed_at__gte": since},
-                    limit=10_000,
-                )
-            else:
-                rows = await db_client.select(
-                    "trades",
-                    filters={"status": "closed"},
-                    limit=10_000,
-                )
-            return rows or []
+            from backend.database.connection import get_db_client
+            db = get_db_client()
+            since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            result = (
+                db.table("trades")
+                .select("id,symbol,pnl,risk_reward,closed_at,direction")
+                .eq("status", "CLOSED")
+                .gte("closed_at", since)
+                .order("closed_at", desc=False)
+                .execute()
+            )
+            return result.data or []
         except Exception as exc:
-            logger.warning("[analytics] _fetch_closed_trades failed: %s", exc)
+            logger.warning("_fetch_closed_trades error: %s", exc)
             return []
 
-    # ── Cache helpers ───────────────────────────────────────────────────────── #
+    async def _count_active_signals(self) -> int:
+        """Count active (pending) signals from DB."""
+        try:
+            from backend.database.connection import get_db_client
+            db = get_db_client()
+            result = (
+                db.table("signals")
+                .select("id", count="exact")
+                .eq("status", "ACTIVE")
+                .execute()
+            )
+            return result.count or 0
+        except Exception as exc:
+            logger.warning("_count_active_signals error: %s", exc)
+            return 0
+
+    # ── Cache helpers ─────────────────────────────────────────────────────────── #
 
     def _is_cached(self, key: str) -> bool:
-        import time
-        ts = self._cache_ts.get(key, 0.0)
-        return key in self._cache and (time.time() - ts) < self._cache_ttl
+        if key not in self._cache:
+            return False
+        return (time.monotonic() - self._cache_ts.get(key, 0)) < self._cache_ttl
 
     def _set_cache(self, key: str, value: Any) -> None:
-        import time
         self._cache[key]    = value
-        self._cache_ts[key] = time.time()
+        self._cache_ts[key] = time.monotonic()
+
+    def invalidate_cache(self) -> None:
+        """Force invalidate all cached results (e.g. after new trades)."""
+        self._cache.clear()
+        self._cache_ts.clear()
 
 
-# ── Module-level singleton ────────────────────────────────────────────────── #
+# ── Singleton ─────────────────────────────────────────────────────────────────
 analytics_service = AnalyticsService()
