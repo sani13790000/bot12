@@ -1,83 +1,93 @@
-"""فاز E — dashboard/app.py
-FIX-E13: API_BASE_URL از os.getenv — نه hardcode
-FIX-E14: st.exception فقط در development
-FIX-E15: unsafe_allow_html فقط برای رشته hardcode CSS (نه user input)
-"""
+"""Galaxy Vast AI Trading Dashboard — Phase I: Live Data."""
 from __future__ import annotations
-
-import importlib
 import os
-import sys
-from pathlib import Path
-
+from typing import Any, Callable, Dict, Optional
 import streamlit as st
+import requests
 
-# ───────────────────────────────────────────────────────────────────────────── #
-# Config
-# ───────────────────────────────────────────────────────────────────────────── #
-_ENVIRONMENT   = os.getenv("ENVIRONMENT", "development")
-_IS_DEV        = _ENVIRONMENT != "production"
-_API_BASE_URL  = os.getenv("API_BASE_URL", "http://api:8000")
+API_BASE_URL: str = os.getenv("API_BASE_URL", "http://api:8000")
+IS_DEV: bool = os.getenv("ENVIRONMENT", "production").lower() in ("dev", "development", "local")
+_REFRESH_MS: int = int(os.getenv("DASHBOARD_REFRESH_MS", "5000"))
 
-st.set_page_config(
-    page_title="Galaxy Vast AI",
-    page_icon="\U0001f980",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ───────────────────────────────────────────────────────────────────────────── #
-# Custom CSS — hardcoded string, NOT user input — safe for html=True
-# ───────────────────────────────────────────────────────────────────────────── #
-_CUSTOM_CSS = """
-<style>
-    .main-header { font-size: 2rem; font-weight: 700; color: #00d4ff; }
-    .metric-card { background: #1e1e2e; border-radius: 8px; padding: 1rem; }
-    .stSelectbox label { color: #a0a0b0; }
-    [data-testid="stSidebar"] { background: #13131f; }
-</style>
-"""
-st.markdown(_CUSTOM_CSS, unsafe_allow_html=True)  # safe: hardcoded HTML
-
-# ───────────────────────────────────────────────────────────────────────────── #
-# Sidebar navigation
-# ───────────────────────────────────────────────────────────────────────────── #
-st.sidebar.markdown("## \U0001f980 Galaxy Vast AI")  # no unsafe_allow_html needed
-st.sidebar.markdown("---")
-
-_PAGES = {
-    "\U0001f504 Market Replay":     "replay",
-    "\U0001f4c8 Backtest Results":  "backtest",
-    "\u23f9 Walk-Forward":          "walk_forward",
-    "\U0001f4bc Portfolio":         "portfolio",
-    "\U0001f9a0 Explainability":    "explainability",
-    "\U0001f0b2 Monte Carlo":       "monte_carlo",
-}
-
-_selected_label = st.sidebar.radio("Navigation", list(_PAGES.keys()))
-_module_name    = _PAGES[_selected_label]
-
-st.sidebar.markdown("---")
-# Read API URL from env — not hardcoded
-st.sidebar.caption(f"API: {_API_BASE_URL}")
-st.sidebar.caption(f"Env: {_ENVIRONMENT}")
-
-# ───────────────────────────────────────────────────────────────────────────── #
-# Page loader
-# ───────────────────────────────────────────────────────────────────────────── #
-_pages_dir = str(Path(__file__).parent / "pages")
-if _pages_dir not in sys.path:
-    sys.path.insert(0, _pages_dir)
+st.set_page_config(page_title="Galaxy Vast AI Trading", page_icon="🌌", layout="wide", initial_sidebar_state="expanded")
 
 try:
-    _mod = importlib.import_module(_module_name)
-    if hasattr(_mod, "render"):
-        _mod.render()
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=_REFRESH_MS, key="live_refresh")
+except ImportError:
+    st.sidebar.caption("Install streamlit-autorefresh for auto-refresh")
+
+
+def _get(path: str, params: Optional[Dict] = None, timeout: int = 8) -> Optional[Any]:
+    """GET from API — returns parsed JSON or None on error."""
+    try:
+        r = requests.get(f"{API_BASE_URL}{path}", params=params, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.ConnectionError:
+        st.sidebar.error(f"API offline: {API_BASE_URL}")
+        return None
+    except requests.exceptions.Timeout:
+        st.sidebar.warning(f"Timeout: {path}")
+        return None
+    except Exception as exc:  # noqa: BLE001
+        if IS_DEV:
+            st.exception(exc)
+        return None
+
+
+def _post(path: str, payload: Dict, timeout: int = 15) -> Optional[Any]:
+    """POST to API — returns parsed JSON or None on error."""
+    try:
+        r = requests.post(f"{API_BASE_URL}{path}", json=payload, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:  # noqa: BLE001
+        if IS_DEV:
+            st.exception(exc)
+        return None
+
+
+with st.sidebar:
+    st.markdown("### 🌌 Galaxy Vast AI")
+    st.markdown("---")
+    page = st.radio("Navigation", ["📊 Overview", "💹 Live Trades", "📈 Analytics", "🤖 AI Model", "⚙️ Settings"], key="nav")
+    st.markdown("---")
+    health = _get("/health/live")
+    if health and health.get("status") == "ok":
+        st.success("🟢 API Online")
     else:
-        st.error(f"Page '{_module_name}' has no render() function.")
-except Exception as _e:
-    st.error(f"Failed to load page '{_module_name}': {_e}")
-    if _IS_DEV:
-        st.exception(_e)  # full traceback only in development
+        st.error("🔴 API Offline")
+    st.caption(f"Refresh: {_REFRESH_MS // 1000}s | {API_BASE_URL}")
+
+if page == "📊 Overview":
+    st.title("📊 System Overview")
+    ready = _get("/health/ready")
+    if ready:
+        st.json(ready)
+    col1, col2, col3 = st.columns(3)
+    account = _get("/metrics/account")
+    if account:
+        col1.metric("Equity", f"${account.get('equity', 0):,.2f}")
+        col2.metric("Balance", f"${account.get('balance', 0):,.2f}")
+        col3.metric("Free Margin", f"${account.get('free_margin', 0):,.2f}")
+
+elif page == "💹 Live Trades":
+    from dashboard.pages import live_trading
+    live_trading.render(api_get=_get, api_base=API_BASE_URL)
+
+elif page == "📈 Analytics":
+    from dashboard.pages import portfolio
+    portfolio.render(api_get=_get)
+
+elif page == "🤖 AI Model":
+    from dashboard.pages import explainability
+    explainability.render(api_get=_get)
+
+elif page == "⚙️ Settings":
+    st.title("⚙️ Settings")
+    cfg = _get("/admin/config")
+    if cfg:
+        st.json(cfg)
     else:
-        st.info("\U0001f527 Please contact support or check server logs.")
+        st.info("Settings managed via .env file")
