@@ -1,204 +1,253 @@
-"""
-bot.py — Telegram Bot entrypoint
+"""Telegram Bot — polling + heartbeat + commands.
 
-Runs as: python -m backend.telegram.bot
-Includes:
-  - Aiogram polling
-  - Liveness heartbeat (/tmp/bot_heartbeat)
-  - Admin command handlers
-  - Signal notification system
+BUG-N5 FIX: _format_position() uses .get() with safe fallbacks
+so /positions command never crashes with KeyError in DEMO mode.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-import sys
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Bot initialization
-# ---------------------------------------------------------------------------
-
-_bot = None
-_dp = None
-_initialized = False
-
-
-async def init_bot() -> bool:
-    """Initialize bot and dispatcher. Returns True on success."""
-    global _bot, _dp, _initialized
-    try:
-        from aiogram import Bot, Dispatcher
-        from aiogram.enums import ParseMode
-        from aiogram.client.default import DefaultBotProperties
-        from backend.core.config import get_settings
-
-        settings = get_settings()
-        token = settings.TELEGRAM_BOT_TOKEN
-        if not token or token == "your_telegram_bot_token_here":
-            logger.error("[Bot] TELEGRAM_BOT_TOKEN not configured")
-            return False
-
-        _bot = Bot(
-            token=token,
-            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-        )
-        _dp = Dispatcher()
-        _register_handlers(_dp)
-        _initialized = True
-        logger.info("[Bot] Initialized successfully")
-        return True
-    except ImportError as e:
-        logger.error("[Bot] aiogram not installed: %s", e)
-        return False
-    except Exception as e:
-        logger.error("[Bot] Initialization failed: %s", e)
-        return False
+try:
+    from telegram import Bot, Update
+    from telegram.ext import Application, CommandHandler, ContextTypes
+    TELEGRAM_AVAILABLE = True
+except ImportError:
+    TELEGRAM_AVAILABLE = False
+    log.warning("python-telegram-bot not installed — bot disabled")
 
 
-def _register_handlers(dp) -> None:
-    """Register all command and message handlers."""
-    try:
-        from aiogram import Router
-        from aiogram.filters import Command
-        from aiogram.types import Message
-        from backend.core.config import get_settings
+def _format_position(pos: Dict[str, Any]) -> str:
+    """Format a position dict safely — handles both LIVE and DEMO key schemas.
 
-        router = Router()
-        settings = get_settings()
-        admin_ids = set(getattr(settings, 'TELEGRAM_ADMIN_IDS', []))
+    BUG-N5 FIX: use .get() with fallbacks for every key so KeyError
+    never crashes /positions in DEMO mode where keys differ.
+    """
+    symbol = pos.get("symbol", pos.get("ticker", "UNKNOWN"))
+    volume = pos.get("volume", pos.get("lots", pos.get("size", 0.0)))
+    pos_type = pos.get("type", pos.get("side", "?"))
+    open_price = pos.get("open_price", pos.get("entry_price", pos.get("price_open", 0.0)))
+    current_price = pos.get("current_price", pos.get("price_current", open_price))
+    # DEMO mode may not have 'profit' — compute from price difference
+    profit = pos.get("profit", pos.get("unrealized_pnl", pos.get("pnl", None)))
+    if profit is None:
+        try:
+            profit = (float(current_price) - float(open_price)) * float(volume)
+        except Exception:
+            profit = 0.0
+    ticket = pos.get("ticket", pos.get("id", pos.get("mt5_ticket", "")))
+    comment = pos.get("comment", pos.get("description", ""))
 
-        @router.message(Command("start"))
-        async def cmd_start(message: Message):
-            await message.answer(
-                "<b>GalaxyVast MT5 Trading Bot</b>\n"
-                "Type /help for available commands."
-            )
-
-        @router.message(Command("help"))
-        async def cmd_help(message: Message):
-            await message.answer(
-                "<b>Available Commands:</b>\n"
-                "/status — Bot and system status\n"
-                "/balance — Account balance\n"
-                "/positions — Open positions\n"
-                "/kill — Emergency stop (admin only)\n"
-                "/resume — Resume trading (admin only)\n"
-                "/health — System health check"
-            )
-
-        @router.message(Command("status"))
-        async def cmd_status(message: Message):
-            from backend.risk.kill_switch import kill_switch
-            ks_status = "\ud83d\udd34 ACTIVE" if kill_switch.is_active else "\ud83d\udfe2 Inactive"
-            await message.answer(
-                f"<b>Bot Status</b>\n"
-                f"Kill Switch: {ks_status}\n"
-                f"Mode: {'DEMO' if os.environ.get('MT5_DEMO_MODE', '').lower() in ('1', 'true') else 'LIVE'}"
-            )
-
-        @router.message(Command("kill"))
-        async def cmd_kill(message: Message):
-            if message.from_user.id not in admin_ids:
-                await message.answer("\u26d4 Unauthorized")
-                return
-            from backend.risk.kill_switch import kill_switch
-            kill_switch.activate("Manual kill via Telegram")
-            await message.answer("\ud83d\udd34 <b>KILL SWITCH ACTIVATED</b>\nAll trading stopped.")
-
-        @router.message(Command("resume"))
-        async def cmd_resume(message: Message):
-            if message.from_user.id not in admin_ids:
-                await message.answer("\u26d4 Unauthorized")
-                return
-            from backend.risk.kill_switch import kill_switch
-            kill_switch.reset("Manual resume via Telegram")
-            await message.answer("\u2705 Kill switch reset. Trading resumed.")
-
-        @router.message(Command("health"))
-        async def cmd_health(message: Message):
-            from backend.telegram.heartbeat import is_alive
-            alive = is_alive()
-            await message.answer(
-                f"<b>Health Check</b>\n"
-                f"Bot heartbeat: {'\u2705 alive' if alive else '\u26a0\ufe0f stale'}\n"
-            )
-
-        dp.include_router(router)
-        logger.info("[Bot] Handlers registered")
-    except Exception as e:
-        logger.error("[Bot] Handler registration failed: %s", e)
-
-
-async def start_polling() -> None:
-    """Start bot polling loop."""
-    if not _initialized or _bot is None or _dp is None:
-        logger.error("[Bot] Not initialized — call init_bot() first")
-        return
-    try:
-        await _dp.start_polling(_bot, allowed_updates=["message", "callback_query"])
-    except Exception as e:
-        logger.error("[Bot] Polling error: %s", e)
-        raise
-
-
-async def send_notification(message: str, parse_mode: str = "HTML") -> bool:
-    """Send notification to all admin users."""
-    if not _initialized or _bot is None:
-        return False
-    try:
-        from backend.core.config import get_settings
-        settings = get_settings()
-        admin_ids = getattr(settings, 'TELEGRAM_ADMIN_IDS', [])
-        for admin_id in admin_ids:
-            try:
-                await _bot.send_message(admin_id, message, parse_mode=parse_mode)
-            except Exception as e:
-                logger.warning("[Bot] Failed to send to %s: %s", admin_id, e)
-        return True
-    except Exception as e:
-        logger.error("[Bot] send_notification error: %s", e)
-        return False
-
-
-# ---------------------------------------------------------------------------
-# Main entry point
-# ---------------------------------------------------------------------------
-
-async def _main() -> None:
-    """Main async entry point for the bot."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        stream=sys.stdout,
+    emoji = "🟢" if float(profit) >= 0 else "🔴"
+    return (
+        f"{emoji} *{symbol}* | {pos_type} | Vol: {volume}\n"
+        f"   Open: `{open_price}` → Now: `{current_price}`\n"
+        f"   P&L: `{profit:.2f}` | Ticket: `{ticket}`"
+        + (f"\n   📝 {comment}" if comment else "")
     )
 
-    logger.info("[Bot] Starting GalaxyVast Telegram Bot...")
 
-    # Initialize bot
-    ok = await init_bot()
-    if not ok:
-        logger.critical("[Bot] Failed to initialize. Exiting.")
-        sys.exit(1)
+class TelegramBot:
+    """Telegram bot with polling, heartbeat, and trading commands."""
 
-    # Start heartbeat
-    from backend.telegram.heartbeat import start_heartbeat, stop_heartbeat
-    await start_heartbeat()
+    def __init__(self) -> None:
+        self._token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self._chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
+        self._app: Optional[Any] = None
+        self._running: bool = False
+        self._heartbeat_task: Optional[asyncio.Task] = None
 
-    try:
-        logger.info("[Bot] Starting polling...")
-        await start_polling()
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        logger.info("[Bot] Polling stopped")
-    finally:
-        await stop_heartbeat()
-        if _bot:
-            await _bot.session.close()
-        logger.info("[Bot] Shutdown complete")
+    # ---------------------------------------------------------------------- #
+    # Lifecycle
+    # ---------------------------------------------------------------------- #
+    async def start(self) -> None:
+        if not TELEGRAM_AVAILABLE or not self._token:
+            log.warning("TelegramBot: token missing or library unavailable — skipping")
+            return
+        if self._running:
+            return
+        self._running = True
+        try:
+            self._app = (
+                Application.builder()
+                .token(self._token)
+                .build()
+            )
+            self._register_handlers()
+            await self._app.initialize()
+            await self._app.start()
+            self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            log.info("TelegramBot started (polling)")
+            await self._app.updater.start_polling(drop_pending_updates=True)
+        except Exception as e:
+            log.error("TelegramBot.start: %s", e)
+            self._running = False
+
+    async def stop(self) -> None:
+        self._running = False
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+        if self._app:
+            try:
+                await self._app.updater.stop()
+                await self._app.stop()
+                await self._app.shutdown()
+            except Exception as e:
+                log.debug("TelegramBot.stop: %s", e)
+
+    # ---------------------------------------------------------------------- #
+    # Public: send helpers
+    # ---------------------------------------------------------------------- #
+    async def send_message(self, text: str, parse_mode: str = "Markdown") -> None:
+        if not self._app or not self._chat_id:
+            return
+        try:
+            await self._app.bot.send_message(
+                chat_id=self._chat_id, text=text, parse_mode=parse_mode
+            )
+        except Exception as e:
+            log.warning("TelegramBot.send_message: %s", e)
+
+    async def send_alert(self, text: str) -> None:
+        await self.send_message(text)
+
+    async def send_signal(self, signal: Dict[str, Any]) -> None:
+        direction = signal.get("direction", "NO_TRADE")
+        symbol = signal.get("symbol", "?")
+        entry = signal.get("entry_price", 0)
+        sl = signal.get("sl_price", 0)
+        tp = signal.get("tp_price", 0)
+        rr = signal.get("rr_ratio", 0)
+        conf = signal.get("confidence", 0)
+        emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "⚪"
+        msg = (
+            f"{emoji} *Signal: {direction}* | {symbol}\n"
+            f"Entry: `{entry}` | SL: `{sl}` | TP: `{tp}`\n"
+            f"RR: `{rr:.2f}` | Conf: `{conf:.1%}`"
+        )
+        await self.send_message(msg)
+
+    # ---------------------------------------------------------------------- #
+    # Command handlers
+    # ---------------------------------------------------------------------- #
+    def _register_handlers(self) -> None:
+        if not self._app:
+            return
+        cmds = [
+            ("start",     self._cmd_start),
+            ("status",    self._cmd_status),
+            ("positions", self._cmd_positions),
+            ("kill",      self._cmd_kill),
+            ("resume",    self._cmd_resume),
+            ("stats",     self._cmd_stats),
+            ("help",      self._cmd_help),
+        ]
+        for name, handler in cmds:
+            self._app.add_handler(CommandHandler(name, handler))
+
+    async def _cmd_start(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.message.reply_text(
+            "🤖 *GalaxyVast MT5 Bot*\nActive and monitoring markets.",
+            parse_mode="Markdown",
+        )
+
+    async def _cmd_help(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.message.reply_text(
+            "*Commands:*\n"
+            "/status — system status\n"
+            "/positions — open positions\n"
+            "/kill — activate kill switch\n"
+            "/resume — deactivate kill switch\n"
+            "/stats — performance stats",
+            parse_mode="Markdown",
+        )
+
+    async def _cmd_status(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            from backend.risk.kill_switch import kill_switch
+            ks = "🔴 ACTIVE" if kill_switch.is_active else "🟢 OK"
+        except Exception:
+            ks = "unknown"
+        await update.message.reply_text(
+            f"*System Status*\nKill Switch: {ks}\nTime: {datetime.now(timezone.utc).strftime('%H:%M UTC')}",
+            parse_mode="Markdown",
+        )
+
+    async def _cmd_positions(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        """Show open positions — BUG-N5 FIX: uses _format_position() with safe .get()"""
+        try:
+            from backend.execution.mt5_connector import mt5_connector
+            positions: List[Dict[str, Any]] = await mt5_connector.get_positions()
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error fetching positions: {e}")
+            return
+
+        if not positions:
+            await update.message.reply_text("📭 No open positions.")
+            return
+
+        lines = [f"📊 *Open Positions* ({len(positions)})\n"]
+        for pos in positions:
+            try:
+                lines.append(_format_position(pos))
+            except Exception as e:
+                lines.append(f"⚠️ position parse error: {e}")
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+    async def _cmd_kill(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            from backend.risk.kill_switch import kill_switch
+            await kill_switch.activate(reason="Telegram /kill command")
+            await update.message.reply_text("🔴 *Kill switch ACTIVATED*", parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
+    async def _cmd_resume(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            from backend.risk.kill_switch import kill_switch
+            await kill_switch.reset()
+            await update.message.reply_text("🟢 *Kill switch RESET — trading resumed*", parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
+    async def _cmd_stats(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            from backend.analytics.metrics_engine import metrics_engine
+            perf = await metrics_engine.get_performance_metrics()
+            win_rate = perf.get("win_rate", 0)
+            total = perf.get("total_trades", 0)
+            pnl = perf.get("total_pnl", 0)
+            msg = (
+                f"📈 *Performance Stats*\n"
+                f"Total trades: `{total}`\n"
+                f"Win rate: `{win_rate:.1%}`\n"
+                f"Total P&L: `{pnl:.2f}`"
+            )
+        except Exception as e:
+            msg = f"❌ Stats error: {e}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
+
+    # ---------------------------------------------------------------------- #
+    # Heartbeat
+    # ---------------------------------------------------------------------- #
+    async def _heartbeat_loop(self) -> None:
+        interval = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL", "3600"))
+        while self._running:
+            try:
+                await asyncio.sleep(interval)
+                if self._running:
+                    await self.send_message(
+                        f"💓 *Heartbeat* — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+                    )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                log.debug("heartbeat: %s", e)
 
 
-if __name__ == "__main__":
-    asyncio.run(_main())
+telegram_bot = TelegramBot()

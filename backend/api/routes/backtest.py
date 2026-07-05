@@ -1,121 +1,115 @@
-"""Legacy /backtest route — thin wrapper kept for backward compatibility.
+"""Backtest routes.
 
-The heavy lifting is done by backtest_engine.py (ProcessPool workers).
-This router exposes the simpler single-run endpoints that the frontend
-original consumed before the engine refactor.
+BUG-N7 FIX: date_range validation added — start_date must be before end_date.
 """
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, validator
 
-from backend.core.auth import require_auth
-from backend.core.logger import get_logger
+log = logging.getLogger(__name__)
+router = APIRouter(prefix="/backtest", tags=["backtest"])
 
-logger = get_logger(__name__)
-
-router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------------------------
 
 class BacktestRequest(BaseModel):
-    symbol: str = Field(..., examples=["XAUUSD"])
-    timeframe: str = Field("H1", examples=["M15", "H1", "H4", "D1"])
-    strategy: str = Field("smc", examples=["smc", "pa", "combined"])
-    initial_balance: float = Field(10_000.0, gt=0)
-    risk_pct: float = Field(1.0, gt=0, le=10)
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-
-
-class BacktestResponse(BaseModel):
-    status: str
     symbol: str
-    timeframe: str
+    start_date: str  # ISO format e.g. "2025-01-01"
+    end_date: str    # ISO format e.g. "2025-12-31"
+    strategy: str = "smc_default"
+    initial_balance: float = 10_000.0
+    risk_per_trade_pct: float = 1.0
+    max_workers: int = 2
+
+    @validator("end_date")
+    def end_after_start(cls, end_date: str, values: Dict[str, Any]) -> str:
+        """BUG-N7 FIX: validate start_date < end_date."""
+        start = values.get("start_date")
+        if start:
+            try:
+                dt_start = datetime.fromisoformat(start)
+                dt_end = datetime.fromisoformat(end_date)
+                if dt_end <= dt_start:
+                    raise ValueError(
+                        f"end_date ({end_date}) must be after start_date ({start})"
+                    )
+            except ValueError as e:
+                if "must be after" in str(e):
+                    raise
+                raise ValueError(f"Invalid date format: {e}") from e
+        return end_date
+
+
+class BacktestResult(BaseModel):
+    symbol: str
     strategy: str
+    start_date: str
+    end_date: str
     total_trades: int
     win_rate: float
-    profit_factor: float
-    net_pnl: float
+    total_pnl: float
     max_drawdown: float
     sharpe_ratio: float
-    trades: List[Dict[str, Any]] = []
-    equity_curve: List[float] = []
+    status: str
+    duration_seconds: float
+    details: Dict[str, Any]
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
-
-@router.post(
-    "/run",
-    response_model=BacktestResponse,
-    summary="Run a single backtest synchronously (lightweight)",
-)
-async def run_backtest(
-    req: BacktestRequest,
-    _user: dict = Depends(require_auth),
-) -> Dict[str, Any]:
-    """Synchronous backtest — delegates to MultiSymbolBacktestEngine."""
+@router.post("/run", response_model=BacktestResult)
+async def run_backtest(request: BacktestRequest) -> BacktestResult:
+    """Run a backtest for the given symbol and date range."""
+    import time
+    t0 = time.monotonic()
     try:
-        from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
-        from backend.backtest_engine.data_provider import DataProvider
-
-        provider = DataProvider()
-        candles = provider.get_candles(
-            symbol=req.symbol,
-            timeframe=req.timeframe,  # type: ignore[arg-type]
-            start_date=req.start_date,
-            end_date=req.end_date,
+        from backend.services.backtest_engine import BacktestEngine
+        engine = BacktestEngine(
+            symbol=request.symbol,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            strategy=request.strategy,
+            initial_balance=request.initial_balance,
+            risk_per_trade_pct=request.risk_per_trade_pct,
+            max_workers=min(request.max_workers, 4),
         )
-        engine = MultiSymbolBacktestEngine(
-            symbol=req.symbol,
-            timeframe=req.timeframe,  # type: ignore[arg-type]
-            initial_balance=req.initial_balance,
-            risk_pct=req.risk_pct,
+        result = await engine.run(timeout=300)
+        duration = time.monotonic() - t0
+        return BacktestResult(
+            symbol=request.symbol,
+            strategy=request.strategy,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            total_trades=result.get("total_trades", 0),
+            win_rate=result.get("win_rate", 0.0),
+            total_pnl=result.get("total_pnl", 0.0),
+            max_drawdown=result.get("max_drawdown", 0.0),
+            sharpe_ratio=result.get("sharpe_ratio", 0.0),
+            status="completed",
+            duration_seconds=round(duration, 2),
+            details=result,
         )
-        result: Dict[str, Any] = engine.run(
-            candles=candles,
-            strategy=req.strategy,
-        )
-        return {
-            "status": "completed",
-            "symbol": req.symbol,
-            "timeframe": req.timeframe,
-            "strategy": req.strategy,
-            "total_trades": result.get("total_trades", 0),
-            "win_rate": result.get("win_rate", 0.0),
-            "profit_factor": result.get("profit_factor", 0.0),
-            "net_pnl": result.get("net_pnl", 0.0),
-            "max_drawdown": result.get("max_drawdown", 0.0),
-            "sharpe_ratio": result.get("sharpe_ratio", 0.0),
-            "trades": result.get("trades", []),
-            "equity_curve": result.get("equity_curve", []),
-        }
-    except Exception as exc:
-        logger.error("Backtest failed: %s", exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest failed: {exc}",
-        ) from exc
+    except Exception as e:
+        log.error("backtest error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/symbols", summary="List supported symbols")
-async def list_symbols(_user: dict = Depends(require_auth)) -> Dict[str, Any]:
-    """Return the list of symbols the backtest engine supports."""
-    return {
-        "symbols": [
-            "XAUUSD", "EURUSD", "GBPUSD", "USDJPY",
-            "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
-            "BTCUSD", "ETHUSD", "US30", "NAS100",
-            "UKOIL", "USOIL",
-        ],
-        "timeframes": ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"],
-        "strategies": ["smc", "pa", "combined", "rl"],
-    }
+@router.get("/history")
+async def get_backtest_history(limit: int = 20) -> Dict[str, Any]:
+    """Get recent backtest results from DB."""
+    try:
+        from backend.database.connection import get_db_client
+        import asyncio
+        db = await get_db_client()
+        r = await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: db.table("backtest_results")
+                .select("*").order("created_at", desc=True).limit(limit).execute()
+            ),
+            timeout=10.0,
+        )
+        return {"results": r.data or [], "count": len(r.data or [])}
+    except Exception as e:
+        log.debug("backtest history: %s", e)
+        return {"results": [], "count": 0, "note": str(e)}

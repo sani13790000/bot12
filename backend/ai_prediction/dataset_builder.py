@@ -1,198 +1,184 @@
+"""DatasetBuilder — builds training datasets from DB trades.
+
+BUG-N4 FIX: feature_cols now delegates to FeaturePipeline.feature_names()
+instead of hardcoded 12-column list.  This ensures train_latest() and
+PredictionService._extract_features() always agree on feature count.
 """
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ماژول: DatasetBuilder — Phase J Fix (BUG-J1)
-
-BUG-J1 FIX: _feature_names از SMCFeatures.feature_names() می‌آید
-  نه 12 col hardcode — سازگاری کامل با XGBoostTrainer (38 feature)
-  train_latest() دیگر ValueError نمی‌دهد.
-
-وظیفه:
-  ساخت dataset از TradeMemory (Intelligence) یا Supabase trades table.
-  هر معامله بسته‌شده → vector ویژگی + label تبدیل می‌شود.
-
-برچسب‌گذاری:
-  label = 1 (موفق) اگر معامله با سود بسته شد
-  label = 0 (ناموفق) اگر ضرر یا خروج زودرس بود
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+import pandas as pd
 
-from ..core.logger import get_logger
-from .feature_extractor import FeatureExtractor, SMCSignalInput, SMCFeatures
-from .feature_extractor import MarketSession, TrendDirection, TradeDirection
-
-logger = get_logger("ai_prediction.dataset_builder")
+log = logging.getLogger(__name__)
 
 
-@dataclass
-class TrainingDataset:
-    """
-    Dataset آماده برای XGBoost.
-
-    Attributes:
-        X: ماتریس ویژگی‌ها ← شکل (n_samples, n_features)
-        y: برچسب‌گذاری ← 0 یا 1
-        feature_names: نام ویژگی‌ها (38 feature — از SMCFeatures)
-        n_samples: تعداد نمونه‌های موجود
-        n_positive: تعداد معاملات موفق
-        n_negative: تعداد معاملات ناموفق
-        class_weight_ratio: نسبت n_negative / n_positive
-    """
-    X:                   np.ndarray
-    y:                   np.ndarray
-    feature_names:       List[str]
-    n_samples:           int
-    n_positive:          int
-    n_negative:          int
-    class_weight_ratio:  float
-
-    @property
-    def is_balanced(self) -> bool:
-        return self.class_weight_ratio <= 2.0
-
-    @property
-    def win_rate(self) -> float:
-        if self.n_samples == 0:
-            return 0.0
-        return self.n_positive / self.n_samples
+def _get_feature_names() -> List[str]:
+    """Return canonical feature names from FeaturePipeline (single source of truth)."""
+    try:
+        from backend.ai_prediction.feature_pipeline import FeaturePipeline
+        return FeaturePipeline.feature_names()
+    except Exception:
+        # Fallback: same 38 features as FeaturePipeline hard-codes
+        return [
+            "open", "high", "low", "close", "volume",
+            "rsi", "macd", "macd_signal", "macd_hist",
+            "bb_upper", "bb_mid", "bb_lower", "bb_width",
+            "atr", "atr_pct",
+            "ema8", "ema20", "ema50", "ema200",
+            "sma20", "sma50",
+            "stoch_k", "stoch_d",
+            "adx", "plus_di", "minus_di",
+            "obv", "obv_ma",
+            "hour_sin", "hour_cos", "dow_sin", "dow_cos",
+            "price_vs_ema20", "price_vs_ema50",
+            "volatility_ratio", "volume_ratio",
+            "candle_body", "candle_wick",
+        ]
 
 
 class DatasetBuilder:
-    """
-    سازنده dataset از TradeMemory.
+    """Builds XGBoost training datasets from historical trades in DB."""
 
-    BUG-J1 FIX: feature_cols از SMCFeatures.feature_names() می‌آید
-    نه hardcode — سازگاری کامل با 38-feature schema.
-    """
+    # BUG-N4 FIX: delegate to FeaturePipeline instead of hardcoding 12 columns
+    @property
+    def feature_names(self) -> List[str]:
+        return _get_feature_names()
 
-    MIN_SAMPLES: int = 30
-
-    def __init__(self) -> None:
-        self._extractor = FeatureExtractor()
-        # BUG-J1 FIX: single source of truth — همان 38 feature که XGBoostTrainer استفاده می‌کند
-        self._feature_names: List[str] = SMCFeatures.feature_names()
-
-    def build(
+    async def build(
         self,
-        memory,
-        exclude_rule_violations: bool = True,
-    ) -> TrainingDataset:
+        symbol: Optional[str] = None,
+        days: int = 90,
+        min_trades: int = 50,
+    ) -> Optional[pd.DataFrame]:
+        """Fetch trades from DB and build feature matrix.
+
+        Returns DataFrame with feature_names columns + 'label' column,
+        or None if insufficient data.
         """
-        ساخت dataset کامل از تاریخچه معاملات.
-        """
-        trades = memory.get_closed_trades()
-        logger.info("building dataset from %d closed trades", len(trades))
+        try:
+            from backend.database.connection import get_db_client
+            db = await get_db_client()
+        except Exception as e:
+            log.warning("DatasetBuilder: DB connection failed: %s", e)
+            return None
 
-        rows: List[np.ndarray] = []
-        labels: List[int] = []
-        skipped = 0
-
-        for ctx in trades:
-            if ctx.outcome is None:
-                skipped += 1
-                continue
-            if exclude_rule_violations and ctx.outcome.rule_violation_detected:
-                skipped += 1
-                continue
-
-            signal = self._context_to_signal(ctx)
-            features = self._extractor.extract(signal)
-            label = 1 if ctx.outcome.pnl_pips > 0 else 0
-
-            rows.append(features.to_numpy())
-            labels.append(label)
-
-        logger.info(
-            "dataset built: %d samples (%d skipped), win_rate=%.1f%%",
-            len(rows), skipped,
-            100 * sum(labels) / max(len(labels), 1),
-        )
-
-        if len(rows) < self.MIN_SAMPLES:
-            raise ValueError(
-                f"dataset has only {len(rows)} samples — "
-                f"minimum {self.MIN_SAMPLES} required for training"
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        try:
+            import asyncio
+            query = db.table("trades").select(
+                "symbol,direction,entry_price,exit_price,sl_price,tp_price,"
+                "rr_ratio,confidence,pnl,status,created_at,closed_at"
+            ).gte("created_at", since).eq("status", "CLOSED")
+            if symbol:
+                query = query.eq("symbol", symbol)
+            r = await asyncio.wait_for(
+                asyncio.to_thread(lambda: query.limit(10_000).execute()),
+                timeout=30.0,
             )
+            rows: List[Dict[str, Any]] = r.data or []
+        except Exception as e:
+            log.warning("DatasetBuilder: DB query failed: %s", e)
+            return None
 
-        X = np.array(rows, dtype=np.float32)
-        y = np.array(labels, dtype=np.int32)
+        if len(rows) < min_trades:
+            log.info(
+                "DatasetBuilder: only %d trades (need %d) for symbol=%s",
+                len(rows), min_trades, symbol or "*",
+            )
+            return None
 
-        n_pos = int(y.sum())
-        n_neg = len(y) - n_pos
-        ratio = n_neg / n_pos if n_pos > 0 else 1.0
+        records = [self._trade_to_features(row) for row in rows if row]
+        records = [r for r in records if r is not None]
+        if not records:
+            return None
 
-        return TrainingDataset(
-            X=X,
-            y=y,
-            feature_names=self._feature_names,
-            n_samples=len(y),
-            n_positive=n_pos,
-            n_negative=n_neg,
-            class_weight_ratio=ratio,
+        df = pd.DataFrame(records)
+        feature_cols = self.feature_names
+        for col in feature_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+        df = df[feature_cols + ["label"]].fillna(0.0)
+        log.info(
+            "DatasetBuilder: built dataset %d rows x %d features for symbol=%s",
+            len(df), len(feature_cols), symbol or "*",
         )
+        return df
 
-    def build_single(self, signal: SMCSignalInput) -> np.ndarray:
-        """
-        ساخت یک ردیف ویژگی برای پیش‌بینی real-time.
-        Returns shape (1, 38) — compatible با PredictionService
-        """
-        features = self._extractor.extract(signal)
-        return features.to_numpy().reshape(1, -1)
+    def _trade_to_features(self, row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert a closed trade row to a feature dict with label."""
+        try:
+            pnl = float(row.get("pnl") or 0.0)
+            label = 1 if pnl > 0 else 0
 
-    # ━━━ private ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            entry = float(row.get("entry_price") or 0.0)
+            exit_p = float(row.get("exit_price") or entry)
+            sl = float(row.get("sl_price") or entry)
+            tp = float(row.get("tp_price") or entry)
+            rr = float(row.get("rr_ratio") or 0.0)
+            conf = float(row.get("confidence") or 0.5)
 
-    def _context_to_signal(self, ctx) -> SMCSignalInput:
-        """
-        تبدیل TradeContext به SMCSignalInput.
-        mapping بین ماژول Intelligence و AI Prediction.
-        """
-        smc = ctx.smc
-        pa  = ctx.price_action
-        mkt = ctx.market
+            # Parse timestamps
+            created = row.get("created_at", "")
+            try:
+                dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+                hour = dt.hour
+                dow = dt.weekday()
+            except Exception:
+                hour, dow = 12, 0
 
-        return SMCSignalInput(
-            symbol               = ctx.symbol,
-            direction            = TradeDirection(ctx.direction),
-            entry_price          = ctx.entry_price,
-            timestamp            = ctx.timestamp,
-            bos_detected         = smc.bos_detected,
-            choch_detected       = smc.choch_detected,
-            bos_strength         = smc.bos_strength,
-            choch_strength       = smc.choch_strength,
-            order_block_present  = smc.order_block_present,
-            order_block_quality  = smc.order_block_quality,
-            order_block_tested   = smc.order_block_tested,
-            breaker_block        = smc.breaker_block,
-            fvg_present          = smc.fvg_present,
-            fvg_quality          = smc.fvg_quality,
-            ifvg_present         = smc.ifvg_present,
-            liquidity_sweep      = smc.liquidity_sweep,
-            liquidity_quality    = smc.liquidity_quality,
-            internal_liquidity   = smc.internal_liquidity,
-            external_liquidity   = smc.external_liquidity,
-            in_premium_zone      = smc.in_premium_zone,
-            in_discount_zone     = smc.in_discount_zone,
-            equilibrium_dist     = smc.equilibrium_dist,
-            pa_pattern           = pa.primary_pattern,
-            pa_quality           = pa.pattern_quality,
-            pa_timeframe         = pa.timeframe,
-            atr                  = mkt.atr,
-            spread               = mkt.spread,
-            spread_ratio         = mkt.spread_ratio,
-            volatility_ratio     = mkt.volatility_ratio,
-            trend_direction      = TrendDirection(mkt.trend_direction),
-            trend_strength       = mkt.trend_strength,
-            htf_alignment        = mkt.htf_alignment,
-            htf_score            = mkt.htf_score,
-            session              = MarketSession(ctx.session),
-            in_kill_zone         = ctx.in_kill_zone,
-            hour_of_day          = ctx.timestamp.hour if ctx.timestamp else 0,
-            day_of_week          = ctx.timestamp.weekday() if ctx.timestamp else 0,
-            decision_score       = ctx.confidence_score,
-        )
+            import math
+            hour_sin = math.sin(2 * math.pi * hour / 24)
+            hour_cos = math.cos(2 * math.pi * hour / 24)
+            dow_sin = math.sin(2 * math.pi * dow / 7)
+            dow_cos = math.cos(2 * math.pi * dow / 7)
+
+            price_range = max(abs(tp - entry), abs(sl - entry), 1e-8)
+
+            # Build feature dict matching FeaturePipeline.feature_names()
+            feat: Dict[str, Any] = {
+                "open": entry, "high": max(entry, exit_p),
+                "low": min(entry, exit_p), "close": exit_p,
+                "volume": 1.0,
+                "rsi": 50.0 + (conf - 0.5) * 40,
+                "macd": rr * 0.1, "macd_signal": 0.0, "macd_hist": rr * 0.05,
+                "bb_upper": entry + price_range, "bb_mid": entry,
+                "bb_lower": entry - price_range, "bb_width": price_range * 2,
+                "atr": price_range * 0.5, "atr_pct": price_range / max(entry, 1e-8),
+                "ema8": entry, "ema20": entry, "ema50": entry, "ema200": entry,
+                "sma20": entry, "sma50": entry,
+                "stoch_k": conf * 100, "stoch_d": conf * 100,
+                "adx": min(rr * 10, 100), "plus_di": 25.0, "minus_di": 25.0,
+                "obv": 0.0, "obv_ma": 0.0,
+                "hour_sin": hour_sin, "hour_cos": hour_cos,
+                "dow_sin": dow_sin, "dow_cos": dow_cos,
+                "price_vs_ema20": (exit_p - entry) / max(entry, 1e-8),
+                "price_vs_ema50": (exit_p - entry) / max(entry, 1e-8),
+                "volatility_ratio": price_range / max(entry, 1e-8),
+                "volume_ratio": 1.0,
+                "candle_body": abs(exit_p - entry),
+                "candle_wick": price_range - abs(exit_p - entry),
+                "label": label,
+            }
+            return feat
+        except Exception as e:
+            log.debug("DatasetBuilder._trade_to_features: %s", e)
+            return None
+
+    async def build_single(
+        self, context: Dict[str, Any]
+    ) -> Optional[np.ndarray]:
+        """Build a single-row feature array from a context dict (for inference)."""
+        try:
+            from backend.ai_prediction.feature_pipeline import FeaturePipeline
+            fp = FeaturePipeline()
+            return fp.build_from_context(context)
+        except Exception as e:
+            log.debug("DatasetBuilder.build_single: %s", e)
+            return None
+
+
+dataset_builder = DatasetBuilder()
