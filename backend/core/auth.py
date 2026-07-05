@@ -59,3 +59,14 @@ def make_token_payload(user_id: str, role: str = "customer",
 
 def is_dangerous_secret(s: str) -> bool:
     return s.lower() in _DANGEROUS or len(s) < 32
+
+
+# Alias for backward compatibility — deps.py uses verify_token
+def verify_token(token: str) -> Optional[Dict[str, Any]]:
+    """Alias for verify_jwt using settings secret key."""
+    try:
+        from backend.core.config import get_settings
+        secret = get_settings().JWT_SECRET_KEY
+        return verify_jwt(token, secret)
+    except Exception:
+        return None
