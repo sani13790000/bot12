@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 from supabase import Client, create_client
 
@@ -14,7 +14,13 @@ logger = logging.getLogger(__name__)
 _client: Optional[Client] = None
 _lock = asyncio.Lock()
 _last_healthy: float = 0.0
-_HEALTH_TTL = 10.0
+
+# Q3-FIX: TTL increased from 10.0 to 30.0 seconds.
+# Under high traffic, a 10-second TTL causes a DB probe + potential
+# reconnect every 10 seconds per worker — unacceptable overhead.
+# 30 seconds provides a good balance: stale connections are caught
+# quickly enough for health checks, but probes don't dominate CPU.
+_HEALTH_TTL = 30.0
 
 
 def _probe_sync(client: Client) -> None:
