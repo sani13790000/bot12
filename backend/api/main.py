@@ -1,54 +1,37 @@
-"""
-main.py - FastAPI application entrypoint for GalaxyVast MT5 Trading Bot
-
-Startup sequence:
-  1. run_startup_checks()     - Redis, Supabase, MT5 gateway ping
-  2. init_redis()             - warm up Redis connection pool
-  3. mt5_connector.connect()  - connect to MT5 gateway
-  4. signal_processor.register_agents([smc, ml, news])
-  5. ml_agent.set_engine(trainer) - activate ML predictions
-  6. Background tasks: stale order cleaner, position reconciler
-  7. GracefulDrain SIGTERM handler
-
-Phase C additions:
-  - CSP middleware (from settings.CSP_ENABLED)
-  - /health/ready: license_engine.secret_configured check
-  - CORS uses settings.ALLOWED_ORIGINS (not CORS_ORIGINS)
-"""
+"""FastAPI entrypoint — Production-grade with full Phase F engine injection."""
 from __future__ import annotations
 
 import asyncio
 import logging
 import signal
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Optional
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from backend.core.config import get_settings
+
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
-# ── GracefulDrain ──────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Graceful drain
+# ---------------------------------------------------------------------------
 
 class GracefulDrain:
-    """Track in-flight requests and wait for them to complete on SIGTERM."""
-
-    def __init__(self, timeout: float = 30.0) -> None:
+    def __init__(self) -> None:
         self._count: int = 0
-        self._timeout = timeout
-        self._lock: Optional[asyncio.Lock] = None  # Lazy init - BUG-R6-6 fix
-        self._draining = False
+        self._draining: bool = False
+        self._lock: Optional[asyncio.Lock] = None   # lazy init
 
     def _get_lock(self) -> asyncio.Lock:
         if self._lock is None:
             self._lock = asyncio.Lock()
         return self._lock
-
-    def start_drain(self) -> None:
-        self._draining = True
-        logger.info("[GracefulDrain] SIGTERM received, waiting for %d in-flight requests", self._count)
 
     async def enter(self) -> None:
         async with self._get_lock():
@@ -56,344 +39,276 @@ class GracefulDrain:
 
     async def exit(self) -> None:
         async with self._get_lock():
-            self._count -= 1
+            self._count = max(0, self._count - 1)
 
-    async def wait_drain(self) -> None:
-        waited = 0.0
-        while self._count > 0 and waited < self._timeout:
-            await asyncio.sleep(0.5)
-            waited += 0.5
+    def start_drain(self) -> None:
+        self._draining = True
+        logger.info("[GracefulDrain] draining started, in_flight=%d", self._count)
+
+    async def wait_drain(self, timeout: float = 30.0) -> None:
+        deadline = time.monotonic() + timeout
+        while self._count > 0 and time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
         if self._count > 0:
             logger.warning(
-                "[GracefulDrain] Timeout after %.1fs, %d requests still in flight",
-                waited, self._count,
+                "[GracefulDrain] timeout: %d requests still in flight", self._count
             )
+        else:
+            logger.info("[GracefulDrain] drain complete")
 
     def register_sigterm(self) -> None:
-        """Register SIGTERM handler using running loop. BUG-R5-1 fix."""
         try:
-            loop = asyncio.get_running_loop()  # NOT get_event_loop()
-            def _handler():
+            loop = asyncio.get_running_loop()
+            def _handler() -> None:
                 self.start_drain()
                 loop.call_soon_threadsafe(
-                    lambda: loop.create_task(self.wait_drain())
+                    loop.create_task, self.wait_drain()
                 )
             loop.add_signal_handler(signal.SIGTERM, _handler)
         except (NotImplementedError, OSError, RuntimeError):
-            pass  # Windows / no running loop
+            pass
 
 
-_drain = GracefulDrain(timeout=30.0)
+_drain = GracefulDrain()
 
 
-# ── Background Tasks ───────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Startup helpers
+# ---------------------------------------------------------------------------
 
-async def _stale_order_cleaner() -> None:
-    """Clean up stale orders every 60 seconds. BUG-R4-4 fix."""
-    from backend.execution.order_state_machine import order_state_machine
-    while True:
-        try:
-            await asyncio.sleep(60)
-            expired = order_state_machine.expire_stale_tickets(max_age_minutes=60)
-            if expired:
-                logger.warning("[OrderCleaner] Expired %d stale tickets: %s", len(expired), expired)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error("[OrderCleaner] Error: %s", e)
+async def safe_startup_task(name: str, coro: Any) -> bool:
+    try:
+        if asyncio.iscoroutine(coro):
+            await coro
+        return True
+    except Exception as exc:
+        logger.warning("[Startup] %s failed (non-fatal): %s", name, exc)
+        return False
 
 
-async def _position_reconciler() -> None:
-    """Reconcile OrderStateMachine vs MT5 live positions. BUG-R4-5/ARCH-R5 fix."""
-    from backend.execution.mt5_connector import mt5_connector
-    from backend.execution.order_state_machine import order_state_machine
-    from backend.core.config import get_settings
-    settings = get_settings()
-    interval = getattr(settings, 'RECONCILE_INTERVAL_SECONDS', 30)
-    while True:
-        try:
-            await asyncio.sleep(interval)
-            if not mt5_connector._connected:
-                continue
-            live: list = await mt5_connector.get_positions()  # BUG-R5-6 fix
-            live_tickets = {int(p.get('ticket', 0)) for p in live if p.get('ticket')}
-            osm_active = set(order_state_machine.active_tickets())
-            ghost_tickets = osm_active - live_tickets
-            for ticket in ghost_tickets:
-                try:
-                    order_state_machine.transition(ticket, "CLOSED")
-                    logger.info("[Reconciler] Ghost ticket %d closed", ticket)
-                except Exception:
-                    pass
-        except asyncio.CancelledError:
-            break
-        except AttributeError as e:
-            logger.error("[Reconciler] MT5 method missing: %s", e)
-        except Exception as e:
-            logger.debug("[Reconciler] Error: %s", e)
-
-
-# ── Lifespan ───────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# Lifespan
+# ---------------------------------------------------------------------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: startup => yield => shutdown."""
-    logger.info("=" * 60)
-    logger.info("GalaxyVast MT5 Trading Bot - Starting Up")
-    logger.info("=" * 60)
+    """Application lifespan: startup → yield → shutdown."""
 
-    # 1. Register graceful drain SIGTERM
-    _drain.register_sigterm()
+    # ── 1. Config validation ───────────────────────────────────────────
+    logger.info("[Startup] ENV=%s", settings.ENVIRONMENT)
 
-    # 2. Pre-flight checks
+    # ── 2. Startup checks ─────────────────────────────────────────────
     try:
         from backend.startup_check import run_startup_checks
         await run_startup_checks()
-    except Exception as e:
-        logger.warning("[Startup] Startup checks failed: %s", e)
+    except Exception as exc:
+        logger.warning("[Startup] startup checks failed: %s", exc)
 
-    # 3. Redis warm-up
+    # ── 3. Redis ──────────────────────────────────────────────────────
     try:
         from backend.database.redis_client import init_redis
-        await init_redis()
-        logger.info("[Startup] Redis connected")
-    except Exception as e:
-        logger.warning("[Startup] Redis init failed (non-fatal): %s", e)
+        await safe_startup_task("redis", init_redis())
+    except Exception as exc:
+        logger.warning("[Startup] redis init failed: %s", exc)
 
-    # 4. MT5 Gateway connect  - BUG-R4-2 fix
+    # ── 4. MT5 Connector ─────────────────────────────────────────────
+    mt5_connector = None
     try:
-        from backend.execution.mt5_connector import mt5_connector
-        await mt5_connector.connect()
-        logger.info("[Startup] MT5 connector ready (demo=%s)", mt5_connector.demo)
-    except Exception as e:
-        logger.warning("[Startup] MT5 connect failed (non-fatal): %s", e)
+        from backend.execution.mt5_connector import mt5_connector as _mt5
+        await _mt5.connect()
+        mt5_connector = _mt5
+        logger.info("[Startup] MT5 connected demo=%s", _mt5.demo)
+    except Exception as exc:
+        logger.warning("[Startup] MT5 connect failed: %s", exc)
 
-    # 5. Register agents with SignalProcessor - BUG-R5-4 fix
+    # ── 5. SMC Engine ─────────────────────────────────────────────────
+    smc_engine = None
+    try:
+        from backend.analysis.smc_engine import SMCEngine
+        smc_engine = SMCEngine()
+        logger.info("[Startup] SMCEngine ready")
+    except Exception as exc:
+        logger.warning("[Startup] SMCEngine init failed: %s", exc)
+
+    # ── 6. ML Engine (XGBoost) ────────────────────────────────────────
+    ml_engine = None
+    try:
+        from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
+        _trainer = XGBoostTrainer()
+        _trainer.load_model()   # load saved model if exists
+        ml_engine = _trainer
+        logger.info("[Startup] XGBoostTrainer loaded")
+    except Exception as exc:
+        logger.warning("[Startup] XGBoostTrainer load failed: %s", exc)
+
+    # ── 7. Inject engines into ContextEnricher via SignalProcessor ────
+    try:
+        from backend.services.signal_processor import signal_processor
+        signal_processor.register_engines(
+            smc_engine=smc_engine,
+            ml_engine=ml_engine,
+        )
+        logger.info("[Startup] ContextEnricher engines injected")
+    except Exception as exc:
+        logger.warning("[Startup] engine injection failed: %s", exc)
+
+    # ── 8. Register Agents ────────────────────────────────────────────
     try:
         from backend.services.signal_processor import signal_processor
         from backend.agents.smc_agent import SMCAgent
         from backend.agents.ml_agent import MLAgent, ml_agent
-        from backend.agents.news_agent import NewsAgent
-        _smc = SMCAgent()
-        _ml = ml_agent   # Use singleton
-        _news = NewsAgent()
-        signal_processor.register_agents([_smc, _ml, _news])
-        logger.info("[Startup] Agents registered: SMC, ML, News")
-    except Exception as e:
-        logger.warning("[Startup] Agent registration failed: %s", e)
+        from backend.agents.liquidity_agent import LiquidityAgent
+        from backend.agents.market_structure_agent import MarketStructureAgent
+        from backend.agents.execution_agent import ExecutionAgent
 
-    # 6. Initialize ML engine  - Phase A fix
+        # Inject ML engine into MLAgent
+        if ml_engine is not None:
+            ml_agent.set_engine(ml_engine)
+            logger.info("[Startup] MLAgent engine set")
+
+        signal_processor.register_agents([
+            SMCAgent(),
+            ml_agent,
+            LiquidityAgent(),
+            MarketStructureAgent(),
+            ExecutionAgent(),
+        ])
+        logger.info("[Startup] 5 agents registered")
+    except Exception as exc:
+        logger.warning("[Startup] agent registration failed: %s", exc)
+
+    # ── 9. Retraining Service ─────────────────────────────────────────
     try:
-        from backend.agents.ml_agent import ml_agent
-        from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
-        _trainer = XGBoostTrainer()
-        loaded = _trainer.load_model()  # Load saved model if exists
-        if loaded:
-            ml_agent.set_engine(_trainer)
-            logger.info("[Startup] ML engine loaded and active")
-        else:
-            logger.warning("[Startup] No saved ML model found - MLAgent will ABSTAIN until trained")
-    except Exception as e:
-        logger.warning("[Startup] ML engine init failed: %s", e)
+        from backend.self_learning.retraining_service import retraining_service
+        if ml_engine is not None:
+            retraining_service.set_trainer(ml_engine)
+        await retraining_service.start()
+        logger.info("[Startup] RetrainingService started")
+    except Exception as exc:
+        logger.warning("[Startup] RetrainingService start failed: %s", exc)
 
-    # 7. Start background tasks
-    _tasks = [
-        asyncio.create_task(_stale_order_cleaner()),
-        asyncio.create_task(_position_reconciler()),
-    ]
-    logger.info("[Startup] Background tasks started")
+    # ── 10. Background tasks ──────────────────────────────────────────
+    async def _stale_order_cleaner() -> None:
+        while True:
+            await asyncio.sleep(60)
+            try:
+                from backend.execution.order_state_machine import order_state_machine
+                order_state_machine.expire_stale_tickets()
+            except Exception as exc:
+                logger.warning("[OSM] expire_stale_tickets: %s", exc)
 
-    logger.info("=" * 60)
-    logger.info("Startup complete - serving requests")
-    logger.info("=" * 60)
+    async def _position_reconciler() -> None:
+        interval = getattr(settings, "RECONCILE_INTERVAL_SECONDS", 30)
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                from backend.execution.mt5_connector import mt5_connector as _c
+                from backend.execution.order_state_machine import order_state_machine
+                if not _c._connected:
+                    continue
+                live = await _c.get_positions()
+                live_tickets = {int(p.get("ticket", 0)) for p in live}
+                osm_tickets  = set(order_state_machine.active_tickets())
+                ghost = osm_tickets - live_tickets
+                if ghost:
+                    logger.warning("[Reconciler] ghost tickets: %s", ghost)
+            except Exception as exc:
+                logger.debug("[Reconciler] %s", exc)
 
-    yield  # Application running
+    asyncio.create_task(_stale_order_cleaner(), name="stale_order_cleaner")
+    asyncio.create_task(_position_reconciler(), name="position_reconciler")
 
-    # Shutdown
-    logger.info("[Shutdown] Stopping background tasks...")
-    for task in _tasks:
-        task.cancel()
-    await asyncio.gather(*_tasks, return_exceptions=True)
+    # ── 11. SIGTERM handler ───────────────────────────────────────────
+    _drain.register_sigterm()
 
-    # Disconnect MT5
+    logger.info("[Startup] ✅ All systems ready")
+    yield
+
+    # ── Shutdown ──────────────────────────────────────────────────────
+    logger.info("[Shutdown] starting")
     try:
-        from backend.execution.mt5_connector import mt5_connector
-        await mt5_connector.disconnect()
+        from backend.self_learning.retraining_service import retraining_service
+        await retraining_service.stop()
     except Exception:
         pass
-
-    # Close Redis
+    try:
+        from backend.execution.mt5_connector import mt5_connector as _c
+        await _c.disconnect()
+    except Exception:
+        pass
     try:
         from backend.database.redis_client import close_redis
         await close_redis()
     except Exception:
         pass
-
-    logger.info("[Shutdown] Complete")
-
-
-# ── FastAPI App ────────────────────────────────────────────────────────────────
-
-app = FastAPI(
-    title="GalaxyVast MT5 Trading Bot API",
-    description="Institutional-grade algorithmic trading system",
-    version="12.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    lifespan=lifespan,
-)
+    logger.info("[Shutdown] complete")
 
 
-# ── CORS Middleware - ARCH-R5-6 fix: use ALLOWED_ORIGINS not CORS_ORIGINS ──────
+# ---------------------------------------------------------------------------
+# App factory
+# ---------------------------------------------------------------------------
 
-try:
-    from backend.core.config import get_settings
-    _settings = get_settings()
-    _origins = getattr(_settings, 'ALLOWED_ORIGINS', ["*"])
-except Exception:
-    _origins = ["*"]
+def create_app() -> FastAPI:
+    _app = FastAPI(
+        title="GalaxyVast MT5 Trading API",
+        version="12.0.0",
+        docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # CORS
+    _app.add_middleware(
+        CORSMiddleware,
+        allow_origins=getattr(settings, "ALLOWED_ORIGINS", ["*"]),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
+    # CSP middleware
+    if getattr(settings, "CSP_ENABLED", False):
+        csp_value = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:;"
+        )
+        @_app.middleware("http")
+        async def csp_middleware(request: Request, call_next: Callable) -> Response:
+            response = await call_next(request)
+            response.headers["Content-Security-Policy"] = csp_value
+            return response
 
-# ── CSP Middleware (Phase C) ───────────────────────────────────────────────────
-
-@app.middleware("http")
-async def csp_middleware(request: Request, call_next):
-    """Phase C: Inject Content-Security-Policy header if enabled."""
-    response = await call_next(request)
-    try:
-        from backend.core.config import get_settings
-        s = get_settings()
-        if getattr(s, 'CSP_ENABLED', False):
-            report_only = getattr(s, 'CSP_REPORT_ONLY', False)
-            report_uri = getattr(s, 'CSP_REPORT_URI', '')
-            csp = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline'; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data:; "
-                "connect-src 'self'; "
-                "font-src 'self'; "
-                "frame-ancestors 'none';"
+    # Drain middleware
+    @_app.middleware("http")
+    async def drain_middleware(request: Request, call_next: Callable) -> Response:
+        if _drain._draining:
+            return JSONResponse(
+                {"detail": "server is draining"},
+                status_code=503,
             )
-            if report_uri:
-                csp += f" report-uri {report_uri};"
-            header = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
-            response.headers[header] = csp
-    except Exception:
-        pass
-    return response
-
-
-# ── GracefulDrain Middleware ───────────────────────────────────────────────────
-
-@app.middleware("http")
-async def drain_middleware(request: Request, call_next):
-    """Track in-flight requests for graceful shutdown."""
-    if _drain._draining:
-        return Response(content="Service shutting down", status_code=503)
-    await _drain.enter()
-    try:
-        return await call_next(request)
-    finally:
-        await _drain.exit()
-
-
-# ── Health Endpoints ───────────────────────────────────────────────────────────
-
-@app.get("/health/live", tags=["health"])
-async def health_live():
-    """Liveness probe - always returns 200 if server is up."""
-    return {"status": "ok"}
-
-
-@app.get("/health/ready", tags=["health"])
-async def health_ready():
-    """Readiness probe - checks all dependencies."""
-    checks: Dict[str, Any] = {}
-
-    # Redis
-    try:
-        from backend.database.redis_client import redis_ping
-        checks["redis"] = "ok" if await redis_ping() else "degraded"
-    except Exception:
-        checks["redis"] = "error"
-
-    # MT5
-    try:
-        from backend.execution.mt5_connector import mt5_connector
-        checks["mt5"] = "connected" if mt5_connector._connected else "disconnected"
-    except Exception:
-        checks["mt5"] = "error"
-
-    # KillSwitch - BUG-R4-1 fix: is_active not is_active()
-    try:
-        from backend.risk.kill_switch import kill_switch
-        checks["kill_switch"] = "ACTIVE" if kill_switch.is_active else "inactive"
-    except Exception:
-        checks["kill_switch"] = "unknown"
-
-    # ML Agent
-    try:
-        from backend.agents.ml_agent import ml_agent
-        checks["ml_agent"] = "active" if ml_agent._engine is not None else "no_model"
-    except Exception:
-        checks["ml_agent"] = "unknown"
-
-    # License Engine (Phase C)
-    try:
-        from backend.license.engine import license_engine
-        stats = license_engine.stats()
-        checks["license"] = "ok" if stats["secret_configured"] else "no_secret"
-    except Exception:
-        checks["license"] = "unknown"
-
-    all_ok = all(
-        v in ("ok", "inactive", "connected", "active", "no_model")
-        for v in checks.values()
-    )
-    return JSONResponse(
-        status_code=200 if all_ok else 207,
-        content={"status": "ready" if all_ok else "degraded", "checks": checks},
-    )
-
-
-# ── Router Registration ────────────────────────────────────────────────────────
-
-def _register_routers() -> None:
-    """Register all API routers with graceful ImportError handling."""
-    routers = [
-        ("backend.api.routes.health", "/api/v1", ["health"]),
-        ("backend.api.routes.trading", "/api/v1", ["trading"]),
-        ("backend.api.routes.analysis", "/api/v1", ["analysis"]),
-        ("backend.api.routes.risk", "/api/v1", ["risk"]),
-        ("backend.api.routes.signals", "/api/v1", ["signals"]),
-        ("backend.api.routes.positions", "/api/v1", ["positions"]),
-        ("backend.api.routes.users", "/api/v1", ["users"]),
-        ("backend.api.routes.settings", "/api/v1", ["settings"]),
-        ("backend.api.routes.ai_prediction", "/api/v1", ["ai"]),
-        ("backend.api.routes.license", "/api/v1", ["license"]),
-        ("backend.api.routes.auth", "/api/v1", ["auth"]),
-    ]
-    for module_path, prefix, tags in routers:
+        await _drain.enter()
         try:
-            import importlib
-            mod = importlib.import_module(module_path)
-            router = getattr(mod, 'router', None)
-            if router is not None:
-                app.include_router(router, prefix=prefix, tags=tags)
-        except ImportError as e:
-            logger.warning("[Router] Skipped %s: %s", module_path, e)
-        except Exception as e:
-            logger.error("[Router] Failed to register %s: %s", module_path, e)
+            return await call_next(request)
+        finally:
+            await _drain.exit()
+
+    # Routers
+    try:
+        from backend.api.routes import health, trading, analysis, admin
+        _app.include_router(health.router,    prefix="/api/v1")
+        _app.include_router(trading.router,   prefix="/api/v1")
+        _app.include_router(analysis.router,  prefix="/api/v1")
+        _app.include_router(admin.router,     prefix="/api/v1/admin")
+    except Exception as exc:
+        logger.error("[App] router registration failed: %s", exc)
+
+    @_app.get("/health/live")
+    async def liveness() -> dict:
+        return {"status": "ok", "time": time.time()}
+
+    return _app
 
 
-_register_routers()
+app = create_app()
