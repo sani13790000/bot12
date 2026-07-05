@@ -1,4 +1,4 @@
-"""
+"""backend/analytics/metrics_engine.py
 Galaxy Vast AI Trading Platform
 MetricsEngine — Professional Quant Metrics Calculator
 
@@ -13,405 +13,250 @@ Calculates:
   - Win Rate            (% winning trades)
   - Average RR          (average risk:reward)
   - CAGR                (compound annual growth rate)
+  - Agent Performance   (via AgentPerformanceTracker — Phase L)
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence
 
+
+# ------------------------------------------------------------------ #
+# Data types
+# ------------------------------------------------------------------ #
 
 @dataclass
 class TradeRecord:
-    """Single closed trade record."""
-    ticket: int
-    symbol: str
-    direction: str                  # BUY | SELL
-    entry_price: float
-    exit_price: float
-    stop_loss: float
-    lot_size: float
-    profit_loss: float              # in account currency
-    open_time: datetime
-    close_time: datetime
-    pips: float = 0.0
-    risk_amount: float = 0.0        # risk in account currency
-    reward_amount: float = 0.0      # reward in account currency
-    confidence_score: float = 0.0
-    session: str = "UNKNOWN"
-    strategy_tags: List[str] = field(default_factory=list)
-
-    @property
-    def is_winner(self) -> bool:
-        return self.profit_loss > 0
-
-    @property
-    def rr_ratio(self) -> float:
-        """Risk:Reward realized."""
-        if self.risk_amount and self.risk_amount != 0:
-            return abs(self.profit_loss) / abs(self.risk_amount)
-        return 0.0
-
-    @property
-    def hold_minutes(self) -> float:
-        return (self.close_time - self.open_time).total_seconds() / 60
+    """Minimal trade record for metric calculations."""
+    pnl:          float
+    entry_price:  float
+    exit_price:   float
+    stop_loss:    float
+    take_profit:  float
+    direction:    str          # "BUY" | "SELL"
+    opened_at:    datetime
+    closed_at:    datetime
+    symbol:       str = ""
+    commission:   float = 0.0
 
 
 @dataclass
-class DrawdownPoint:
-    timestamp: datetime
-    equity: float
-    drawdown_pct: float
-    drawdown_amount: float
+class MetricResult:
+    sharpe_ratio:    Optional[float] = None
+    sortino_ratio:   Optional[float] = None
+    calmar_ratio:    Optional[float] = None
+    profit_factor:   Optional[float] = None
+    recovery_factor: Optional[float] = None
+    expectancy:      Optional[float] = None
+    max_drawdown:    Optional[float] = None
+    win_rate:        Optional[float] = None
+    avg_rr:          Optional[float] = None
+    cagr:            Optional[float] = None
+    total_trades:    int = 0
+    total_pnl:       float = 0.0
+    gross_profit:    float = 0.0
+    gross_loss:      float = 0.0
+    winning_trades:  int = 0
+    losing_trades:   int = 0
+    avg_win:         Optional[float] = None
+    avg_loss:        Optional[float] = None
+    errors:          List[str] = field(default_factory=list)
 
 
-@dataclass
-class AnalyticsResult:
-    """Complete analytics snapshot."""
-    # ── Core Stats ──────────────────────────────────────────────
-    total_trades: int = 0
-    winning_trades: int = 0
-    losing_trades: int = 0
-    break_even_trades: int = 0
-
-    # ── Profitability ────────────────────────────────────────────
-    gross_profit: float = 0.0
-    gross_loss: float = 0.0
-    net_profit: float = 0.0
-    profit_factor: float = 0.0
-
-    # ── Ratios ───────────────────────────────────────────────────
-    win_rate: float = 0.0
-    sharpe_ratio: float = 0.0
-    sortino_ratio: float = 0.0
-    calmar_ratio: float = 0.0
-    recovery_factor: float = 0.0
-
-    # ── Expectancy ───────────────────────────────────────────────
-    expectancy: float = 0.0           # in account currency
-    expectancy_r: float = 0.0         # in R multiples
-    average_win: float = 0.0
-    average_loss: float = 0.0
-    average_rr: float = 0.0
-
-    # ── Drawdown ─────────────────────────────────────────────────
-    max_drawdown_pct: float = 0.0
-    max_drawdown_amount: float = 0.0
-    avg_drawdown_pct: float = 0.0
-    max_consecutive_losses: int = 0
-    max_consecutive_wins: int = 0
-
-    # ── Growth ───────────────────────────────────────────────────
-    cagr: float = 0.0
-    initial_balance: float = 0.0
-    final_balance: float = 0.0
-
-    # ── Time ─────────────────────────────────────────────────────
-    period_start: Optional[datetime] = None
-    period_end: Optional[datetime] = None
-    trading_days: int = 0
-    avg_hold_minutes: float = 0.0
-
-    # ── Symbol Breakdown ─────────────────────────────────────────
-    by_symbol: dict = field(default_factory=dict)
-    by_session: dict = field(default_factory=dict)
-    by_direction: dict = field(default_factory=dict)
-
-    # ── Equity Curve ─────────────────────────────────────────────
-    equity_curve: List[dict] = field(default_factory=list)
-    drawdown_curve: List[dict] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "total_trades": self.total_trades,
-            "winning_trades": self.winning_trades,
-            "losing_trades": self.losing_trades,
-            "break_even_trades": self.break_even_trades,
-            "gross_profit": round(self.gross_profit, 2),
-            "gross_loss": round(self.gross_loss, 2),
-            "net_profit": round(self.net_profit, 2),
-            "profit_factor": round(self.profit_factor, 4),
-            "win_rate": round(self.win_rate, 4),
-            "sharpe_ratio": round(self.sharpe_ratio, 4),
-            "sortino_ratio": round(self.sortino_ratio, 4),
-            "calmar_ratio": round(self.calmar_ratio, 4),
-            "recovery_factor": round(self.recovery_factor, 4),
-            "expectancy": round(self.expectancy, 4),
-            "expectancy_r": round(self.expectancy_r, 4),
-            "average_win": round(self.average_win, 2),
-            "average_loss": round(self.average_loss, 2),
-            "average_rr": round(self.average_rr, 4),
-            "max_drawdown_pct": round(self.max_drawdown_pct, 4),
-            "max_drawdown_amount": round(self.max_drawdown_amount, 2),
-            "avg_drawdown_pct": round(self.avg_drawdown_pct, 4),
-            "max_consecutive_losses": self.max_consecutive_losses,
-            "max_consecutive_wins": self.max_consecutive_wins,
-            "cagr": round(self.cagr, 4),
-            "initial_balance": round(self.initial_balance, 2),
-            "final_balance": round(self.final_balance, 2),
-            "period_start": self.period_start.isoformat() if self.period_start else None,
-            "period_end": self.period_end.isoformat() if self.period_end else None,
-            "trading_days": self.trading_days,
-            "avg_hold_minutes": round(self.avg_hold_minutes, 1),
-            "by_symbol": self.by_symbol,
-            "by_session": self.by_session,
-            "by_direction": self.by_direction,
-            "equity_curve": self.equity_curve,
-            "drawdown_curve": self.drawdown_curve,
-        }
-
+# ------------------------------------------------------------------ #
+# Engine
+# ------------------------------------------------------------------ #
 
 class MetricsEngine:
-    """
-    Institutional-grade quantitative metrics calculator.
+    """Stateless metrics calculator."""
 
-    SOLID: Single Responsibility — only calculates metrics.
-    No I/O, no DB access.
-    """
+    RISK_FREE_RATE_ANNUAL: float = 0.05   # 5% annual
+    TRADING_DAYS_YEAR:     int   = 252
 
-    RISK_FREE_RATE_ANNUAL: float = 0.05        # 5% annual risk-free rate
-    TRADING_DAYS_PER_YEAR: int = 252
-    MINUTES_PER_YEAR: float = 252 * 6.5 * 60  # ~98,280
+    # ---------------------------------------------------------------- #
+    # Main entry point
+    # ---------------------------------------------------------------- #
 
-    def calculate(
-        self,
-        trades: List[TradeRecord],
-        initial_balance: float = 10_000.0,
-        risk_free_rate: Optional[float] = None,
-    ) -> AnalyticsResult:
-        """
-        Full analytics pass over a list of closed trades.
-
-        Args:
-            trades:          List of closed TradeRecord objects (chronological order)
-            initial_balance: Starting account balance
-            risk_free_rate:  Annual risk-free rate (overrides default)
-        Returns:
-            AnalyticsResult with all metrics populated
-        """
-        result = AnalyticsResult(initial_balance=initial_balance)
-
+    def calculate(self, trades: Sequence[TradeRecord]) -> MetricResult:
+        """Calculate all metrics from a list of closed trades."""
+        result = MetricResult()
         if not trades:
+            result.errors.append("no_trades")
             return result
 
-        rfr = risk_free_rate if risk_free_rate is not None else self.RISK_FREE_RATE_ANNUAL
-        trades_sorted = sorted(trades, key=lambda t: t.open_time)
+        result.total_trades = len(trades)
+        pnls = [t.pnl - t.commission for t in trades]
+        result.total_pnl   = sum(pnls)
+        result.gross_profit = sum(p for p in pnls if p > 0)
+        result.gross_loss   = abs(sum(p for p in pnls if p < 0))
 
-        # ── Basic counts ─────────────────────────────────────────
-        result.total_trades = len(trades_sorted)
-        result.winning_trades = sum(1 for t in trades_sorted if t.profit_loss > 0)
-        result.losing_trades = sum(1 for t in trades_sorted if t.profit_loss < 0)
-        result.break_even_trades = result.total_trades - result.winning_trades - result.losing_trades
-        result.win_rate = result.winning_trades / result.total_trades
+        wins  = [p for p in pnls if p > 0]
+        losses = [p for p in pnls if p < 0]
+        result.winning_trades = len(wins)
+        result.losing_trades  = len(losses)
+        result.avg_win  = sum(wins)   / len(wins)   if wins   else None
+        result.avg_loss = sum(losses) / len(losses) if losses else None
 
-        # ── P&L ──────────────────────────────────────────────────
-        result.gross_profit = sum(t.profit_loss for t in trades_sorted if t.profit_loss > 0)
-        result.gross_loss = abs(sum(t.profit_loss for t in trades_sorted if t.profit_loss < 0))
-        result.net_profit = result.gross_profit - result.gross_loss
-        result.final_balance = initial_balance + result.net_profit
-
-        # ── Profit Factor ─────────────────────────────────────────
-        result.profit_factor = (
-            result.gross_profit / result.gross_loss
-            if result.gross_loss > 0 else float("inf")
-        )
-
-        # ── Averages ─────────────────────────────────────────────
-        winners = [t.profit_loss for t in trades_sorted if t.profit_loss > 0]
-        losers  = [t.profit_loss for t in trades_sorted if t.profit_loss < 0]
-        result.average_win  = (sum(winners) / len(winners)) if winners else 0.0
-        result.average_loss = (sum(losers) / len(losers)) if losers else 0.0
-        result.average_rr = (
-            abs(result.average_win / result.average_loss)
-            if result.average_loss != 0 else 0.0
-        )
-        result.avg_hold_minutes = sum(t.hold_minutes for t in trades_sorted) / len(trades_sorted)
-
-        # ── Expectancy ───────────────────────────────────────────
-        result.expectancy = (
-            result.win_rate * result.average_win
-            + (1 - result.win_rate) * result.average_loss
-        )
-        # Expectancy in R multiples
-        r_multiples = []
-        for t in trades_sorted:
-            if t.risk_amount and t.risk_amount > 0:
-                r_multiples.append(t.profit_loss / t.risk_amount)
-        result.expectancy_r = sum(r_multiples) / len(r_multiples) if r_multiples else 0.0
-
-        # ── Equity Curve + Drawdown ───────────────────────────────
-        equity_curve = self._build_equity_curve(trades_sorted, initial_balance)
-        result.equity_curve = [
-            {"time": str(p["time"]), "equity": round(p["equity"], 2)}
-            for p in equity_curve
-        ]
-
-        dd_points = self._calculate_drawdown_series(equity_curve)
-        result.max_drawdown_pct    = max((p.drawdown_pct for p in dd_points), default=0.0)
-        result.max_drawdown_amount = max((p.drawdown_amount for p in dd_points), default=0.0)
-        result.avg_drawdown_pct    = (
-            sum(p.drawdown_pct for p in dd_points) / len(dd_points) if dd_points else 0.0
-        )
-        result.drawdown_curve = [
-            {"time": str(p.timestamp), "drawdown_pct": round(p.drawdown_pct * 100, 4)}
-            for p in dd_points
-        ]
-
-        # ── Recovery Factor ───────────────────────────────────────
-        result.recovery_factor = (
-            result.net_profit / result.max_drawdown_amount
-            if result.max_drawdown_amount > 0 else float("inf")
-        )
-
-        # ── Period ───────────────────────────────────────────────
-        result.period_start = trades_sorted[0].open_time
-        result.period_end   = trades_sorted[-1].close_time
-        delta_days = (result.period_end - result.period_start).days
-        result.trading_days = max(delta_days, 1)
-
-        # ── CAGR ─────────────────────────────────────────────────
-        result.cagr = self._cagr(initial_balance, result.final_balance, result.trading_days)
-
-        # ── Sharpe Ratio ─────────────────────────────────────────
-        daily_returns = self._daily_returns(equity_curve)
-        result.sharpe_ratio  = self._sharpe(daily_returns, rfr)
-        result.sortino_ratio = self._sortino(daily_returns, rfr)
-
-        # ── Calmar Ratio ─────────────────────────────────────────
-        result.calmar_ratio = (
-            result.cagr / result.max_drawdown_pct
-            if result.max_drawdown_pct > 0 else float("inf")
-        )
-
-        # ── Consecutive Streaks ───────────────────────────────────
-        result.max_consecutive_wins, result.max_consecutive_losses = (
-            self._consecutive_streaks(trades_sorted)
-        )
-
-        # ── Breakdowns ───────────────────────────────────────────
-        result.by_symbol    = self._group_breakdown(trades_sorted, "symbol")
-        result.by_session   = self._group_breakdown(trades_sorted, "session")
-        result.by_direction = self._group_breakdown(trades_sorted, "direction")
+        result.win_rate      = self._win_rate(pnls)
+        result.profit_factor = self._profit_factor(result.gross_profit, result.gross_loss)
+        result.max_drawdown  = self._max_drawdown(pnls)
+        result.expectancy    = self._expectancy(trades)
+        result.avg_rr        = self._avg_rr(trades)
+        result.sharpe_ratio  = self._sharpe(pnls)
+        result.sortino_ratio = self._sortino(pnls)
+        result.calmar_ratio  = self._calmar(pnls, result.max_drawdown, trades)
+        result.recovery_factor = self._recovery(result.total_pnl, result.max_drawdown)
+        result.cagr          = self._cagr(pnls, trades)
 
         return result
 
-    # ── Private helpers ──────────────────────────────────────────────────────
+    # ---------------------------------------------------------------- #
+    # Individual metric calculators
+    # ---------------------------------------------------------------- #
 
-    def _build_equity_curve(
-        self, trades: List[TradeRecord], initial_balance: float
-    ) -> List[dict]:
-        curve = [{"time": trades[0].open_time, "equity": initial_balance}]
-        equity = initial_balance
+    def _win_rate(self, pnls: List[float]) -> float:
+        if not pnls:
+            return 0.0
+        return len([p for p in pnls if p > 0]) / len(pnls)
+
+    def _profit_factor(self, gross_profit: float, gross_loss: float) -> Optional[float]:
+        if gross_loss == 0:
+            return None if gross_profit == 0 else float("inf")
+        return gross_profit / gross_loss
+
+    def _max_drawdown(self, pnls: List[float]) -> float:
+        peak = 0.0
+        equity = 0.0
+        max_dd = 0.0
+        for pnl in pnls:
+            equity += pnl
+            if equity > peak:
+                peak = equity
+            dd = peak - equity
+            if dd > max_dd:
+                max_dd = dd
+        return max_dd
+
+    def _expectancy(self, trades: Sequence[TradeRecord]) -> Optional[float]:
+        if not trades:
+            return None
+        pnls = [t.pnl - t.commission for t in trades]
+        wins  = [p for p in pnls if p > 0]
+        losses = [p for p in pnls if p < 0]
+        if not losses:
+            return sum(wins) / len(trades) if wins else 0.0
+        win_rate   = len(wins) / len(pnls)
+        avg_win    = sum(wins) / len(wins) if wins else 0.0
+        avg_loss   = abs(sum(losses) / len(losses))
+        return win_rate * avg_win - (1 - win_rate) * avg_loss
+
+    def _avg_rr(self, trades: Sequence[TradeRecord]) -> Optional[float]:
+        rrs: List[float] = []
         for t in trades:
-            equity += t.profit_loss
-            curve.append({"time": t.close_time, "equity": equity})
-        return curve
+            risk   = abs(t.entry_price - t.stop_loss)
+            reward = abs(t.exit_price - t.entry_price)
+            if risk > 0:
+                rrs.append(reward / risk)
+        return sum(rrs) / len(rrs) if rrs else None
 
-    def _calculate_drawdown_series(self, equity_curve: List[dict]) -> List[DrawdownPoint]:
-        points = []
-        peak = equity_curve[0]["equity"]
-        for point in equity_curve:
-            eq = point["equity"]
-            if eq > peak:
-                peak = eq
-            drawdown_amount = peak - eq
-            drawdown_pct    = drawdown_amount / peak if peak > 0 else 0.0
-            points.append(DrawdownPoint(
-                timestamp=point["time"],
-                equity=eq,
-                drawdown_pct=drawdown_pct,
-                drawdown_amount=drawdown_amount,
-            ))
-        return points
-
-    def _daily_returns(self, equity_curve: List[dict]) -> List[float]:
-        """Compute daily percentage returns from equity curve."""
-        returns = []
-        # group by date
-        daily: dict = {}
-        for pt in equity_curve:
-            d = pt["time"].date() if hasattr(pt["time"], "date") else pt["time"]
-            daily[d] = pt["equity"]
-        dates = sorted(daily.keys())
-        for i in range(1, len(dates)):
-            prev = daily[dates[i - 1]]
-            curr = daily[dates[i]]
-            if prev > 0:
-                returns.append((curr - prev) / prev)
-        return returns
-
-    def _sharpe(self, daily_returns: List[float], annual_rfr: float) -> float:
-        if len(daily_returns) < 2:
-            return 0.0
-        n   = len(daily_returns)
-        avg = sum(daily_returns) / n
-        var = sum((r - avg) ** 2 for r in daily_returns) / (n - 1)
-        std = math.sqrt(var)
+    def _sharpe(self, pnls: List[float]) -> Optional[float]:
+        if len(pnls) < 2:
+            return None
+        n = len(pnls)
+        mean = sum(pnls) / n
+        variance = sum((p - mean) ** 2 for p in pnls) / (n - 1)
+        std = math.sqrt(variance)
         if std == 0:
-            return 0.0
-        daily_rfr = annual_rfr / self.TRADING_DAYS_PER_YEAR
-        excess    = avg - daily_rfr
-        return (excess / std) * math.sqrt(self.TRADING_DAYS_PER_YEAR)
+            return None
+        daily_rf = self.RISK_FREE_RATE_ANNUAL / self.TRADING_DAYS_YEAR
+        return (mean - daily_rf) / std * math.sqrt(self.TRADING_DAYS_YEAR)
 
-    def _sortino(self, daily_returns: List[float], annual_rfr: float) -> float:
-        if len(daily_returns) < 2:
-            return 0.0
-        n         = len(daily_returns)
-        avg       = sum(daily_returns) / n
-        daily_rfr = annual_rfr / self.TRADING_DAYS_PER_YEAR
-        excess    = avg - daily_rfr
-        # downside deviation (semi-variance)
-        neg = [r for r in daily_returns if r < daily_rfr]
-        if not neg:
-            return float("inf")
-        downside_var = sum((r - daily_rfr) ** 2 for r in neg) / len(neg)
+    def _sortino(self, pnls: List[float]) -> Optional[float]:
+        if len(pnls) < 2:
+            return None
+        n = len(pnls)
+        mean = sum(pnls) / n
+        downside = [p for p in pnls if p < 0]
+        if not downside:
+            return None
+        downside_var = sum(p ** 2 for p in downside) / n
         downside_std = math.sqrt(downside_var)
         if downside_std == 0:
-            return 0.0
-        return (excess / downside_std) * math.sqrt(self.TRADING_DAYS_PER_YEAR)
+            return None
+        daily_rf = self.RISK_FREE_RATE_ANNUAL / self.TRADING_DAYS_YEAR
+        return (mean - daily_rf) / downside_std * math.sqrt(self.TRADING_DAYS_YEAR)
 
-    def _cagr(self, initial: float, final: float, trading_days: int) -> float:
-        if initial <= 0 or trading_days <= 0:
-            return 0.0
-        years = trading_days / self.TRADING_DAYS_PER_YEAR
-        if years < 1e-6:
-            return 0.0
-        return ((final / initial) ** (1 / years)) - 1
+    def _calmar(self, pnls: List[float], max_dd: float,
+                trades: Sequence[TradeRecord]) -> Optional[float]:
+        if max_dd == 0 or not trades:
+            return None
+        # Annualise total PnL
+        total_pnl = sum(pnls)
+        days = max((trades[-1].closed_at - trades[0].opened_at).days, 1)
+        annual_return = total_pnl * (365 / days)
+        return annual_return / max_dd
 
-    def _consecutive_streaks(self, trades: List[TradeRecord]):
-        max_wins = max_losses = 0
-        cur_wins = cur_losses = 0
-        for t in trades:
-            if t.is_winner:
-                cur_wins  += 1
-                cur_losses = 0
-            elif t.profit_loss < 0:
-                cur_losses += 1
-                cur_wins   = 0
-            else:
-                cur_wins = cur_losses = 0
-            max_wins   = max(max_wins,   cur_wins)
-            max_losses = max(max_losses, cur_losses)
-        return max_wins, max_losses
+    def _recovery(self, total_pnl: float, max_dd: float) -> Optional[float]:
+        if max_dd == 0:
+            return None
+        return total_pnl / max_dd
 
-    def _group_breakdown(self, trades: List[TradeRecord], attr: str) -> dict:
-        groups: dict = {}
-        for t in trades:
-            key = getattr(t, attr, "UNKNOWN")
-            if key not in groups:
-                groups[key] = {
-                    "trades": 0, "wins": 0, "losses": 0,
-                    "profit": 0.0, "win_rate": 0.0,
-                }
-            g = groups[key]
-            g["trades"] += 1
-            g["profit"] = round(g["profit"] + t.profit_loss, 2)
-            if t.profit_loss > 0:
-                g["wins"] += 1
-            elif t.profit_loss < 0:
-                g["losses"] += 1
-        for g in groups.values():
-            g["win_rate"] = round(g["wins"] / g["trades"], 4) if g["trades"] > 0 else 0.0
-        return groups
+    def _cagr(self, pnls: List[float], trades: Sequence[TradeRecord]) -> Optional[float]:
+        if not trades or len(trades) < 2:
+            return None
+        days = max((trades[-1].closed_at - trades[0].opened_at).days, 1)
+        years = days / 365.0
+        start_equity = 10_000.0   # normalised base
+        end_equity   = start_equity + sum(pnls)
+        if end_equity <= 0 or start_equity <= 0:
+            return None
+        return (end_equity / start_equity) ** (1 / years) - 1
+
+    # ---------------------------------------------------------------- #
+    # Agent performance — Phase L: real data via AgentPerformanceTracker
+    # ---------------------------------------------------------------- #
+
+    async def get_agent_performance(self) -> Dict[str, Any]:
+        """Real agent voting stats from AgentPerformanceTracker ring buffer."""
+        try:
+            from backend.analytics.agent_performance_tracker import agent_tracker
+            return await agent_tracker.get_agent_performance()
+        except Exception as e:
+            return {
+                "agents": [],
+                "total_votes": 0,
+                "consensus_rate": 0.0,
+                "error": str(e),
+            }
+
+    # ---------------------------------------------------------------- #
+    # Convenience: metrics from raw DB trade rows
+    # ---------------------------------------------------------------- #
+
+    def from_db_rows(self, rows: List[Dict[str, Any]]) -> MetricResult:
+        """Convert raw Supabase trade rows to MetricResult."""
+        trades: List[TradeRecord] = []
+        for row in rows:
+            try:
+                trades.append(TradeRecord(
+                    pnl=float(row.get("pnl", 0)),
+                    entry_price=float(row.get("entry_price", 0)),
+                    exit_price=float(row.get("exit_price", 0)),
+                    stop_loss=float(row.get("stop_loss", 0)),
+                    take_profit=float(row.get("take_profit", 0)),
+                    direction=row.get("direction", "BUY"),
+                    opened_at=datetime.fromisoformat(row["opened_at"]) if row.get("opened_at") else datetime.now(timezone.utc),
+                    closed_at=datetime.fromisoformat(row["closed_at"]) if row.get("closed_at") else datetime.now(timezone.utc),
+                    symbol=row.get("symbol", ""),
+                    commission=float(row.get("commission", 0)),
+                ))
+            except Exception:
+                continue
+        return self.calculate(trades)
+
+
+# Module-level singleton
+metrics_engine = MetricsEngine()
