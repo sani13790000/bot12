@@ -1,4 +1,8 @@
-"""ML Agent — Phase 5: uses UnifiedMLEngine, returns drift info, feature importance."""
+"""
+ML Agent — Phase A Fix
+BUG-ML: MLAgent always returned NO_TRADE because ml_engine was never injected.
+        Now accepts engine at __init__ and is properly wired in lifespan().
+"""
 from __future__ import annotations
 
 import logging
@@ -8,119 +12,173 @@ logger = logging.getLogger(__name__)
 
 
 class MLAgent:
-    """Agent that queries the ML engine and returns a structured vote result."""
+    """
+    Voting agent that uses XGBoost model predictions to cast BUY/SELL/NO_TRADE.
 
-    name = "ml_agent"
-    weight = 1.0
+    Phase A Fix:
+    - ml_engine is now properly injected (was always None before)
+    - Falls back to NO_TRADE with clear log message instead of silent ABSTAIN
+    - Confidence threshold is configurable
+    - Feature extraction from context is explicit and documented
+    """
 
-    def __init__(self, ml_engine: Optional[Any] = None):
+    name: str = "MLAgent"
+    weight: float = 1.5    # Higher weight than base agents (model-based)
+
+    def __init__(
+        self,
+        ml_engine: Optional[Any] = None,
+        confidence_threshold: float = 0.60,
+        min_features: int = 3,
+    ) -> None:
+        """
+        Args:
+            ml_engine: XGBoostTrainer instance. If None, agent always abstains.
+            confidence_threshold: minimum probability to cast BUY/SELL vote.
+            min_features: minimum number of features needed in context.
+        """
         self._engine = ml_engine
+        self._threshold = confidence_threshold
+        self._min_features = min_features
         self._prediction_count = 0
+        self._abstain_count = 0
 
-    # ------------------------------------------------------------------ #
-    #  MAIN ENTRY POINT (called by VotingEngine)
-    # ------------------------------------------------------------------ #
+        if ml_engine is None:
+            logger.warning(
+                "[MLAgent] Initialized WITHOUT ml_engine — "
+                "all votes will be NO_TRADE until engine is injected. "
+                "Call ml_agent.set_engine(trainer) in lifespan()."
+            )
 
-    async def analyze(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Return agent result compatible with VotingEngine."""
+    def set_engine(self, ml_engine: Any) -> None:
+        """Inject or replace the ML engine at runtime (e.g., after retraining)."""
+        self._engine = ml_engine
+        logger.info("[MLAgent] Engine injected: %s", type(ml_engine).__name__)
+
+    def analyze(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyze market context and return vote dict.
+
+        Returns:
+            {
+                "signal": "BUY" | "SELL" | "NO_TRADE",
+                "confidence": float,
+                "reason": str,
+                "features_used": int,
+            }
+        """
         if self._engine is None:
+            self._abstain_count += 1
             return self._no_engine_result()
 
         try:
-            features = self._extract_features(market_data)
-            prediction = self._engine.predict(features)
+            import numpy as np
+            features = self._extract_features(context)
+
+            if len(features) < self._min_features:
+                self._abstain_count += 1
+                return {
+                    "signal": "NO_TRADE",
+                    "confidence": 0.0,
+                    "reason": f"Insufficient features: {len(features)}/{self._min_features}",
+                    "features_used": len(features),
+                }
+
+            X = np.array([features], dtype=np.float32)
+            proba = self._engine.predict_proba(X)[0]  # [prob_loss, prob_profit]
+
+            prob_profit = float(proba[1])
+            prob_loss = float(proba[0])
             self._prediction_count += 1
 
-            direction = getattr(prediction, "direction", "NO_TRADE")
-            confidence = float(getattr(prediction, "confidence", 0.5))
-            risk_score = float(getattr(prediction, "risk_score", 0.5))
-            should_trade = bool(getattr(prediction, "should_trade", False))
-            reliability = float(getattr(prediction, "reliability_score", confidence))
-            importance = getattr(prediction, "feature_importance", {})
-            version = getattr(prediction, "model_version", "1.0")
+            if prob_profit >= self._threshold:
+                signal = "BUY"
+                confidence = prob_profit
+                reason = f"XGBoost profit_prob={prob_profit:.3f} >= threshold={self._threshold}"
+            elif prob_loss >= self._threshold:
+                signal = "SELL"
+                confidence = prob_loss
+                reason = f"XGBoost loss_prob={prob_loss:.3f} >= threshold={self._threshold}"
+            else:
+                signal = "NO_TRADE"
+                confidence = max(prob_profit, prob_loss)
+                reason = (
+                    f"XGBoost confidence below threshold: "
+                    f"profit={prob_profit:.3f} loss={prob_loss:.3f} < {self._threshold}"
+                )
 
-            # Convert to VotingEngine-compatible score (0–100)
-            score = round(reliability * 100, 2) if should_trade else 50.0
-
-            drift_info = {}
-            if hasattr(self._engine, "get_drift_info"):
-                try:
-                    drift_info = self._engine.get_drift_info()
-                except Exception:
-                    pass
-
+            logger.debug(
+                "[MLAgent] signal=%s confidence=%.3f reason=%s",
+                signal, confidence, reason
+            )
             return {
-                "agent": self.name,
-                "direction": direction,
-                "score": score,
+                "signal": signal,
                 "confidence": confidence,
-                "risk_score": risk_score,
-                "should_trade": should_trade,
-                "reliability": reliability,
-                "feature_importance": importance,
-                "model_version": version,
-                "drift_info": drift_info,
-                "prediction_count": self._prediction_count,
-                "error": None,
+                "reason": reason,
+                "features_used": len(features),
             }
 
-        except Exception as exc:
-            logger.error("[MLAgent] analyze error: %s", exc)
+        except RuntimeError as exc:
+            # Model not trained yet
+            logger.warning("[MLAgent] Model not ready: %s", exc)
+            self._abstain_count += 1
             return {
-                "agent": self.name,
-                "direction": "NO_TRADE",
-                "score": 50.0,
-                "confidence": 0.5,
-                "risk_score": 0.5,
-                "should_trade": False,
-                "error": str(exc),
+                "signal": "NO_TRADE",
+                "confidence": 0.0,
+                "reason": f"Model not ready: {exc}",
+                "features_used": 0,
+            }
+        except Exception as exc:
+            logger.error("[MLAgent] Unexpected error in analyze(): %s", exc, exc_info=True)
+            self._abstain_count += 1
+            return {
+                "signal": "NO_TRADE",
+                "confidence": 0.0,
+                "reason": f"Error: {exc}",
+                "features_used": 0,
             }
 
-    def get_status(self) -> Dict[str, Any]:
-        return {
-            "agent": self.name,
-            "engine_available": self._engine is not None,
-            "engine_trained": getattr(self._engine, "is_trained", False) if self._engine else False,
-            "engine_version": getattr(self._engine, "model_version", None) if self._engine else None,
-            "prediction_count": self._prediction_count,
-        }
+    # ── Feature extraction ────────────────────────────────────────────────────
 
-    # ------------------------------------------------------------------ #
-    #  FEATURE EXTRACTION
-    # ------------------------------------------------------------------ #
+    def _extract_features(self, context: Dict[str, Any]) -> list:
+        """
+        Extract ordered feature vector from signal context.
+        Must match the feature order used during training (DatasetBuilder._feature_cols).
+        """
+        feature_keys = [
+            "rsi", "macd", "macd_signal", "bb_upper", "bb_lower",
+            "atr", "volume_ratio", "spread", "session_hour",
+            "day_of_week", "smc_score", "pa_score",
+        ]
+        features = []
+        for key in feature_keys:
+            val = context.get(key)
+            if val is not None:
+                try:
+                    features.append(float(val))
+                except (TypeError, ValueError):
+                    features.append(0.0)
+            else:
+                features.append(0.0)
+        return features
 
-    def _extract_features(self, market_data: Dict[str, Any]) -> Dict[str, float]:
-        """Extract the 15-feature vector MLEngine expects from market_data context."""
-        smc = market_data.get("smc") or {}
-        pa = market_data.get("price_action") or {}
-        session = str(market_data.get("session") or "").upper()
-        risk = market_data.get("risk") or {}
-
-        return {
-            "pnl_pips": float(market_data.get("last_pnl_pips", 0) or 0),
-            "realized_rr": float(market_data.get("last_rr", 0) or 0),
-            "confidence_score": float(market_data.get("confidence", 50) or 50) / 100.0,
-            "duration_minutes": float(market_data.get("avg_duration_minutes", 0) or 0),
-            "previous_consecutive_losses": float(market_data.get("consecutive_losses", 0) or 0),
-            "news_active": 1.0 if market_data.get("news_active") else 0.0,
-            "smc_ob_count": float(smc.get("order_blocks", 0) or 0),
-            "smc_fvg_count": float(smc.get("fvg_count", 0) or 0),
-            "smc_liquidity": float(smc.get("liquidity_score", 0) or 0),
-            "pa_pin_bar": 1.0 if pa.get("pin_bar") else 0.0,
-            "pa_engulfing": 1.0 if pa.get("engulfing") else 0.0,
-            "pa_inside_bar": 1.0 if pa.get("inside_bar") else 0.0,
-            "session_asian": 1.0 if "ASIAN" in session else 0.0,
-            "session_london": 1.0 if "LONDON" in session else 0.0,
-            "session_ny": 1.0 if "NEW_YORK" in session or "NY" in session else 0.0,
-        }
+    # ── Diagnostics ───────────────────────────────────────────────────────────
 
     def _no_engine_result(self) -> Dict[str, Any]:
         return {
+            "signal": "NO_TRADE",
+            "confidence": 0.0,
+            "reason": "MLAgent has no engine — set_engine() was never called",
+            "features_used": 0,
+        }
+
+    def stats(self) -> Dict[str, Any]:
+        """Return agent performance stats."""
+        total = self._prediction_count + self._abstain_count
+        return {
             "agent": self.name,
-            "direction": "NO_TRADE",
-            "score": 50.0,
-            "confidence": 0.5,
-            "risk_score": 0.5,
-            "should_trade": False,
-            "error": "ml_engine_not_initialized",
+            "predictions": self._prediction_count,
+            "abstains": self._abstain_count,
+            "abstain_rate": self._abstain_count / max(total, 1),
+            "engine_loaded": self._engine is not None,
         }
