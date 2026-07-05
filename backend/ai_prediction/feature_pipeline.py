@@ -74,105 +74,104 @@ def _is_kill_zone(hour:int)->float:
 def _london_ny_overlap(hour:int)->float: return 1.0 if 12<=hour<16 else 0.0
 
 def _minutes_to_session_open(hour:int,minute:int=0)->float:
-    cur=hour*60+minute
-    return float(min((o-cur)%(24*60) for o in [7*60,12*60]))
+    opens=[7,12,22,0]
+    return min((o-hour)*60-minute for o in opens if (o-hour)*60-minute>=0) if any((o-hour)*60-minute>=0 for o in opens) else 0.0
+
+
+def build_feature_vector(signal: Dict[str, Any]) -> List[float]:
+    """
+    Q-1 FIX: Build 38-feature vector from signal dict.
+    Returns list of float in exact order of get_feature_names().
+    """
+    smc = signal.get("smc_analysis", signal)  # flat or nested
+    pa  = signal.get("price_action", signal)
+    mkt = signal.get("market",       signal)
+    hour = _broker_hour(signal)
+    minute = int(signal.get("minute", 0))
+
+    direction = str(signal.get("direction", "NEUTRAL")).upper()
+    dir_factor = 1.0 if direction == "BUY" else (-1.0 if direction == "SELL" else 0.0)
+
+    # SMC features (14)
+    f_smc = [
+        _safe_float(smc.get("bos_detected",    False), name="bos_detected"),
+        _safe_float(smc.get("choch_detected",  False), name="choch_detected"),
+        _safe_float(smc.get("ob_quality",      0.0),   name="ob_quality"),
+        _safe_float(smc.get("ob_size_pips",    0.0),   name="ob_size_pips"),
+        _safe_float(smc.get("fvg_size_pips",   0.0),   name="fvg_size_pips"),
+        _safe_float(smc.get("fvg_filled_pct",  0.0),   name="fvg_filled_pct"),
+        _safe_float(smc.get("liquidity_sweep", False), name="liquidity_swept"),
+        _safe_float(smc.get("sweep_type",      0.0),   name="sweep_type"),
+        _safe_float(smc.get("in_premium_zone", False), name="premium_discount_zone"),
+        _safe_float(smc.get("smc_confidence",  0.5),   name="pd_score"),
+        _safe_float(smc.get("htf_alignment",   False), name="structure_aligned"),
+        _safe_float(smc.get("mss_count",       0),     name="mss_count"),
+        _safe_float(smc.get("inducement",      False), name="inducement_detected"),
+        _safe_float(smc.get("order_flow",      0.5),   name="order_flow_score"),
+    ]
+    # PA features (8)
+    f_pa = [
+        _safe_float(pa.get("candle_pattern_score", 0.5), name="candle_pattern_score"),
+        _safe_float(pa.get("candle_quality",       0.5), name="candle_quality"),
+        _safe_float(dir_factor,                          name="direction_aligned"),
+        _safe_float(pa.get("timeframe_weight",     1.0), name="timeframe_weight"),
+        _safe_float(pa.get("wick_ratio",           0.3), name="wick_ratio"),
+        _safe_float(pa.get("body_ratio",           0.6), name="body_ratio"),
+        _safe_float(pa.get("close_position",       0.5), name="close_position"),
+        _safe_float(pa.get("engulf_strength",      0.0), name="engulf_strength"),
+    ]
+    # Market features (8)
+    f_mkt = [
+        _safe_float(mkt.get("atr_normalized",   1.0), name="atr_normalized"),
+        _safe_float(mkt.get("spread_ratio",     1.0), name="spread_ratio"),
+        _safe_float(mkt.get("volatility_score", 0.5), name="volatility_score"),
+        _safe_float(mkt.get("trend_strength",   0.5), name="trend_strength"),
+        _safe_float(mkt.get("adx_value",        25.0),name="adx_value"),
+        _safe_float(mkt.get("rsi_14",           50.0),name="rsi_14"),
+        _safe_float(mkt.get("macd_histogram",   0.0), name="macd_histogram"),
+        _safe_float(mkt.get("bb_width_pct",     1.0), name="bb_width_pct"),
+    ]
+    # Time features (8)
+    f_time = [
+        _session_score(hour),
+        math.sin(2 * math.pi * hour / 24),
+        math.cos(2 * math.pi * hour / 24),
+        _safe_float(signal.get("day_of_week", datetime.now(timezone.utc).weekday())),
+        _is_kill_zone(hour),
+        _minutes_to_session_open(hour, minute),
+        _safe_float(signal.get("is_news_window", False), name="is_news_window"),
+        _london_ny_overlap(hour),
+    ]
+    return f_smc + f_pa + f_mkt + f_time
+
+
+def build_features_from_context(context: Dict[str, Any]) -> "np.ndarray":
+    """
+    Phase G NEW: Build 38-feature numpy array from enriched context dict.
+    Used by PredictionService._extract_features().
+    """
+    import numpy as np
+    feats = build_feature_vector(context)
+    if len(feats) != 38:
+        logger.warning("[FeaturePipeline] expected 38 features, got %d", len(feats))
+    return np.array([feats], dtype=np.float32)
 
 
 @dataclass
-class FeatureNormalizer:
-    """Q-1: min-max normalization — fit on train set only to prevent leakage."""
-    mins:  Dict[str,float] = field(default_factory=dict)
-    maxs:  Dict[str,float] = field(default_factory=dict)
-    fitted:bool = False
+class FeatureVector:
+    """Typed wrapper for a single feature vector."""
+    values: List[float]
+    feature_names: List[str] = field(default_factory=get_feature_names)
+    schema_hash: str = field(default_factory=feature_schema_hash)
 
-    def fit(self, rows:List[Dict[str,float]])->None:
-        if not rows: return
-        for name in get_feature_names():
-            vals=[r[name] for r in rows if name in r and not math.isnan(r[name])]
-            if vals: self.mins[name]=min(vals); self.maxs[name]=max(vals)
-        self.fitted=True
-
-    def transform(self, row:Dict[str,float])->Dict[str,float]:
-        if not self.fitted: return row
-        out={}
-        for name,val in row.items():
-            lo,hi=self.mins.get(name,0.0),self.maxs.get(name,1.0)
-            out[name]=0.0 if hi-lo<1e-9 else max(0.0,min(1.0,(val-lo)/(hi-lo)))
-        return out
-
-    def to_dict(self)->Dict[str,Any]: return {"mins":self.mins,"maxs":self.maxs,"fitted":self.fitted}
+    def to_numpy(self) -> "np.ndarray":
+        import numpy as np
+        return np.array(self.values, dtype=np.float32)
 
     @classmethod
-    def from_dict(cls,d:Dict[str,Any])->"FeatureNormalizer":
-        o=cls(); o.mins=d.get("mins",{}); o.maxs=d.get("maxs",{}); o.fitted=d.get("fitted",False)
-        return o
-
-
-class FeaturePipeline:
-    """Production feature extractor — used identically in training and inference."""
-    VERSION = FEATURE_VERSION
-
-    def extract(self, signal:Dict[str,Any])->Tuple[List[float],List[str]]:
-        names=get_feature_names()
-        raw=self._extract_raw(signal)
-        vec=[_safe_float(raw.get(n,0.0),0.0,n) for n in names]
-        if len(vec)!=38: raise ValueError(f"expected 38 features, got {len(vec)}")
-        return vec,names
-
-    def extract_dict(self,signal:Dict[str,Any])->Dict[str,float]:
-        vec,names=self.extract(signal); return dict(zip(names,vec))
-
-    def _extract_raw(self,signal:Dict[str,Any])->Dict[str,Any]:
-        hour=_broker_hour(signal); minute=int(signal.get("minute",0))
-        smc=signal.get("smc_data") or {}; ob=smc.get("order_block") or smc.get("ob") or {}
-        fvg=smc.get("fvg") or {}; pa=signal.get("pa_data") or {}; candle=pa.get("candle") or {}
-        mkt=signal.get("market_data") or {}
-        atr=_safe_float(mkt.get("atr"),0.0,"atr"); spread=_safe_float(mkt.get("spread"),0.0,"spread")
-        price=_safe_float(signal.get("price") or signal.get("entry_price"),1.0,"price")
-        hr=2*math.pi*hour/24
-        st={"HIGH":1.0,"LOW":-1.0,"BOTH":0.5}; zn={"PREMIUM":1.0,"DISCOUNT":-1.0,"EQUILIBRIUM":0.0}
-        return {
-            "bos_detected":float(bool(smc.get("bos"))),
-            "choch_detected":float(bool(smc.get("choch"))),
-            "ob_quality":_safe_float(ob.get("quality"),0.0,"ob_quality"),
-            "ob_size_pips":_safe_float(ob.get("size_pips"),0.0,"ob_size_pips"),
-            "fvg_size_pips":_safe_float(fvg.get("size_pips"),0.0,"fvg_size_pips"),
-            "fvg_filled_pct":_safe_float(fvg.get("filled_pct"),0.0,"fvg_filled_pct"),
-            "liquidity_swept":float(bool(smc.get("liquidity_swept"))),
-            "sweep_type":st.get(str(smc.get("sweep_type","")),0.0),
-            "premium_discount_zone":zn.get(str(smc.get("pd_zone","")),0.0),
-            "pd_score":_safe_float(smc.get("pd_score"),0.0,"pd_score"),
-            "structure_aligned":float(bool(smc.get("structure_aligned"))),
-            "mss_count":_safe_float(smc.get("mss_count"),0.0,"mss_count"),
-            "inducement_detected":float(bool(smc.get("inducement"))),
-            "order_flow_score":_safe_float(smc.get("order_flow_score"),0.0,"order_flow_score"),
-            "candle_pattern_score":_safe_float(pa.get("pattern_score"),0.0,"candle_pattern_score"),
-            "candle_quality":_safe_float(pa.get("quality"),0.0,"candle_quality"),
-            "direction_aligned":float(pa.get("direction","")==signal.get("direction","")),
-            "timeframe_weight":_safe_float(pa.get("timeframe_weight"),0.5,"timeframe_weight"),
-            "wick_ratio":_safe_float(candle.get("wick_ratio"),0.0,"wick_ratio"),
-            "body_ratio":_safe_float(candle.get("body_ratio"),0.5,"body_ratio"),
-            "close_position":_safe_float(candle.get("close_position"),0.5,"close_position"),
-            "engulf_strength":_safe_float(pa.get("engulf_strength"),0.0,"engulf_strength"),
-            "atr_normalized":_safe_float((atr/price) if price>0 else 0.0,0.0,"atr_normalized"),
-            "spread_ratio":_safe_float((spread/atr) if atr>0 else 0.0,0.0,"spread_ratio"),
-            "volatility_score":_safe_float(mkt.get("volatility_score"),0.0,"volatility_score"),
-            "trend_strength":_safe_float(mkt.get("trend_strength"),0.0,"trend_strength"),
-            "adx_value":_safe_float(mkt.get("adx"),0.0,"adx_value"),
-            "rsi_14":_safe_float(mkt.get("rsi"),50.0,"rsi_14"),
-            "macd_histogram":_safe_float(mkt.get("macd_hist"),0.0,"macd_histogram"),
-            "bb_width_pct":_safe_float(mkt.get("bb_width_pct"),0.0,"bb_width_pct"),
-            "session_score":_session_score(hour),
-            "hour_sin":math.sin(hr),"hour_cos":math.cos(hr),
-            "day_of_week":float(signal.get("day_of_week",0)),
-            "is_kill_zone":_is_kill_zone(hour),
-            "minutes_to_session_open":_minutes_to_session_open(hour,minute)/(24*60),
-            "is_news_window":float(bool(signal.get("news_window"))),
-            "london_ny_overlap":_london_ny_overlap(hour),
-        }
-
-_pipeline: Optional[FeaturePipeline]=None
-def get_feature_pipeline()->FeaturePipeline:
-    global _pipeline
-    if _pipeline is None: _pipeline=FeaturePipeline()
-    return _pipeline
+    def from_signal(cls, signal: Dict[str, Any]) -> "FeatureVector":
+        """Q-1: build from signal dict, validate length."""
+        values = build_feature_vector(signal)
+        if len(values) != 38:
+            raise ValueError(f"[FeaturePipeline] expected 38, got {len(values)}")
+        return cls(values=values)

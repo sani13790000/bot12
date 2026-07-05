@@ -1,290 +1,259 @@
-"""Context Enrichment Pipeline — Phase F Fix.
+"""
+ContextEnricher v2 — Phase G Fix
 
-This module runs SMCEngine, PredictionService, and SessionManager
-BEFORE the VotingEngine receives the context dict.
-
-Previous problem: All agents called context.get('smc_analysis', {})
-but no code ever PUT smc_analysis into context. Same for ai_prediction,
-session, liquidity_sweep, bos_detected, etc.
-
-This module fixes that by building a rich context dict from real engines.
+Fixes:
+- BUG-G6: ML enrichment now calls prediction_service.predict(context) async-safe
+          instead of trainer.predict_proba(X) directly
+- ARCH: SMC layer, Session layer, ML layer all feed into context dict
+        so every agent receives real data before voting
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_SESSIONS = {
-    "sydney":   (21, 6),
-    "tokyo":    (0,  9),
-    "london":   (7,  16),
-    "new_york": (12, 21),
+# Session schedule (UTC hours)
+_SESSIONS: Dict[str, tuple] = {
+    "SYDNEY":   (22, 7),
+    "TOKYO":    (0,  9),
+    "LONDON":   (7,  16),
+    "NEW_YORK": (12, 21),
 }
-
-_KILL_ZONES = {
-    "london_open":   (7,  9),
-    "new_york_open": (12, 14),
-    "london_close":  (15, 16),
-    "asian_session": (0,  4),
+_KILL_ZONES: Dict[str, tuple] = {
+    "LONDON_OPEN":  (7,  9),
+    "NY_OPEN":      (12, 14),
+    "ASIA_OPEN":    (0,  2),
+    "LONDON_CLOSE": (15, 17),
 }
-
-_HIGH_IMPACT_PAIRS = {"EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "USDCHF"}
-
-
-def _get_session_context(symbol: str) -> Dict[str, Any]:
-    now_utc = datetime.now(timezone.utc)
-    hour = now_utc.hour
-    active_sessions: List[str] = []
-    for name, (start, end) in _SESSIONS.items():
-        if start > end:
-            if hour >= start or hour < end:
-                active_sessions.append(name)
-        elif start <= hour < end:
-            active_sessions.append(name)
-    primary_session = active_sessions[0] if active_sessions else "off_hours"
-    in_kill_zone = False
-    kill_zone_name = ""
-    for name, (start, end) in _KILL_ZONES.items():
-        if start <= hour < end:
-            in_kill_zone = True
-            kill_zone_name = name
-            break
-    base_slippage = 2.0
-    if in_kill_zone:
-        base_slippage = 1.0
-    elif primary_session == "off_hours":
-        base_slippage = 5.0
-    if symbol.upper() in _HIGH_IMPACT_PAIRS:
-        base_slippage *= 0.8
-    return {
-        "session": primary_session,
-        "active_sessions": active_sessions,
-        "in_kill_zone": in_kill_zone,
-        "kill_zone_name": kill_zone_name,
-        "expected_slippage_pips": round(base_slippage, 1),
-        "trading_hour_utc": hour,
-    }
-
-
-def _ob_to_dict(ob: Any) -> Dict:
-    if isinstance(ob, dict):
-        return ob
-    return {
-        "high": getattr(ob, "high", 0),
-        "low": getattr(ob, "low", 0),
-        "direction": getattr(ob, "direction", "NEUTRAL"),
-        "strength": getattr(ob, "strength", 0.5),
-        "mitigated": getattr(ob, "mitigated", False),
-    }
-
-
-def _fvg_to_dict(fvg: Any) -> Dict:
-    if isinstance(fvg, dict):
-        return fvg
-    return {
-        "high": getattr(fvg, "high", 0),
-        "low": getattr(fvg, "low", 0),
-        "direction": getattr(fvg, "direction", "NEUTRAL"),
-        "filled": getattr(fvg, "filled", False),
-    }
-
-
-def _liq_to_dict(liq: Any) -> Dict:
-    if isinstance(liq, dict):
-        return liq
-    return {
-        "level": getattr(liq, "level", 0),
-        "type": getattr(liq, "type", "equal_high"),
-        "swept": getattr(liq, "swept", False),
-    }
-
-
-def _extract_smc_context(
-    smc_result: Optional[Any],
-    candles: Optional[List[Dict]] = None,
-) -> Dict[str, Any]:
-    if smc_result is None:
-        return {
-            "smc_analysis": {},
-            "order_blocks": [],
-            "fvgs": [],
-            "liquidity_levels": [],
-            "swing_high": None,
-            "swing_low": None,
-            "bias": "NEUTRAL",
-            "premium_zone": None,
-            "discount_zone": None,
-            "in_premium_zone": False,
-            "in_discount_zone": False,
-            "liquidity_sweep": False,
-            "internal_liquidity": False,
-            "bos_detected": False,
-            "choch_detected": False,
-            "htf_alignment": "NEUTRAL",
-            "smc_confidence": 0.0,
-        }
-    obs  = getattr(smc_result, "order_blocks", []) or []
-    fvgs = getattr(smc_result, "fair_value_gaps", []) or []
-    liq  = getattr(smc_result, "liquidity_levels", []) or []
-    bias = getattr(smc_result, "bias", "NEUTRAL")
-    if hasattr(bias, "value"):
-        bias = bias.value
-    swing_high = getattr(smc_result, "swing_high", None)
-    swing_low  = getattr(smc_result, "swing_low",  None)
-    bos   = getattr(smc_result, "bos_detected",   False)
-    choch = getattr(smc_result, "choch_detected",  False)
-    premium_zone = discount_zone = None
-    in_premium = in_discount = False
-    if swing_high is not None and swing_low is not None:
-        rng = swing_high - swing_low
-        if rng > 0:
-            premium_zone  = swing_low + rng * 0.618
-            discount_zone = swing_low + rng * 0.382
-            if candles:
-                cp = candles[-1].get("close", 0)
-                in_premium  = cp >= premium_zone
-                in_discount = cp <= discount_zone
-    liq_sweep    = getattr(smc_result, "liquidity_sweep",   False)
-    internal_liq = getattr(smc_result, "internal_liquidity", len(liq) > 2)
-    signals_count = len(obs) + len(fvgs) + (1 if bos else 0) + (1 if choch else 0)
-    confidence = min(signals_count / 6.0, 1.0)
-    htf = getattr(smc_result, "htf_alignment", bias)
-    if hasattr(htf, "value"):
-        htf = htf.value
-    return {
-        "smc_analysis": {
-            "order_blocks": [_ob_to_dict(ob) for ob in obs],
-            "fvgs":         [_fvg_to_dict(f)  for f  in fvgs],
-            "bias": bias, "bos": bos, "choch": choch,
-        },
-        "order_blocks":     [_ob_to_dict(ob)  for ob  in obs],
-        "fvgs":             [_fvg_to_dict(f)  for f   in fvgs],
-        "liquidity_levels": [_liq_to_dict(l)  for l   in liq],
-        "swing_high":       swing_high,
-        "swing_low":        swing_low,
-        "bias":             bias,
-        "premium_zone":     premium_zone,
-        "discount_zone":    discount_zone,
-        "in_premium_zone":  in_premium,
-        "in_discount_zone": in_discount,
-        "liquidity_sweep":  liq_sweep,
-        "internal_liquidity": internal_liq,
-        "bos_detected":    bos,
-        "choch_detected":  choch,
-        "htf_alignment":   htf,
-        "smc_confidence":  round(confidence, 2),
-    }
-
-
-def _extract_ml_context(
-    ml_engine: Optional[Any],
-    signal_context: Dict[str, Any],
-) -> Dict[str, Any]:
-    if ml_engine is None:
-        return {"ai_prediction": {
-            "probability": 0.0, "confidence": 0.0,
-            "direction": "NEUTRAL", "model_auc": 0.0,
-            "available": False,
-        }}
-    try:
-        features = {
-            "confidence":        signal_context.get("confidence", 0.5),
-            "rr":                signal_context.get("rr", 0.0),
-            "smc_confidence":    signal_context.get("smc_confidence", 0.0),
-            "bos_detected":      int(signal_context.get("bos_detected", False)),
-            "choch_detected":    int(signal_context.get("choch_detected", False)),
-            "in_kill_zone":      int(signal_context.get("in_kill_zone", False)),
-            "in_discount_zone":  int(signal_context.get("in_discount_zone", False)),
-            "in_premium_zone":   int(signal_context.get("in_premium_zone", False)),
-            "liquidity_sweep":   int(signal_context.get("liquidity_sweep", False)),
-            "ob_count":          len(signal_context.get("order_blocks", [])),
-            "fvg_count":         len(signal_context.get("fvgs", [])),
-            "slippage":          signal_context.get("expected_slippage_pips", 2.0),
-        }
-        result    = ml_engine.predict(features)
-        prob      = float(result.get("probability", 0.0))
-        direction = "BUY" if prob >= 0.55 else ("SELL" if prob <= 0.45 else "NEUTRAL")
-        return {"ai_prediction": {
-            "probability":    round(prob, 4),
-            "confidence":     round(abs(prob - 0.5) * 2, 4),
-            "direction":      direction,
-            "model_auc":      float(result.get("model_auc", 0.0)),
-            "available":      True,
-            "features_used":  list(features.keys()),
-        }}
-    except Exception as exc:
-        logger.warning("[ContextEnricher] ML prediction failed: %s", exc)
-        return {"ai_prediction": {
-            "probability": 0.0, "confidence": 0.0,
-            "direction": "NEUTRAL", "model_auc": 0.0,
-            "available": False, "error": str(exc),
-        }}
+_SLIPPAGE_BY_SESSION: Dict[str, float] = {
+    "LONDON":   0.5,
+    "NEW_YORK": 0.8,
+    "TOKYO":    1.2,
+    "SYDNEY":   1.5,
+}
 
 
 class ContextEnricher:
-    """Enriches a signal context dict before it reaches the VotingEngine.
-
-    Usage in SignalProcessor.process():
-        enricher = ContextEnricher(smc_engine=smc, ml_engine=ml)
-        context  = enricher.enrich(raw_context, candles=candles)
-        vote     = voting_engine.vote(agents, context)
+    """
+    Enriches a base context dict with 20+ keys before VotingEngine.
+    Three enrichment layers:
+      Layer 1 — Session: session name, kill zone, slippage
+      Layer 2 — SMC:     order blocks, FVGs, BOS/CHOCH, bias, liquidity
+      Layer 3 — ML:      ai_prediction dict from PredictionService (async-safe)
     """
 
-    def __init__(
-        self,
-        smc_engine: Optional[Any] = None,
-        ml_engine:  Optional[Any] = None,
-    ) -> None:
-        self._smc = smc_engine
-        self._ml  = ml_engine
-        logger.info(
-            "[ContextEnricher] init smc=%s ml=%s",
-            smc_engine is not None, ml_engine is not None,
-        )
+    def __init__(self) -> None:
+        self._smc_engine: Optional[Any] = None
+        self._ml_engine:  Optional[Any] = None   # XGBoostTrainer or PredictionService
 
     def set_smc_engine(self, engine: Any) -> None:
-        self._smc = engine
-        logger.info("[ContextEnricher] SMC engine: %s", type(engine).__name__)
+        self._smc_engine = engine
+        logger.info("[ContextEnricher] SMCEngine registered: %s", type(engine).__name__)
 
     def set_ml_engine(self, engine: Any) -> None:
-        self._ml = engine
-        logger.info("[ContextEnricher] ML engine: %s", type(engine).__name__)
+        self._ml_engine = engine
+        logger.info("[ContextEnricher] ML engine registered: %s", type(engine).__name__)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def enrich(
         self,
-        base_context: Dict[str, Any],
+        base_ctx: Dict[str, Any],
         candles: Optional[List[Dict]] = None,
     ) -> Dict[str, Any]:
-        """Return enriched context. Layers: Session → SMC → ML."""
-        ctx    = dict(base_context)
-        symbol = ctx.get("symbol", "EURUSD")
-
-        # Layer 1: session
-        ctx.update(_get_session_context(symbol))
-
-        # Layer 2: SMC
-        smc_result = None
-        if self._smc is not None and candles:
-            try:
-                smc_result = self._smc.analyse(candles)
-            except Exception as exc:
-                logger.warning("[ContextEnricher] SMCEngine failed: %s", exc)
-        ctx.update(_extract_smc_context(smc_result, candles))
-
-        # Layer 3: ML
-        ctx.update(_extract_ml_context(self._ml, ctx))
-
-        logger.debug(
-            "[ContextEnricher] enriched symbol=%s session=%s bos=%s ml_prob=%.3f",
-            symbol, ctx.get("session"), ctx.get("bos_detected"),
-            ctx.get("ai_prediction", {}).get("probability", 0.0),
-        )
+        """Synchronous enrichment entry point used by SignalProcessor."""
+        ctx = dict(base_ctx)
+        self._enrich_session(ctx)
+        self._enrich_smc(ctx, candles or [])
+        self._enrich_ml_sync(ctx)   # BUG-G6 FIX: sync wrapper
         return ctx
 
+    async def enrich_async(
+        self,
+        base_ctx: Dict[str, Any],
+        candles: Optional[List[Dict]] = None,
+    ) -> Dict[str, Any]:
+        """Async enrichment — preferred when called from async context."""
+        ctx = dict(base_ctx)
+        self._enrich_session(ctx)
+        self._enrich_smc(ctx, candles or [])
+        await self._enrich_ml_async(ctx)
+        return ctx
 
+    # ------------------------------------------------------------------
+    # Layer 1 — Session
+    # ------------------------------------------------------------------
+
+    def _enrich_session(self, ctx: Dict[str, Any]) -> None:
+        now = datetime.now(timezone.utc)
+        hour = now.hour
+
+        # Detect active sessions
+        active = [
+            name for name, (s, e) in _SESSIONS.items()
+            if (s <= e and s <= hour < e)
+            or (s > e and (hour >= s or hour < e))
+        ]
+        session = active[0] if active else "OFF_HOURS"
+
+        # Detect kill zone
+        in_kz = any(
+            s <= hour < e for s, e in _KILL_ZONES.values()
+        )
+
+        # London/NY overlap
+        london_ny_overlap = 12 <= hour < 16
+
+        ctx.update({
+            "session":                session,
+            "active_sessions":        active,
+            "in_kill_zone":           in_kz,
+            "london_ny_overlap":      london_ny_overlap,
+            "expected_slippage_pips": _SLIPPAGE_BY_SESSION.get(session, 1.0),
+            "hour_utc":               hour,
+            "day_of_week":            now.weekday(),
+            "session_score":          len(active) / 4.0,
+        })
+
+    # ------------------------------------------------------------------
+    # Layer 2 — SMC
+    # ------------------------------------------------------------------
+
+    def _enrich_smc(self, ctx: Dict[str, Any], candles: List[Dict]) -> None:
+        if self._smc_engine is None or not candles:
+            ctx.setdefault("smc_analysis", {})
+            ctx.setdefault("order_blocks",  [])
+            ctx.setdefault("fvgs",          [])
+            ctx.setdefault("bos_detected",  False)
+            ctx.setdefault("choch_detected", False)
+            ctx.setdefault("bias",          "NEUTRAL")
+            ctx.setdefault("smc_confidence", 0.0)
+            ctx.setdefault("liquidity_sweep", False)
+            ctx.setdefault("htf_alignment",  False)
+            ctx.setdefault("in_premium_zone", False)
+            ctx.setdefault("in_discount_zone", False)
+            ctx.setdefault("swing_high",    None)
+            ctx.setdefault("swing_low",     None)
+            return
+
+        try:
+            result = self._smc_engine.analyse(candles)
+            smc_data = result if isinstance(result, dict) else vars(result)
+
+            # Flatten top-level keys for agent consumption
+            ctx["smc_analysis"]   = smc_data
+            ctx["order_blocks"]   = smc_data.get("order_blocks",  [])
+            ctx["fvgs"]           = smc_data.get("fvgs",          [])
+            ctx["bos_detected"]   = bool(smc_data.get("bos_detected",  False))
+            ctx["choch_detected"] = bool(smc_data.get("choch_detected", False))
+            ctx["bias"]           = smc_data.get("bias",          "NEUTRAL")
+            ctx["smc_confidence"] = float(smc_data.get("confidence", 0.5))
+            ctx["liquidity_sweep"] = bool(smc_data.get("liquidity_sweep", False))
+            ctx["htf_alignment"]  = bool(smc_data.get("htf_alignment",  False))
+            ctx["in_premium_zone"] = bool(smc_data.get("in_premium_zone", False))
+            ctx["in_discount_zone"] = bool(smc_data.get("in_discount_zone", False))
+            ctx["swing_high"]     = smc_data.get("swing_high")
+            ctx["swing_low"]      = smc_data.get("swing_low")
+            # Liquidity sub-keys for LiquidityAgent
+            ctx["internal_liquidity"] = smc_data.get("internal_liquidity", 0.0)
+            ctx["external_liquidity"] = smc_data.get("external_liquidity", 0.0)
+        except Exception as exc:
+            logger.warning("[ContextEnricher] SMCEngine.analyse() failed: %s", exc)
+            self._enrich_smc(ctx, [])   # fill defaults
+
+    # ------------------------------------------------------------------
+    # Layer 3 — ML  (BUG-G6 FIX)
+    # ------------------------------------------------------------------
+
+    def _enrich_ml_sync(self, ctx: Dict[str, Any]) -> None:
+        """
+        Sync wrapper — tries to get running event loop and schedules
+        the async prediction. Falls back to direct trainer call if no loop.
+        """
+        if self._ml_engine is None:
+            # Try module-level prediction_service singleton
+            try:
+                from backend.ai_prediction.prediction_service import prediction_service as _ps
+                if _ps._manager and _ps._manager.load_best_model() is not None:
+                    self._ml_engine = _ps
+            except Exception:
+                pass
+
+        if self._ml_engine is None:
+            ctx["ai_prediction"] = self._empty_prediction("no ml engine")
+            return
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're inside an async context — use run_coroutine_threadsafe
+                import concurrent.futures
+                future = asyncio.run_coroutine_threadsafe(
+                    self._enrich_ml_async(ctx), loop
+                )
+                future.result(timeout=2.0)
+            else:
+                # No running loop — run directly
+                loop.run_until_complete(self._enrich_ml_async(ctx))
+        except Exception as exc:
+            logger.warning("[ContextEnricher] ML enrichment failed: %s", exc)
+            ctx["ai_prediction"] = self._empty_prediction(str(exc))
+
+    async def _enrich_ml_async(self, ctx: Dict[str, Any]) -> None:
+        """Async ML enrichment."""
+        if self._ml_engine is None:
+            ctx["ai_prediction"] = self._empty_prediction("no ml engine")
+            return
+        try:
+            # PredictionService.predict(context)
+            if hasattr(self._ml_engine, "predict") and asyncio.iscoroutinefunction(
+                self._ml_engine.predict
+            ):
+                result = await self._ml_engine.predict(ctx)
+                ctx["ai_prediction"] = (
+                    result.to_dict() if hasattr(result, "to_dict") else dict(result)
+                )
+            # XGBoostTrainer.predict_proba(X) — direct trainer fallback
+            elif hasattr(self._ml_engine, "predict_proba"):
+                from backend.ai_prediction.feature_pipeline import build_features_from_context
+                X = build_features_from_context(ctx)
+                raw_prob = float(self._ml_engine.predict_proba(X)[0, 1])
+                probability = int(round(raw_prob * 100))
+                ctx["ai_prediction"] = {
+                    "probability":  probability,
+                    "confidence":   50 if probability >= 60 else 0,
+                    "is_tradeable": probability >= 60,
+                    "model_auc":    0.60,
+                    "risk":         "MEDIUM",
+                    "reason":       f"direct trainer prob={probability}%",
+                    "is_fallback":  False,
+                }
+            else:
+                ctx["ai_prediction"] = self._empty_prediction("unknown engine type")
+        except Exception as exc:
+            logger.warning("[ContextEnricher] async ML enrichment failed: %s", exc)
+            ctx["ai_prediction"] = self._empty_prediction(str(exc))
+
+    @staticmethod
+    def _empty_prediction(reason: str) -> Dict[str, Any]:
+        return {
+            "probability":  50,
+            "confidence":   0,
+            "is_tradeable": False,
+            "model_auc":    0.0,
+            "risk":         "HIGH",
+            "reason":       reason,
+            "is_fallback":  True,
+        }
+
+
+# Module-level singleton
 _enricher: Optional[ContextEnricher] = None
 
 
@@ -293,6 +262,3 @@ def get_context_enricher() -> ContextEnricher:
     if _enricher is None:
         _enricher = ContextEnricher()
     return _enricher
-
-
-context_enricher: ContextEnricher = get_context_enricher()
