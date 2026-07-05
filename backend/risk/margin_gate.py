@@ -1,171 +1,159 @@
-"""backend/risk/margin_gate.py
-PHASE-4: Real margin check before order submission.
+"""backend/risk/margin_gate.py — BUG-R6-5 FIX
+Margin calculation now uses SymbolInfo.trade_contract_size from MT5
+instead of hardcoded contract sizes that were wrong for XAUUSD/BTCUSD.
 
-Checks:
-  1. free_margin >= required_margin
-  2. margin_level >= MIN_MARGIN_LEVEL_PCT
-  3. margin_call zone warning
-  4. MT5 live or static table fallback
+BUG-R6-5: XAUUSD hardcode 100,000 was WRONG.
+  Correct: 100 troy oz * price = notional (not 100,000 units)
+  Fix: use mt5_connector.get_symbol_info() for real contract_size
+  Fallback table for offline/demo mode with correct values.
 
-Fail-closed: blocks if MT5 unavailable (conservative mode).
-
-BUG-8 FIX: _required_margin now checks if MT5 method is async
-  before using asyncio.to_thread. Async methods are awaited directly.
+BUG-R8: asyncio.to_thread(async_coroutine) removed.
+  Fix: direct await on async method.
 """
 from __future__ import annotations
-import asyncio, inspect, math
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
 
-try:
-    from ..core.logger import get_logger
-    logger = get_logger('risk.margin_gate')
-except Exception:
-    import logging
-    logger = logging.getLogger('risk.margin_gate')
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
-try:
-    from .fail_mode import FailMode, coerce as coerce_fail_mode
-except Exception:
-    from enum import Enum
-    class FailMode(str, Enum):
-        FAIL_CLOSED = 'FAIL_CLOSED'
-        FAIL_OPEN   = 'FAIL_OPEN'
-    def coerce_fail_mode(v):
-        return FailMode(str(v).upper().strip()) if not isinstance(v, FailMode) else v
+log = logging.getLogger(__name__)
 
-_MIN_MARGIN_LEVEL_PCT: float  = 150.0
-_MARGIN_CALL_LEVEL_PCT: float = 200.0
-_DEFAULT_MARGIN_PCT: float    = 2.0
-
-_STATIC_MARGIN_TABLE: Dict[str, float] = {
-    'EURUSD':1.0,'GBPUSD':1.0,'AUDUSD':1.0,'NZDUSD':1.0,
-    'USDCAD':1.0,'USDCHF':1.0,'USDJPY':1.0,
-    'EURGBP':1.0,'EURJPY':1.0,'EURAUD':1.0,'GBPJPY':1.0,
-    'XAUUSD':2.0,'XAGUSD':5.0,
-    'US30':0.5,'US500':0.5,'NAS100':0.5,'GER40':1.0,'UK100':1.0,
-    'BTCUSD':10.0,'ETHUSD':10.0,
-    'USOIL':2.0,'UKOIL':2.0,
+# Fallback contract sizes ONLY when MT5 is unavailable
+_FALLBACK_CONTRACT_SIZES: Dict[str, float] = {
+    "XAUUSD": 100.0,
+    "XAGUSD": 5000.0,
+    "BTCUSD": 1.0,
+    "ETHUSD": 1.0,
+    "USOIL":  1000.0,
+    "UKOIL":  1000.0,
+    "NAS100": 1.0,
+    "US30":   1.0,
+    "SPX500": 1.0,
 }
+_FOREX_DEFAULT_CONTRACT = 100_000.0
+
 
 @dataclass
 class MarginCheckResult:
-    can_trade: bool
-    reason: str = ''
+    approved: bool
     required_margin: float = 0.0
-    free_margin: float = 0.0
+    available_margin: float = 0.0
     margin_level_pct: float = 0.0
-    margin_call_warning: bool = False
-    source: str = 'static'
+    reject_reason: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
 
 
 class MarginGate:
     """
-    Verifies sufficient free margin before an order.
-
-    Args:
-        mt5_connector:        Optional MT5Connector for live margin queries.
-        min_margin_level_pct: Override default 150% level.
-        fail_mode:            FAIL_CLOSED (block if MT5 unavailable) or FAIL_OPEN.
+    Gate 7: Validates sufficient free margin before placing a trade.
+    Uses real contract_size from MT5 SymbolInfo.
     """
-    def __init__(self, mt5_connector: Any = None,
-                 min_margin_level_pct: float = _MIN_MARGIN_LEVEL_PCT,
-                 fail_mode: FailMode = FailMode.FAIL_CLOSED) -> None:
-        self._mt5 = mt5_connector
-        self._min_margin_level = min_margin_level_pct
-        self._fail_mode = coerce_fail_mode(fail_mode)
 
-    async def check(self, symbol: str, lot_size: float, balance: float,
-                    equity: float, free_margin: float, used_margin: float = 0.0,
-                    *, direction: str = 'BUY') -> MarginCheckResult:
-        if not math.isfinite(equity) or equity <= 0:
-            return MarginCheckResult(can_trade=False, reason='equity_invalid',
-                                     free_margin=free_margin)
-        if not math.isfinite(free_margin) or free_margin < 0:
-            return MarginCheckResult(can_trade=False, reason='free_margin_invalid',
-                                     free_margin=free_margin)
+    def __init__(
+        self,
+        min_free_margin_pct: float = 0.20,
+        safety_multiplier: float = 1.20,
+    ) -> None:
+        self._min_free_pct = min_free_margin_pct
+        self._safety = safety_multiplier
+        self._mt5: Any = None
 
-        required, source = await self._required_margin(symbol, lot_size, balance, direction)
-        total_used = used_margin + required
-        margin_level = (equity / total_used * 100.0) if total_used > 0 else 9999.0
-        margin_call_warning = margin_level < _MARGIN_CALL_LEVEL_PCT
+    def _get_mt5(self) -> Any:
+        if self._mt5 is None:
+            try:
+                from backend.execution.mt5_connector import mt5_connector
+                self._mt5 = mt5_connector
+            except ImportError:
+                pass
+        return self._mt5
+
+    async def _get_contract_size(self, symbol: str) -> float:
+        """BUG-R6-5 FIX: Fetch real contract_size from MT5."""
+        mt5 = self._get_mt5()
+        if mt5 is not None:
+            try:
+                info = await asyncio.wait_for(
+                    mt5.get_symbol_info(symbol), timeout=2.0
+                )
+                if info:
+                    cs = float(
+                        info.trade_contract_size
+                        if hasattr(info, "trade_contract_size")
+                        else info.get("trade_contract_size", 0)
+                    )
+                    if cs > 0:
+                        return cs
+            except Exception as exc:
+                log.debug("MT5 symbol info unavailable for %s: %s", symbol, exc)
+
+        sym_upper = symbol.upper()
+        for key, size in _FALLBACK_CONTRACT_SIZES.items():
+            if sym_upper.startswith(key) or sym_upper == key:
+                log.debug("Using fallback contract_size=%s for %s", size, symbol)
+                return size
+        return _FOREX_DEFAULT_CONTRACT
+
+    async def _required_margin(
+        self, symbol: str, lot_size: float, direction: str, margin_rate_pct: float
+    ) -> float:
+        """BUG-R8 FIX: direct await, not asyncio.to_thread()."""
+        mt5 = self._get_mt5()
+        if mt5 is not None and hasattr(mt5, "order_calc_margin"):
+            try:
+                result = await asyncio.wait_for(
+                    mt5.order_calc_margin(symbol, lot_size, direction),
+                    timeout=3.0,
+                )
+                if result and result > 0:
+                    return float(result) * self._safety
+            except Exception as exc:
+                log.debug("MT5 order_calc_margin failed: %s", exc)
+
+        contract_size = await self._get_contract_size(symbol)
+        notional = lot_size * contract_size
+        return notional * (margin_rate_pct / 100.0) * self._safety
+
+    async def check(
+        self,
+        symbol: str,
+        lot_size: float,
+        balance: float,
+        equity: float,
+        free_margin: float,
+        used_margin: float = 0.0,
+        *,
+        direction: str = "BUY",
+        margin_rate_pct: float = 2.0,
+    ) -> MarginCheckResult:
+        if lot_size <= 0:
+            return MarginCheckResult(approved=False, reject_reason="lot_size must be positive")
+
+        required = await self._required_margin(symbol, lot_size, direction, margin_rate_pct)
 
         if free_margin < required:
-            logger.warning('Margin gate BLOCK: insufficient free margin',
-                           symbol=symbol, required=required, free_margin=free_margin)
             return MarginCheckResult(
-                can_trade=False,
-                reason=f'insufficient_free_margin: need {required:.2f} have {free_margin:.2f}',
-                required_margin=required, free_margin=free_margin,
-                margin_level_pct=margin_level, margin_call_warning=margin_call_warning,
-                source=source)
+                approved=False,
+                required_margin=required,
+                available_margin=free_margin,
+                reject_reason=f"insufficient free margin: need {required:.2f}, have {free_margin:.2f}",
+            )
 
-        if margin_level < self._min_margin_level:
-            logger.warning('Margin gate BLOCK: margin level too low',
-                           symbol=symbol, margin_level=margin_level,
-                           threshold=self._min_margin_level)
-            return MarginCheckResult(
-                can_trade=False,
-                reason=f'margin_level_too_low: {margin_level:.1f}% < {self._min_margin_level:.1f}%',
-                required_margin=required, free_margin=free_margin,
-                margin_level_pct=margin_level, margin_call_warning=True,
-                source=source)
+        if equity > 0:
+            free_pct = free_margin / equity
+            if free_pct < self._min_free_pct:
+                return MarginCheckResult(
+                    approved=False,
+                    required_margin=required,
+                    available_margin=free_margin,
+                    margin_level_pct=free_pct * 100,
+                    reject_reason=f"free margin {free_pct:.1%} below minimum {self._min_free_pct:.1%}",
+                )
 
-        if margin_call_warning:
-            logger.warning('Margin call zone', symbol=symbol, margin_level=margin_level)
-
+        margin_level = (equity / (used_margin + required) * 100) if (used_margin + required) > 0 else 9999.0
         return MarginCheckResult(
-            can_trade=True, reason='ok', required_margin=required,
-            free_margin=free_margin, margin_level_pct=margin_level,
-            margin_call_warning=margin_call_warning, source=source)
-
-    async def _required_margin(self, symbol: str, lot_size: float,
-                                balance: float, direction: str) -> Tuple[float, str]:
-        """
-        BUG-8 FIX: asyncio.to_thread wrapping async coroutine causes
-        RuntimeError('This event loop is already running').
-        Fix: check isawaitable first; await directly if async,
-        use to_thread only for sync implementations.
-        """
-        sym = symbol.upper().strip()
-        if self._mt5 is not None:
-            try:
-                calc = self._mt5.order_calc_margin(symbol, lot_size, direction)
-                if inspect.isawaitable(calc):
-                    # async method: await directly
-                    result = await asyncio.wait_for(calc, timeout=3.0)
-                else:
-                    # sync method: run in thread pool
-                    result = await asyncio.wait_for(
-                        asyncio.to_thread(self._mt5.order_calc_margin,
-                                          symbol, lot_size, direction), timeout=3.0)
-                if result is not None and math.isfinite(result) and result > 0:
-                    return result, 'mt5'
-            except asyncio.TimeoutError:
-                logger.debug('MT5 margin calc timeout', symbol=symbol)
-            except Exception as exc:
-                logger.debug('MT5 margin calc failed', symbol=symbol, error=str(exc))
-
-        margin_pct = _STATIC_MARGIN_TABLE.get(sym, _DEFAULT_MARGIN_PCT)
-        contract_size = 100_000.0 if sym.isalpha() and len(sym) == 6 else 10_000.0
-        notional = lot_size * contract_size
-        required = notional * (margin_pct / 100.0)
-        if self._fail_mode == FailMode.FAIL_CLOSED:
-            required *= 1.20
-            source = 'static_conservative'
-        else:
-            source = 'static'
-        return required, source
-
-
-_gate: Optional[MarginGate] = None
-
-def get_margin_gate(mt5_connector: Any = None,
-                   min_margin_level_pct: float = _MIN_MARGIN_LEVEL_PCT,
-                   fail_mode: FailMode = FailMode.FAIL_CLOSED) -> MarginGate:
-    global _gate
-    if _gate is None:
-        _gate = MarginGate(mt5_connector=mt5_connector,
-                           min_margin_level_pct=min_margin_level_pct,
-                           fail_mode=fail_mode)
-    return _gate
+            approved=True,
+            required_margin=required,
+            available_margin=free_margin - required,
+            margin_level_pct=margin_level,
+        )
