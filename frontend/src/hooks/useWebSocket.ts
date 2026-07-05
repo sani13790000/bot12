@@ -1,12 +1,12 @@
 /**
  * frontend/src/hooks/useWebSocket.ts
- * FIX-13: WSMessageType تعریف شد
- * FIX-14: WebSocket بعد از unmount باز می‌ماند (cleanup)
- * FIX-15: retryCount reset در cleanup
- * FIX-16: WS_URL مستقیم از env var
- * FIX-18: setState بعد از unmount guard
+ * FIX-E10: WS_URL از config.ts (getWsUrl) — نه VITE_API_URL مستقیم
+ * FIX-E11: token از tokenStorage — نه localStorage.getItem مستقیم
+ * FIX-E12: mounted guard برای تمام setState
  */
 import { useEffect, useRef, useCallback, useState } from "react";
+import { tokenStorage } from "@/utils/api";
+import { WS_BASE_URL, WS_MAX_RECONNECT } from "@/utils/config";
 
 export type WSMessageType =
   | "TRADE_OPEN" | "TRADE_CLOSE" | "TRADE_UPDATE"
@@ -18,24 +18,23 @@ export type WSMessageType =
 type Handler = (data: unknown) => void;
 
 export interface WSState {
-  connected: boolean;
-  reconnecting: boolean;
-  latency: number;
+  connected:     boolean;
+  reconnecting:  boolean;
+  latency:       number;
 }
 
 function getWsUrl(): string {
-  const base = (import.meta.env?.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
-  return base.replace(/^http/, "ws") + "/ws";
+  return `${WS_BASE_URL}/ws`;
 }
 
 export function useWebSocket() {
-  const ws         = useRef<WebSocket | null>(null);
-  const handlers   = useRef<Map<string, Set<Handler>>>(new Map());
-  const pingTimer  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pingTs     = useRef<number>(0);
-  const retry      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCount = useRef(0);
-  const mountedRef = useRef(true);
+  const ws          = useRef<WebSocket | null>(null);
+  const handlers    = useRef<Map<string, Set<Handler>>>(new Map());
+  const pingTimer   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pingTs      = useRef<number>(0);
+  const retry       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount  = useRef(0);
+  const mountedRef  = useRef(true);
 
   const [state, setState] = useState<WSState>({ connected: false, reconnecting: false, latency: 0 });
 
@@ -51,9 +50,12 @@ export function useWebSocket() {
     if (!mountedRef.current) return;
     if (ws.current?.readyState === WebSocket.OPEN) return;
     if (mountedRef.current) setState(s => ({ ...s, reconnecting: retryCount.current > 0 }));
-    const token = localStorage.getItem("gv_token");
-    const url = token ? `${getWsUrl()}?token=${encodeURIComponent(token)}` : getWsUrl();
+
+    // FIX-E11: token از tokenStorage — نه localStorage مستقیم
+    const token = tokenStorage.getAccess();
+    const url   = token ? `${getWsUrl()}?token=${encodeURIComponent(token)}` : getWsUrl();
     const socket = new WebSocket(url);
+
     socket.onopen = () => {
       if (!mountedRef.current) return;
       retryCount.current = 0;
@@ -65,6 +67,7 @@ export function useWebSocket() {
         }
       }, 15_000);
     };
+
     socket.onmessage = (ev) => {
       if (!mountedRef.current) return;
       try {
@@ -74,14 +77,18 @@ export function useWebSocket() {
         handlers.current.get("*")?.forEach(fn => fn(msg));
       } catch { /* ignore */ }
     };
+
     socket.onclose = () => {
       if (!mountedRef.current) return;
       if (pingTimer.current) { clearInterval(pingTimer.current); pingTimer.current = null; }
       setState(s => ({ ...s, connected: false }));
       const delay = Math.min(1_000 * 2 ** retryCount.current, 30_000);
       retryCount.current += 1;
-      retry.current = setTimeout(() => { if (mountedRef.current) connect(); }, delay);
+      if (retryCount.current <= WS_MAX_RECONNECT) {
+        retry.current = setTimeout(() => { if (mountedRef.current) connect(); }, delay);
+      }
     };
+
     socket.onerror = () => socket.close();
     ws.current = socket;
   }, []);

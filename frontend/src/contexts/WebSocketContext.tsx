@@ -1,7 +1,10 @@
 // frontend/src/contexts/WebSocketContext.tsx
-// J-FIX-2: Exponential backoff reconnect (was fixed 3000ms — caused server flood on outage)
+// FIX-E7: WS_URL از WS_BASE_URL (config.ts) — نه VITE_WS_URL مستقیم
+// FIX-E8: token از tokenStorage — نه localStorage مستقیم
+// FIX-E9: mounted guard برای setState بعد از unmount
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { tokenStorage } from "@/utils/api";
+import { WS_BASE_URL, WS_MAX_RECONNECT } from "@/utils/config";
 import type { WSMessage, WSEventType } from "@/types";
 
 type Listener = (data: unknown) => void;
@@ -12,18 +15,14 @@ interface WSContextValue {
   send:        (msg: object) => void;
 }
 
-const WS_URL      = (import.meta.env.VITE_WS_URL ?? "ws://localhost:8000") + "/ws";
-const MAX_RECONNECT       = 10;
-const BASE_DELAY_MS       = 1_000;   // 1s initial
-const MAX_DELAY_MS        = 30_000;  // 30s cap
-const JITTER_FACTOR       = 0.3;     // ½30% jitter to avoid thundering-herd
+const WS_URL        = `${WS_BASE_URL}/ws`;
+const BASE_DELAY_MS = 1_000;
+const MAX_DELAY_MS  = 30_000;
+const JITTER        = 0.3;
 
-/** Compute exponential-backoff delay with full jitter.
- *  attempt=0 → ~1s, attempt=3 → ~8s, attempt=6+ → ~30s (capped)
- */
 function backoffDelay(attempt: number): number {
-  const exp   = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
-  const jitter = exp * JITTER_FACTOR * (Math.random() * 2 - 1); // [-30%, +30%]
+  const exp    = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
+  const jitter = exp * JITTER * (Math.random() * 2 - 1);
   return Math.max(BASE_DELAY_MS, Math.round(exp + jitter));
 }
 
@@ -34,9 +33,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const listenersRef = useRef<Map<WSEventType, Set<Listener>>>(new Map());
   const retryRef     = useRef(0);
   const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef   = useRef(true);
   const [isConnected, setIsConnected] = useState(false);
 
   const connect = useCallback(() => {
+    if (!mountedRef.current) return;
     const token = tokenStorage.getAccess();
     if (!token) return;
 
@@ -45,11 +46,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (!mountedRef.current) return;
       setIsConnected(true);
-      retryRef.current = 0; // reset backoff on success
+      retryRef.current = 0;
     };
 
     ws.onmessage = (e) => {
+      if (!mountedRef.current) return;
       try {
         const msg: WSMessage = JSON.parse(e.data);
         listenersRef.current.get(msg.event)?.forEach(fn => fn(msg.data));
@@ -57,14 +60,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     };
 
     ws.onclose = () => {
+      if (!mountedRef.current) return;
       setIsConnected(false);
       wsRef.current = null;
-
-      if (retryRef.current < MAX_RECONNECT) {
+      if (retryRef.current < WS_MAX_RECONNECT) {
         const delay = backoffDelay(retryRef.current);
         retryRef.current++;
-        // eslint-disable-next-line no-console
-        console.debug(`[WS] reconnect attempt ${retryRef.current}/${MAX_RECONNECT} in ${delay}ms`);
         timerRef.current = setTimeout(connect, delay);
       } else {
         // eslint-disable-next-line no-console
@@ -76,8 +77,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
       wsRef.current?.close();
     };
@@ -85,13 +88,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
   const subscribe = useCallback((event: WSEventType, fn: Listener) => {
     if (!listenersRef.current.has(event)) listenersRef.current.set(event, new Set());
-    listenersRef.current.get(event)!.add(fn );
+    listenersRef.current.get(event)!.add(fn);
     return () => listenersRef.current.get(event)?.delete(fn);
   }, []);
 
   const send = useCallback((msg: object) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(msg));
-    }, []);
+    if (wsRef.current?.readyState === WebSocket.OPEN)
+      wsRef.current.send(JSON.stringify(msg));
+  }, []);
 
   return (
     <WebSocketContext.Provider value={{ isConnected, subscribe, send }}>
