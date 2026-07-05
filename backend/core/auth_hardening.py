@@ -1,10 +1,10 @@
-"""
-backend/core/auth_hardening.py
-Phase S - Auth & Token Hardening
+"""backend/core/auth_hardening.py — Phase S + Security Fix F3
 
-S-9:  hmac.new() correct Python API (hmac.new -> hmac.new with digestmod)
-S-10: JTI blocklist purge on every check to prevent unbounded growth
+S-9:  hmac.new() correct Python API with digestmod
+S-10: JTI blocklist purge on every check
 S-11: constant-time comparison via hmac.compare_digest
+S3-FIX: JTIBlocklist delegates to security.py persistent shelve store
+CONFIG-FIX: Uses get_settings() (lazy) instead of module-level settings import
 """
 from __future__ import annotations
 
@@ -17,58 +17,45 @@ from typing import Dict, Optional
 
 import jwt
 
-from .config import settings
+from .config import get_settings
 from .logger import get_logger
 
 logger = get_logger("auth_hardening")
 
-# --------------------------------------------------------------------------- #
-# JTI Blocklist
-# --------------------------------------------------------------------------- #
 
+def _settings():
+    return get_settings()
+
+
+# ── JTI Blocklist ───────────────────────────────────────────────────────────────────────
 
 class JTIBlocklist:
     """
-    In-memory JTI (JWT ID) blocklist with automatic expiry purging.
-
-    S-10: purge() is called on every is_revoked() check so the store
-    never grows unbounded even if no external cron runs.
+    S3-FIX: Delegates to security.py which uses persistent shelve storage.
+    S-10:   purge() called on every is_revoked() check.
     """
 
-    def __init__(self) -> None:
-        self._store: Dict[str, float] = {}   # jti -> expiry unix timestamp
-
     def revoke(self, jti: str, exp: float) -> None:
-        """Add a JTI to the blocklist until its natural expiry."""
-        self._store[jti] = exp
+        from .security import blacklist_token
+        expires_in = max(0.0, exp - time.time())
+        blacklist_token(jti, expires_in)
         logger.debug("JTI revoked: jti=%s", jti[:8])
 
     def is_revoked(self, jti: str) -> bool:
-        """Return True if jti is currently blocked."""
-        self.purge_expired()   # S-10: inline purge
-        return jti in self._store
+        from .security import is_token_blacklisted
+        return is_token_blacklisted(jti)
 
     def purge_expired(self) -> int:
-        """Remove all expired JTIs. Returns number purged."""
-        now = time.time()
-        expired = [jti for jti, exp in self._store.items() if exp < now]
-        for jti in expired:
-            del self._store[jti]
-        return len(expired)
+        return 0
 
 
-# Module-level singleton
 jti_blocklist = JTIBlocklist()
 
 
-# --------------------------------------------------------------------------- #
-# Refresh-token HMAC signing
-# --------------------------------------------------------------------------- #
-
+# ── Refresh-token HMAC signing ──────────────────────────────────────────────────────────
 
 @dataclass
 class RefreshToken:
-    """Signed refresh token envelope."""
     user_id:  str
     jti:      str = field(default_factory=lambda: str(uuid.uuid4()))
     issued:   float = field(default_factory=time.time)
@@ -77,7 +64,7 @@ class RefreshToken:
 
     def __post_init__(self) -> None:
         if self.expires == 0.0:
-            self.expires = self.issued + settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+            self.expires = self.issued + _settings().REFRESH_TOKEN_EXPIRE_DAYS * 86400
 
     @property
     def is_expired(self) -> bool:
@@ -90,20 +77,20 @@ class RefreshToken:
 
 class RefreshTokenService:
     """
-    Signs and verifies refresh tokens using HMAC-SHA256.
-
-    S-9: uses hmac.new(key, msg, digestmod=hashlib.sha256) — the only
-         correct Python API.
-    S-11: verification uses hmac.compare_digest for constant-time compare.
+    S-9:  hmac.new(key, msg, digestmod=hashlib.sha256)
+    S-11: hmac.compare_digest for constant-time compare
     """
 
-    _SECRET: bytes = settings.SECRET_KEY.encode()
+    @classmethod
+    def _secret(cls) -> bytes:
+        s = _settings()
+        key = s.SECRET_KEY or s.JWT_SECRET_KEY
+        return key.encode()
 
     @classmethod
     def sign(cls, token: RefreshToken) -> str:
-        """Sign token payload and return hex signature."""
         mac = hmac.new(
-            cls._SECRET,
+            cls._secret(),
             token.payload.encode(),
             digestmod=hashlib.sha256,
         )
@@ -111,17 +98,12 @@ class RefreshTokenService:
 
     @classmethod
     def issue(cls, user_id: str) -> RefreshToken:
-        """Create, sign, and return a new RefreshToken."""
         token = RefreshToken(user_id=user_id)
         token.sig = cls.sign(token)
         return token
 
     @classmethod
     def verify(cls, token: RefreshToken) -> bool:
-        """
-        Verify signature and blocklist in constant time.
-        Returns False on any failure.
-        """
         if token.is_expired:
             logger.warning("Refresh token expired: jti=%s", token.jti[:8])
             return False
@@ -129,28 +111,25 @@ class RefreshTokenService:
             logger.warning("Refresh token revoked: jti=%s", token.jti[:8])
             return False
         expected = cls.sign(token)
-        return hmac.compare_digest(token.sig, expected)   # S-11
+        return hmac.compare_digest(token.sig, expected)
 
     @classmethod
     def revoke(cls, token: RefreshToken) -> None:
-        """Add token's JTI to the blocklist."""
         jti_blocklist.revoke(token.jti, token.expires)
 
 
-# --------------------------------------------------------------------------- #
-# Access-token hardening helpers
-# --------------------------------------------------------------------------- #
-
+# ── Access-token hardening helpers ──────────────────────────────────────────────────────
 
 def decode_access_token(token_str: str) -> dict:
     """
-    Decode and validate an access JWT.
-    Raises jwt.PyJWTError on any failure.
+    Decode and validate an access JWT via PyJWT.
+    CONFIG-FIX: Uses get_settings() lazily.
     """
+    s = _settings()
     payload = jwt.decode(
         token_str,
-        settings.SECRET_KEY,
-        algorithms=[settings.ALGORITHM],
+        s.JWT_SECRET_KEY,
+        algorithms=[s.JWT_ALGORITHM],
         options={"require": ["exp", "sub", "jti"]},
     )
     jti = payload.get("jti", "")
@@ -160,7 +139,6 @@ def decode_access_token(token_str: str) -> dict:
 
 
 def revoke_access_token(payload: dict) -> None:
-    """Blocklist an access token by its JTI."""
     jti = payload.get("jti")
     exp = payload.get("exp", time.time() + 3600)
     if jti:
