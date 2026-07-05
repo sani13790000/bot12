@@ -3,6 +3,8 @@ backend/api/routes/billing.py
 Phase 10 - Billing API Routes
 BUG-W1 fix: _get_billing_engine() now dispatches to real providers (zarinpal/stripe/manual)
 BUG-V2 fix: removed router=None guard
+BUG-X1 fix: removed duplicate prefix (was /billing/billing/*, now /billing/*)
+BUG-X2 fix: _get_current_user_id() and _require_admin() now use real JWT via get_current_user
 
 Customer routes  (require JWT):
   POST /billing/checkout               -> initiate payment
@@ -34,9 +36,11 @@ from pydantic import BaseModel, Field
 from ...billing.engine   import BillingEngine, PLANS
 from ...billing.provider import Currency, ProviderName
 from ...billing.webhook  import WebhookProcessor
+from ...core.deps import get_current_user
 
 # BUG-V2 fix: router always created — no None guard
-router = APIRouter(prefix="/billing", tags=["billing"])
+# BUG-X1 fix: prefix removed from router — main.py provides prefix="/billing"
+router = APIRouter(tags=["billing"])
 
 
 class CheckoutRequest(BaseModel):
@@ -72,7 +76,7 @@ class AdminRevokeRequest(BaseModel):
 
 def _get_billing_engine() -> BillingEngine:
     """BUG-W1 fix: dispatch to real provider based on BILLING_PROVIDER setting.
-    
+
     Providers:
       mock     -> MockProvider (development / testing only)
       zarinpal -> ZarinpalProvider (Iranian payment gateway)
@@ -142,22 +146,35 @@ def _get_billing_engine() -> BillingEngine:
     # --- Unknown provider: log warning and fallback ---
     import logging
     logging.getLogger(__name__).warning(
-        "Unknown BILLING_PROVIDER=%r, using MockProvider", provider_name
+        "Unknown BILLING_PROVIDER=%r, falling back to MockProvider", provider_name
     )
     from ...billing.provider import MockProvider
     return BillingEngine(provider=MockProvider())
 
 
-def _get_current_user_id(authorization: str = Header("")) -> str:
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
-    return "user_from_jwt"
+# ---------------------------------------------------------------------------
+# BUG-X2 fix: Real JWT auth via get_current_user from backend.core.deps
+# The old stubs returned hardcoded strings without decoding the JWT.
+# ---------------------------------------------------------------------------
+
+def _get_current_user_id(current_user=Depends(get_current_user)) -> str:
+    """BUG-X2 fix: extract real user_id from JWT via get_current_user dependency."""
+    user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Could not identify user from token")
+    return str(user_id)
 
 
-def _require_admin(authorization: str = Header("")) -> str:
-    if not authorization:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return "admin_user"
+def _require_admin(current_user=Depends(get_current_user)) -> str:
+    """BUG-X2 fix: check real JWT user has admin/billing role."""
+    user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    role    = getattr(current_user, "role", "") or ""
+    if role.lower() not in ("admin", "superadmin", "billing_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or billing_admin role required",
+        )
+    return str(user_id)
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
@@ -298,43 +315,23 @@ async def list_all_subscriptions(
     return {"subscriptions": subs, "total": len(subs)}
 
 
-@router.post("/webhook/{provider_name}")
-async def receive_webhook(
-    request:       Request,
-    provider_name: str    = Path(...),
-    x_signature:   str    = Header("", alias="X-Signature"),
-    x_event_id:    str    = Header("", alias="X-Event-Id"),
-    x_timestamp:   str    = Header("", alias="X-Timestamp"),
-    engine:        BillingEngine = Depends(_get_billing_engine),
+@router.post("/webhook/{provider}")
+async def webhook(
+    provider: str     = Path(...),
+    request:  Request = None,
 ):
+    """Webhook endpoint — NO auth, signature verified internally."""
     try:
-        pname = ProviderName(provider_name.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_name!r}")
-
-    payload = await request.body()
-    ts = float(x_timestamp) if x_timestamp else None
-
-    # Use the engine's configured provider for webhook verification
-    provider  = engine._provider
-    processor = WebhookProcessor(
-        engine=engine, provider=provider,
-        webhook_secret=getattr(
-            __import__('backend.core.config', fromlist=['settings']).settings,
-            'WEBHOOK_SECRET', 'webhook-secret'
-        ),
-    )
-    try:
-        result = processor.process(
-            payload=payload, signature=x_signature,
-            event_id=x_event_id, timestamp=ts,
+        raw_body = await request.body()
+        headers  = dict(request.headers)
+        processor = WebhookProcessor()
+        result = await processor.process(
+            provider=provider,
+            raw_body=raw_body,
+            headers=headers,
         )
+        return {"status": "ok", "processed": result}
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return {
-        "accepted":   result.accepted,
-        "event_id":   result.event_id,
-        "event_type": result.event_type,
-        "duplicate":  result.duplicate,
-    }
+        import logging
+        logging.getLogger(__name__).error("Webhook processing error: %s", exc)
+        raise HTTPException(status_code=400, detail="Webhook processing failed") from exc
