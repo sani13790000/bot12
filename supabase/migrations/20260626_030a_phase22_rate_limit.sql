@@ -12,9 +12,9 @@ CREATE TABLE IF NOT EXISTS rate_limit_bans (
     actor_id    TEXT,
     CONSTRAINT rate_limit_bans_ip_check CHECK (length(ip) <= 45)
 );
-CREATE INDEX IF NOT EXISTS idx_rl_bans_ip      ON rate_limit_bans(ip);
-CREATE INDEX IF NOT EXISTS idx_rl_bans_expires ON rate_limit_bans(expires_at);
-CREATE INDEX IF NOT EXISTS idx_rl_bans_abuse   ON rate_limit_bans(abuse_type);
+CREATE INDEX IF NOT EXISTS idx_rl_bans_ip        ON rate_limit_bans(ip);
+CREATE INDEX IF NOT EXISTS idx_rl_bans_expires   ON rate_limit_bans(expires_at);
+CREATE INDEX IF NOT EXISTS idx_rl_bans_abuse     ON rate_limit_bans(abuse_type);
 CREATE TABLE IF NOT EXISTS rate_limit_violations (
     id          BIGSERIAL PRIMARY KEY,
     ip          TEXT        NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS rate_limit_abuse (
 CREATE INDEX IF NOT EXISTS idx_rl_abuse_ip   ON rate_limit_abuse(ip);
 CREATE INDEX IF NOT EXISTS idx_rl_abuse_type ON rate_limit_abuse(abuse_type);
 CREATE INDEX IF NOT EXISTS idx_rl_abuse_at   ON rate_limit_abuse(detected_at);
-ALTER TABLE rate_limit_bans       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rate_limit_bans        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_violations  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limit_abuse       ENABLE ROW LEVEL SECURITY;
 CREATE POLICY rl_bans_admin       ON rate_limit_bans       FOR ALL USING (auth.role() = 'service_role');
