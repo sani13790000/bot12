@@ -13,6 +13,11 @@ On activation:
   - Logs CRITICAL
 
 Reset: explicit reset() with admin token only.
+
+Fixes applied:
+  CB-NEW-1: is_active is @property — callers must NOT add ()
+  CB-NEW-2: kill_switch singleton exported at module level
+  CB-NEW-3: check() requires equity + balance args (documented clearly)
 """
 from __future__ import annotations
 import asyncio, time
@@ -58,6 +63,10 @@ class KillSwitch:
         ks = get_kill_switch()
         await ks.check(equity=9500.0, balance=10000.0)  # raises if triggered
         ks.register_callback(close_all_positions)
+
+    IMPORTANT — is_active is a @property (not a method):
+        correct:   if ks.is_active:
+        WRONG:     if ks.is_active():   ← TypeError: bool is not callable
     """
 
     def __init__(self, config: Optional[KillSwitchConfig] = None) -> None:
@@ -76,7 +85,13 @@ class KillSwitch:
         self._callbacks = [c for c in self._callbacks if c is not cb]
 
     async def check(self, equity: float, balance: float) -> None:
-        """Call before every order. Raises KillSwitchActivatedError if triggered."""
+        """
+        Call before every order. Raises KillSwitchActivatedError if triggered.
+
+        Args:
+            equity:  Current account equity in USD.
+            balance: Current account balance in USD.
+        """
         from ..core.exceptions import KillSwitchActivatedError
 
         if not self.config.enabled:
@@ -91,7 +106,7 @@ class KillSwitch:
             if equity > self.state.high_water_mark:
                 self.state.high_water_mark = equity
 
-            # K-1
+            # K-1: Absolute equity floor
             if self.config.absolute_floor_usd > 0 and equity < self.config.absolute_floor_usd:
                 await self._activate(
                     reason=f'equity {equity:.2f} below floor {self.config.absolute_floor_usd:.2f}',
@@ -99,7 +114,7 @@ class KillSwitch:
                 raise KillSwitchActivatedError(
                     reason=self.state.reason, equity=equity, threshold_pct=0.0)
 
-            # K-2
+            # K-2: Hard drawdown from HWM
             if self.state.high_water_mark > 0:
                 dd_pct = (self.state.high_water_mark - equity) / self.state.high_water_mark * 100
                 if dd_pct >= self.config.hard_drawdown_pct:
@@ -111,7 +126,7 @@ class KillSwitch:
                         reason=self.state.reason, equity=equity,
                         threshold_pct=self.config.hard_drawdown_pct)
 
-            # K-3: Flash crash
+            # K-3: Flash crash detection
             now = time.monotonic()
             self._equity_history.append((now, equity))
             cutoff = now - self.config.flash_window_seconds
@@ -146,6 +161,9 @@ class KillSwitch:
                         total_activations=self.state.total_activations)
         return True
 
+    # CB-NEW-1 FIX: is_active is a @property — do NOT call with ()
+    # Correct:   if ks.is_active:
+    # Wrong:     if ks.is_active():   ← TypeError
     @property
     def is_active(self) -> bool:
         return self.state.active
@@ -175,7 +193,7 @@ class KillSwitch:
         self.state.activated_at = datetime.now(timezone.utc)
         self.state.activation_equity = equity
         self.state.total_activations += 1
-        logger.critical('🚨 KILL SWITCH ACTIVATED', reason=reason, equity=equity,
+        logger.critical('\U0001f6a8 KILL SWITCH ACTIVATED', reason=reason, equity=equity,
                         hwm=self.state.high_water_mark,
                         activations=self.state.total_activations)
         for cb in list(self._callbacks):
@@ -187,10 +205,20 @@ class KillSwitch:
                 logger.error('kill_switch callback error', cb=cb.__name__, error=str(exc))
 
 
+# ── Singleton management ─────────────────────────────────────────────── #
+
 _kill_switch: Optional[KillSwitch] = None
 
+
 def get_kill_switch(config: Optional[KillSwitchConfig] = None) -> KillSwitch:
+    """Return the global KillSwitch singleton."""
     global _kill_switch
     if _kill_switch is None:
         _kill_switch = KillSwitch(config=config)
     return _kill_switch
+
+
+# CB-NEW-2 FIX: Export module-level singleton so
+#   `from backend.risk.kill_switch import kill_switch` works.
+# Previously only `get_kill_switch()` was defined — no `kill_switch` name.
+kill_switch: KillSwitch = get_kill_switch()
