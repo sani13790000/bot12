@@ -1,14 +1,19 @@
 """
-main.py — FastAPI application entrypoint for GalaxyVast MT5 Trading Bot
+main.py - FastAPI application entrypoint for GalaxyVast MT5 Trading Bot
 
 Startup sequence:
-  1. run_startup_checks()     — Redis, Supabase, MT5 gateway ping
-  2. init_redis()             — warm up Redis connection pool
-  3. mt5_connector.connect()  — connect to MT5 gateway
+  1. run_startup_checks()     - Redis, Supabase, MT5 gateway ping
+  2. init_redis()             - warm up Redis connection pool
+  3. mt5_connector.connect()  - connect to MT5 gateway
   4. signal_processor.register_agents([smc, ml, news])
-  5. ml_agent.set_engine(trainer)  — activate ML predictions
+  5. ml_agent.set_engine(trainer) - activate ML predictions
   6. Background tasks: stale order cleaner, position reconciler
   7. GracefulDrain SIGTERM handler
+
+Phase C additions:
+  - CSP middleware (from settings.CSP_ENABLED)
+  - /health/ready: license_engine.secret_configured check
+  - CORS uses settings.ALLOWED_ORIGINS (not CORS_ORIGINS)
 """
 from __future__ import annotations
 
@@ -25,9 +30,7 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# GracefulDrain — in-flight request tracking for safe SIGTERM
-# ---------------------------------------------------------------------------
+# ── GracefulDrain ──────────────────────────────────────────────────────────────
 
 class GracefulDrain:
     """Track in-flight requests and wait for them to complete on SIGTERM."""
@@ -35,7 +38,7 @@ class GracefulDrain:
     def __init__(self, timeout: float = 30.0) -> None:
         self._count: int = 0
         self._timeout = timeout
-        self._lock: Optional[asyncio.Lock] = None  # Lazy init — BUG-R6-6 fix
+        self._lock: Optional[asyncio.Lock] = None  # Lazy init - BUG-R6-6 fix
         self._draining = False
 
     def _get_lock(self) -> asyncio.Lock:
@@ -61,7 +64,10 @@ class GracefulDrain:
             await asyncio.sleep(0.5)
             waited += 0.5
         if self._count > 0:
-            logger.warning("[GracefulDrain] Timeout after %.1fs, %d requests still in flight", waited, self._count)
+            logger.warning(
+                "[GracefulDrain] Timeout after %.1fs, %d requests still in flight",
+                waited, self._count,
+            )
 
     def register_sigterm(self) -> None:
         """Register SIGTERM handler using running loop. BUG-R5-1 fix."""
@@ -80,9 +86,7 @@ class GracefulDrain:
 _drain = GracefulDrain(timeout=30.0)
 
 
-# ---------------------------------------------------------------------------
-# Background Tasks
-# ---------------------------------------------------------------------------
+# ── Background Tasks ───────────────────────────────────────────────────────────
 
 async def _stale_order_cleaner() -> None:
     """Clean up stale orders every 60 seconds. BUG-R4-4 fix."""
@@ -114,7 +118,6 @@ async def _position_reconciler() -> None:
             live: list = await mt5_connector.get_positions()  # BUG-R5-6 fix
             live_tickets = {int(p.get('ticket', 0)) for p in live if p.get('ticket')}
             osm_active = set(order_state_machine.active_tickets())
-            # Tickets in OSM but not in MT5 — they've been closed externally
             ghost_tickets = osm_active - live_tickets
             for ticket in ghost_tickets:
                 try:
@@ -130,15 +133,13 @@ async def _position_reconciler() -> None:
             logger.debug("[Reconciler] Error: %s", e)
 
 
-# ---------------------------------------------------------------------------
-# Lifespan
-# ---------------------------------------------------------------------------
+# ── Lifespan ───────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: startup → yield → shutdown."""
+    """Application lifespan: startup => yield => shutdown."""
     logger.info("=" * 60)
-    logger.info("GalaxyVast MT5 Trading Bot — Starting Up")
+    logger.info("GalaxyVast MT5 Trading Bot - Starting Up")
     logger.info("=" * 60)
 
     # 1. Register graceful drain SIGTERM
@@ -159,7 +160,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[Startup] Redis init failed (non-fatal): %s", e)
 
-    # 4. MT5 Gateway connect  — BUG-R4-2 fix
+    # 4. MT5 Gateway connect  - BUG-R4-2 fix
     try:
         from backend.execution.mt5_connector import mt5_connector
         await mt5_connector.connect()
@@ -167,7 +168,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[Startup] MT5 connect failed (non-fatal): %s", e)
 
-    # 5. Register agents with SignalProcessor  — BUG-R5-4 fix
+    # 5. Register agents with SignalProcessor - BUG-R5-4 fix
     try:
         from backend.services.signal_processor import signal_processor
         from backend.agents.smc_agent import SMCAgent
@@ -181,7 +182,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[Startup] Agent registration failed: %s", e)
 
-    # 6. Initialize ML engine  — Phase A fix
+    # 6. Initialize ML engine  - Phase A fix
     try:
         from backend.agents.ml_agent import ml_agent
         from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
@@ -191,7 +192,7 @@ async def lifespan(app: FastAPI):
             ml_agent.set_engine(_trainer)
             logger.info("[Startup] ML engine loaded and active")
         else:
-            logger.warning("[Startup] No saved ML model found — MLAgent will ABSTAIN until trained")
+            logger.warning("[Startup] No saved ML model found - MLAgent will ABSTAIN until trained")
     except Exception as e:
         logger.warning("[Startup] ML engine init failed: %s", e)
 
@@ -203,7 +204,7 @@ async def lifespan(app: FastAPI):
     logger.info("[Startup] Background tasks started")
 
     logger.info("=" * 60)
-    logger.info("Startup complete — serving requests")
+    logger.info("Startup complete - serving requests")
     logger.info("=" * 60)
 
     yield  # Application running
@@ -231,9 +232,7 @@ async def lifespan(app: FastAPI):
     logger.info("[Shutdown] Complete")
 
 
-# ---------------------------------------------------------------------------
-# FastAPI App
-# ---------------------------------------------------------------------------
+# ── FastAPI App ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="GalaxyVast MT5 Trading Bot API",
@@ -246,9 +245,7 @@ app = FastAPI(
 )
 
 
-# ---------------------------------------------------------------------------
-# CORS Middleware  — ARCH-R5-6 fix: use ALLOWED_ORIGINS not CORS_ORIGINS
-# ---------------------------------------------------------------------------
+# ── CORS Middleware - ARCH-R5-6 fix: use ALLOWED_ORIGINS not CORS_ORIGINS ──────
 
 try:
     from backend.core.config import get_settings
@@ -266,9 +263,37 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
-# GracefulDrain Middleware
-# ---------------------------------------------------------------------------
+# ── CSP Middleware (Phase C) ───────────────────────────────────────────────────
+
+@app.middleware("http")
+async def csp_middleware(request: Request, call_next):
+    """Phase C: Inject Content-Security-Policy header if enabled."""
+    response = await call_next(request)
+    try:
+        from backend.core.config import get_settings
+        s = get_settings()
+        if getattr(s, 'CSP_ENABLED', False):
+            report_only = getattr(s, 'CSP_REPORT_ONLY', False)
+            report_uri = getattr(s, 'CSP_REPORT_URI', '')
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "font-src 'self'; "
+                "frame-ancestors 'none';"
+            )
+            if report_uri:
+                csp += f" report-uri {report_uri};"
+            header = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
+            response.headers[header] = csp
+    except Exception:
+        pass
+    return response
+
+
+# ── GracefulDrain Middleware ───────────────────────────────────────────────────
 
 @app.middleware("http")
 async def drain_middleware(request: Request, call_next):
@@ -282,19 +307,17 @@ async def drain_middleware(request: Request, call_next):
         await _drain.exit()
 
 
-# ---------------------------------------------------------------------------
-# Health Endpoints
-# ---------------------------------------------------------------------------
+# ── Health Endpoints ───────────────────────────────────────────────────────────
 
 @app.get("/health/live", tags=["health"])
 async def health_live():
-    """Liveness probe — always returns 200 if server is up."""
+    """Liveness probe - always returns 200 if server is up."""
     return {"status": "ok"}
 
 
 @app.get("/health/ready", tags=["health"])
 async def health_ready():
-    """Readiness probe — checks all dependencies."""
+    """Readiness probe - checks all dependencies."""
     checks: Dict[str, Any] = {}
 
     # Redis
@@ -311,7 +334,7 @@ async def health_ready():
     except Exception:
         checks["mt5"] = "error"
 
-    # KillSwitch  — BUG-R4-1 fix: is_active not is_active()
+    # KillSwitch - BUG-R4-1 fix: is_active not is_active()
     try:
         from backend.risk.kill_switch import kill_switch
         checks["kill_switch"] = "ACTIVE" if kill_switch.is_active else "inactive"
@@ -325,16 +348,25 @@ async def health_ready():
     except Exception:
         checks["ml_agent"] = "unknown"
 
-    all_ok = all(v in ("ok", "inactive", "connected", "active", "no_model") for v in checks.values())
+    # License Engine (Phase C)
+    try:
+        from backend.license.engine import license_engine
+        stats = license_engine.stats()
+        checks["license"] = "ok" if stats["secret_configured"] else "no_secret"
+    except Exception:
+        checks["license"] = "unknown"
+
+    all_ok = all(
+        v in ("ok", "inactive", "connected", "active", "no_model")
+        for v in checks.values()
+    )
     return JSONResponse(
         status_code=200 if all_ok else 207,
         content={"status": "ready" if all_ok else "degraded", "checks": checks},
     )
 
 
-# ---------------------------------------------------------------------------
-# Router Registration
-# ---------------------------------------------------------------------------
+# ── Router Registration ────────────────────────────────────────────────────────
 
 def _register_routers() -> None:
     """Register all API routers with graceful ImportError handling."""
@@ -349,6 +381,7 @@ def _register_routers() -> None:
         ("backend.api.routes.settings", "/api/v1", ["settings"]),
         ("backend.api.routes.ai_prediction", "/api/v1", ["ai"]),
         ("backend.api.routes.license", "/api/v1", ["license"]),
+        ("backend.api.routes.auth", "/api/v1", ["auth"]),
     ]
     for module_path, prefix, tags in routers:
         try:
