@@ -1,12 +1,13 @@
 """Backtest routes.
 
-BUG-N7 FIX: date_range validation added — start_date must be before end_date.
+BUG-N7 FIX: date_range validation.
+BUG-P2 FIX: max_workers and timeout from settings (not hardcode).
 """
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
@@ -17,8 +18,8 @@ router = APIRouter(prefix="/backtest", tags=["backtest"])
 
 class BacktestRequest(BaseModel):
     symbol: str
-    start_date: str  # ISO format e.g. "2025-01-01"
-    end_date: str    # ISO format e.g. "2025-12-31"
+    start_date: str
+    end_date: str
     strategy: str = "smc_default"
     initial_balance: float = 10_000.0
     risk_per_trade_pct: float = 1.0
@@ -26,16 +27,13 @@ class BacktestRequest(BaseModel):
 
     @validator("end_date")
     def end_after_start(cls, end_date: str, values: Dict[str, Any]) -> str:
-        """BUG-N7 FIX: validate start_date < end_date."""
         start = values.get("start_date")
         if start:
             try:
                 dt_start = datetime.fromisoformat(start)
-                dt_end = datetime.fromisoformat(end_date)
+                dt_end   = datetime.fromisoformat(end_date)
                 if dt_end <= dt_start:
-                    raise ValueError(
-                        f"end_date ({end_date}) must be after start_date ({start})"
-                    )
+                    raise ValueError(f"end_date ({end_date}) must be after start_date ({start})")
             except ValueError as e:
                 if "must be after" in str(e):
                     raise
@@ -62,19 +60,24 @@ class BacktestResult(BaseModel):
 async def run_backtest(request: BacktestRequest) -> BacktestResult:
     """Run a backtest for the given symbol and date range."""
     import time
+    from backend.core.config import get_settings
+    _s = get_settings()
     t0 = time.monotonic()
     try:
         from backend.services.backtest_engine import BacktestEngine
-        engine = BacktestEngine(
+        # BUG-P2: use settings values, cap at user-requested workers
+        max_w   = min(request.max_workers, _s.BACKTEST_MAX_WORKERS)
+        timeout = _s.BACKTEST_JOB_TIMEOUT
+        engine  = BacktestEngine(
             symbol=request.symbol,
             start_date=request.start_date,
             end_date=request.end_date,
             strategy=request.strategy,
             initial_balance=request.initial_balance,
             risk_per_trade_pct=request.risk_per_trade_pct,
-            max_workers=min(request.max_workers, 4),
+            max_workers=max_w,
         )
-        result = await engine.run(timeout=300)
+        result   = await engine.run(timeout=timeout)
         duration = time.monotonic() - t0
         return BacktestResult(
             symbol=request.symbol,
@@ -102,7 +105,7 @@ async def get_backtest_history(limit: int = 20) -> Dict[str, Any]:
         from backend.database.connection import get_db_client
         import asyncio
         db = await get_db_client()
-        r = await asyncio.wait_for(
+        r  = await asyncio.wait_for(
             asyncio.to_thread(
                 lambda: db.table("backtest_results")
                 .select("*").order("created_at", desc=True).limit(limit).execute()

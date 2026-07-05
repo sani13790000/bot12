@@ -1,9 +1,8 @@
-"""backend/core/config.py v9 - Phase O Extended
+"""backend/core/config.py v10 - Phase P
 
-Phase O additions over v8:
-  - MODEL_DIR: path for SecurityAIAgent IsolationForest persistence (BUG-O2)
-  - METRICS_MIN_TRADES_FOR_SHARPE: configurable minimum trades for Sharpe ratio
-  - SECURITY_MODEL_RETRAIN_INTERVAL_S: configurable retrain interval
+Phase P additions over v9:
+  - ANALYTICS_PAGE_SIZE: configurable page size for trade history endpoint
+  - SMC_MAX_CANDLES: max candles per SMC/PA analysis request (prevents memory spike)
 """
 from __future__ import annotations
 
@@ -68,11 +67,11 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT
 
     # Security / JWT
-    JWT_SECRET_KEY:               str = "changeme"
-    JWT_ALGORITHM:                str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES:  int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
-    REFRESH_TOKEN_EXPIRE_DAYS:    int = Field(default=30, ge=1, le=90)
-    BCRYPT_ROUNDS:                int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
+    JWT_SECRET_KEY:                   str = "changeme"
+    JWT_ALGORITHM:                    str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES:      int = Field(default=60, ge=5, le=_ACCESS_TOKEN_MAX_MINUTES)
+    REFRESH_TOKEN_EXPIRE_DAYS:        int = Field(default=30, ge=1, le=90)
+    BCRYPT_ROUNDS:                    int = Field(default=_BCRYPT_ROUNDS_DEFAULT, ge=_BCRYPT_ROUNDS_MIN, le=_BCRYPT_ROUNDS_MAX)
 
     # Cookie Security (Phase C)
     SESSION_COOKIE_SECURE:   bool = True
@@ -92,11 +91,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_API_PER_MINUTE: int = Field(default=60, ge=1, le=10000)
 
     # Database
-    DATABASE_URL:           str = ""
-    SUPABASE_URL:           str = ""
-    SUPABASE_KEY:           str = ""
-    SUPABASE_SERVICE_KEY:   str = ""
-    SUPABASE_JWT_SECRET:    str = ""
+    DATABASE_URL:         str = ""
+    SUPABASE_URL:         str = ""
+    SUPABASE_KEY:         str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_JWT_SECRET:  str = ""
 
     # Redis
     REDIS_URL:             str = "redis://localhost:6379/0"
@@ -132,31 +131,31 @@ class Settings(BaseSettings):
     ADMIN_IP_ALLOWLIST: List[str] = []
 
     # Encryption & Secrets
-    SECRETS_MASTER_KEY:    str = ""
-    FIELD_ENCRYPTION_KEY:  str = ""
+    SECRETS_MASTER_KEY:   str = ""
+    FIELD_ENCRYPTION_KEY: str = ""
 
     # License
-    LICENSE_SECRET:                 str = ""
-    LICENSE_SALT:                   str = ""
-    MQL5_API_TOKEN:                 str = ""
-    LICENSE_REPLAY_WINDOW_SECONDS:  int = Field(default=3600, ge=60, le=86400)
+    LICENSE_SECRET:                  str = ""
+    LICENSE_SALT:                    str = ""
+    MQL5_API_TOKEN:                  str = ""
+    LICENSE_REPLAY_WINDOW_SECONDS:   int = Field(default=3600, ge=60, le=86400)
 
     # Payments
-    STRIPE_WEBHOOK_SECRET:    str = ""
-    ZARINPAL_WEBHOOK_SECRET:  str = ""
+    STRIPE_WEBHOOK_SECRET:   str = ""
+    ZARINPAL_WEBHOOK_SECRET: str = ""
 
     # Logging
-    LOG_LEVEL:              str  = "INFO"
-    LOG_REDACTION_ENABLED:  bool = True
+    LOG_LEVEL:             str  = "INFO"
+    LOG_REDACTION_ENABLED: bool = True
 
     # Risk & Trading
-    MAX_DAILY_LOSS_PCT:          float = Field(default=5.0, ge=0.1, le=50.0)
-    MAX_POSITION_SIZE_PCT:       float = Field(default=2.0, ge=0.01, le=10.0)
-    MAX_OPEN_TRADES:             int   = Field(default=5, ge=1, le=50)
-    DEFAULT_RISK_PER_TRADE_PCT:  float = Field(default=1.0, ge=0.01, le=5.0)
-    RECONCILE_INTERVAL_SECONDS:  int   = Field(default=30, ge=5, le=300)
-    SEMI_AUTO_PENDING_TTL_S:     int   = Field(default=300, ge=30, le=3600)
-    BROKER_INIT_TIMEOUT_S:       float = Field(default=30.0, ge=5.0, le=120.0)
+    MAX_DAILY_LOSS_PCT:         float = Field(default=5.0, ge=0.1, le=50.0)
+    MAX_POSITION_SIZE_PCT:      float = Field(default=2.0, ge=0.01, le=10.0)
+    MAX_OPEN_TRADES:            int   = Field(default=5, ge=1, le=50)
+    DEFAULT_RISK_PER_TRADE_PCT: float = Field(default=1.0, ge=0.01, le=5.0)
+    RECONCILE_INTERVAL_SECONDS: int  = Field(default=30, ge=5, le=300)
+    SEMI_AUTO_PENDING_TTL_S:    int   = Field(default=300, ge=30, le=3600)
+    BROKER_INIT_TIMEOUT_S:      float = Field(default=30.0, ge=5.0, le=120.0)
 
     # Backtest (Phase C)
     BACKTEST_MAX_WORKERS: int = Field(default=4, ge=1, le=16)
@@ -166,7 +165,7 @@ class Settings(BaseSettings):
     ENABLE_METRICS: bool = True
     API_BASE_URL:   str  = ""
 
-    # ML / Model Storage (Phase O — BUG-O2 fix)
+    # ML / Model Storage (Phase O)
     MODEL_DIR: str = Field(
         default="/data/models",
         description="Directory for persisted ML models (SecurityAIAgent, XGBoost, etc.)"
@@ -174,16 +173,24 @@ class Settings(BaseSettings):
 
     # Metrics Thresholds (Phase O)
     METRICS_MIN_TRADES_FOR_SHARPE: int = Field(
-        default=30,
-        ge=1,
-        le=1000,
+        default=30, ge=1, le=1000,
         description="Minimum closed trades required to calculate Sharpe ratio"
     )
     SECURITY_MODEL_RETRAIN_INTERVAL_S: int = Field(
-        default=3600,
-        ge=300,
-        le=86400,
+        default=3600, ge=300, le=86400,
         description="Interval in seconds between SecurityAIAgent model retrains"
+    )
+
+    # Analytics (Phase P — BUG-P3 fix)
+    ANALYTICS_PAGE_SIZE: int = Field(
+        default=100, ge=10, le=1000,
+        description="Default/max page size for trade history and analytics endpoints"
+    )
+
+    # Analysis / SMC (Phase P — BUG-P4 fix)
+    SMC_MAX_CANDLES: int = Field(
+        default=1000, ge=50, le=10000,
+        description="Maximum number of candles allowed per SMC/PA analysis API request"
     )
 
     # Feature flags
@@ -246,13 +253,13 @@ def validate_settings(s: Settings) -> None:
         log.warning("[config] DATABASE_URL unexpected scheme: %s", s.DATABASE_URL[:30])
     if is_production():
         if not s.LICENSE_SECRET:
-            log.error("[config] LICENSE_SECRET not set in production - license system disabled")
+            log.error("[config] LICENSE_SECRET not set in production")
         if not s.FIELD_ENCRYPTION_KEY:
-            log.error("[config] FIELD_ENCRYPTION_KEY not set - field encryption disabled")
+            log.error("[config] FIELD_ENCRYPTION_KEY not set")
         if not s.SECRETS_MASTER_KEY:
             log.error("[config] SECRETS_MASTER_KEY not set")
         if s.ALLOWED_ORIGINS == ["*"]:
-            log.warning("[config] ALLOWED_ORIGINS is wildcard in production - restrict to your domains")
+            log.warning("[config] ALLOWED_ORIGINS is wildcard in production")
         if not os.path.isdir(s.MODEL_DIR):
             log.warning("[config] MODEL_DIR '%s' does not exist — models will not persist", s.MODEL_DIR)
 
