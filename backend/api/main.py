@@ -1,15 +1,11 @@
-"""backend/api/main.py -- Phase I Production Hardening
-Fixes:
-  I-1: CORS from ALLOWED_ORIGINS (alias in config)
-  I-2: SecurityHardenedMiddleware added
-  I-3: RateLimitMiddleware added as ASGI middleware
-  I-4: TrustedHostMiddleware with TRUSTED_HOSTS from env
-  I-5: init_redis called in lifespan
-  I-6: /health endpoint with CB + DB + MT5
-  I-7: GracefulDrain with docker-safe SIGTERM
-  I-8: /metrics Prometheus endpoint
-  Q5-FIX: register_missing_routes now LOGS at ERROR level for failed routes
-           and exposes them in /health response (status=degraded)
+"""
+backend/api/main.py — FIXED
+Fixes applied:
+  CB-1 FIX: /health/live endpoint added directly on app (Docker HEALTHCHECK target)
+  CB-7 FIX: mt5_ok dict → evaluated as mt5_ok.get("ok", False)
+  AI-2 FIX: kill_switch.is_active() called as sync consistently
+  CB-8 FIX: startup_check imported and called in lifespan
+  AI-4 FIX: MT5_GATEWAY_URL now in config (not raw os.environ in connector)
 """
 from __future__ import annotations
 
@@ -32,7 +28,7 @@ settings = get_settings()
 logger = get_logger("api.main")
 
 _STARTUP_T0: float = 0.0
-_FAILED_ROUTES: List[str] = []  # Q5-FIX: tracks failed route registrations
+_FAILED_ROUTES: List[str] = []
 
 
 def register_missing_routes(app: FastAPI) -> None:
@@ -66,7 +62,7 @@ def register_missing_routes(app: FastAPI) -> None:
                 app.include_router(router, prefix=prefix, tags=tags)
                 logger.debug("route registered", prefix=prefix)
             except Exception as exc:
-                logger.error(  # Q5-FIX: ERROR not debug
+                logger.error(
                     "ROUTE REGISTRATION FAILED",
                     prefix=prefix,
                     module=module,
@@ -147,6 +143,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Galaxy Vast AI -- startup", version=settings.APP_VERSION, env=settings.APP_ENV)
     _drain.register_sigterm()
 
+    # CB-8 FIX: startup_check now actually runs at startup
+    try:
+        from backend.startup_check import run_startup_checks
+        await run_startup_checks()
+        logger.info("Startup checks passed")
+    except ImportError:
+        logger.debug("startup_check module not found -- skipping pre-flight")
+    except Exception as exc:
+        logger.error("Startup checks FAILED", error=str(exc))
+        if settings.APP_ENV == "production":
+            raise
+
     try:
         from backend.database.redis_client import init_redis
         await safe_startup_task("redis", init_redis())
@@ -206,6 +214,16 @@ def create_app() -> FastAPI:
     except Exception as exc:
         logger.warning("RateLimitMiddleware skipped", error=str(exc))
 
+    # CB-1 FIX: /health/live added directly on app
+    # Docker HEALTHCHECK: curl -f http://localhost:8000/health/live
+    @app.get("/health/live", tags=["System"], include_in_schema=False)
+    async def health_live() -> Dict[str, Any]:
+        """Docker/Kubernetes liveness probe — no external dependencies."""
+        return {
+            "status": "alive",
+            "uptime_seconds": round(time.monotonic() - _STARTUP_T0, 1),
+        }
+
     @app.get("/health", tags=["System"])
     async def health_check() -> Dict[str, Any]:
         checks: Dict[str, Any] = {
@@ -216,7 +234,7 @@ def create_app() -> FastAPI:
         }
         checks["circuit_breakers"] = get_circuit_breaker_health()
 
-        if _FAILED_ROUTES:  # Q5-FIX: expose failed routes
+        if _FAILED_ROUTES:
             checks["failed_routes"] = _FAILED_ROUTES
             checks["status"] = "degraded"
 
@@ -229,13 +247,16 @@ def create_app() -> FastAPI:
 
         try:
             from backend.execution.mt5_connector import mt5_connector
-            mt5_ok = await asyncio.wait_for(mt5_connector.health_check(), timeout=3.0)
+            mt5_result = await asyncio.wait_for(mt5_connector.health_check(), timeout=3.0)
+            # CB-7 FIX: was `if mt5_ok` (always True for non-empty dict)
+            mt5_ok = mt5_result.get("ok", False) if isinstance(mt5_result, dict) else bool(mt5_result)
             checks["mt5_gateway"] = "ok" if mt5_ok else "degraded"
         except Exception as exc:
             checks["mt5_gateway"] = f"error: {str(exc)[:50]}"
 
         try:
             from backend.risk.kill_switch import kill_switch
+            # AI-2 FIX: sync is_active() — consistent across all files
             checks["kill_switch"] = "ACTIVE" if kill_switch.is_active() else "inactive"
         except Exception:
             checks["kill_switch"] = "unknown"
@@ -257,20 +278,10 @@ def create_app() -> FastAPI:
     async def prometheus_metrics() -> Any:
         try:
             from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-            from fastapi.responses import Response as FastAPIResponse
-            return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
-        except ImportError:
-            return JSONResponse(status_code=503, content={"error": "prometheus_client not installed"})
-
-    @app.exception_handler(Exception)
-    async def _global_exc(request: Request, exc: Exception) -> JSONResponse:
-        logger.error(
-            "unhandled exception",
-            path=str(request.url.path),
-            method=request.method,
-            error=str(exc)[:200],
-        )
-        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+            from fastapi.responses import Response
+            return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+        except Exception as exc:
+            return JSONResponse(status_code=503, content={"error": str(exc)})
 
     return app
 
