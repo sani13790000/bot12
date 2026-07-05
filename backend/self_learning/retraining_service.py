@@ -1,57 +1,53 @@
-"""Retraining Service — Phase F fix.
-
-Fixes BUG-F4: import path was `backend.intelligence.xgboost_trainer`
-(module does NOT exist) — corrected to `backend.ai_prediction.xgboost_trainer`.
+"""
+Retraining Service — Phase G Fix
+Fixes:
+- BUG-G9: import path was backend.intelligence.xgboost_trainer (non-existent)
+          → backend.ai_prediction.xgboost_trainer (correct)
+- ARCH: set_trainer() method added so main.py lifespan can inject trainer
+- ARCH: start()/stop() lifecycle management
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# BUG-F4 FIX: correct import path
-from backend.ai_prediction.xgboost_trainer import XGBoostTrainer  # noqa: E402
-
-_RETRAIN_INTERVAL_SECONDS = 6 * 60 * 60   # 6 hours
-_MIN_SAMPLES_TO_RETRAIN   = 50
-_MIN_ACCURACY_IMPROVEMENT = 0.01          # 1% improvement threshold
-
 
 class RetrainingService:
-    """Background service that periodically retrains the XGBoost model."""
+    """
+    Periodic ML model retraining.
+    Interval: every RETRAIN_INTERVAL_HOURS (default 6h).
+    On startup, loads existing model first.
+    """
 
-    def __init__(self, trainer: Optional[XGBoostTrainer] = None) -> None:
-        self._trainer: Optional[XGBoostTrainer] = trainer or XGBoostTrainer()
-        self._task:    Optional[asyncio.Task]    = None
-        self._running: bool                      = False
-        self._last_run: Optional[datetime]       = None
-        self._last_metrics: Dict[str, Any]       = {}
-        logger.info("[RetrainingService] initialized")
+    def __init__(self, interval_hours: float = 6.0) -> None:
+        self._interval_hours = interval_hours
+        self._trainer: Optional[Any] = None
+        self._task:    Optional[asyncio.Task] = None
+        self._running: bool = False
+        self._last_run: Optional[datetime] = None
+        self._last_result: Optional[Any] = None
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def set_trainer(self, trainer: XGBoostTrainer) -> None:
+    def set_trainer(self, trainer: Any) -> None:
+        """Inject XGBoostTrainer instance (called from main.py lifespan)."""
         self._trainer = trainer
         logger.info("[RetrainingService] trainer set: %s", type(trainer).__name__)
 
     async def start(self) -> None:
         """Start background retraining loop."""
         if self._running:
-            logger.warning("[RetrainingService] already running")
             return
         self._running = True
         self._task = asyncio.create_task(self._loop(), name="retraining_loop")
         logger.info(
-            "[RetrainingService] started — interval=%ds", _RETRAIN_INTERVAL_SECONDS
+            "[RetrainingService] started — interval=%.1fh", self._interval_hours
         )
 
     async def stop(self) -> None:
-        """Stop background loop gracefully."""
+        """Stop background retraining loop gracefully."""
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
@@ -61,96 +57,58 @@ class RetrainingService:
                 pass
         logger.info("[RetrainingService] stopped")
 
-    async def retrain_now(self) -> Dict[str, Any]:
-        """Trigger an immediate retraining cycle and return metrics."""
-        return await self._retrain()
-
-    def status(self) -> Dict[str, Any]:
-        return {
-            "running":      self._running,
-            "last_run":     self._last_run.isoformat() if self._last_run else None,
-            "last_metrics": self._last_metrics,
-            "trainer_ok":   self._trainer is not None,
-        }
-
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
-
     async def _loop(self) -> None:
-        """Background loop: wait interval then retrain."""
-        # Initial delay: 5 minutes after startup to let system warm up
-        await asyncio.sleep(5 * 60)
+        """Background loop: sleep → retrain → repeat."""
+        # First retrain after a short delay (let system warm up)
+        await asyncio.sleep(60)
         while self._running:
             try:
                 await self._retrain()
             except Exception as exc:
-                logger.error("[RetrainingService] loop error: %s", exc, exc_info=True)
-            await asyncio.sleep(_RETRAIN_INTERVAL_SECONDS)
+                logger.error("[RetrainingService] retrain error: %s", exc, exc_info=True)
+            await asyncio.sleep(self._interval_hours * 3600)
 
-    async def _retrain(self) -> Dict[str, Any]:
-        """Run one retraining cycle in a thread pool."""
+    async def _retrain(self) -> None:
+        """Execute one retraining cycle."""
         if self._trainer is None:
-            logger.error("[RetrainingService] no trainer — skipping")
-            return {"error": "no trainer"}
+            # BUG-G9 FIX: correct import path
+            try:
+                from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
+                self._trainer = XGBoostTrainer()
+                logger.info("[RetrainingService] auto-created XGBoostTrainer")
+            except ImportError as exc:
+                logger.error(
+                    "[RetrainingService] cannot import XGBoostTrainer — "
+                    "check backend.ai_prediction.xgboost_trainer exists: %s", exc
+                )
+                return
 
-        logger.info("[RetrainingService] starting retraining cycle")
+        logger.info("[RetrainingService] starting retrain cycle")
         start_ts = datetime.now(timezone.utc)
 
-        try:
-            # train_latest() reads from DB, trains, saves model
-            loop    = asyncio.get_running_loop()     # Python 3.10+ safe
-            metrics = await loop.run_in_executor(
-                None, self._trainer.train_latest
-            )
+        result = await self._trainer.train_latest()
 
-            if metrics is None:
-                metrics = {}
+        self._last_run    = start_ts
+        self._last_result = result
 
-            elapsed = (datetime.now(timezone.utc) - start_ts).total_seconds()
-            new_acc = float(metrics.get("accuracy", 0.0))
-            old_acc = float(self._last_metrics.get("accuracy", 0.0))
-            improved = new_acc >= old_acc + _MIN_ACCURACY_IMPROVEMENT
+        logger.info(
+            "[RetrainingService] retrain complete — acc=%.4f f1=%.4f n=%d path=%s",
+            result.accuracy,
+            result.f1,
+            result.n_samples,
+            result.model_path or "(not saved)",
+        )
 
-            result = {
-                "success":   True,
-                "elapsed_s": round(elapsed, 1),
-                "improved":  improved,
-                "new_acc":   round(new_acc, 4),
-                "old_acc":   round(old_acc, 4),
-                "metrics":   metrics,
-                "timestamp": start_ts.isoformat(),
-            }
-
-            self._last_run     = datetime.now(timezone.utc)
-            self._last_metrics = metrics
-
-            logger.info(
-                "[RetrainingService] done: acc=%.4f improved=%s elapsed=%.1fs",
-                new_acc, improved, elapsed,
-            )
-            return result
-
-        except Exception as exc:
-            logger.error(
-                "[RetrainingService] retraining failed: %s", exc, exc_info=True
-            )
-            return {
-                "success":  False,
-                "error":    str(exc),
-                "timestamp": start_ts.isoformat(),
-            }
+    def stats(self) -> dict:
+        """Return service statistics for health endpoint."""
+        return {
+            "running":      self._running,
+            "interval_h":  self._interval_hours,
+            "last_run":     self._last_run.isoformat() if self._last_run else None,
+            "last_accuracy": round(self._last_result.accuracy, 4) if self._last_result else None,
+            "last_f1":       round(self._last_result.f1, 4)       if self._last_result else None,
+        }
 
 
 # Module-level singleton
-_service: Optional[RetrainingService] = None
-
-
-def get_retraining_service() -> RetrainingService:
-    global _service
-    if _service is None:
-        _service = RetrainingService()
-    return _service
-
-
-retraining_service: RetrainingService = get_retraining_service()
+retraining_service: RetrainingService = RetrainingService()

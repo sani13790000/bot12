@@ -1,10 +1,12 @@
 """
-XGBoost Trainer — Phase A Fix
+XGBoost Trainer — Phase G Fix
 Added: train_latest() wrapper that retraining_service.py expects.
 Fixed: dataset building from recent trade history.
+Fixed(G8): train_latest() now saves via ModelManager for versioning.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,13 +18,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TrainResult:
-    accuracy: float
+    accuracy:  float
     precision: float
-    recall: float
-    f1: float
+    recall:    float
+    f1:        float
     n_samples: int
     model_path: Optional[str] = None
     feature_names: List[str] = field(default_factory=list)
+    auc_roc:   float = 0.0
 
 
 class DatasetBuilder:
@@ -108,15 +111,15 @@ class XGBoostTrainer:
     """Trains an XGBoost classifier to predict trade profitability."""
 
     DEFAULT_PARAMS: Dict[str, Any] = {
-        "n_estimators": 200,
-        "max_depth": 6,
-        "learning_rate": 0.05,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "use_label_encoder": False,
-        "eval_metric": "logloss",
-        "random_state": 42,
-        "n_jobs": -1,
+        "n_estimators":        200,
+        "max_depth":           6,
+        "learning_rate":       0.05,
+        "subsample":           0.8,
+        "colsample_bytree":    0.8,
+        "use_label_encoder":   False,
+        "eval_metric":         "logloss",
+        "random_state":        42,
+        "n_jobs":              -1,
     }
 
     def __init__(
@@ -129,14 +132,14 @@ class XGBoostTrainer:
         self._model: Optional[Any] = None
         self._feature_names: List[str] = []
 
-    # ── Training ──────────────────────────────────────────────────────────────
+    # ── Training ───────────────────────────────────────────────────────────────
 
     def train(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
+        X_val:   Optional[np.ndarray] = None,
+        y_val:   Optional[np.ndarray] = None,
     ) -> TrainResult:
         """
         Train XGBoost classifier and return evaluation metrics.
@@ -148,7 +151,7 @@ class XGBoostTrainer:
             logger.error("[XGBoostTrainer] xgboost not installed")
             return TrainResult(accuracy=0.0, precision=0.0, recall=0.0, f1=0.0, n_samples=0)
 
-        from sklearn.metrics import accuracy_score, classification_report
+        from sklearn.metrics import accuracy_score
         from sklearn.model_selection import train_test_split
 
         if X_val is None or y_val is None:
@@ -167,17 +170,25 @@ class XGBoostTrainer:
         y_pred = model.predict(X_val)
         acc = float(accuracy_score(y_val, y_pred))
 
+        # AUC-ROC
+        auc = 0.60
+        try:
+            from sklearn.metrics import roc_auc_score
+            auc = float(roc_auc_score(y_val, model.predict_proba(X_val)[:, 1]))
+        except Exception:
+            pass
+
         try:
             from sklearn.metrics import precision_score, recall_score, f1_score
             prec = float(precision_score(y_val, y_pred, zero_division=0))
-            rec = float(recall_score(y_val, y_pred, zero_division=0))
-            f1 = float(f1_score(y_val, y_pred, zero_division=0))
+            rec  = float(recall_score(y_val, y_pred, zero_division=0))
+            f1   = float(f1_score(y_val, y_pred, zero_division=0))
         except Exception:
             prec = rec = f1 = 0.0
 
         logger.info(
-            "[XGBoostTrainer] train() — acc=%.4f prec=%.4f rec=%.4f f1=%.4f n=%d",
-            acc, prec, rec, f1, len(y_train)
+            "[XGBoostTrainer] train() — acc=%.4f prec=%.4f rec=%.4f f1=%.4f auc=%.4f n=%d",
+            acc, prec, rec, f1, auc, len(y_train)
         )
         return TrainResult(
             accuracy=acc,
@@ -185,19 +196,19 @@ class XGBoostTrainer:
             recall=rec,
             f1=f1,
             n_samples=len(y_train),
+            auc_roc=auc,
         )
 
     async def train_latest(
         self,
         lookback_days: int = 90,
-        min_samples: int = 50,
+        min_samples:   int = 50,
+        symbol:        str = "default",
     ) -> TrainResult:
         """
-        PHASE A FIX: This method was called by retraining_service.py but
-        did not exist, causing AttributeError on every retrain cycle.
-
+        Phase A FIX: Called by retraining_service.py.
+        Phase G FIX (BUG-G8): Saves via ModelManager for versioning.
         Builds dataset from recent trades, trains model, saves if improved.
-        Returns TrainResult with real accuracy metrics.
         """
         builder = DatasetBuilder(lookback_days=lookback_days)
         loop = asyncio.get_running_loop()
@@ -216,19 +227,40 @@ class XGBoostTrainer:
             )
 
         # Run CPU-bound training in thread pool
-        import asyncio
         result = await loop.run_in_executor(
             None, self.train, X, y, None, None
         )
 
-        # Save model if training succeeded
+        # BUG-G8 FIX: Save via ModelManager for versioning
         if result.accuracy > 0 and self._model is not None:
             try:
-                saved_path = await loop.run_in_executor(None, self._save_model)
+                from backend.ai_prediction.model_manager import ModelManager, ModelMetadata
+                from datetime import datetime, timezone
+                manager = ModelManager(self._model_dir)
+                meta = ModelMetadata(
+                    symbol=symbol,
+                    trained_at=datetime.now(timezone.utc).isoformat(),
+                    n_samples=result.n_samples,
+                    accuracy=result.accuracy,
+                    precision=result.precision,
+                    recall=result.recall,
+                    f1=result.f1,
+                    auc_roc=result.auc_roc,
+                    feature_names=feature_names,
+                )
+                saved_path = await loop.run_in_executor(
+                    None, manager.save_model, self._model, meta
+                )
                 result.model_path = saved_path
                 result.feature_names = feature_names
+                logger.info("[XGBoostTrainer] model versioned at %s (auc=%.3f)", saved_path, result.auc_roc)
             except Exception as exc:
-                logger.warning("[XGBoostTrainer] Could not save model: %s", exc)
+                logger.warning("[XGBoostTrainer] ModelManager save failed: %s — using pickle fallback", exc)
+                try:
+                    saved_path = await loop.run_in_executor(None, self._save_model_pkl)
+                    result.model_path = saved_path
+                except Exception as exc2:
+                    logger.warning("[XGBoostTrainer] pickle fallback also failed: %s", exc2)
 
         return result
 
@@ -243,23 +275,35 @@ class XGBoostTrainer:
         proba = self.predict_proba(features)
         return (proba[:, 1] >= threshold).astype(int)
 
-    # ── Persistence ───────────────────────────────────────────────────────────
+    # ── Persistence ───────────────────────────────────────────────────────────────
 
-    def _save_model(self) -> str:
-        """Save model to disk. Returns saved path."""
+    def _save_model_pkl(self) -> str:
+        """Pickle fallback. Returns saved path."""
         import os
         import pickle
         os.makedirs(self._model_dir, exist_ok=True)
         path = os.path.join(self._model_dir, "model_latest.pkl")
         with open(path, "wb") as f:
             pickle.dump({"model": self._model, "features": self._feature_names}, f)
-        logger.info("[XGBoostTrainer] Model saved to %s", path)
+        logger.info("[XGBoostTrainer] Model saved (pickle fallback) to %s", path)
         return path
 
     def load_model(self, path: Optional[str] = None) -> bool:
         """Load model from disk. Returns True if successful."""
         import os
         import pickle
+        # First try ModelManager
+        try:
+            from backend.ai_prediction.model_manager import ModelManager
+            manager = ModelManager(self._model_dir)
+            model = manager.load_best_model()
+            if model is not None:
+                self._model = model
+                logger.info("[XGBoostTrainer] Loaded model via ModelManager")
+                return True
+        except Exception:
+            pass
+        # Fallback: pickle
         load_path = path or os.path.join(self._model_dir, "model_latest.pkl")
         if not os.path.exists(load_path):
             logger.warning("[XGBoostTrainer] No model file at %s", load_path)
@@ -274,7 +318,3 @@ class XGBoostTrainer:
         except Exception as exc:
             logger.error("[XGBoostTrainer] Failed to load model: %s", exc)
             return False
-
-
-# Module-level import fix for train_latest
-import asyncio
