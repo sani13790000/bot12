@@ -6,6 +6,9 @@ import { useApi } from "@/hooks/useApi";
 import Badge from "@/components/Badge";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
+// BUG-V3 fix: version from env, not hardcoded
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "3.0.0";
+
 export default function SettingsPage() {
   const { data: license, isLoading, refetch } = useApi(licenseApi.getStatus);
   const [licKey, setLicKey] = useState("");
@@ -29,7 +32,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
             <div><p className="text-gray-400">وضعیت</p><Badge label={license.is_valid?"معتبر":"نامعتبر"} color={license.is_valid?"green":"red"} /></div>
             <div><p className="text-gray-400">پلن</p><p className="text-white mt-1">{license.plan}</p></div>
-            <div><p className="text-gray-400">انقضا</p><p className="text-white mt-1">{new Date(license.expires_at).toLocaleDateString("fa-IR")}</p></div>
+            <div><p className="text-gray-400">انقضاء</p><p className="text-white mt-1">{new Date(license.expires_at).toLocaleDateString("fa-IR")}</p></div>
             <div><p className="text-gray-400">حساب‌ها</p><p className="text-white mt-1">{license.active_accounts}/{license.max_accounts}</p></div>
           </div>
         )}
@@ -46,7 +49,7 @@ export default function SettingsPage() {
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
         <h2 className="text-sm font-semibold text-white mb-3">اطلاعات سیستم</h2>
         <div className="space-y-2 text-xs">
-          {[{k:"API URL",v:import.meta.env.VITE_API_URL??"http://localhost:8000"},{k:"WS URL",v:import.meta.env.VITE_WS_URL??"ws://localhost:8000"},{k:"نسخه",v:"3.0.0"}]
+          {[{k:"API URL",v:import.meta.env.VITE_API_URL??"http://localhost:8000"},{k:"WS URL",v:import.meta.env.VITE_WS_URL??"ws://localhost:8000"},{k:"نسخه",v:APP_VERSION}]
             .map(({k,v}) => <div key={k} className="flex justify-between p-2 rounded-lg bg-gray-800"><span className="text-gray-400">{k}</span><span className="text-gray-300 font-mono">{v}</span></div>)}
         </div>
       </div>

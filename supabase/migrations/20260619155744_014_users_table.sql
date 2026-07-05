@@ -1,13 +1,14 @@
 -- Migration 014: Users table (canonical)
--- BUG-U3a FIX: renamed from 20260610_014_users_table.sql
--- timestamp 20260612155743 = 1 second after 001 (20260612155742)
--- ensures users table is created AFTER initial_schema
+-- BUG-V4 FIX: renamed from 20260612155743_014_users_table.sql
+-- timestamp 20260619155744 = 1 second after migration 013 (20260619)
+-- ensures users table is created AFTER migrations 002-013
+-- (previously was 20260612155743 which sorted between 001 and 002)
 
 BEGIN;
 
--- ====================================================================
+-- =============================================================================
 -- 1. Users table
--- ====================================================================
+-- =============================================================================
 CREATE TABLE IF NOT EXISTS public.users (
     id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     username     TEXT        NOT NULL UNIQUE,
@@ -19,17 +20,17 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ====================================================================
+-- =============================================================================
 -- 2. Indexes
--- ====================================================================
+-- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_users_username ON public.users (username);
 CREATE INDEX IF NOT EXISTS idx_users_email    ON public.users (email);
 CREATE INDEX IF NOT EXISTS idx_users_role     ON public.users (role);
 CREATE INDEX IF NOT EXISTS idx_users_active   ON public.users (is_active) WHERE is_active = TRUE;
 
--- ====================================================================
+-- =============================================================================
 -- 3. updated_at auto-update trigger
--- ====================================================================
+-- =============================================================================
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -43,9 +44,9 @@ CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON public.users
     FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ====================================================================
+-- =============================================================================
 -- 4. Row Level Security
--- ====================================================================
+-- =============================================================================
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS users_service_all ON public.users;
@@ -63,9 +64,9 @@ CREATE POLICY users_self_update ON public.users
     USING (id::TEXT = auth.uid()::TEXT)
     WITH CHECK (id::TEXT = auth.uid()::TEXT);
 
--- ====================================================================
+-- =============================================================================
 -- 5. refresh_tokens table for revocation list
--- ====================================================================
+-- =============================================================================
 CREATE TABLE IF NOT EXISTS public.refresh_tokens (
     jti          TEXT     PRIMARY KEY,
     user_id      UUID     NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
