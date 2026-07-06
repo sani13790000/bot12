@@ -3,11 +3,14 @@ backend/api/main.py
 Galaxy Vast AI Trading Platform — FastAPI Application Entry Point
 
 Phase AB fix: restore from placeholder "MAIN_CONTENT" (12 bytes) to full application.
+Phase AC fix:
+  BUG-AC1: backtest double prefix removed (backtest.py no longer has prefix="/backtest")
+  BUG-AC2: research added to import list and include_router at /research
 
 All routes registered:
   auth, signals, trades, dashboard, health, admin, admin_users, admin_observability,
   analytics, risk, reports, portfolio, metrics, billing, backtest, backtest_engine,
-  decision, intelligence, learning, self_learning, license, institutional,
+  research, decision, intelligence, learning, self_learning, license, institutional,
   institutional_backtest, agents, ai_prediction, analysis, security_ai,
   security_ai_extended, permissions_routes, rate_limit_routes, trade_history,
   trade_report, users, websocket_routes, audit_routes_v21
@@ -108,46 +111,47 @@ def _create_app() -> FastAPI:
         analysis, analytics, auth, backtest, backtest_engine, billing,
         dashboard, decision, health, institutional, institutional_backtest,
         intelligence, learning, license, metrics, permissions_routes,
-        portfolio, rate_limit_routes, reports, risk, security_ai,
+        portfolio, rate_limit_routes, reports, research, risk, security_ai,
         security_ai_extended, security_ai_loader, self_learning, signals,
         trade_history, trade_report, trades, users, websocket_routes,
     )
 
-    app.include_router(auth.router,                   prefix="/auth",                    tags=["auth"])
-    app.include_router(signals.router,                prefix="/signals",                 tags=["signals"])
-    app.include_router(trades.router,                 prefix="/trades",                  tags=["trades"])
-    app.include_router(decision.router,               prefix="/decision",                tags=["decision"])
-    app.include_router(analysis.router,               prefix="/analysis",                tags=["analysis"])
-    app.include_router(ai_prediction.router,          prefix="/ai-prediction",           tags=["ai_prediction"])
-    app.include_router(dashboard.router,              prefix="/dashboard",               tags=["dashboard"])
-    app.include_router(metrics.router,                prefix="/metrics",                 tags=["metrics"])
-    app.include_router(analytics.router,              prefix="/analytics",               tags=["analytics"])
-    app.include_router(portfolio.router,              prefix="/portfolio",               tags=["portfolio"])
-    app.include_router(reports.router,                prefix="/reports",                 tags=["reports"])
-    app.include_router(risk.router,                   prefix="/risk",                    tags=["risk"])
-    app.include_router(health.router,                 prefix="/health",                  tags=["health"])
-    app.include_router(backtest.router,               prefix="/backtest",                tags=["backtest"])
-    app.include_router(backtest_engine.router,        prefix="/backtest-engine",         tags=["backtest_engine"])
-    app.include_router(intelligence.router,           prefix="/intelligence",            tags=["intelligence"])
-    app.include_router(learning.router,               prefix="/learning",                tags=["learning"])
-    app.include_router(self_learning.router,          prefix="/self-learning",           tags=["self_learning"])
-    app.include_router(institutional.router,          prefix="/institutional",           tags=["institutional"])
-    app.include_router(institutional_backtest.router, prefix="/institutional-backtest",  tags=["institutional_backtest"])
-    app.include_router(agents.router,                 prefix="/agents",                  tags=["agents"])
-    app.include_router(security_ai.router,            prefix="/security-ai",             tags=["security_ai"])
-    app.include_router(security_ai_extended.router,   prefix="/security-ai-ext",         tags=["security_ai_extended"])
-    app.include_router(security_ai_loader.router,     prefix="/security-ai-loader",      tags=["security_ai_loader"])
-    app.include_router(billing.router,                prefix="/billing",                 tags=["billing"])
-    app.include_router(license.router,                prefix="/license",                 tags=["license"])
-    app.include_router(users.router,                  prefix="/users",                   tags=["users"])
-    app.include_router(admin.router,                  prefix="/admin",                   tags=["admin"])
-    app.include_router(admin_users.router,            prefix="/admin",                   tags=["admin_users"])
-    app.include_router(admin_observability.router,    prefix="/admin",                   tags=["admin_observability"])
-    app.include_router(permissions_routes.router,     prefix="/permissions",             tags=["permissions"])
-    app.include_router(rate_limit_routes.router,      prefix="/rate-limit",              tags=["rate_limit"])
-    app.include_router(trade_history.router,          prefix="/trade-history",           tags=["trade_history"])
-    app.include_router(trade_report.router,           prefix="/trade-report",            tags=["trade_report"])
-    app.include_router(websocket_routes.router,       prefix="/ws",                      tags=["websocket"])
+    app.include_router(auth.router,                   prefix="/auth",                     tags=["auth"])
+    app.include_router(signals.router,                prefix="/signals",                   tags=["signals"])
+    app.include_router(trades.router,                 prefix="/trades",                    tags=["trades"])
+    app.include_router(decision.router,               prefix="/decision",                  tags=["decision"])
+    app.include_router(analysis.router,               prefix="/analysis",                  tags=["analysis"])
+    app.include_router(ai_prediction.router,          prefix="/ai-prediction",             tags=["ai_prediction"])
+    app.include_router(dashboard.router,              prefix="/dashboard",                 tags=["dashboard"])
+    app.include_router(metrics.router,                prefix="/metrics",                   tags=["metrics"])
+    app.include_router(analytics.router,              prefix="/analytics",                 tags=["analytics"])
+    app.include_router(portfolio.router,              prefix="/portfolio",                 tags=["portfolio"])
+    app.include_router(reports.router,                prefix="/reports",                   tags=["reports"])
+    app.include_router(risk.router,                   prefix="/risk",                      tags=["risk"])
+    app.include_router(health.router,                 prefix="/health",                    tags=["health"])
+    app.include_router(backtest.router,               prefix="/backtest",                  tags=["backtest"])
+    app.include_router(backtest_engine.router,        prefix="/backtest-engine",           tags=["backtest_engine"])
+    app.include_router(research.router,               prefix="/research",                  tags=["research"])
+    app.include_router(intelligence.router,           prefix="/intelligence",              tags=["intelligence"])
+    app.include_router(learning.router,               prefix="/learning",                  tags=["learning"])
+    app.include_router(self_learning.router,          prefix="/self-learning",             tags=["self_learning"])
+    app.include_router(institutional.router,          prefix="/institutional",             tags=["institutional"])
+    app.include_router(institutional_backtest.router, prefix="/institutional-backtest",    tags=["institutional_backtest"])
+    app.include_router(agents.router,                 prefix="/agents",                    tags=["agents"])
+    app.include_router(security_ai.router,            prefix="/security-ai",               tags=["security_ai"])
+    app.include_router(security_ai_extended.router,   prefix="/security-ai-ext",           tags=["security_ai_extended"])
+    app.include_router(security_ai_loader.router,     prefix="/security-ai-loader",        tags=["security_ai_loader"])
+    app.include_router(billing.router,                prefix="/billing",                   tags=["billing"])
+    app.include_router(license.router,                prefix="/license",                   tags=["license"])
+    app.include_router(users.router,                  prefix="/users",                     tags=["users"])
+    app.include_router(admin.router,                  prefix="/admin",                     tags=["admin"])
+    app.include_router(admin_users.router,            prefix="/admin",                     tags=["admin_users"])
+    app.include_router(admin_observability.router,    prefix="/admin",                     tags=["admin_observability"])
+    app.include_router(permissions_routes.router,     prefix="/permissions",               tags=["permissions"])
+    app.include_router(rate_limit_routes.router,      prefix="/rate-limit",                tags=["rate_limit"])
+    app.include_router(trade_history.router,          prefix="/trade-history",             tags=["trade_history"])
+    app.include_router(trade_report.router,           prefix="/trade-report",              tags=["trade_report"])
+    app.include_router(websocket_routes.router,       prefix="/ws",                        tags=["websocket"])
 
     try:
         from backend.api.routes import audit_routes_v21

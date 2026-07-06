@@ -2,6 +2,7 @@
 
 BUG-N7 FIX: date_range validation.
 BUG-P2 FIX: max_workers and timeout from settings (not hardcode).
+BUG-AC1 FIX: removed prefix="/backtest" from APIRouter — main.py provides it.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/backtest", tags=["backtest"])
+router = APIRouter(tags=["backtest"])
 
 
 class BacktestRequest(BaseModel):
