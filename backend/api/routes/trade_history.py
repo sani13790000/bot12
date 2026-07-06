@@ -1,8 +1,14 @@
 """Trade history endpoint with pagination.
 
-BUG-P3 FIX: GET /trades/history now supports limit/offset pagination.
+BUG-P3 FIX: GET /trade-history/history now supports limit/offset pagination.
   - Default/max page size from settings.ANALYTICS_PAGE_SIZE (default=100)
   - Returns total_count, has_more, page, total_pages for cursor navigation
+
+BUG-AJ1 FIX: @router.get("/trades/history") → @router.get("/history")
+  - was: main.py prefix="/trade-history" + router "/trades/history"
+         → effective: /trade-history/trades/history → 404
+  - now: main.py prefix="/trade-history" + router "/history"
+         → effective: /trade-history/history ✅
 """
 from __future__ import annotations
 
@@ -18,7 +24,7 @@ log    = logging.getLogger(__name__)
 router = APIRouter(tags=["trades"])
 
 
-@router.get("/trades/history")
+@router.get("/history")
 async def get_trade_history(
     limit:  int           = Query(default=100, ge=1, le=500,  description="Records per page"),
     offset: int           = Query(default=0,   ge=0,          description="Offset for pagination"),
@@ -26,7 +32,7 @@ async def get_trade_history(
     status: Optional[str] = Query(default="closed",           description="Trade status filter"),
     days:   int           = Query(default=90,  ge=1, le=3650, description="Lookback window in days"),
 ) -> JSONResponse:
-    """Paginated trade history. BUG-P3 fix."""
+    """Paginated trade history. BUG-P3 + BUG-AJ1 fix."""
     from backend.core.config import get_settings
     _s    = get_settings()
     limit = min(limit, _s.ANALYTICS_PAGE_SIZE)   # cap at configured max
