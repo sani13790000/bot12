@@ -5,8 +5,13 @@ P20-ROUTE-PERM-1: GET /permissions/matrix  → full role×permission matrix
 P20-ROUTE-PERM-2: GET /permissions/my      → current user's permissions
 P20-ROUTE-PERM-3: GET /permissions/endpoints → all endpoints + required perm
 P20-ROUTE-PERM-4: GET /permissions/roles   → role definitions
+
+Phase AH fix: BUG-AH1 — added APIRouter + @router decorators
+(was plain functions only — no router attr → AttributeError in main.py L154)
 """
 from __future__ import annotations
+
+from fastapi import APIRouter, Depends
 
 from ..core.permissions import (
     AuthContext,
@@ -19,28 +24,37 @@ from ..core.permissions import (
     expand_permissions,
 )
 from ..core.deps_v3 import require_perm
+from ..core.deps import get_current_user
+
+router = APIRouter(tags=["permissions"])
 
 
-def get_matrix(ctx: AuthContext) -> dict:
-    """P20-ROUTE-PERM-1."""
+@router.get("/matrix")
+async def get_matrix(_user=Depends(get_current_user)) -> dict:
+    """P20-ROUTE-PERM-1. Full role×permission matrix."""
+    ctx: AuthContext = _user
     require_perm(P.PROFILE_READ_OWN)(ctx)
     return rbac_v2.permission_matrix()
 
 
-def get_my_permissions(ctx: AuthContext) -> dict:
-    """P20-ROUTE-PERM-2."""
+@router.get("/my")
+async def get_my_permissions(_user=Depends(get_current_user)) -> dict:
+    """P20-ROUTE-PERM-2. Current user's permissions."""
+    ctx: AuthContext = _user
     require_perm(P.PROFILE_READ_OWN)(ctx)
     return {
-        "user_id":    ctx.user_id,
-        "role":       ctx.role,
-        "rank":       ctx.rank,
+        "user_id":     ctx.user_id,
+        "role":        ctx.role,
+        "rank":        ctx.rank,
         "permissions": sorted(ctx.effective_perms - {P.ALL}),
-        "plan":       ctx.plan,
+        "plan":        ctx.plan,
     }
 
 
-def get_endpoint_permissions(ctx: AuthContext) -> dict:
-    """P20-ROUTE-PERM-3."""
+@router.get("/endpoints")
+async def get_endpoint_permissions(_user=Depends(get_current_user)) -> dict:
+    """P20-ROUTE-PERM-3. All endpoints + required permission."""
+    ctx: AuthContext = _user
     require_perm(P.PROFILE_READ_OWN)(ctx)
     return {
         "endpoints": rbac_v2.endpoint_permissions(),
@@ -48,8 +62,10 @@ def get_endpoint_permissions(ctx: AuthContext) -> dict:
     }
 
 
-def get_role_definitions(ctx: AuthContext) -> dict:
-    """P20-ROUTE-PERM-4."""
+@router.get("/roles")
+async def get_role_definitions(_user=Depends(get_current_user)) -> dict:
+    """P20-ROUTE-PERM-4. Role definitions."""
+    ctx: AuthContext = _user
     require_perm(P.PROFILE_READ_OWN)(ctx)
     roles = {}
     for role in [Role.READONLY, Role.CUSTOMER, Role.SUPPORT,
