@@ -1,23 +1,14 @@
 """
 backend/api/main.py
-Galaxy Vast AI Trading Platform — FastAPI Application Entry Point
+Galaxy Vast AI Trading Platform -- FastAPI Application Entry Point
 
 Phase AB fix: restore from placeholder "MAIN_CONTENT" (12 bytes) to full application.
-Phase AC fix:
-  BUG-AC1: backtest double prefix removed (backtest.py no longer has prefix="/backtest")
-  BUG-AC2: research added to import list and include_router at /research
-Phase AD fix:
-  BUG-AD5: CORS wildcard ["*"] default → None + production-safe fallback with logger.warning
-
-All routes registered:
-  auth, signals, trades, dashboard, health, admin, admin_users, admin_observability,
-  analytics, risk, reports, portfolio, metrics, billing, backtest, backtest_engine,
-  research, decision, intelligence, learning, self_learning, license, institutional,
-  institutional_backtest, agents, ai_prediction, analysis, security_ai,
-  security_ai_extended, permissions_routes, rate_limit_routes, trade_history,
-  trade_report, users, websocket_routes, audit_routes_v21
-
-BUG-AA2 fix: shutdown logger.warning (not bare pass)
+Phase AC fix: BUG-AC1 backtest double prefix + BUG-AC2 research registered.
+Phase AD fix: BUG-AD5 CORS wildcard default -> None + production-safe fallback.
+Phase AG fix:
+  BUG-AG1: websocket_routes.py no longer has prefix="/ws" -- main.py provides it
+  BUG-AG2: institutional_backtest.py no longer has broken prefix
+  BUG-AG3: security_ai_loader.router removed -- it has no .router attr (only function)
 """
 from __future__ import annotations
 
@@ -37,7 +28,6 @@ _startup_time: float = 0.0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan: startup → yield → shutdown."""
     global _startup_time
     _startup_time = time.time()
     logger.info("[startup] Galaxy Vast AI Trading Platform starting...")
@@ -46,17 +36,17 @@ async def lifespan(app: FastAPI):
         from backend.self_learning.retraining_service import retraining_service
         await retraining_service.start()
         logger.info("[startup] RetrainingService started")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("[startup] RetrainingService start failed: %s", exc)
 
     try:
         from backend.agents.security_ai_agent import security_ai_agent
         await security_ai_agent.start()
         logger.info("[startup] SecurityAIAgent started")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("[startup] SecurityAIAgent start failed: %s", exc)
 
-    logger.info("[startup] All services started — ready to serve.")
+    logger.info("[startup] All services started -- ready to serve.")
     yield
 
     logger.info("[shutdown] Shutting down Galaxy Vast AI Trading Platform...")
@@ -65,14 +55,14 @@ async def lifespan(app: FastAPI):
         from backend.self_learning.retraining_service import retraining_service
         retraining_service.stop()
         logger.info("[shutdown] RetrainingService stopped")
-    except Exception as exc:  # noqa: BLE001 — BUG-AA2 fix: was bare pass
+    except Exception as exc:  # BUG-AA2 fix: was bare pass
         logger.warning("[shutdown] RetrainingService.stop failed: %s", exc)
 
     try:
         from backend.agents.security_ai_agent import security_ai_agent
         await security_ai_agent.stop()
         logger.info("[shutdown] SecurityAIAgent stopped")
-    except Exception as exc:  # noqa: BLE001 — BUG-AA2 fix: was bare pass
+    except Exception as exc:  # BUG-AA2 fix: was bare pass
         logger.warning("[shutdown] SecurityAIAgent.stop failed: %s", exc)
 
     logger.info("[shutdown] Shutdown complete.")
@@ -83,7 +73,7 @@ def _create_app() -> FastAPI:
 
     app = FastAPI(
         title="Galaxy Vast AI Trading Platform",
-        description="Enterprise MT5 Trading Ecosystem — SMC + ML + Decision Engine",
+        description="Enterprise MT5 Trading Ecosystem -- SMC + ML + Decision Engine",
         version=getattr(settings, "APP_VERSION", "3.0.0"),
         docs_url="/docs",
         redoc_url="/redoc",
@@ -91,14 +81,13 @@ def _create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # BUG-AD5 fix: was getattr(settings, 'CORS_ORIGINS', ['*']) — wildcard with credentials=True
-    # is browser-rejected in production. Now: None → production=localhost-only + warning, dev=['*']
+    # BUG-AD5 fix: CORS wildcard default -> None + production-safe fallback
     cors_origins = getattr(settings, "CORS_ORIGINS", None)
     if not cors_origins:
         env = getattr(settings, "ENVIRONMENT", "development").lower()
         if env in ("production", "prod", "staging"):
             logger.warning(
-                "[CORS] CORS_ORIGINS not set in %s — defaulting to localhost only. "
+                "[CORS] CORS_ORIGINS not set in %s -- defaulting to localhost only. "
                 "Set CORS_ORIGINS env var for production.", env
             )
             cors_origins = ["http://localhost:3000", "http://localhost:5173"]
@@ -126,53 +115,55 @@ def _create_app() -> FastAPI:
         dashboard, decision, health, institutional, institutional_backtest,
         intelligence, learning, license, metrics, permissions_routes,
         portfolio, rate_limit_routes, reports, research, risk, security_ai,
-        security_ai_extended, security_ai_loader, self_learning, signals,
+        security_ai_extended, self_learning, signals,
         trade_history, trade_report, trades, users, websocket_routes,
     )
+    # BUG-AG3: security_ai_loader removed from imports -- it has no .router attr
+    # security_ai.router + security_ai_extended.router are registered directly below
 
-    app.include_router(auth.router,                   prefix="/auth",                     tags=["auth"])
-    app.include_router(signals.router,                prefix="/signals",                  tags=["signals"])
-    app.include_router(trades.router,                 prefix="/trades",                   tags=["trades"])
-    app.include_router(decision.router,               prefix="/decision",                  tags=["decision"])
-    app.include_router(analysis.router,               prefix="/analysis",                 tags=["analysis"])
-    app.include_router(ai_prediction.router,          prefix="/ai-prediction",             tags=["ai_prediction"])
-    app.include_router(dashboard.router,              prefix="/dashboard",                 tags=["dashboard"])
-    app.include_router(metrics.router,                prefix="/metrics",                   tags=["metrics"])
-    app.include_router(analytics.router,              prefix="/analytics",                 tags=["analytics"])
-    app.include_router(portfolio.router,              prefix="/portfolio",                 tags=["portfolio"])
-    app.include_router(reports.router,                prefix="/reports",                   tags=["reports"])
-    app.include_router(risk.router,                   prefix="/risk",                      tags=["risk"])
-    app.include_router(health.router,                 prefix="/health",                    tags=["health"])
-    app.include_router(backtest.router,               prefix="/backtest",                  tags=["backtest"])
-    app.include_router(backtest_engine.router,        prefix="/backtest-engine",            tags=["backtest_engine"])
-    app.include_router(research.router,               prefix="/research",                  tags=["research"])
-    app.include_router(intelligence.router,           prefix="/intelligence",               tags=["intelligence"])
-    app.include_router(learning.router,               prefix="/learning",                  tags=["learning"])
-    app.include_router(self_learning.router,          prefix="/self-learning",              tags=["self_learning"])
-    app.include_router(institutional.router,          prefix="/institutional",              tags=["institutional"])
-    app.include_router(institutional_backtest.router, prefix="/institutional-backtest",     tags=["institutional_backtest"])
-    app.include_router(agents.router,                 prefix="/agents",                    tags=["agents"])
-    app.include_router(security_ai.router,            prefix="/security-ai",               tags=["security_ai"])
-    app.include_router(security_ai_extended.router,   prefix="/security-ai-ext",           tags=["security_ai_extended"])
-    app.include_router(security_ai_loader.router,     prefix="/security-ai-loader",        tags=["security_ai_loader"])
-    app.include_router(billing.router,                prefix="/billing",                   tags=["billing"])
-    app.include_router(license.router,                prefix="/license",                   tags=["license"])
-    app.include_router(users.router,                  prefix="/users",                     tags=["users"])
-    app.include_router(admin.router,                  prefix="/admin",                     tags=["admin"])
-    app.include_router(admin_users.router,            prefix="/admin",                     tags=["admin_users"])
-    app.include_router(admin_observability.router,    prefix="/admin",                     tags=["admin_observability"])
-    app.include_router(permissions_routes.router,     prefix="/permissions",               tags=["permissions"])
-    app.include_router(rate_limit_routes.router,      prefix="/rate-limit",                tags=["rate_limit"])
-    app.include_router(trade_history.router,          prefix="/trade-history",             tags=["trade_history"])
-    app.include_router(trade_report.router,           prefix="/trade-report",              tags=["trade_report"])
-    app.include_router(websocket_routes.router,       prefix="/ws",                        tags=["websocket"])
+    app.include_router(auth.router,                     prefix="/auth",                     tags=["auth"])
+    app.include_router(signals.router,                  prefix="/signals",                  tags=["signals"])
+    app.include_router(trades.router,                   prefix="/trades",                   tags=["trades"])
+    app.include_router(decision.router,                 prefix="/decision",                 tags=["decision"])
+    app.include_router(analysis.router,                 prefix="/analysis",                 tags=["analysis"])
+    app.include_router(ai_prediction.router,            prefix="/ai-prediction",            tags=["ai_prediction"])
+    app.include_router(dashboard.router,                prefix="/dashboard",                tags=["dashboard"])
+    app.include_router(metrics.router,                  prefix="/metrics",                  tags=["metrics"])
+    app.include_router(analytics.router,                prefix="/analytics",                tags=["analytics"])
+    app.include_router(portfolio.router,                prefix="/portfolio",                tags=["portfolio"])
+    app.include_router(reports.router,                  prefix="/reports",                  tags=["reports"])
+    app.include_router(risk.router,                     prefix="/risk",                     tags=["risk"])
+    app.include_router(health.router,                   prefix="/health",                   tags=["health"])
+    app.include_router(backtest.router,                 prefix="/backtest",                 tags=["backtest"])
+    app.include_router(backtest_engine.router,          prefix="/backtest-engine",          tags=["backtest_engine"])
+    app.include_router(research.router,                 prefix="/research",                 tags=["research"])
+    app.include_router(intelligence.router,             prefix="/intelligence",             tags=["intelligence"])
+    app.include_router(learning.router,                 prefix="/learning",                 tags=["learning"])
+    app.include_router(self_learning.router,            prefix="/self-learning",            tags=["self_learning"])
+    app.include_router(institutional.router,            prefix="/institutional",            tags=["institutional"])
+    app.include_router(institutional_backtest.router,   prefix="/institutional-backtest",   tags=["institutional_backtest"])
+    app.include_router(agents.router,                   prefix="/agents",                   tags=["agents"])
+    app.include_router(security_ai.router,              prefix="/security-ai",              tags=["security_ai"])
+    app.include_router(security_ai_extended.router,     prefix="/security-ai-ext",          tags=["security_ai_extended"])
+    app.include_router(billing.router,                  prefix="/billing",                  tags=["billing"])
+    app.include_router(license.router,                  prefix="/license",                  tags=["license"])
+    app.include_router(users.router,                    prefix="/users",                    tags=["users"])
+    app.include_router(admin.router,                    prefix="/admin",                    tags=["admin"])
+    app.include_router(admin_users.router,              prefix="/admin",                    tags=["admin_users"])
+    app.include_router(admin_observability.router,      prefix="/admin",                    tags=["admin_observability"])
+    app.include_router(permissions_routes.router,       prefix="/permissions",              tags=["permissions"])
+    app.include_router(rate_limit_routes.router,        prefix="/rate-limit",               tags=["rate_limit"])
+    app.include_router(trade_history.router,            prefix="/trade-history",            tags=["trade_history"])
+    app.include_router(trade_report.router,             prefix="/trade-report",             tags=["trade_report"])
+    # BUG-AG1 fix: websocket_routes no longer has prefix="/ws" -- main.py provides it
+    app.include_router(websocket_routes.router,         prefix="/ws",                       tags=["websocket"])
 
     try:
         from backend.api.routes import audit_routes_v21
         if audit_routes_v21.router is not None:
             app.include_router(audit_routes_v21.router, prefix="/admin/audit", tags=["audit"])
             logger.info("[startup] AuditRouteV21 registered at /admin/audit")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("[startup] audit_routes_v21 not loaded: %s", exc)
 
     @app.get("/", include_in_schema=False)
