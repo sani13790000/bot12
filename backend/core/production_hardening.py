@@ -69,7 +69,7 @@ class ProductionHardening:
             if not val:
                 self.errors.append(f"Missing critical env var: {key}")
             elif len(val) < 16:
-                self.warnings.append(f"{ky} is too short (<16 chars)")
+                self.warnings.append(f"{key} is too short (<16 chars)")
 
     def _check_debug_mode(self) -> None:
         debug = os.getenv("DEBUG", "").lower()

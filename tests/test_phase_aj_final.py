@@ -22,7 +22,7 @@ def read_file(path):
 
 
 class TestBugAJ1TradeHistoryPath:
-    """BUG-AJ1: @{router}.get("/trades/history") -> "/history""""
+    """BUG-AJ1: @router.get("/trades/history") -> "/history" """
 
     def test_file_exists(self):
         assert os.path.exists(TRADE_HISTORY), f"trade_history.py not found: {TRADE_HISTORY}"

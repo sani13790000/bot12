@@ -12,12 +12,15 @@ import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import asyncpg
 import numpy as np
 
 from ..core.logger import get_logger
+
+if TYPE_CHECKING:
+    from .training_pipeline import TrainingResult
 
 logger = get_logger("self_learning.performance_tracker")
 

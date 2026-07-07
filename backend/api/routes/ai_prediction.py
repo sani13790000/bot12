@@ -1,1 +1,153 @@
-IiIiCkFJIFByZWRpY3Rpb24gcm91dGVzLgpCVUctQUYzIEZJWDogcmVtb3ZlZCBwcmVmaXg9Ii9hcGkvdjEvYWkiIC0tIGRvdWJsZSBwcmVmaXggd2FzIGNhdXNpbmcgL2FpLXByZWRpY3Rpb24vYXBpL3YxL2FpLyoKTm93OiBwcmVmaXggcHJvdmlkZWQgYnkgbWFpbi5weSBhcyAiL2FpLXByZWRpY3Rpb24iCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmZyb20gdHlwaW5nIGltcG9ydCBEaWN0LCBMaXN0LCBPcHRpb25hbApmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgSFRUUEV4Y2VwdGlvbiwgc3RhdHVzCmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbCwgRmllbGQKZnJvbSAuLi5haV9wcmVkaWN0aW9uIGltcG9ydCAoUHJlZGljdGlvblNlcnZpY2UsIFByZWRpY3Rpb25SZXN1bHQsIFJpc2tMZXZlbCwgWEdCb29zdFRyYWluZXIsIERhdGFzZXRCdWlsZGVyLCBNb2RlbE1hbmFnZXIsIEZlYXR1cmVFeHRyYWN0b3IsIFNNQ0ZlYXR1cmVzKQpmcm9tIC4uLmFpX3ByZWRpY3Rpb24uZmVhdHVyZV9leHRyYWN0b3IgaW1wb3J0IChTTUNTaWduYWxJbnB1dCwgTWFya2V0U2Vzc2lvbiwgVHJlbmREaXJlY3Rpb24sIFRyYWRlRGlyZWN0aW9uKQpmcm9tIC4uLmNvcmUubG9nZ2VyIGltcG9ydCBnZXRfbG9nZ2VyCgpsb2dnZXIgPSBnZXRfbG9nZ2VyKCJhcGkucm91dGVzLmFpX3ByZWRpY3Rpb24iKQpyb3V0ZXIgPSBBUElSb3V0ZXIodGFncz1bIkFJIFByZWRpY3Rpb24iXSkKCl9wcmVkaWN0aW9uX3NlcnZpY2UgPSBQcmVkaWN0aW9uU2VydmljZSgpCl9tb2RlbF9tYW5hZ2VyID0gTW9kZWxNYW5hZ2VyKCkKX3RyYWluZXIgPSBYR0Jvb3N0VHJhaW5lcigpCgoKY2xhc3MgU2lnbmFsUmVxdWVzdChCYXNlTW9kZWwpOgogICAgc3ltYm9sOiBzdHIgPSBGaWVsZCgiWEFVVVNEIikKICAgIGRpcmVjdGlvbjogc3RyID0gRmllbGQoIkJVWSIpCiAgICBlbnRyeV9wcmljZTogZmxvYXQgPSBGaWVsZCgwLjAsIGdlPTApCiAgICBhdHI6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wKQogICAgc3ByZWFkOiBmbG9hdCA9IEZpZWxkKDAuMCwgZ2U9MCkKICAgIHNwcmVhZF9yYXRpbzogZmxvYXQgPSBGaWVsZCgwLjAsIGdlPTApCiAgICB2b2xhdGlsaXR5X3JhdGlvOiBmbG9hdCA9IEZpZWxkKDEuMCwgZ2U9MCkKICAgIGJvc19kZXRlY3RlZDogYm9vbCA9IEZhbHNlCiAgICBjaG9jaF9kZXRlY3RlZDogYm9vbCA9IEZhbHNlCiAgICBib3Nfc3RyZW5ndGg6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wLCBsZT0xKQogICAgY2hvY2hfc3RyZW5ndGg6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wLCBsZT0xKQogICAgb3JkZXJfYmxvY2tfcHJlc2VudDogYm9vbCA9IEZhbHNlCiAgICBvcmRlcl9ibG9ja19xdWFsaXR5OiBmbG9hdCA9IEZpZWxkKDAuMCwgZ2U9MCwgbGU9MSkKICAgIG9yZGVyX2Jsb2NrX3Rlc3RlZDogYm9vbCA9IEZhbHNlCiAgICBicmVha2VyX2Jsb2NrOiBib29sID0gRmFsc2UKICAgIGZ2Z19wcmVzZW50OiBib29sID0gRmFsc2UKICAgIGZ2Z19xdWFsaXR5OiBmbG9hdCA9IEZpZWxkKDAuMCwgZ2U9MCwgbGU9MSkKICAgIGlmdmdfcHJlc2VudDogYm9vbCA9IEZhbHNlCiAgICBsaXF1aWRpdHlfc3dlZXA6IGJvb2wgPSBGYWxzZQogICAgbGlxdWlkaXR5X3F1YWxpdHk6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wLCBsZT0xKQogICAgaW50ZXJuYWxfbGlxdWlkaXR5OiBib29sID0gRmFsc2UKICAgIGV4dGVybmFsX2xpcXVpZGl0eTogYm9vbCA9IEZhbHNlCiAgICBpbl9wcmVtaXVtX3pvbmU6IGJvb2wgPSBGYWxzZQogICAgaW5fZGlzY291bnRfem9uZTogYm9vbCA9IEZhbHNlCiAgICBlcXVpbGlicml1bV9kaXN0OiBmbG9hdCA9IEZpZWxkKDAuNSwgZ2U9MCwgbGU9MSkKICAgIHBhX3BhdHRlcm46IHN0ciA9ICJOT05FIgogICAgcGFfcXVhbGl0eTogZmxvYXQgPSBGaWVsZCgwLjAsIGdlPTAsIGxlPTEpCiAgICBwYV90aW1lZnJhbWU6IHN0ciA9ICJNMTUiCiAgICBodGZfYWxpZ25tZW50OiBib29sID0gRmFsc2UKICAgIGh0Zl9zY29yZTogZmxvYXQgPSBGaWVsZCgwLjAsIGdlPTAsIGxlPTEpCiAgICBzZXNzaW9uOiBzdHIgPSAiT0ZGIgogICAgaW5fa2lsbF96b25lOiBib29sID0gRmFsc2UKICAgIGhvdXJfb2ZfZGF5OiBpbnQgPSBGaWVsZCgwLCBnZT0wLCBsZT0yMykKICAgIGRheV9vZl93ZWVrOiBpbnQgPSBGaWVsZCgwLCBnZT0wLCBsZT00KQogICAgZGVjaXNpb25fc2NvcmU6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wLCBsZT0xMDApCiAgICB0cmVuZF9kaXJlY3Rpb246IHN0ciA9ICJORVVUUkFMIgogICAgdHJlbmRfc3RyZW5ndGg6IGZsb2F0ID0gRmllbGQoMC4wLCBnZT0wLCBsZT0xKQoKCmNsYXNzIFByZWRpY3Rpb25SZXNwb25zZShCYXNlTW9kZWwpOgogICAgcHJvYmFiaWxpdHk6IGludAogICAgY29uZmlkZW5jZTogaW50CiAgICByaXNrOiBzdHIKICAgIG1vZGVsX2F1YzogZmxvYXQKICAgIGlzX3RyYWRlYWJsZTogYm9vbAogICAgcmVhc29uOiBzdHIKCgpjbGFzcyBUcmFpblJlcXVlc3QoQmFzZU1vZGVsKToKICAgIGV4Y2x1ZGVfcnVsZV92aW9sYXRpb25zOiBib29sID0gVHJ1ZQoKCmNsYXNzIFRyYWluUmVzcG9uc2UoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogc3RyCiAgICBhdWNfcm9jOiBmbG9hdAogICAgYWNjdXJhY3k6IGZsb2F0CiAgICBmMV9zY29yZTogZmxvYXQKICAgIGN2X21lYW46IGZsb2F0CiAgICBjdl9zdGQ6IGZsb2F0CiAgICBuX2VzdGltYXRvcnM6IGludAogICAgbl9zYW1wbGVzOiBpbnQKICAgIGlzX3JlbGlhYmxlOiBib29sCiAgICBtZXNzYWdlOiBzdHIKCgpjbGFzcyBNb2RlbEluZm9SZXNwb25zZShCYXNlTW9kZWwpOgogICAgc3ltYm9sOiBzdHIKICAgIHZlcnNpb246IGludAogICAgdHJhaW5lZF9hdDogc3RyCiAgICBhdWNfcm9jOiBmbG9hdAogICAgYWNjdXJhY3k6IGZsb2F0CiAgICBmMV9zY29yZTogZmxvYXQKICAgIG5fc2FtcGxlczogaW50CiAgICBpc19iZXN0OiBib29sCgoKQHJvdXRlci5wb3N0KCIvcHJlZGljdCIsIHJlc3BvbnNlX21vZGVsPVByZWRpY3Rpb25SZXNwb25zZSkKZGVmIHByZWRpY3QocmVxdWVzdDogU2lnbmFsUmVxdWVzdCkgLT4gUHJlZGljdGlvblJlc3BvbnNlOgogICAgc2lnbmFsID0gX3JlcXVlc3RfdG9fc2lnbmFsKHJlcXVlc3QpCiAgICByZXN1bHQgPSBfcHJlZGljdGlvbl9zZXJ2aWNlLnByZWRpY3Qoc2lnbmFsKQogICAgcmV0dXJuIFByZWRpY3Rpb25SZXNwb25zZSgqKnJlc3VsdC50b19kaWN0KCkpCgoKQHJvdXRlci5wb3N0KCIvYmF0Y2gtcHJlZGljdCIsIHJlc3BvbnNlX21vZGVsPUxpc3RbUHJlZGljdGlvblJlc3BvbnNlXSkKZGVmIGJhdGNoX3ByZWRpY3QocmVxdWVzdHM6IExpc3RbU2lnbmFsUmVxdWVzdF0pIC0+IExpc3RbUHJlZGljdGlvblJlc3BvbnNlXToKICAgIGlmIGxlbihyZXF1ZXN0cykgPiAyMDogcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1zdGF0dXMuSFRUUF80MjJfVU5QUk9DRVNTQUJMRV9FTlRJVFksIGRldGFpbD0ibWF4aW11bSAyMCBzaWduYWxzIHBlciBiYXRjaCByZXF1ZXN0IikKICAgIHJlc3VsdHMgPSBbXQogICAgZm9yIHJlcSBpbiByZXF1ZXN0czoKICAgICAgICBzaWduYWwgPSBfcmVxdWVzdF90b19zaWduYWwocmVxKQogICAgICAgIHJlc3VsdHMuYXBwZW5kKFByZWRpY3Rpb25SZXNwb25zZSgqKl9wcmVkaWN0aW9uX3NlcnZpY2UucHJlZGljdChzaWduYWwpLnRvX2RpY3QoKSkpCiAgICByZXR1cm4gcmVzdWx0cwoKCkByb3V0ZXIucG9zdCgiL3RyYWluL3tzeW1ib2x9IiwgcmVzcG9uc2VfbW9kZWw9VHJhaW5SZXNwb25zZSkKZGVmIHRyYWluX21vZGVsKHN5bWJvbDogc3RyLCByZXF1ZXN0OiBUcmFpblJlcXVlc3QpIC0+IFRyYWluUmVzcG9uc2U6CiAgICB0cnk6CiAgICAgICAgZnJvbSAuLi5pbnRlbGxpZ2VuY2UubGVhcm5pbmdfc2VydmljZSBpbXBvcnQgbGVhcm5pbmdfc2VydmljZQogICAgICAgIG1lbW9yeSA9IGxlYXJuaW5nX3NlcnZpY2UubWVtb3J5CiAgICAgICAgZGF0YXNldCA9IERhdGFzZXRCdWlsZGVyKCkuYnVpbGQobWVtb3J5LCBleGNsdWRlX3J1bGVfdmlvbGF0aW9ucz1yZXF1ZXN0LmV4Y2x1ZGVfcnVsZV92aW9sYXRpb25zKQogICAgICAgIHJlc3VsdCA9IF90cmFpbmVyLnRyYWluKGRhdGFzZXQpCiAgICAgICAgbWV0YSA9IF9tb2RlbF9tYW5hZ2VyLnNhdmVfbW9kZWwocmVzdWx0PXJlc3VsdCwgc3ltYm9sPXN5bWJvbCwgbl9zYW1wbGVzPWRhdGFzZXQubl9zYW1wbGVzLCB3aW5fcmF0ZT1kYXRhc2V0Lndpbl9yYXRlKQogICAgICAgIF9tb2RlbF9tYW5hZ2VyLmludmFsaWRhdGVfY2FjaGUoc3ltYm9sKQogICAgICAgIHJldHVybiBUcmFpblJlc3BvbnNlKHN5bWJvbD1zeW1ib2wsIGF1Y19yb2M9cm91bmQocmVzdWx0LmF1Y19yb2MsIDQpLCBhY2N1cmFjeT1yb3VuZChyZXN1bHQuYWNjdXJhY3ksIDQpLCBmMV9zY29yZT1yb3VuZChyZXN1bHQuZjFfc2NvcmUsIDQpLCBjdl9tZWFuPXJvdW5kKHJlc3VsdC5jdl9tZWFuLCA0KSwgY3Zfc3RkPXJvdW5kKHJlc3VsdC5jdl9zdGQsIDQpLCBuX2VzdGltYXRvcnM9cmVzdWx0Lm5fZXN0aW1hdG9yc191c2VkLCBuX3NhbXBsZXM9ZGF0YXNldC5uX3NhbXBsZXMsIGlzX3JlbGlhYmxlPXJlc3VsdC5pc19yZWxpYWJsZSwgbWVzc2FnZT1mIm1vZGVsIHZ7bWV0YS52ZXJzaW9ufSB0cmFpbmVkIHN1Y2Nlc3NmdWxseSIpCiAgICBleGNlcHQgVmFsdWVFcnJvciBhcyBlOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXZQ4MDtCQURfUkVRVUVTVCwgZGV0YWlsPXN0cihlKSkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTogbG9nZ2VyLmVycm9yKCJ0cmFpbmluZyBmYWlsZWQgZm9yICVzOiAlcyIsIHN5bWJvbCwgZSk7IHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9ZiJ0cmFpbmluZyBmYWlsZWQ6IHtlfSIpCgoKQHJvdXRlci5nZXQoIi9tb2RlbHMiLCByZXNwb25zZV9tb2RlbD1MaXN0W01vZGVsSW5mb1Jlc3BvbnNlXSkKZGVmIGxpc3RfbW9kZWxzKCkgLT4gTGlzdFtNb2RlbEluZm9SZXNwb25zZV06CiAgICByZXR1cm4gW01vZGVsSW5mb1Jlc3BvbnNlKHN5bWJvbD1tLnN5bWJvbCwgdmVyc2lvbj1tLnZlcnNpb24sIHRyYWluZWRfYXQ9bS50cmFpbmVkX2F0LCBhdWNfcm9jPW0uYXVjX3JvYywgYWNjdXJhY3k9bS5hY2N1cmFjeSwgZjFfc2NvcmU9bS5mMV9zY29yZSwgbl9zYW1wbGVzPW0ubl9zYW1wbGVzLCBpc19iZXN0PW0uaXNfYmVzdCkgZm9yIG0gaW4gX21vZGVsX21hbmFnZXIubGlzdF9tb2RlbHMoKV0KCgpAcm91dGVyLmdldCgiL21vZGVscy97c3ltYm9sfSIsIHJlc3BvbnNlX21vZGVsPU1vZGVsSW5mb1Jlc3BvbnNlKQpkZWYgZ2V0X2Jlc3RfbW9kZWwoc3ltYm9sOiBzdHIpIC0+IE1vZGVsSW5mb1Jlc3BvbnNlOgogICAgbWV0YSA9IF9tb2RlbF9tYW5hZ2VyLmdldF9iZXN0X21ldGFkYXRhKHN5bWJvbCkKICAgIGlmIG1ldGEgaXMgTm9uZTogcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1zdGF0dXMuSFRUUF80MDRfTk9UX0ZPVU5ELCBkZXRhaWw9ZiJubyBtb2RlbCBmb3Ige3N5bWJvbH0iKQogICAgcmV0dXJuIE1vZGVsSW5mb1Jlc3BvbnNlKHN5bWJvbD1tZXRhLnN5bWJvbCwgdmVyc2lvbj1tZXRhLnZlcnNpb24sIHRyYWluZWRfYXQ9bWV0YS50cmFpbmVkX2F0LCBhdWNfcm9jPW1ldGEuYXVjX3JvYywgYWNjdXJhY3k9bWV0YS5hY2N1cmFjeSwgZjFfc2NvcmU9bWV0YS5mMV9zY29yZSwgbl9zYW1wbGVzPW1ldGEubl9zYW1wbGVzLCBpc19iZXN0PW1ldGEuaXNfYmVzdCkKCgpAcm91dGVyLmdldCgiL2ZlYXR1cmUtbmFtZXMiLCByZXNwb25zZV9tb2RlbD1MaXN0W3N0cl0pCmRlZiBnZXRfZmVhdHVyZV9uYW1lcygpIC0+IExpc3Rbc3RyXToKICAgIHJldHVybiBTTUNGZWF0dXJlcy5mZWF0dXJlX25hbWVzKCkKCgpkZWYgX3JlcXVlc3RfdG9fc2lnbmFsKHJlcTogU2lnbmFsUmVxdWVzdCkgLT4gU01DU2lnbmFsSW5wdXQ6CiAgICB0cnk6CiAgICAgICAgZGlyZWN0aW9uID0gVHJhZGVEaXJlY3Rpb24ocmVxLmRpcmVjdGlvbi51cHBlcigpKQogICAgICAgIHNlc3Npb24gPSBNYXJrZXRTZXNzaW9uKHJlcS5zZXNzaW9uLnVwcGVyKCkpCiAgICAgICAgdHJlbmQgPSBUcmVuZERpcmVjdGlvbihyZXEudHJlbmRfZGlyZWN0aW9uLnVwcGVyKCkpCiAgICBleGNlcHQgVmFsdWVFcnJvciBhcyBlOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXZQ4OlVOUFJPQ0VTU0FCTEVfRU5USVRZLCBkZXRhaWw9c3RyKGUpKQogICAgcmV0dXJuIFNNQ1NpZ25hbElucHV0KHN5bWJvbD1yZXEuc3ltYm9sLCBkaXJlY3Rpb249ZGlyZWN0aW9uLCBlbnRyeV9wcmljZT1yZXEuZW50cnlfcHJpY2UsIGJvc19kZXRlY3RlZD1yZXEuYm9zX2RldGVjdGVkLCBjaG9jaF9kZXRlY3RlZD1yZXEuY2hvY2hfZGV0ZWN0ZWQsIGJvc19zdHJlbmd0aD1yZXEuYm9zX3N0cmVuZ3RoLCBjaG9jaF9zdHJlbmd0aD1yZXEuY2hvY2hfc3RyZW5ndGgsIG9yZGVyX2Jsb2NrX3ByZXNlbnQ9cmVxLm9yZGVyX2Jsb2NrX3ByZXNlbnQsIG9yZGVyX2Jsb2NrX3F1YWxpdHk9cmVxLm9yZGVyX2Jsb2NrX3F1YWxpdHksIG9yZGVyX2Jsb2NrX3Rlc3RlZD1yZXEub3JkZXJfYmxvY2tfdGVzdGVkLCBicmVha2VyX2Jsb2NrPXJlcS5icmVha2VyX2Jsb2NrLCBmdmdfcHJlc2VudD1yZXEuZnZnX3ByZXNlbnQsIGZ2Z19xdWFsaXR5PXJlcS5mdmdfcXVhbGl0eSwgaWZ2Z19wcmVzZW50PXJlcS5pZnZnX3ByZXNlbnQsIGxpcXVpZGl0eV9zd2VlcD1yZXEubGlxdWlkaXR5X3N3ZWVwLCBsaXF1aWRpdHlfcXVhbGl0eT1yZXEubGlxdWlkaXR5X3F1YWxpdHksIGludGVybmFsX2xpcXVpZGl0eT1yZXEuaW50ZXJuYWxfbGlxdWlkaXR5LCBleHRlcm5hbF9saXF1aWRpdHk9cmVxLmV4dGVybmFsX2xpcXVpZGl0eSwgaW5fcHJlbWl1bV96b25lPXJlcS5pbl9wcmVtaXVtX3pvbmUsIGluX2Rpc2NvdW50X3pvbmU9cmVxLmluX2Rpc2NvdW50X3pvbmUsIGVxdWlsaWJyaXVtX2Rpc3Q9cmVxLmVxdWlsaWJyaXVtX2Rpc3QsIHBhX3BhdHRlcm49cmVxLnBhX3BhdHRlcm4sIHBhX3F1YWxpdHk9cmVxLnBhX3F1YWxpdHksIHBhX3RpbWVmcmFtZT1yZXEucGFfdGltZWZyYW1lLCBhdHI9cmVxLmF0ciwgc3ByZWFkPXJlcS5zcHJlYWQsIHNwcmVhZF9yYXRpbz1yZXEuc3ByZWFkX3JhdGlvLCB2b2xhdGlsaXR5X3JhdGlvPXJlcS52b2xhdGlsaXR5X3JhdGlvLCB0cmVuZF9kaXJlY3Rpb249dHJlbmQsIHRyZW5kX3N0cmVuZ3RoPXJlcS50cmVuZF9zdHJlbmd0aCwgaHRmX2FsaWdubWVudD1yZXEuaHRmX2FsaWdubWVudCwgaHRmX3Njb3JlPXJlcS5odGZfc2NvcmUsIHNlc3Npb249c2Vzc2lvbiwgaW5fa2lsbF96b25lPXJlcS5pbl9raWxsX3pvbmUsIGhvdXJfb2ZfZGF5PXJlcS5ob3VyX29mX2RheSwgZGF5X29mX3dlZWs9cmVxLmRheV9vZl93ZWVrLCBkZWNpc2lvbl9zY29yZT1yZXEuZGVjaXNpb25fc2NvcmUpCg==
+"""
+AI Prediction routes.
+BUG-AF3 FIX: removed prefix="/api/v1/ai" -- double prefix was causing /ai-prediction/api/v1/ai/*
+Now: prefix provided by main.py as "/ai-prediction"
+"""
+from __future__ import annotations
+from typing import Dict, List, Optional
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
+from ...ai_prediction import (PredictionService, PredictionResult, RiskLevel, XGBoostTrainer, DatasetBuilder, ModelManager, FeatureExtractor, SMCFeatures)
+from ...ai_prediction.feature_extractor import (SMCSignalInput, MarketSession, TrendDirection, TradeDirection)
+from ...core.logger import get_logger
+
+logger = get_logger("api.routes.ai_prediction")
+router = APIRouter(tags=["AI Prediction"])
+
+_prediction_service = PredictionService()
+_model_manager = ModelManager()
+_trainer = XGBoostTrainer()
+
+
+class SignalRequest(BaseModel):
+    symbol: str = Field("XAUUSD")
+    direction: str = Field("BUY")
+    entry_price: float = Field(0.0, ge=0)
+    atr: float = Field(0.0, ge=0)
+    spread: float = Field(0.0, ge=0)
+    spread_ratio: float = Field(0.0, ge=0)
+    volatility_ratio: float = Field(1.0, ge=0)
+    bos_detected: bool = False
+    choch_detected: bool = False
+    bos_strength: float = Field(0.0, ge=0, le=1)
+    choch_strength: float = Field(0.0, ge=0, le=1)
+    order_block_present: bool = False
+    order_block_quality: float = Field(0.0, ge=0, le=1)
+    order_block_tested: bool = False
+    breaker_block: bool = False
+    fvg_present: bool = False
+    fvg_quality: float = Field(0.0, ge=0, le=1)
+    ifvg_present: bool = False
+    liquidity_sweep: bool = False
+    liquidity_quality: float = Field(0.0, ge=0, le=1)
+    internal_liquidity: bool = False
+    external_liquidity: bool = False
+    in_premium_zone: bool = False
+    in_discount_zone: bool = False
+    equilibrium_dist: float = Field(0.5, ge=0, le=1)
+    pa_pattern: str = "NONE"
+    pa_quality: float = Field(0.0, ge=0, le=1)
+    pa_timeframe: str = "M15"
+    htf_alignment: bool = False
+    htf_score: float = Field(0.0, ge=0, le=1)
+    session: str = "OFF"
+    in_kill_zone: bool = False
+    hour_of_day: int = Field(0, ge=0, le=23)
+    day_of_week: int = Field(0, ge=0, le=4)
+    decision_score: float = Field(0.0, ge=0, le=100)
+    trend_direction: str = "NEUTRAL"
+    trend_strength: float = Field(0.0, ge=0, le=1)
+
+
+class PredictionResponse(BaseModel):
+    probability: int
+    confidence: int
+    risk: str
+    model_auc: float
+    is_tradeable: bool
+    reason: str
+
+
+class TrainRequest(BaseModel):
+    exclude_rule_violations: bool = True
+
+
+class TrainResponse(BaseModel):
+    symbol: str
+    auc_roc: float
+    accuracy: float
+    f1_score: float
+    cv_mean: float
+    cv_std: float
+    n_estimators: int
+    n_samples: int
+    is_reliable: bool
+    message: str
+
+
+class ModelInfoResponse(BaseModel):
+    symbol: str
+    version: int
+    trained_at: str
+    auc_roc: float
+    accuracy: float
+    f1_score: float
+    n_samples: int
+    is_best: bool
+
+
+@router.post("/predict", response_model=PredictionResponse)
+def predict(request: SignalRequest) -> PredictionResponse:
+    signal = _request_to_signal(request)
+    result = _prediction_service.predict(signal)
+    return PredictionResponse(**result.to_dict())
+
+
+@router.post("/batch-predict", response_model=List[PredictionResponse])
+def batch_predict(requests: List[SignalRequest]) -> List[PredictionResponse]:
+    if len(requests) > 20: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="maximum 20 signals per batch request")
+    results = []
+    for req in requests:
+        signal = _request_to_signal(req)
+        results.append(PredictionResponse(**_prediction_service.predict(signal).to_dict()))
+    return results
+
+
+@router.post("/train/{symbol}", response_model=TrainResponse)
+def train_model(symbol: str, request: TrainRequest) -> TrainResponse:
+    try:
+        from ...intelligence.learning_service import learning_service
+        memory = learning_service.memory
+        dataset = DatasetBuilder().build(memory, exclude_rule_violations=request.exclude_rule_violations)
+        result = _trainer.train(dataset)
+        meta = _model_manager.save_model(result=result, symbol=symbol, n_samples=dataset.n_samples, win_rate=dataset.win_rate)
+        _model_manager.invalidate_cache(symbol)
+        return TrainResponse(symbol=symbol, auc_roc=round(result.auc_roc, 4), accuracy=round(result.accuracy, 4), f1_score=round(result.f1_score, 4), cv_mean=round(result.cv_mean, 4), cv_std=round(result.cv_std, 4), n_estimators=result.n_estimators_used, n_samples=dataset.n_samples, is_reliable=result.is_reliable, message=f"model v{meta.version} trained successfully")
+    except ValueError as e: raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e: logger.error("training failed for %s: %s", symbol, e); raise HTTPException(status_code=500, detail=f"training failed: {e}")
+
+
+@router.get("/models", response_model=List[ModelInfoResponse])
+def list_models() -> List[ModelInfoResponse]:
+    return [ModelInfoResponse(symbol=m.symbol, version=m.version, trained_at=m.trained_at, auc_roc=m.auc_roc, accuracy=m.accuracy, f1_score=m.f1_score, n_samples=m.n_samples, is_best=m.is_best) for m in _model_manager.list_models()]
+
+
+@router.get("/models/{symbol}", response_model=ModelInfoResponse)
+def get_best_model(symbol: str) -> ModelInfoResponse:
+    meta = _model_manager.get_best_metadata(symbol)
+    if meta is None: raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"no model for {symbol}")
+    return ModelInfoResponse(symbol=meta.symbol, version=meta.version, trained_at=meta.trained_at, auc_roc=meta.auc_roc, accuracy=meta.accuracy, f1_score=meta.f1_score, n_samples=meta.n_samples, is_best=meta.is_best)
+
+
+@router.get("/feature-names", response_model=List[str])
+def get_feature_names() -> List[str]:
+    return SMCFeatures.feature_names()
+
+
+def _request_to_signal(req: SignalRequest) -> SMCSignalInput:
+    try:
+        direction = TradeDirection(req.direction.upper())
+        session = MarketSession(req.session.upper())
+        trend = TrendDirection(req.trend_direction.upper())
+    except ValueError as e: raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    return SMCSignalInput(symbol=req.symbol, direction=direction, entry_price=req.entry_price, bos_detected=req.bos_detected, choch_detected=req.choch_detected, bos_strength=req.bos_strength, choch_strength=req.choch_strength, order_block_present=req.order_block_present, order_block_quality=req.order_block_quality, order_block_tested=req.order_block_tested, breaker_block=req.breaker_block, fvg_present=req.fvg_present, fvg_quality=req.fvg_quality, ifvg_present=req.ifvg_present, liquidity_sweep=req.liquidity_sweep, liquidity_quality=req.liquidity_quality, internal_liquidity=req.internal_liquidity, external_liquidity=req.external_liquidity, in_premium_zone=req.in_premium_zone, in_discount_zone=req.in_discount_zone, equilibrium_dist=req.equilibrium_dist, pa_pattern=req.pa_pattern, pa_quality=req.pa_quality, pa_timeframe=req.pa_timeframe, atr=req.atr, spread=req.spread, spread_ratio=req.spread_ratio, volatility_ratio=req.volatility_ratio, trend_direction=trend, trend_strength=req.trend_strength, htf_alignment=req.htf_alignment, htf_score=req.htf_score, session=session, in_kill_zone=req.in_kill_zone, hour_of_day=req.hour_of_day, day_of_week=req.day_of_week, decision_score=req.decision_score)

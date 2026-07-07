@@ -1,1 +1,121 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy90cmFkZXMucHkgLS0gUGhhc2UtRSBmaXgKCkUtNzogb3Blbl90cmFkZSgpIG5vdyBjYWxscyBFeGVjdXRpb25TZXJ2aWNlLm9wZW5fcG9zaXRpb24oKSBhZnRlciBEQiBpbnNlcnQuCkUtODogY2xvc2VfdHJhZGUoKSBub3cgY2FsbHMgRXhlY3V0aW9uU2VydmljZS5jbG9zZV9wb3NpdGlvbih0aWNrZXQpLgpFLTk6IEFkZGVkIEdFVCAve3RyYWRlX2lkfSBzaW5nbGUtdHJhZGUgZW5kcG9pbnQuCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwppbXBvcnQgdXVpZApmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZXpvbmUKZnJvbSB0eXBpbmcgaW1wb3J0IExpc3QsIE9wdGlvbmFsCgpmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgRGVwZW5kcywgSFRUUEV4Y2VwdGlvbiwgUXVlcnksIHN0YXR1cyBhcyBodHRwX3N0YXR1cwpmcm9tIHB5ZGFudGljIGltcG9ydCBCYXNlTW9kZWwsIEZpZWxkCgpmcm9tIGJhY2tlbmQuY29yZS5hdXRoIGltcG9ydCBnZXRfY3VycmVudF91c2VyCmZyb20gYmFja2VuZC5kYXRhYmFzZS5jb25uZWN0aW9uIGltcG9ydCBnZXRfZGIKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIodGFncz1bInRyYWRlcyJdKQoKCmNsYXNzIFRyYWRlQ3JlYXRlKEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgICAgc3RyCiAgICBkaXJlY3Rpb246ICAgc3RyCiAgICBsb3Rfc2l6ZTogICAgZmxvYXQgPSBGaWVsZChndD0wLCBsZT0xMDApCiAgICBlbnRyeV9wcmljZTogZmxvYXQKICAgIHN0b3BfbG9zczogICBmbG9hdAogICAgdGFrZV9wcm9maXQ6IGZsb2F0CiAgICBzdHJhdGVneTogICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKICAgIGNvbW1lbnQ6ICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQoKCmNsYXNzIFRyYWRlUmVzcG9uc2UoQmFzZU1vZGVsKToKICAgIGlkOiAgICAgICAgICAgc3RyCiAgICB1c2VyX2lkOiAgICAgIHN0cgogICAgc3ltYm9sOiAgICAgICBzdHIKICAgIGRpcmVjdGlvbjogICAgc3RyCiAgICBsb3Rfc2l6ZTogICAgIGZsb2F0CiAgICBlbnRyeV9wcmljZTogIGZsb2F0CiAgICBzdG9wX2xvc3M6ICAgIGZsb2F0CiAgICB0YWtlX3Byb2ZpdDogIGZsb2F0CiAgICBzdGF0dXM6ICAgICAgIHN0cgogICAgc3RyYXRlZ3k6ICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgY29tbWVudDogICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgb3BlbmVkX2F0OiAgICBzdHIKICAgIGNsb3NlZF9hdDogICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKICAgIHBubDogICAgICAgICAgT3B0aW9uYWxbZmxvYXRdID0gTm9uZQogICAgbXQ1X3RpY2tldDogICBPcHRpb25hbFtpbnRdID0gTm9uZQoKCmRlZiBfZ2V0X2V4ZWN1dGlvbl9zZXJ2aWNlKCk6CiAgICBmcm9tIGJhY2tlbmQuZXhlY3V0aW9uLmV4ZWN1dGlvbl9zZXJ2aWNlIGltcG9ydCBleGVjdXRpb25fc2VydmljZQogICAgcmV0dXJuIGV4ZWN1dGlvbl9zZXJ2aWNlCgoKQHJvdXRlci5nZXQoIi8iLCByZXNwb25zZV9tb2RlbD1MaXN0W1RyYWRlUmVzcG9uc2VdKQphc3luYyBkZWYgbGlzdF90cmFkZXModHJhZGVfc3RhdHVzOiBPcHRpb25hbFtzdHJdID0gUXVlcnkoTm9uZSwgYWxpYXM9InN0YXR1cyIpLCBsaW1pdDogaW50ID0gUXVlcnkoNTAsIGdlPTEsIGxlPTUwMCksIG9mZnNldDogaW50ID0gUXVlcnkoMCwgZ2U9MCksIHVzZXI6IGRpY3QgPSBEZXBlbmRzKGdldF9jdXJyZW50X3VzZXIpLCBkYiA9IERlcGVuZHMoZ2V0X2RiKSkgLT4gTGlzdFtUcmFkZVJlc3BvbnNlXToKICAgIGZpbHRlcnM6IGRpY3QgPSB7InVzZXJfaWQiOiB1c2VyWyJzdWIiXX0KICAgIGlmIHRyYWRlX3N0YXR1czoKICAgICAgICBmaWx0ZXJzWyJzdGF0dXMiXSA9IHRyYWRlX3N0YXR1cwogICAgcm93cyA9IGF3YWl0IGRiLnNlbGVjdCgidHJhZGVzIiwgZmlsdGVycywgb3JkZXJfYnk9Im9wZW5lZF9hdCIsIG9yZGVyX2Rlc2M9VHJ1ZSwgbGltaXQ9bGltaXQsIG9mZnNldD1vZmZzZXQpCiAgICByZXR1cm4gW1RyYWRlUmVzcG9uc2UoKipyKSBmb3IgciBpbiAocm93cyBvciBbXSldCgoKQHJvdXRlci5nZXQoIi97dHJhZGVfaWR9IiwgcmVzcG9uc2VfbW9kZWw9VHJhZGVSZXNwb25zZSkKYXN5bmMgZGVmIGdldF90cmFkZSh0cmFkZV9pZDogc3RyLCB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwgZGIgPSBEZXBlbmRzKGdldF9kYikpIC0+IFRyYWRlUmVzcG9uc2U6CiAgICB0cmFkZSA9IGF3YWl0IGRiLnNlbGVjdF9vbmUoInRyYWRlcyIsIHsiaWQiOiB0cmFkZV9pZCwgInVzZXJfaWQiOiB1c2VyWyJzdWIiXX0pCiAgICBpZiBub3QgdHJhZGU6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDQsIGRldGFpbD0iVHJhZGUgbm90IGZvdW5kIikKICAgIHJldHVybiBUcmFkZVJlc3BvbnNlKCoqdHJhZGUpCgoKQHJvdXRlci5wb3N0KCIvIiwgcmVzcG9uc2VfbW9kZWw9VHJhZGVSZXNwb25zZSwgc3RhdHVzX2NvZGU9MjAxKQphc3luYyBkZWYgb3Blbl90cmFkZShib2R5OiBUcmFkZUNyZWF0ZSwgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksIGRiID0gRGVwZW5kcyhnZXRfZGIpKSAtPiBUcmFkZVJlc3BvbnNlOgogICAgaWYgYm9keS5kaXJlY3Rpb24gbm90IGluICgiYnV5IiwgInNlbGwiKToKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPWh0dHBfc3RhdHVzLkhUVFBfNDIyX1VOUFJPQ0VTU0FCTEVfRU5USVRZLCBkZXRhaWw9ZiJkaXJlY3Rpb24gbXVzdCBiZSAnYnV5JyBvciAnc2VsbCciKQogICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuaXNvZm9ybWF0KCkKICAgIHRyYWRlX2lkID0gc3RyKHV1aWQudXVpZDQoKSkKICAgIGRiX2RhdGEgPSB7ImlkIjogdHJhZGVfaWQsICJ1c2VyX2lkIjogdXNlclsic3ViIl0sICJzeW1ib2wiOiBib2R5LnN5bWJvbCwgImRpcmVjdGlvbiI6IGJvZHkuZGlyZWN0aW9uLCAibG90X3NpemUiOiBib2R5LmxvdF9zaXplLCAiZW50cnlfcHJpY2UiOiBib2R5LmVudHJ5X3ByaWNlLCAic3RvcF9sb3NzIjogYm9keS5zdG9wX2xvc3MsICJ0YWtlX3Byb2ZpdCI6IGJvZHkudGFrZV9wcm9maXQsICJzdGF0dXMiOiAicGVuZGluZyIsICJzdHJhdGVneSI6IGJvZHkuc3RyYXRlZ3ksICJjb21tZW50IjogYm9keS5jb21tZW50LCAib3BlbmVkX2F0Ijogbm93LCAiY2xvc2VkX2F0IjogTm9uZSwgInBubCI6IE5vbmUsICJtdDVfdGlja2V0IjogTm9uZX0KICAgIHJlY29yZCA9IGF3YWl0IGRiLmluc2VydCgidHJhZGVzIiwgZGJfZGF0YSkKICAgIGlmIG5vdCByZWNvcmQ6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD0iRmFpbGVkIHRvIGNyZWF0ZSB0cmFkZSByZWNvcmQiKQogICAgdHJ5OgogICAgICAgIHN2YyA9IF9nZXRfZXhlY3V0aW9uX3NlcnZpY2UoKQogICAgICAgIHJlc3VsdCA9IGF3YWl0IHN2Yy5vcGVuX3Bvc2l0aW9uKHN5bWJvbD1ib2R5LnN5bWJvbCwgZGlyZWN0aW9uPWJvZHkuZGlyZWN0aW9uLCBsb3Rfc2l6ZT1ib2R5LmxvdF9zaXplLCBlbnRyeV9wcmljZT1ib2R5LmVudHJ5X3ByaWNlLCBzdG9wX2xvc3M9Ym9keS5zdG9wX2xvc3MsIHRha2VfcHJvZml0PWJvZHkudGFrZV9wcm9maXQsIGNvbW1lbnQ9Ym9keS5jb21tZW50IG9yICIiKQogICAgICAgIHRpY2tldCA9IHJlc3VsdC5nZXQoInRpY2tldCIpCiAgICAgICAgYWN0dWFsX3ByaWNlID0gcmVzdWx0LmdldCgicHJpY2UiLCBib2R5LmVudHJ5X3ByaWNlKQogICAgICAgIHVwZGF0ZWQgPSBhd2FpdCBkYi51cGRhdGUoInRyYWRlcyIsIHsiaWQiOiB0cmFkZV9pZH0sIHsic3RhdHVzIjogIm9wZW4iLCAibXQ1X3RpY2tldCI6IHRpY2tldCwgImVudHJ5X3ByaWNlIjogYWN0dWFsX3ByaWNlfSkKICAgICAgICBmaW5hbCA9IHVwZGF0ZWRbMF0gaWYgdXBkYXRlZCBlbHNlIHsqKmRiX2RhdGEsICJzdGF0dXMiOiAib3BlbiIsICJtdDVfdGlja2V0IjogdGlja2V0fQogICAgICAgIGxvZ2dlci5pbmZvKCJUcmFkZSBvcGVuZWQ6IGlkPSVzIHRpY2tldD0lcyIsIHRyYWRlX2lkLCB0aWNrZXQpCiAgICAgICAgcmV0dXJuIFRyYWRlUmVzcG9uc2UoKipmaW5hbCkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigiTVQ1IG9wZW5fcG9zaXRpb24gZmFpbGVkOiAlcyIsIGV4YykKICAgICAgICBhd2FpdCBkYi51cGRhdGUoInRyYWRlcyIsIHsiaWQiOiB0cmFkZV9pZH0sIHsic3RhdHVzIjogImZhaWxlZCJ9KQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9aHR0cF9zdGF0dXMuSFRUUF81MDJfQkFEX0dBVEVXQVksIGRldGFpbD1mIk1UNSBleGVjdXRpb24gZmFpbGVkOiB7ZXhjfSIpCgoKQHJvdXRlci5wb3N0KCIve3RyYWRlX2lkfS9jbG9zZSIpCmFzeW5jIGRlZiBjbG9zZV90cmFkZSh0cmFkZV9pZDogc3RyLCB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwgZGIgPSBEZXBlbmRzKGdldF9kYikpIC0+IGRpY3Q6CiAgICB0cmFkZSA9IGF3YWl0IGRiLnNlbGVjdF9vbmUoInRyYWRlcyIsIHsiaWQiOiB0cmFkZV9pZCwgInVzZXJfaWQiOiB1c2VyWyJzdWIiXX0pCiAgICBpZiBub3QgdHJhZGU6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDQsIGRldGFpbD0iVHJhZGUgbm90IGZvdW5kIikKICAgIGlmIHRyYWRlLmdldCgic3RhdHVzIikgIT0gIm9wZW4iOgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9aHR0cF9zdGF0dXMuSFRUUF80MDlfQ09ORkxJQ1QsIGRldGFpbD1mIlRyYWRlIGlzIG5vdCBvcGVuIikKICAgIHRpY2tldCA9IHRyYWRlLmdldCgibXQ1X3RpY2tldCIpCiAgICBpZiBub3QgdGlja2V0OgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9aHR0cF9zdGF0dXMuSFRUUF80MDlfQ09ORkxJQ1QsIGRldGFpbD0iVHJhZGUgaGFzIG5vIE1UNSB0aWNrZXQiKQogICAgdHJ5OgogICAgICAgIHN2YyA9IF9nZXRfZXhlY3V0aW9uX3NlcnZpY2UoKQogICAgICAgIHJlc3VsdCA9IGF3YWl0IHN2Yy5jbG9zZV9wb3NpdGlvbih0aWNrZXQ9dGlja2V0LCBzeW1ib2w9dHJhZGVbInN5bWJvbCJdKQogICAgICAgIHBubCA9IHJlc3VsdC5nZXQoInBubCIsIDAuMCkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigiTVQ1IGNsb3NlX3Bvc2l0aW9uIGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1odHRwX3N0YXR1cy5IVFRQXzUwMl9CQURfR0FURVdBWSwgZGV0YWlsPWYiTVQ1IGNsb3NlIGZhaWxlZDoge2V4Y30iKQogICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuaXNvZm9ybWF0KCkKICAgIHVwZGF0ZWQgPSBhd2FpdCBkYi51cGRhdGUoInRyYWRlcyIsIHsiaWQiOiB0cmFkZV9pZH0sIHsic3RhdHVzIjogImNsb3NlZCIsICJjbG9zZWRfYXQiOiBub3csICJwbmwiOiBwbmx9KQogICAgbG9nZ2VyLmluZm8oIlRyYWRlIGNsb3NlZDogaWQ9JXMgdGlja2V0PSVzIHBubD0lLjJmIiwgdHJhZGVfaWQsIHRpY2tldCwgcG5sKQogICAgcmV0dXJuIHsic3VjY2VzcyI6IFRydWUsICJ0cmFkZV9pZCI6IHRyYWRlX2lkLCAidGlja2V0IjogdGlja2V0LCAicG5sIjogcG5sLCAidHJhZGUiOiB1cGRhdGVkWzBdIGlmIHVwZGF0ZWQgZWxzZSB0cmFkZX0K
+"""
+backend/api/routes/trades.py -- Phase-E fix
+
+E-7: open_trade() now calls ExecutionService.open_position() after DB insert.
+E-8: close_trade() now calls ExecutionService.close_position(ticket).
+E-9: Added GET /{trade_id} single-trade endpoint.
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from pydantic import BaseModel, Field
+
+from backend.core.auth import get_current_user
+from backend.database.connection import get_db
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["trades"])
+
+
+class TradeCreate(BaseModel):
+    symbol:      str
+    direction:   str
+    lot_size:    float = Field(gt=0, le=100)
+    entry_price: float
+    stop_loss:   float
+    take_profit: float
+    strategy:    Optional[str] = None
+    comment:     Optional[str] = None
+
+
+class TradeResponse(BaseModel):
+    id:           str
+    user_id:      str
+    symbol:       str
+    direction:    str
+    lot_size:     float
+    entry_price:  float
+    stop_loss:    float
+    take_profit:  float
+    status:       str
+    strategy:     Optional[str] = None
+    comment:      Optional[str] = None
+    opened_at:    str
+    closed_at:    Optional[str] = None
+    pnl:          Optional[float] = None
+    mt5_ticket:   Optional[int] = None
+
+
+def _get_execution_service():
+    from backend.execution.execution_service import execution_service
+    return execution_service
+
+
+@router.get("/", response_model=List[TradeResponse])
+async def list_trades(trade_status: Optional[str] = Query(None, alias="status"), limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0), user: dict = Depends(get_current_user), db = Depends(get_db)) -> List[TradeResponse]:
+    filters: dict = {"user_id": user["sub"]}
+    if trade_status:
+        filters["status"] = trade_status
+    rows = await db.select("trades", filters, order_by="opened_at", order_desc=True, limit=limit, offset=offset)
+    return [TradeResponse(**r) for r in (rows or [])]
+
+
+@router.get("/{trade_id}", response_model=TradeResponse)
+async def get_trade(trade_id: str, user: dict = Depends(get_current_user), db = Depends(get_db)) -> TradeResponse:
+    trade = await db.select_one("trades", {"id": trade_id, "user_id": user["sub"]})
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    return TradeResponse(**trade)
+
+
+@router.post("/", response_model=TradeResponse, status_code=201)
+async def open_trade(body: TradeCreate, user: dict = Depends(get_current_user), db = Depends(get_db)) -> TradeResponse:
+    if body.direction not in ("buy", "sell"):
+        raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"direction must be 'buy' or 'sell'")
+    now = datetime.now(timezone.utc).isoformat()
+    trade_id = str(uuid.uuid4())
+    db_data = {"id": trade_id, "user_id": user["sub"], "symbol": body.symbol, "direction": body.direction, "lot_size": body.lot_size, "entry_price": body.entry_price, "stop_loss": body.stop_loss, "take_profit": body.take_profit, "status": "pending", "strategy": body.strategy, "comment": body.comment, "opened_at": now, "closed_at": None, "pnl": None, "mt5_ticket": None}
+    record = await db.insert("trades", db_data)
+    if not record:
+        raise HTTPException(status_code=500, detail="Failed to create trade record")
+    try:
+        svc = _get_execution_service()
+        result = await svc.open_position(symbol=body.symbol, direction=body.direction, lot_size=body.lot_size, entry_price=body.entry_price, stop_loss=body.stop_loss, take_profit=body.take_profit, comment=body.comment or "")
+        ticket = result.get("ticket")
+        actual_price = result.get("price", body.entry_price)
+        updated = await db.update("trades", {"id": trade_id}, {"status": "open", "mt5_ticket": ticket, "entry_price": actual_price})
+        final = updated[0] if updated else {**db_data, "status": "open", "mt5_ticket": ticket}
+        logger.info("Trade opened: id=%s ticket=%s", trade_id, ticket)
+        return TradeResponse(**final)
+    except Exception as exc:
+        logger.error("MT5 open_position failed: %s", exc)
+        await db.update("trades", {"id": trade_id}, {"status": "failed"})
+        raise HTTPException(status_code=http_status.HTTP_502_BAD_GATEWAY, detail=f"MT5 execution failed: {exc}")
+
+
+@router.post("/{trade_id}/close")
+async def close_trade(trade_id: str, user: dict = Depends(get_current_user), db = Depends(get_db)) -> dict:
+    trade = await db.select_one("trades", {"id": trade_id, "user_id": user["sub"]})
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    if trade.get("status") != "open":
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail=f"Trade is not open")
+    ticket = trade.get("mt5_ticket")
+    if not ticket:
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail="Trade has no MT5 ticket")
+    try:
+        svc = _get_execution_service()
+        result = await svc.close_position(ticket=ticket, symbol=trade["symbol"])
+        pnl = result.get("pnl", 0.0)
+    except Exception as exc:
+        logger.error("MT5 close_position failed: %s", exc)
+        raise HTTPException(status_code=http_status.HTTP_502_BAD_GATEWAY, detail=f"MT5 close failed: {exc}")
+    now = datetime.now(timezone.utc).isoformat()
+    updated = await db.update("trades", {"id": trade_id}, {"status": "closed", "closed_at": now, "pnl": pnl})
+    logger.info("Trade closed: id=%s ticket=%s pnl=%.2f", trade_id, ticket, pnl)
+    return {"success": True, "trade_id": trade_id, "ticket": ticket, "pnl": pnl, "trade": updated[0] if updated else trade}

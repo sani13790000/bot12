@@ -48,7 +48,9 @@ pandas>=2.2.0,<3.0
 scikit-learn==1.5.2
 xgboost==2.1.1
 shap==0.46.0
-pandas-ta==0.3.14b
+# pandas-ta removed: 0.3.14b0 was pulled from PyPI and the only remaining
+# releases (0.4.x) require Python>=3.12 and numpy>=2.2, conflicting with the
+# numpy<2.0 pin above (XGBoost 2.1.1). Not imported anywhere in the codebase.
 
 # -----------------------------------------------------------------------
 # RL (optional — comment out to save ~800MB image size)

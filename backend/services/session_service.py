@@ -1,1 +1,211 @@
-IiIiCmJhY2tlbmQvc2VydmljZXMvc2Vzc2lvbl9zZXJ2aWNlLnB5IC0tIFBoYXNlLUMgZml4CgpDLTcgIFVzZXJTZXNzaW9uTWFuYWdlci5fY2xpZW50IHdhcyBjYWxsaW5nIGdldF9zdXBhYmFzZV9jbGllbnRfc3luYygpCiAgICAgYnV0IHRoYXQgbWF5IHJldHVybiBOb25lIG9uIGNvbGQgc3RhcnQuICBGSVg6IHVzZSBkYiB3cmFwcGVyCiAgICAgKERhdGFiYXNlV3JhcHBlcikgd2hpY2ggaGFuZGxlcyBpdHMgb3duIGV4ZWN1dG9yICsgcmV0cnkuCgpUd28gcmVzcG9uc2liaWxpdGllczoKICAxLiBTZXNzaW9uU2VydmljZSAgLS0gdHJhZGluZyBzZXNzaW9uIGRldGVjdGlvbiAobm8gSS9PKQogIDIuIFVzZXJTZXNzaW9uTWFuYWdlciAtLSByZWZyZXNoLXRva2VuIGxpZmVjeWNsZSBpbiBEQgoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGFzeW5jaW8KaW1wb3J0IGxvZ2dpbmcKZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzLCBmaWVsZApmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZXpvbmUKZnJvbSBlbnVtIGltcG9ydCBFbnVtCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERpY3QsIExpc3QsIE9wdGlvbmFsCgpsb2cgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKCgpjbGFzcyBTZXNzaW9uVHlwZShFbnVtKToKICAgIE5PTkUgICAgPSAiYmRvbiBzZXNuIgogICAgU1lETkVZICA9ICJTeWRuZXkiCiAgICBUT0tZTyAgID0gIlRva3lvIgogICAgTE9ORE9OICA9ICJMb25kb24iCiAgICBORVdZT1JLID0gIk5ldyBZb3JrIgogICAgT1ZFUkxBUCA9ICJMb25kb24vTlkgT3ZlcmxhcCIKCgpjbGFzcyBLaWxsWm9uZVR5cGUoRW51bSk6CiAgICBOT05FICAgICAgICAgPSAiYmRvbiBLaWxsIFpvbmUiCiAgICBBU0lBTiAgICAgICAgPSAiQXNpYW4gS2lsbCBab25lIgogICAgTE9ORE9OX09QRU4gID0gIkxvbmRvbiBPcGVuIEtpbGwgWm9uZSIKICAgIE5ZX09QRU4gICAgICA9ICJOWSBPZW4gS2lsbCBab25lIgogICAgTllfUE0gICAgICAgID0gIk5ZIFBNIEtpbGwgWm9uZSIKICAgIExPTkRPTl9DTE9TRSA9ICJMb25kb24gQ2xvc2UgS2lsbCBab25lIgoKCkBkYXRhY2xhc3MKY2xhc3MgU2Vzc2lvbkluZm86CiAgICBzZXNzaW9uX3R5cGU6ICAgICAgICAgICBTZXNzaW9uVHlwZSAgPSBTZXNzaW9uVHlwZS5OT05FCiAgICBraWxsX3pvbmU6ICAgICAgICAgICAgICBLaWxsWm9uZVR5cGUgPSBLaWxsWm9uZVR5cGUuTk9ORQogICAgaXNfb3ZlcmxhcDogICAgICAgICAgICAgYm9vbCAgICAgICAgID0gRmFsc2UKICAgIGlzX2tpbGxfem9uZTogICAgICAgICAgIGJvb2wgICAgICAgICA9IEZhbHNlCiAgICBjYW5fdHJhZGU6ICAgICAgICAgICAgICBib29sICAgICAgICAgPSBGYWxzZQogICAgc2Vzc2lvbl9zY29yZTogICAgICAgICAgZmxvYXQgICAgICAgID0gMC4wCiAgICBzZXNzaW9uX25hbWVfZmE6ICAgICAgICBzdHIgICAgICAgICAgPSAiYmRvbiBzZXNuIgogICAga2lsbF96b25lX25hbWVfZmE6ICAgICAgc3RyICAgICAgICAgID0gImJkb24gS2lsbCBab25lIgogICAgdXRjX2hvdXI6ICAgICAgICAgICAgICAgaW50ICAgICAgICAgID0gMAogICAgdXRjX21pbnV0ZTogICAgICAgICAgICAgaW50ICAgICAgICAgID0gMAogICAgbWludXRlc190b19sb25kb25fb3BlbjogaW50ICAgICAgICAgID0gMAogICAgbWludXRlc190b19ueV9vcGVuOiAgICAgaW50ICAgICAgICAgID0gMAogICAgYWN0aXZlX3Nlc3Npb25zOiAgICAgICAgTGlzdFtzdHJdICAgID0gZmllbGQoZGVmYXVsdF9mYWN0b3J5PWxpc3QpCgoKY2xhc3MgU2Vzc2lvblNlcnZpY2U6CiAgICAiIiJQdXJlIGJ1c2luZXNzIGxvZ2ljIC0tIHplcm8gSS9PLiIiIgoKICAgIF9TRVNTSU9OX1NDT1JFUzogRGljdFtBbnksIGZsb2F0XSA9IHsKICAgICAgICBLaWxsWm9uZVR5cGUuTE9ORE9OX09QRU46ICAxMDAuMCwKICAgICAgICBLaWxsWm9uZVR5cGUuTllfT1BFTjogICAgICAxMDAuMCwKICAgICAgICBTZXNzaW9uVHlwZS5PVkVSTEFQOiAgICAgICAgOTAuMCwKICAgICAgICBLaWxsWm9uZVR5cGUuTllfUE06ICAgICAgICAgNzUuMCwKICAgICAgICBTZXNzaW9uVHlwZS5MT05ET046ICAgICAgICAgIDcwLjAsCiAgICAgICAgU2Vzc2lvblR5cGUuTkVXWU9SSzogICAgICAgICA2NS4wLAogICAgICAgIEtpbGxab25lVHlwZS5BU0lBTjogICAgICAgICAgNTAuMCwKICAgICAgICBLaWxsWm9uZVR5cGUuTE9ORE9OX0NMT1NFOiAgIDQ1LjAsCiAgICAgICAgU2Vzc2lvblR5cGUuVE9LWU86ICAgICAgICAgICA0MC4wLAogICAgICAgIFNlc3Npb25UeXBlLlNZRE5FWTogICAgICAgICAgMjUuMCwKICAgICAgICBTZXNzaW9uVHlwZS5OT05FOiAgICAgICAgICAgICAwLjAsCiAgICB9CgogICAgZGVmIF9faW5pdF9fKAogICAgICAgIHNlbGYsCiAgICAgICAgdXNlX3N5ZG5leTogYm9vbCAgICAgID0gRmFsc2UsCiAgICAgICAgdXNlX3Rva3lvOiBib29sICAgICAgID0gVHJ1ZSwKICAgICAgICB1c2VfbG9uZG9uOiBib29sICAgICAgPSBUcnVlLAogICAgICAgIHVzZV9uZXd5b3JrOiBib29sICAgICA9IFRydWUsCiAgICAgICAgb25seV9raWxsX3pvbmVzOiBib29sID0gRmFsc2UsCiAgICAgICAgcHJlZmVyX292ZXJsYXA6IGJvb2wgID0gRmFsc2UsCiAgICApIC0+IE5vbmU6CiAgICAgICAgc2VsZi51c2Vfc3lkbmV5ICAgICAgPSB1c2Vfc3lkbmV5CiAgICAgICAgc2VsZi51c2VfdG9reW8gICAgICAgPSB1c2VfdG9reW8KICAgICAgICBzZWxmLnVzZV9sb25kb24gICAgICA9IHVzZV9sb25kb24KICAgICAgICBzZWxmLnVzZV9uZXd5b3JrICAgICA9IHVzZV9uZXd5b3JrCiAgICAgICAgc2VsZi5vbmx5X2tpbGxfem9uZXMgPSBvbmx5X2tpbGxfem9uZXMKICAgICAgICBzZWxmLnByZWZlcl9vdmVybGFwICA9IHByZWZlcl9vdmVybGFwCgogICAgQHN0YXRpY21ldGhvZAogICAgZGVmIF9pbl9yYW5nZShoOiBpbnQsIG06IGludCwgc2g6IGludCwgc206IGludCwgZWg6IGludCwgZW06IGludCkgLT4gYm9vbDoKICAgICAgICBjdXIgPSBoICogNjAgKyBtCiAgICAgICAgcyAgID0gc2ggKiA2MCArIHNtCiAgICAgICAgZSAgID0gZWggKiA2MCArIGVtCiAgICAgICAgaWYgcyA8PSBlOgogICAgICAgICAgICByZXR1cm4gcyA8PSBjdXIgPCBlCiAgICAgICAgcmV0dXJuIGN1ciA+PSBzIG9yIGN1ciA8IGUKCiAgICBkZWYgZ2V0X3Nlc3Npb24oc2VsZiwgZHQ6IE9wdGlvbmFsW2RhdGV0aW1lXSA9IE5vbmUpIC0+IFNlc3Npb25JbmZvOgogICAgICAgIGlmIGR0IGlzIE5vbmU6CiAgICAgICAgICAgIGR0ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykKICAgICAgICBoLCBtID0gZHQuaG91ciwgZHQubWludXRlCiAgICAgICAgaW5mbyA9IFNlc3Npb25JbmZvKHV0Y19ob3VyPWgsIHV0Y19taW51dGU9bSkKICAgICAgICBpbmZvLm1pbnV0ZXNfdG9fbG9uZG9uX29wZW4gPSAoKDggKiA2MCkgLSAoaCAqIDYwICsgbSkpICUgKDI0ICogNjApCiAgICAgICAgaW5mby5taW51dGVzX3RvX255X29wZW4gICAgID0gKCgxMyAqIDYwKSAtIChoICogNjAgKyBtKSkgJSAoMjQgKiA2MCkKCiAgICAgICAgYWN0aXZlOiBMaXN0W3N0cl0gPSBbXQogICAgICAgIGlmIHNlbGYudXNlX3N5ZG5leSAgYW5kIHNlbGYuX2luX3JhbmdlKGgsIG0sIDIyLCAwLCA3LCAwKTogIGFjdGl2ZS5hcHBlbmQoIlN5ZG5leSIpCiAgICAgICAgaWYgc2VsZi51c2VfdG9reW8gICBhbmQgc2VsZi5faW5fcmFuZ2UoaCwgbSwgIDAsIDAsIDksIDApOiAgYWN0aXZlLmFwcGVuZCgiVG9reW8iKQogICAgICAgIGlmIHNlbGYudXNlX2xvbmRvbiAgYW5kIHNlbGYuX2luX3JhbmdlKGgsIG0sICA4LCAwLCAxNywgMCk6IGFjdGl2ZS5hcHBlbmQoIkxvbmRvbiIpCiAgICAgICAgaWYgc2VsZi51c2VfbmV3eW9yayBhbmQgc2VsZi5faW5fcmFuZ2UoaCwgbSwgMTMsIDAsIDIyLCAwKTogYWN0aXZlLmFwcGVuZCgiTmV3IFlvcmsiKQogICAgICAgIGluZm8uYWN0aXZlX3Nlc3Npb25zID0gYWN0aXZlCgogICAgICAgIGlmICJMb25kb24iIGluIGFjdGl2ZSBhbmQgIk5ldyBZb3JrIiBpbiBhY3RpdmU6CiAgICAgICAgICAgIGluZm8uc2Vzc2lvbl90eXBlICA9IFNlc3Npb25UeXBlLk9WRVJMQVAKICAgICAgICAgICAgaW5mby5pc19vdmVybGFwICAgID0gVHJ1ZQogICAgICAgIGVsaWYgIkxvbmRvbiIgaW4gYWN0aXZlOgogICAgICAgICAgICBpbmZvLnNlc3Npb25fdHlwZSAgPSBTZXNzaW9uVHlwZS5MT05ET04KICAgICAgICBlbGlmICJOZXcgWW9yayIgaW4gYWN0aXZlOgogICAgICAgICAgICBpbmZvLnNlc3Npb25fdHlwZSAgPSBTZXNzaW9uVHlwZS5ORVdZT1JLCiAgICAgICAgZWxpZiAiVG9reW8iIGluIGFjdGl2ZToKICAgICAgICAgICAgaW5mby5zZXNzaW9uX3R5cGUgID0gU2Vzc2lvblR5cGUuVE9LWU8KICAgICAgICBlbGlmICJTeWRuZXkiIGluIGFjdGl2ZToKICAgICAgICAgICAgaW5mby5zZXNzaW9uX3R5cGUgID0gU2Vzc2lvblR5cGUuU1lETkVZCgogICAgICAgIGlmICAgc2VsZi5faW5fcmFuZ2UoaCwgbSwgIDIsIDAsICA1LCAwKTogaW5mby5raWxsX3pvbmUgPSBLaWxsWm9uZVR5cGUuQVNJQU4KICAgICAgICBlbGlmIHNlbGYuX2luX3JhbmdlKGgsIG0sICA4LCAwLCAxMCwgMCk6IGluZm8ua2lsbF96b25lID0gS2lsbFpvbmVUeXBlLkxPTkRPTl9PUEVOCiAgICAgICAgZWxpZiBzZWxmLl9pbl9yYW5nZShoLCBtLCAxMywgMCwgMTUsIDApOiBpbmZvLmtpbGxfem9uZSA9IEtpbGxab25lVHlwZS5OWV9PUEVOCiAgICAgICAgZWxpZiBzZWxmLl9pbl9yYW5nZShoLCBtLCAxOSwgMCwgMjEsIDApOiBpbmZvLmtpbGxfem9uZSA9IEtpbGxab25lVHlwZS5OWV9QTQogICAgICAgIGVsaWYgc2VsZi5faW5fcmFuZ2UoaCwgbSwgMTUsIDAsIDE3LCAwKTogaW5mby5raWxsX3pvbmUgPSBLaWxsWm9uZVR5cGUuTE9ORE9OX0NMT1NFCgogICAgICAgIGluZm8uaXNfa2lsbF96b25lICAgICA9IGluZm8ua2lsbF96b25lICE9IEtpbGxab25lVHlwZS5OT05FCiAgICAgICAgaW5mby5zZXNzaW9uX25hbWVfZmEgID0gaW5mby5zZXNzaW9uX3R5cGUudmFsdWUKICAgICAgICBpbmZvLmtpbGxfem9uZV9uYW1lX2ZhID0gaW5mby5raWxsX3pvbmUudmFsdWUKICAgICAgICBzY29yZV9rZXkgPSBpbmZvLmtpbGxfem9uZSBpZiBpbmZvLmlzX2tpbGxfem9uZSBlbHNlIGluZm8uc2Vzc2lvbl90eXBlCiAgICAgICAgaW5mby5zZXNzaW9uX3Njb3JlID0gc2VsZi5fU0VTU0lPTl9TQ09SRVMuZ2V0KHNjb3JlX2tleSwgMC4wKQogICAgICAgIGlmIHNlbGYub25seV9raWxsX3pvbmVzOgogICAgICAgICAgICBpbmZvLmNhbl90cmFkZSA9IGluZm8uaXNfa2lsbF96b25lCiAgICAgICAgZWxpZiBzZWxmLnByZWZlcl9vdmVybGFwOgogICAgICAgICAgICBpbmZvLmNhbl90cmFkZSA9IGluZm8uaXNfb3ZlcmxhcCBvciBpbmZvLmlzX2tpbGxfem9uZQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIGluZm8uY2FuX3RyYWRlID0gaW5mby5zZXNzaW9uX3R5cGUgIT0gU2Vzc2lvblR5cGUuTk9ORQogICAgICAgIHJldHVybiBpbmZvCgoKY2xhc3MgVXNlclNlc3Npb25NYW5hZ2VyOgogICAgIiIiCiAgICBNYW5hZ2VzIHJlZnJlc2ggdG9rZW5zIHN0b3JlZCBpbiBgcmVmcmVzaF90b2tlbnNgIHRhYmxlLgoKICAgIEMtNyBGSVg6IHVzZXMgRGF0YWJhc2VXcmFwcGVyIChkYikgaW5zdGVhZCBvZiByYXcgU3VwYWJhc2UgY2xpZW50CiAgICB0byBhdm9pZCBjb2xkLXN0YXJ0IE5vbmUgaXNzdWVzLgogICAgIiIiCgogICAgX1RBQkxFID0gInJlZnJlc2hfdG9rZW5zIgoKICAgIGFzeW5jIGRlZiByZXZva2Vfc2Vzc2lvbihzZWxmLCBqdGk6IHN0cikgLT4gYm9vbDoKICAgICAgICAiIiJNYXJrIGEgc2luZ2xlIHJlZnJlc2ggdG9rZW4gYXMgcmV2b2tlZC4iIiIKICAgICAgICB0cnk6CiAgICAgICAgICAgIGZyb20gYmFja2VuZC5kYXRhYmFzZSBpbXBvcnQgZGIKICAgICAgICAgICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuaXNvZm9ybWF0KCkKICAgICAgICAgICAgYXdhaXQgZGIudXBkYXRlKHNlbGYuX1RBQkxFLCB7Imp0aSI6IGp0aX0sIHsicmV2b2tlZCI6IFRydWUsICJyZXZva2VkX2F0Ijogbm93fSkKICAgICAgICAgICAgbG9nLmluZm8oInNlc3Npb25fcmV2b2tlZCBqdGk9JXMiLCBqdGkpCiAgICAgICAgICAgIHJldHVybiBUcnVlCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgbG9nLmV4Y2VwdGlvbigicmV2b2tlX3Nlc3Npb24gZmFpbGVkIGp0aT0lcyIsIGp0aSkKICAgICAgICAgICAgcmV0dXJuIEZhbHNlCgogICAgYXN5bmMgZGVmIHJldm9rZV9hbGxfdXNlcl9zZXNzaW9ucyhzZWxmLCB1c2VyX2lkOiBzdHIpIC0+IGludDoKICAgICAgICAiIiIKICAgICAgICBSZXZva2UgQUxMIGFjdGl2ZSByZWZyZXNoIHRva2VucyBmb3IgdXNlci4KICAgICAgICBDLTcgRklYOiByZWFsIERCIHdyaXRlIHZpYSBydW5faW5fZXhlY3V0b3IuCiAgICAgICAgUmV0dXJucyBjb3VudCBvZiByZXZva2VkIHNlc3Npb25zLgogICAgICAgICIiIgogICAgICAgIHRyeToKICAgICAgICAgICAgZnJvbSBiYWNrZW5kLmRhdGFiYXNlLmNvbm5lY3Rpb24gaW1wb3J0IGdldF9zdXBhYmFzZV9jbGllbnRfc3luYwogICAgICAgICAgICBub3cgPSBkYXRldGltZS5ub3codGltZXpvbmUudXRjKS5pc29mb3JtYXQoKQogICAgICAgICAgICBkZWYgX3Jldm9rZV9hbGwoKToKICAgICAgICAgICAgICAgIGNsaWVudCA9IGdldF9zdXBhYmFzZV9jbGllbnRfc3luYygpCiAgICAgICAgICAgICAgICBpZiBjbGllbnQgaXMgTm9uZToKICAgICAgICAgICAgICAgICAgICByZXR1cm4gMAogICAgICAgICAgICAgICAgcmVzdWx0ID0gKAogICAgICAgICAgICAgICAgICAgIGNsaWVudC50YWJsZShzZWxmLl9UQUJMRSkKICAgICAgICAgICAgICAgICAgICAudXBkYXRlKHsicmV2b2tlZCI6IFRydWUsICJyZXZva2VkX2F0Ijogbm93fSkKICAgICAgICAgICAgICAgICAgICAuZXEoInVzZXJfaWQiLCB1c2VyX2lkKQogICAgICAgICAgICAgICAgICAgIC5lcSgicmV2b2tlZCIsIEZhbHNlKQogICAgICAgICAgICAgICAgICAgIC5leGVjdXRlKCkKICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgICAgIHJldHVybiBsZW4ocmVzdWx0LmRhdGEpIGlmIHJlc3VsdC5kYXRhIGVsc2UgMAogICAgICAgICAgICBsb29wID0gYXN5bmNpby5nZXRfcnVubmluZ19sb29wKCkKICAgICAgICAgICAgY291bnQgPSBhd2FpdCBsb29wLnJ1bl9pbl9leGVjdXRvcihOb25lLCBfcmV2b2tlX2FsbCkKICAgICAgICAgICAgbG9nLmluZm8oInJldm9rZWRfYWxsX3Nlc3Npb25zIHVzZXJfaWQ9JXMgY291bnQ9JWQiLCB1c2VyX2lkLCBjb3VudCkKICAgICAgICAgICAgcmV0dXJuIGNvdW50CiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgbG9nLmV4Y2VwdGlvbigicmV2b2tlX2FsbF91c2VyX3Nlc3Npb25zIGZhaWxlZCB1c2VyX2lkPSVzIiwgdXNlcl9pZCkKICAgICAgICAgICAgcmV0dXJuIDAKCiAgICBhc3luYyBkZWYgZ2V0X2FjdGl2ZV9zZXNzaW9ucyhzZWxmLCB1c2VyX2lkOiBzdHIpIC0+IExpc3RbRGljdFtzdHIsIEFueV1dOgogICAgICAgIHRyeToKICAgICAgICAgICAgZnJvbSBiYWNrZW5kLmRhdGFiYXNlIGltcG9ydCBkYgogICAgICAgICAgICBub3cgPSBkYXRldGltZS5ub3codGltZXpvbmUudXRjKS5pc29mb3JtYXQoKQogICAgICAgICAgICBzZXNzaW9ucyA9IGF3YWl0IGRiLnNlbGVjdF9tYW55KHNlbGYuX1RBQkxFLCBmaWx0ZXJzPXsidXNlcl9pZCI6IHVzZXJfaWQsICJyZXZva2VkIjogRmFsc2V9LCBsaW1pdD01MCkKICAgICAgICAgICAgcmV0dXJuIFtzIGZvciBzIGluIHNlc3Npb25zIGlmIHMuZ2V0KCJleHBpcmVzX2F0IiwgIiIpID4gbm93XQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb246CiAgICAgICAgICAgIGxvZy5leGNlcHRpb24oImdldF9hY3RpdmVfc2Vzc2lvbnMgZmFpbGVkIHVzZXJfaWQ9JXMiLCB1c2VyX2lkKQogICAgICAgICAgICByZXR1cm4gW10KCgpzZXNzaW9uX3NlcnZpY2UgPSBTZXNzaW9uU2VydmljZSgpCnVzZXJfc2Vzc2lvbl9tYW5hZ2VyID0gVXNlclNlc3Npb25NYW5hZ2VyKCkK
+"""
+backend/services/session_service.py -- Phase-C fix
+
+C-7  UserSessionManager._client was calling get_supabase_client_sync()
+     but that may return None on cold start.  FIX: use db wrapper
+     (DatabaseWrapper) which handles its own executor + retry.
+
+Two responsibilities:
+  1. SessionService  -- trading session detection (no I/O)
+  2. UserSessionManager -- refresh-token lifecycle in DB
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+log = logging.getLogger(__name__)
+
+
+class SessionType(Enum):
+    NONE    = "bdon sesn"
+    SYDNEY  = "Sydney"
+    TOKYO   = "Tokyo"
+    LONDON  = "London"
+    NEWYORK = "New York"
+    OVERLAP = "London/NY Overlap"
+
+
+class KillZoneType(Enum):
+    NONE         = "bdon Kill Zone"
+    ASIAN        = "Asian Kill Zone"
+    LONDON_OPEN  = "London Open Kill Zone"
+    NY_OPEN      = "NY Oen Kill Zone"
+    NY_PM        = "NY PM Kill Zone"
+    LONDON_CLOSE = "London Close Kill Zone"
+
+
+@dataclass
+class SessionInfo:
+    session_type:           SessionType  = SessionType.NONE
+    kill_zone:              KillZoneType = KillZoneType.NONE
+    is_overlap:             bool         = False
+    is_kill_zone:           bool         = False
+    can_trade:              bool         = False
+    session_score:          float        = 0.0
+    session_name_fa:        str          = "bdon sesn"
+    kill_zone_name_fa:      str          = "bdon Kill Zone"
+    utc_hour:               int          = 0
+    utc_minute:             int          = 0
+    minutes_to_london_open: int          = 0
+    minutes_to_ny_open:     int          = 0
+    active_sessions:        List[str]    = field(default_factory=list)
+
+
+class SessionService:
+    """Pure business logic -- zero I/O."""
+
+    _SESSION_SCORES: Dict[Any, float] = {
+        KillZoneType.LONDON_OPEN:  100.0,
+        KillZoneType.NY_OPEN:      100.0,
+        SessionType.OVERLAP:        90.0,
+        KillZoneType.NY_PM:         75.0,
+        SessionType.LONDON:          70.0,
+        SessionType.NEWYORK:         65.0,
+        KillZoneType.ASIAN:          50.0,
+        KillZoneType.LONDON_CLOSE:   45.0,
+        SessionType.TOKYO:           40.0,
+        SessionType.SYDNEY:          25.0,
+        SessionType.NONE:             0.0,
+    }
+
+    def __init__(
+        self,
+        use_sydney: bool      = False,
+        use_tokyo: bool       = True,
+        use_london: bool      = True,
+        use_newyork: bool     = True,
+        only_kill_zones: bool = False,
+        prefer_overlap: bool  = False,
+    ) -> None:
+        self.use_sydney      = use_sydney
+        self.use_tokyo       = use_tokyo
+        self.use_london      = use_london
+        self.use_newyork     = use_newyork
+        self.only_kill_zones = only_kill_zones
+        self.prefer_overlap  = prefer_overlap
+
+    @staticmethod
+    def _in_range(h: int, m: int, sh: int, sm: int, eh: int, em: int) -> bool:
+        cur = h * 60 + m
+        s   = sh * 60 + sm
+        e   = eh * 60 + em
+        if s <= e:
+            return s <= cur < e
+        return cur >= s or cur < e
+
+    def get_session(self, dt: Optional[datetime] = None) -> SessionInfo:
+        if dt is None:
+            dt = datetime.now(timezone.utc)
+        h, m = dt.hour, dt.minute
+        info = SessionInfo(utc_hour=h, utc_minute=m)
+        info.minutes_to_london_open = ((8 * 60) - (h * 60 + m)) % (24 * 60)
+        info.minutes_to_ny_open     = ((13 * 60) - (h * 60 + m)) % (24 * 60)
+
+        active: List[str] = []
+        if self.use_sydney  and self._in_range(h, m, 22, 0, 7, 0):  active.append("Sydney")
+        if self.use_tokyo   and self._in_range(h, m,  0, 0, 9, 0):  active.append("Tokyo")
+        if self.use_london  and self._in_range(h, m,  8, 0, 17, 0): active.append("London")
+        if self.use_newyork and self._in_range(h, m, 13, 0, 22, 0): active.append("New York")
+        info.active_sessions = active
+
+        if "London" in active and "New York" in active:
+            info.session_type  = SessionType.OVERLAP
+            info.is_overlap    = True
+        elif "London" in active:
+            info.session_type  = SessionType.LONDON
+        elif "New York" in active:
+            info.session_type  = SessionType.NEWYORK
+        elif "Tokyo" in active:
+            info.session_type  = SessionType.TOKYO
+        elif "Sydney" in active:
+            info.session_type  = SessionType.SYDNEY
+
+        if   self._in_range(h, m,  2, 0,  5, 0): info.kill_zone = KillZoneType.ASIAN
+        elif self._in_range(h, m,  8, 0, 10, 0): info.kill_zone = KillZoneType.LONDON_OPEN
+        elif self._in_range(h, m, 13, 0, 15, 0): info.kill_zone = KillZoneType.NY_OPEN
+        elif self._in_range(h, m, 19, 0, 21, 0): info.kill_zone = KillZoneType.NY_PM
+        elif self._in_range(h, m, 15, 0, 17, 0): info.kill_zone = KillZoneType.LONDON_CLOSE
+
+        info.is_kill_zone     = info.kill_zone != KillZoneType.NONE
+        info.session_name_fa  = info.session_type.value
+        info.kill_zone_name_fa = info.kill_zone.value
+        score_key = info.kill_zone if info.is_kill_zone else info.session_type
+        info.session_score = self._SESSION_SCORES.get(score_key, 0.0)
+        if self.only_kill_zones:
+            info.can_trade = info.is_kill_zone
+        elif self.prefer_overlap:
+            info.can_trade = info.is_overlap or info.is_kill_zone
+        else:
+            info.can_trade = info.session_type != SessionType.NONE
+        return info
+
+
+class UserSessionManager:
+    """
+    Manages refresh tokens stored in `refresh_tokens` table.
+
+    C-7 FIX: uses DatabaseWrapper (db) instead of raw Supabase client
+    to avoid cold-start None issues.
+    """
+
+    _TABLE = "refresh_tokens"
+
+    async def revoke_session(self, jti: str) -> bool:
+        """Mark a single refresh token as revoked."""
+        try:
+            from backend.database import db
+            now = datetime.now(timezone.utc).isoformat()
+            await db.update(self._TABLE, {"jti": jti}, {"revoked": True, "revoked_at": now})
+            log.info("session_revoked jti=%s", jti)
+            return True
+        except Exception:
+            log.exception("revoke_session failed jti=%s", jti)
+            return False
+
+    async def revoke_all_user_sessions(self, user_id: str) -> int:
+        """
+        Revoke ALL active refresh tokens for user.
+        C-7 FIX: real DB write via run_in_executor.
+        Returns count of revoked sessions.
+        """
+        try:
+            from backend.database.connection import get_supabase_client_sync
+            now = datetime.now(timezone.utc).isoformat()
+            def _revoke_all():
+                client = get_supabase_client_sync()
+                if client is None:
+                    return 0
+                result = (
+                    client.table(self._TABLE)
+                    .update({"revoked": True, "revoked_at": now})
+                    .eq("user_id", user_id)
+                    .eq("revoked", False)
+                    .execute()
+                )
+                return len(result.data) if result.data else 0
+            loop = asyncio.get_running_loop()
+            count = await loop.run_in_executor(None, _revoke_all)
+            log.info("revoked_all_sessions user_id=%s count=%d", user_id, count)
+            return count
+        except Exception:
+            log.exception("revoke_all_user_sessions failed user_id=%s", user_id)
+            return 0
+
+    async def get_active_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+        try:
+            from backend.database import db
+            now = datetime.now(timezone.utc).isoformat()
+            sessions = await db.select_many(self._TABLE, filters={"user_id": user_id, "revoked": False}, limit=50)
+            return [s for s in sessions if s.get("expires_at", "") > now]
+        except Exception:
+            log.exception("get_active_sessions failed user_id=%s", user_id)
+            return []
+
+
+session_service = SessionService()
+user_session_manager = UserSessionManager()

@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib, json, logging, math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 FEATURE_VERSION = "3.0.0"
