@@ -8,6 +8,7 @@ from __future__ import annotations
 import hmac
 import hashlib
 import json
+import logging
 import threading
 import time
 import uuid
@@ -16,6 +17,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Callable
 
+_LOG = logging.getLogger(__name__)
 _DEFAULT_SECRET = b"p25-artifact-hmac-secret-v25"
 
 
@@ -597,8 +599,8 @@ class AdminArtifactOps:
                 try:
                     self._gov.revoke_artifact(r.artifact_id, reason=reason, actor=actor)
                     count += 1
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _LOG.warning('artifact revocation failed for %s: %s', r.artifact_id, exc)
         return count
 
     def published_count(self) -> int:

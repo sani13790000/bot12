@@ -504,8 +504,8 @@ class RBACEngineV2:
             for h in self._deny_hooks:
                 try:
                     h(ctx, perm)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.warning('RBAC deny hook error: %s', exc)
         return result
 
     def check_resource(self, ctx: AuthContext, perm: str, owner_id: Optional[str]) -> bool:

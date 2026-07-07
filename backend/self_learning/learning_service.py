@@ -223,8 +223,8 @@ class LearningService:
             if self._on_cycle_complete is not None:
                 try:
                     self._on_cycle_complete(result)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning('on_cycle_complete hook error: %s', exc)
         return result
 
     # -- Helpers --
@@ -255,8 +255,8 @@ class LearningService:
             if callable(fn):
                 info = await asyncio.to_thread(fn)
                 return float(info.get("drift_score", 0.0) if isinstance(info, dict) else 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug('drift check failed: %s', exc)
         return 0.0
 
     def _engine_should_retrain(self) -> bool:

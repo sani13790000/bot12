@@ -106,7 +106,8 @@ class LicenseService:
             return await license_manager.check_feature(license_key, feature_enum)
         except ValueError:
             return False
-        except Exception:
+        except Exception as exc:
+            logger.warning("Feature check failed for key=%s feature=%s: %s", license_key, feature, exc)
             return False
 
     async def activate_device(
@@ -240,7 +241,8 @@ class LicenseService:
             expiry = datetime.fromisoformat(expires_at)
             remaining = (expiry - datetime.utcnow()).days
             return max(0, remaining)
-        except Exception:
+        except (ValueError, TypeError) as exc:
+            logger.warning("Failed to parse license expiry '%s': %s", expires_at, exc)
             return 0
 
 

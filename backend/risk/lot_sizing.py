@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional, Tuple
 try:
     from ..core.logger import get_logger
     logger = get_logger('risk.lot_sizing')
-except Exception:
+except ImportError:
     import logging
     logger = logging.getLogger('risk.lot_sizing')
 

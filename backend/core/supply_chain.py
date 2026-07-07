@@ -4,6 +4,7 @@ import copy
 import hashlib
 import hmac as _hmac_mod
 import json
+import logging
 import os
 import re
 import threading
@@ -13,6 +14,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 
 class VulnSeverity(str, Enum):
@@ -288,8 +291,8 @@ class VulnerabilityScanner:
         for fn in self._hooks:
             try:
                 fn(found)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('supply chain scan hook error: %s', exc)
         return found
 
     def has_critical(self, specs: List[DepSpec]) -> bool:

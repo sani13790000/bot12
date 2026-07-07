@@ -238,7 +238,7 @@ class PerformanceMetrics:
                 dt = datetime.datetime.utcfromtimestamp(float(t["close_time"]))
                 key = dt.strftime("%Y-%m")
                 monthly[key] = monthly.get(key, 0) + t["net_profit"]
-            except Exception:
+            except (ValueError, TypeError, KeyError):
                 pass
         return monthly
 

@@ -18,11 +18,13 @@ Architecture:
 Sandbox: 63,850 bytes
 """
 from __future__ import annotations
-import copy, hashlib, hmac, json, threading, time, uuid
+import copy, hashlib, hmac, json, logging, threading, time, uuid
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 class CheckDomain(str, Enum):
     TRADING_EXECUTION  = 'trading_execution'
@@ -151,7 +153,8 @@ class ReleaseCheckEngine:
     def _emit(self, result):
         for h in self._hooks:
             try: h(result)
-            except: pass
+            except Exception as exc:
+                _LOG.warning('release check hook error: %s', exc)
         if self._audit is not None:
             self._audit.record(f'CHECK_{result.status.value}', 'release_gate',
                 result.domain.value, detail={'name': result.name})
@@ -385,7 +388,7 @@ class MigrationVerifier:
         for fn in actual_filenames:
             parts = fn.replace('.sql','').split('_')
             try: seq = int(parts[0]) if parts[0].isdigit() else -1
-            except: seq = -1
+            except (ValueError, IndexError): seq = -1
             actual_seqs.append(seq)
         valid_seqs = [s for s in actual_seqs if s > 0]
         if valid_seqs != sorted(valid_seqs):

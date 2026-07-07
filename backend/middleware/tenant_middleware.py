@@ -63,8 +63,8 @@ class TenantMiddleware:
                 actor_id = getattr(token_payload, 'user_id', '')
                 sub = getattr(token_payload, 'user_id', None)
                 actor_tenant_id = _extract_tenant_id_from_jwt_sub(sub)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.debug("JWT verification failed: %s", exc)
         resolved_tenant_id = None
         if x_tenant and actor_role in _ADMIN_ROLES:
             resolved_tenant_id = x_tenant

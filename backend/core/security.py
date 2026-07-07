@@ -90,8 +90,8 @@ def _cleanup_blacklist() -> None:
             with shelve.open(_SHELVE_PATH, flag="c") as db:
                 for k in expired:
                     db.pop(k, None)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("blacklist shelve cleanup failed: %s", exc)
 
 
 _load_blacklist_from_disk()

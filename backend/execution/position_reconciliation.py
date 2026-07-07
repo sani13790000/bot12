@@ -91,7 +91,6 @@ class PositionReconciler:
                         await self.osm.reject(ticket, reason="GHOST reconciled")
                         result.actions_taken += 1
                     except Exception as exc:
-                        pass
                         logger.error("[reconciler] GHOST close error ticket=%d: %s", ticket, exc)
 
             for ticket in orphans:
@@ -107,7 +106,6 @@ class PositionReconciler:
                         await self.osm.register_orphan(ticket)
                         result.actions_taken += 1
                     except Exception as exc:
-                        pass
                         logger.error("[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc)
 
         except Exception as exc:
@@ -122,8 +120,8 @@ class PositionReconciler:
         try:
             positions = await self.connector.get_positions()
             return {p["ticket"] for p in positions if "ticket" in p}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[reconciler] MT5 get_positions failed: %s", exc)
         return set()
 
     async def _get_osm_open_tickets(self) -> set[int]:
@@ -133,8 +131,8 @@ class PositionReconciler:
         try:
             tickets = await self.osm.get_open_tickets()
             return set(tickets)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[reconciler] OSM get_open_tickets failed: %s", exc)
         return set()
 
 

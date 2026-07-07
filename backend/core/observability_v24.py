@@ -176,7 +176,7 @@ class AnomalyDetector:
         if len(self._values)<10: return None
         vals=list(self._values); mean=statistics.mean(vals)
         try: std=statistics.stdev(vals)
-        except: return None
+        except (ValueError, statistics.StatisticsError): return None
         if std==0: return None
         z=abs(value-mean)/std
         self._cusum_pos=max(0.0,self._cusum_pos+(value-mean)-std*0.5)

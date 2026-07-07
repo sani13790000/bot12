@@ -1,7 +1,9 @@
 from __future__ import annotations
-import asyncio, hashlib, hmac, json, os, re, time, uuid
+import asyncio, hashlib, hmac, json, logging, os, re, time, uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 _TEST_SECRET = "integration-test-secret-key-phase19-secure-32chars"
 
@@ -269,8 +271,8 @@ class KillSwitch:
         for cb in self._callbacks:
             try:
                 cb(reason, actor)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('kill switch callback error: %s', exc)
 
     def check(self) -> None:
         if self._active:

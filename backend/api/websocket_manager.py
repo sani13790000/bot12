@@ -139,7 +139,8 @@ class WebSocketManager:
         self._by_user[info.user_id].discard(conn_id)
         if not self._by_user[info.user_id]: del self._by_user[info.user_id]
         try: await info.ws.close()
-        except Exception: pass
+        except Exception as exc:
+            logger.debug("ws close failed for conn=%s: %s", conn_id, exc)
 
     async def _handle_broken(self, conn_id: str) -> None:
         async with self._lock: await self._evict(conn_id, "broken_pipe")

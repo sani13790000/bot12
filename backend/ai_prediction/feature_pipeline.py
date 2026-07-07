@@ -61,7 +61,8 @@ def _broker_hour(signal: Dict[str,Any]) -> int:
             elif isinstance(ts,(int,float)): dt=datetime.fromtimestamp(ts,tz=timezone.utc)
             else: dt=ts
             return dt.hour
-        except Exception: pass
+        except (ValueError, TypeError, OSError) as exc:
+            logger.debug("broker_hour parse failed for ts=%r: %s", ts, exc)
     return datetime.now(timezone.utc).hour  # Q-3 FIX
 
 

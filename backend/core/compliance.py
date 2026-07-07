@@ -2,12 +2,14 @@
 Phase 30 -- Compliance, Legal & User-Facing Disclosures
 """
 from __future__ import annotations
-import copy, hashlib, hmac, json, os, time, uuid
+import copy, hashlib, hmac, json, logging, os, time, uuid
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import RLock
 from typing import Callable, Dict, List, Optional, Set, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 class DocumentType(str, Enum):
     TOS           = "tos"
@@ -409,8 +411,8 @@ class DisclosureEngine:
         for hook in self._hooks:
             try:
                 hook(user_id, tenant_id, missing)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('compliance hook error: %s', exc)
         raise ConsentRequiredError(f"User {user_id} must accept: {[t.value for t in missing]}")
 
     def record_consent(self, user_id: str, tenant_id: str, doc_type: DocumentType,

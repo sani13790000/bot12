@@ -177,8 +177,8 @@ def assert_tenant_access(
             for cb in audit_callbacks:
                 try:
                     cb(entry)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _log.warning('cross-tenant audit callback error: %s', exc)
         return True
     _log.error('cross-tenant boundary violation',
                extra={'actor_tenant': actor_tenant_id,

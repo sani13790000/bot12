@@ -1,10 +1,12 @@
 """Phase 21 - Tamper-Evident Audit Logging - FINAL - 172 tests pass"""
 from __future__ import annotations
-import csv, hashlib, hmac as _hmac, io, json, threading, time, uuid
+import csv, hashlib, hmac as _hmac, io, json, logging, threading, time, uuid
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
+
+_LOG = logging.getLogger(__name__)
 
 _DEFAULT_SECRET: bytes = b"audit-chain-secret-v21-changeme"
 MAX_RECORDS: int = 50_000
@@ -416,8 +418,8 @@ class AuditLogger:
         for h in hooks:
             try:
                 h(rec)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('audit hook error: %s', exc)
 
     # --- AUTH ---
     def auth_login_ok(self, u: str, **kw) -> AuditRecord:
