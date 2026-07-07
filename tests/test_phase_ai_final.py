@@ -31,7 +31,7 @@ class TestBUGAI1MainTruncated:
     """BUG-AI1: main.py was truncated -- restored."""
 
     def test_main_exists(self):
-        assert os.path.exists(MAIN_PATH), f"main.py not found at {MAIL_PATH}"
+        assert os.path.exists(MAIN_PATH), f"main.py not found at {MAIN_PATH}"
 
     def test_main_not_truncated(self):
         content = get_main_content()
