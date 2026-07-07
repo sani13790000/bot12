@@ -1,1 +1,72 @@
-IiIiCkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0KYmFja2VuZC9hcGkvcm91dGVzL2ludGVsbGlnZW5jZS5weSAtLSBNYWNoaW5lIExlYXJuaW5nIEludGVsbGlnZW5jZSBSb3V0ZXMKIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBsb2dnaW5nCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lLCB0aW1lem9uZQpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0LCBMaXN0LCBPcHRpb25hbAoKZnJvbSBmYXN0YXBpIGltcG9ydCBBUElSb3V0ZXIsIERlcGVuZHMsIEhUVFBFeGNlcHRpb24sIFF1ZXJ5CmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbCwgRmllbGQKCmZyb20gYmFja2VuZC5jb3JlLmRlcHMgaW1wb3J0IGdldF9jdXJyZW50X3VzZXIsIGdldF9kYgoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCnJvdXRlciA9IEFQSVJvdXRlcih0YWdzPVsiSW50ZWxsaWdlbmNlIl0pCgoKY2xhc3MgUHJlZGljdFJlcXVlc3QoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogICAgc3RyCiAgICB0aW1lZnJhbWU6IHN0ciA9ICJIMSIKICAgIGZlYXR1cmVzOiAgRGljdFtzdHIsIEFueV0gPSBGaWVsZChkZWZhdWx0X2ZhY3Rvcnk9ZGljdCkKCgpAcm91dGVyLnBvc3QoIi9wcmVkaWN0IikKYXN5bmMgZGVmIHByZWRpY3QoCiAgICBib2R5OiBQcmVkaWN0UmVxdWVzdCwKICAgIHVzZXI6IGRpY3QgPSBEZXBlbmRzKGdldF9jdXJyZW50X3VzZXIpLAopIC0+IERpY3Rbc3RyLCBBbnldOgogICAgIiIiUnVuIE1MIHByZWRpY3Rpb24gZm9yIGEgZ2l2ZW4gc3ltYm9sLiIiIgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5tbC5wcmVkaWN0b3IgaW1wb3J0IE1MUHJlZGljdG9yCiAgICAgICAgcHJlZGljdG9yID0gTUxQcmVkaWN0b3IoKQogICAgICAgIHJlc3VsdCA9IGF3YWl0IHByZWRpY3Rvci5wcmVkaWN0KAogICAgICAgICAgICBzeW1ib2w9Ym9keS5zeW1ib2wsCiAgICAgICAgICAgIHRpbWVmcmFtZT1ib2R5LnRpbWVmcmFtZSwKICAgICAgICAgICAgZmVhdHVyZXM9Ym9keS5mZWF0dXJlcywKICAgICAgICApCiAgICAgICAgcmV0dXJuIHsib2siOiBUcnVlLCAicHJlZGljdGlvbiI6IHJlc3VsdH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigiW0ludGVsbGlnZW5jZV0gcHJlZGljdCBlcnJvcjogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkKCgpAcm91dGVyLmdldCgiL21vZGVscyIpCmFzeW5jIGRlZiBsaXN0X21vZGVscygKICAgIHVzZXI6IGRpY3QgPSBEZXBlbmRzKGdldF9jdXJyZW50X3VzZXIpLAopIC0+IERpY3Rbc3RyLCBBbnldOgogICAgIiIiTGlzdCBhdmFpbGFibGUgTUwgbW9kZWxzIGFuZCB0aGVpciBzdGF0dXMuIiIiCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLm1sLm1vZGVsX3JlZ2lzdHJ5IGltcG9ydCBNb2RlbFJlZ2lzdHJ5CiAgICAgICAgcmVnaXN0cnkgPSBNb2RlbFJlZ2lzdHJ5KCkKICAgICAgICBtb2RlbHMgPSBhd2FpdCByZWdpc3RyeS5saXN0X21vZGVscygpCiAgICAgICAgcmV0dXJuIHsib2siOiBUcnVlLCAibW9kZWxzIjogbW9kZWxzfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmVycm9yKCJbSW50ZWxsaWdlbmNlXSBsaXN0X21vZGVscyBlcnJvcjogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkKCgpAcm91dGVyLmdldCgiL3N0YXR1cyIpCmFzeW5jIGRlZiBnZXRfc3RhdHVzKAogICAgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksCikgLT4gRGljdFtzdHIsIEFueV06CiAgICAiIiJHZXQgTUwgcGlwZWxpbmUgc3RhdHVzLiIiIgogICAgcmV0dXJuIHsKICAgICAgICAib2siOiBUcnVlLAogICAgICAgICJzdGF0dXMiOiAib3BlcmF0aW9uYWwiLAogICAgICAgICJtb2R1bGUiOiAiYmFja2VuZC5tbC54Z2Jvb3N0X3RyYWluZXIiLAogICAgICAgICJmZWF0dXJlcyI6IDM4LAogICAgICAgICJ0aW1lc3RhbXAiOiBkYXRldGltZS5ub3codGltZXpvbmUudXRjKS5pc29mb3JtYXQoKSwKICAgIH0K
+"""
+Galaxy Vast AI Trading Platform
+backend/api/routes/intelligence.py -- Machine Learning Intelligence Routes
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from backend.core.deps import get_current_user, get_db
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["Intelligence"])
+
+
+class PredictRequest(BaseModel):
+    symbol:    str
+    timeframe: str = "H1"
+    features:  Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/predict")
+async def predict(
+    body: PredictRequest,
+    user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Run ML prediction for a given symbol."""
+    try:
+        from backend.ml.predictor import MLPredictor
+        predictor = MLPredictor()
+        result = await predictor.predict(
+            symbol=body.symbol,
+            timeframe=body.timeframe,
+            features=body.features,
+        )
+        return {"ok": True, "prediction": result}
+    except Exception as exc:
+        logger.error("[Intelligence] predict error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/models")
+async def list_models(
+    user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """List available ML models and their status."""
+    try:
+        from backend.ml.model_registry import ModelRegistry
+        registry = ModelRegistry()
+        models = await registry.list_models()
+        return {"ok": True, "models": models}
+    except Exception as exc:
+        logger.error("[Intelligence] list_models error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/status")
+async def get_status(
+    user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Get ML pipeline status."""
+    return {
+        "ok": True,
+        "status": "operational",
+        "module": "backend.ml.xgboost_trainer",
+        "features": 38,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }

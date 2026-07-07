@@ -1,1 +1,103 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9kYXNoYm9hcmQucHkKR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybQoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGxvZ2dpbmcKZnJvbSB0eXBpbmcgaW1wb3J0IEFueSwgRGljdCwgTGlzdAoKZnJvbSBmYXN0YXBpIGltcG9ydCBBUElSb3V0ZXIsIERlcGVuZHMsIEhUVFBFeGNlcHRpb24sIFF1ZXJ5CmZyb20gZmFzdGFwaS5yZXNwb25zZXMgaW1wb3J0IEpTT05SZXNwb25zZQoKbG9nZ2VyID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCgojIEJVRy1BRjEgRklYOiByZW1vdmVkIHByZWZpeD0iL2Rhc2hib2FyZCIgLS0gZG91YmxlIHByZWZpeCB3YXMgY2F1c2luZyAvZGFzaGJvYXJkL2Rhc2hib2FyZC8qCnJvdXRlciA9IEFQSVJvdXRlcih0YWdzPVsiZGFzaGJvYXJkIl0pCgoKZGVmIF9vayhkYXRhOiBBbnkpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgcmV0dXJuIHsic3RhdHVzIjogIm9rIiwgImRhdGEiOiBkYXRhfQoKCmRlZiBfZXJyKG1zZzogc3RyLCBjb2RlOiBpbnQgPSA1MDApIC0+IEpTT05SZXNwb25zZToKICAgIHJldHVybiBKU09OUmVzcG9uc2UoeyJzdGF0dXMiOiAiZXJyb3IiLCAibWVzc2FnZSI6IG1zZ30sIHN0YXR1c19jb2RlPWNvZGUpCgoKQHJvdXRlci5nZXQoIi9zdW1tYXJ5IikKYXN5bmMgZGVmIGdldF9zdW1tYXJ5KCkgLT4gRGljdFtzdHIsIEFueV06CiAgICB0cnk6CiAgICAgICAgc3VtbWFyeTogRGljdFtzdHIsIEFueV0gPSB7fQogICAgICAgIHRyeToKICAgICAgICAgICAgZnJvbSBiYWNrZW5kLmV4ZWN1dGlvbi5tdDVfY29ubmVjdG9yIGltcG9ydCBtdDVfY29ubmVjdG9yCiAgICAgICAgICAgIGFjY291bnQgPSBhd2FpdCBtdDVfY29ubmVjdG9yLmdldF9hY2NvdW50X2luZm8oKQogICAgICAgICAgICBzdW1tYXJ5WyJhY2NvdW50Il0gPSBhY2NvdW50CiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJbZGFzaGJvYXJkXSBhY2NvdW50IHVuYXZhaWxhYmxlOiAlcyIsIGV4YykKICAgICAgICAgICAgc3VtbWFyeVsiYWNjb3VudCJdID0gTm9uZQogICAgICAgIHRyeToKICAgICAgICAgICAgZnJvbSBiYWNrZW5kLnJpc2sua2lsbF9zd2l0Y2ggaW1wb3J0IGtpbGxfc3dpdGNoCiAgICAgICAgICAgIHN1bW1hcnlbImtpbGxfc3dpdGNoX2FjdGl2ZSJdID0ga2lsbF9zd2l0Y2guaXNfYWN0aXZlKCkKICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICBzdW1tYXJ5WyJraWxsX3N3aXRjaF9hY3RpdmUiXSA9IE5vbmUKICAgICAgICB0cnk6CiAgICAgICAgICAgIGZyb20gYmFja2VuZC5leGVjdXRpb24ub3JkZXJfc3RhdGVfbWFjaGluZSBpbXBvcnQgb3JkZXJfc3RhdGVfbWFjaGluZQogICAgICAgICAgICBzdW1tYXJ5WyJhY3RpdmVfcG9zaXRpb25zIl0gPSBsZW4ob3JkZXJfc3RhdGVfbWFjaGluZS5hY3RpdmVfdGlja2V0cygpKQogICAgICAgICAgICBzdW1tYXJ5WyJzdGF0ZV9zdGF0cyJdID0gb3JkZXJfc3RhdGVfbWFjaGluZS5zdGF0cygpCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbjoKICAgICAgICAgICAgc3VtbWFyeVsiYWN0aXZlX3Bvc2l0aW9ucyJdID0gTm9uZQogICAgICAgIHJldHVybiBfb2soc3VtbWFyeSkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5leGNlcHRpb24oIltkYXNoYm9hcmRdIC9zdW1tYXJ5IGVycm9yOiAlcyIsIGV4YykKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihleGMpKQoKCkByb3V0ZXIuZ2V0KCIvcG9zaXRpb25zIikKYXN5bmMgZGVmIGdldF9wb3NpdGlvbnMoKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuZXhlY3V0aW9uLm10NV9jb25uZWN0b3IgaW1wb3J0IG10NV9jb25uZWN0b3IKICAgICAgICBwb3NpdGlvbnMgPSBhd2FpdCBtdDVfY29ubmVjdG9yLmdldF9hbGxfcG9zaXRpb25zKCkKICAgICAgICBkYXRhID0gW3sidGlja2V0IjogcC50aWNrZXQsICJzeW1ib2wiOiBwLnN5bWJvbCwgImRpcmVjdGlvbiI6IHAuZGlyZWN0aW9uLCAidm9sdW1lIjogcC52b2x1bWUsICJvcGVuX3ByaWNlIjogcC5vcGVuX3ByaWNlLCAiY3VycmVudF9wcmljZSI6IHAuY3VycmVudF9wcmljZSwgInByb2ZpdCI6IHAucHJvZml0LCAic2wiOiBwLnNsLCAidHAiOiBwLnRwfSBmb3IgcCBpbiBwb3NpdGlvbnNdCiAgICAgICAgcmV0dXJuIF9vayhkYXRhKQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigiW2Rhc2hib2FyZF0gL3Bvc2l0aW9ucyBlcnJvcjogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkKCgpAcm91dGVyLmdldCgiL3BlcmZvcm1hbmNlIikKYXN5bmMgZGVmIGdldF9wZXJmb3JtYW5jZShkYXlzOiBpbnQgPSBRdWVyeShkZWZhdWx0PTMwLCBnZT0xLCBsZT0zNjUpKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuYW5hbHl0aWNzLmFuYWx5dGljc19zZXJ2aWNlIGltcG9ydCBhbmFseXRpY3Nfc2VydmljZQogICAgICAgIHN0YXRzID0gYXdhaXQgYW5hbHl0aWNzX3NlcnZpY2UuZ2V0X3BlcmZvcm1hbmNlX3N0YXRzKGRheXM9ZGF5cykKICAgICAgICByZXR1cm4gX29rKHN0YXRzKQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigiW2Rhc2hib2FyZF0gL3BlcmZvcm1hbmNlIGVycm9yOiAlcyIsIGV4YykKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihleGMpKQoKCkByb3V0ZXIuZ2V0KCIvaGVhbHRoIikKYXN5bmMgZGVmIGdldF9oZWFsdGgoKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIGhlYWx0aDogRGljdFtzdHIsIEFueV0gPSB7fQogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5kYXRhYmFzZS5jbGllbnQgaW1wb3J0IGRiX2NsaWVudAogICAgICAgIGF3YWl0IGRiX2NsaWVudC5waW5nKCkKICAgICAgICBoZWFsdGhbImRhdGFiYXNlIl0gPSAiaGVhbHRoeSIKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGhlYWx0aFsiZGF0YWJhc2UiXSA9IGYidW5oZWFsdGh5OiB7ZXhjfSIKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuZXhlY3V0aW9uLm10NV9jb25uZWN0b3IgaW1wb3J0IG10NV9jb25uZWN0b3IKICAgICAgICBoZWFsdGhbIm10NSJdID0gImNvbm5lY3RlZCIgaWYgbXQ1X2Nvbm5lY3Rvci5fY29ubmVjdGVkIGVsc2UgImRpc2Nvbm5lY3RlZCIgICMgbm9xYTogU0xGMDAxCiAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgIGhlYWx0aFsibXQ1Il0gPSAidW5rbm93biIKICAgIHJldHVybiBfb2soaGVhbHRoKQoKCkByb3V0ZXIuZ2V0KCIvcmVjZW50LXNpZ25hbHMiKQphc3luYyBkZWYgZ2V0X3JlY2VudF9zaWduYWxzKGxpbWl0OiBpbnQgPSBRdWVyeShkZWZhdWx0PTEwLCBnZT0xLCBsZT0xMDApKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuZGF0YWJhc2UuY2xpZW50IGltcG9ydCBkYl9jbGllbnQKICAgICAgICByb3dzID0gYXdhaXQgZGJfY2xpZW50LnNlbGVjdCgic2lnbmFscyIsIGxpbWl0PWxpbWl0LCBvcmRlcj0iY3JlYXRlZF9hdC5kZXNjIikKICAgICAgICByZXR1cm4gX29rKHJvd3Mgb3IgW10pCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIuZXhjZXB0aW9uKCJbZGFzaGJvYXJkXSAvcmVjZW50LXNpZ25hbHMgZXJyb3I6ICVzIiwgZXhjKQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGV4YykpCg==
+"""
+backend/api/routes/dashboard.py
+Galaxy Vast AI Trading Platform
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+# BUG-AF1 FIX: removed prefix="/dashboard" -- double prefix was causing /dashboard/dashboard/*
+router = APIRouter(tags=["dashboard"])
+
+
+def _ok(data: Any) -> Dict[str, Any]:
+    return {"status": "ok", "data": data}
+
+
+def _err(msg: str, code: int = 500) -> JSONResponse:
+    return JSONResponse({"status": "error", "message": msg}, status_code=code)
+
+
+@router.get("/summary")
+async def get_summary() -> Dict[str, Any]:
+    try:
+        summary: Dict[str, Any] = {}
+        try:
+            from backend.execution.mt5_connector import mt5_connector
+            account = await mt5_connector.get_account_info()
+            summary["account"] = account
+        except Exception as exc:
+            logger.warning("[dashboard] account unavailable: %s", exc)
+            summary["account"] = None
+        try:
+            from backend.risk.kill_switch import kill_switch
+            summary["kill_switch_active"] = kill_switch.is_active()
+        except Exception:
+            summary["kill_switch_active"] = None
+        try:
+            from backend.execution.order_state_machine import order_state_machine
+            summary["active_positions"] = len(order_state_machine.active_tickets())
+            summary["state_stats"] = order_state_machine.stats()
+        except Exception:
+            summary["active_positions"] = None
+        return _ok(summary)
+    except Exception as exc:
+        logger.exception("[dashboard] /summary error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/positions")
+async def get_positions() -> Dict[str, Any]:
+    try:
+        from backend.execution.mt5_connector import mt5_connector
+        positions = await mt5_connector.get_all_positions()
+        data = [{"ticket": p.ticket, "symbol": p.symbol, "direction": p.direction, "volume": p.volume, "open_price": p.open_price, "current_price": p.current_price, "profit": p.profit, "sl": p.sl, "tp": p.tp} for p in positions]
+        return _ok(data)
+    except Exception as exc:
+        logger.exception("[dashboard] /positions error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/performance")
+async def get_performance(days: int = Query(default=30, ge=1, le=365)) -> Dict[str, Any]:
+    try:
+        from backend.analytics.analytics_service import analytics_service
+        stats = await analytics_service.get_performance_stats(days=days)
+        return _ok(stats)
+    except Exception as exc:
+        logger.exception("[dashboard] /performance error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/health")
+async def get_health() -> Dict[str, Any]:
+    health: Dict[str, Any] = {}
+    try:
+        from backend.database.client import db_client
+        await db_client.ping()
+        health["database"] = "healthy"
+    except Exception as exc:
+        health["database"] = f"unhealthy: {exc}"
+    try:
+        from backend.execution.mt5_connector import mt5_connector
+        health["mt5"] = "connected" if mt5_connector._connected else "disconnected"  # noqa: SLF001
+    except Exception:
+        health["mt5"] = "unknown"
+    return _ok(health)
+
+
+@router.get("/recent-signals")
+async def get_recent_signals(limit: int = Query(default=10, ge=1, le=100)) -> Dict[str, Any]:
+    try:
+        from backend.database.client import db_client
+        rows = await db_client.select("signals", limit=limit, order="created_at.desc")
+        return _ok(rows or [])
+    except Exception as exc:
+        logger.exception("[dashboard] /recent-signals error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
