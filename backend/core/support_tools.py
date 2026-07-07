@@ -1,10 +1,12 @@
 from __future__ import annotations
-import hashlib, hmac, json, os, time, uuid
+import hashlib, hmac, json, logging, os, time, uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import RLock
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 class SupportRole(str, Enum):
     L1 = 'support.l1'
@@ -545,7 +547,8 @@ class ControlledInterventionEngine:
         self._store.save(rec)
         for h in self._hooks:
             try: h(rec)
-            except Exception: pass
+            except Exception as exc:
+                _LOG.warning('intervention hook error: %s', exc)
         return rec
     def reset_device(self, agent, device_id, reason=''):
         self._guard.check(agent, InterventionKind.DEVICE_RESET, reason)

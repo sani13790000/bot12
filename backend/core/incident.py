@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import hmac as _hmac_mod
 import json
+import logging
 import threading
 import time
 import uuid
@@ -27,6 +28,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -386,8 +389,8 @@ class KillSwitchV22:
         try:
             self._audit.record(event=event, user_id=user_id,
                                tenant_id=tenant_id, reason=reason, **detail)
-        except Exception:
-            pass
+        except Exception as exc:
+            _LOG.warning('incident audit action failed: %s', exc)
 
 
 VALID_TRANSITIONS: Dict[IncidentState, Set[IncidentState]] = {
@@ -515,8 +518,8 @@ class IncidentManager:
         try:
             self._audit.record(event=event, user_id=user_id,
                                tenant_id=tenant_id, reason=reason, **detail)
-        except Exception:
-            pass
+        except Exception as exc:
+            _LOG.warning('incident audit record failed: %s', exc)
 
 
 @dataclass

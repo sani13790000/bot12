@@ -28,7 +28,7 @@ from typing import Any, Awaitable, Callable, List, Optional
 try:
     from ..core.logger import get_logger
     logger = get_logger('risk.kill_switch')
-except Exception:
+except ImportError:
     import logging
     logger = logging.getLogger('risk.kill_switch')
 

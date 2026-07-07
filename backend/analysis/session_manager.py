@@ -166,8 +166,8 @@ class SessionManager:
         dst_active = False
         try:
             dst_active = is_dst_active("Europe/London", dt)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("DST check failed: %s", exc)
 
         return SessionInfo(
             session=sess,

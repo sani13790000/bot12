@@ -104,7 +104,8 @@ class DecisionService:
         try:
             return await db.select_many("decisions", filters={"user_id": user_id}, order_by="created_at", order_desc=True, limit=limit)
         except Exception as exc:
-            logger.error("get_decision_history failed: %s", exc); return []
+            logger.error("get_decision_history failed for user=%s: %s", user_id, exc, exc_info=True)
+            return []
 
     def invalidate_cache(self, user_id: str, symbol: Optional[str] = None) -> int:
         prefix = f"{user_id}:"

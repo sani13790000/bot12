@@ -141,7 +141,7 @@ def _ip_entropy(ip: str) -> float:
         total = sum(parts) or 1
         probs = [p / total for p in parts if p > 0]
         return min(1.0, -sum(p * math.log2(p) for p in probs) / 8.0)
-    except Exception:
+    except (ValueError, ZeroDivisionError):
         return (int(hashlib.md5(ip.encode()).hexdigest(), 16) % 1000) / 1000.0
 
 
@@ -258,7 +258,8 @@ class SecurityFeatureExtractor:
             prev = self._geo_cache.get(ip, asn)
             self._geo_cache[ip] = asn
             return 0.0 if asn == prev else 1.0
-        except Exception:
+        except Exception as exc:
+            log.debug("geo change check failed for ip=%s: %s", ip, exc)
             return 0.0
 
     def stats(self) -> Dict[str, Any]:

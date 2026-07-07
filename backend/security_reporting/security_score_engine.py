@@ -255,7 +255,8 @@ class SecurityScoreEngine:
                 from backend.circuit_breaker import circuit_breaker_manager
                 open_cbs = sum(1 for cb in circuit_breaker_manager._breakers.values() if cb.state.value=="open")
                 if open_cbs > 0: score -= 0.2*open_cbs; notes.append(f"{open_cbs} CBs OPEN")
-            except Exception: pass
+            except Exception as exc:
+                log.debug("circuit breaker check failed: %s", exc)
         except Exception as ex: notes.append(str(ex)); score = 0.8
         return DimensionScore("trading_security", max(0.0, score), _WEIGHTS["trading_security"], notes)
 
@@ -305,7 +306,10 @@ class SecurityScoreEngine:
             from backend.agents.security_ai_agent import security_ai_agent
             if not security_ai_agent.get_stats().get("model_trained", False):
                 score -= 0.2; notes.append("Model not trained")
-        except Exception: pass
+        except ImportError:
+            pass
+        except Exception as exc:
+            log.debug("compliance model check failed: %s", exc)
         return DimensionScore("compliance", max(0.0, score), _WEIGHTS["compliance"], notes)
 
     @staticmethod
@@ -347,8 +351,10 @@ class SecurityScoreEngine:
                 try:
                     await circuit_breaker_manager.get("security_global").close()
                     asyncio.create_task(alert_circuit_breaker("security_global", "CLOSED", "recovered"))
-                except Exception: pass
-        except ImportError: pass
+                except Exception as exc:
+                    log.warning("failed to close security circuit breaker: %s", exc)
+        except ImportError:
+            pass
         except Exception as e: log.warning("threshold check: %s", e)
 
 

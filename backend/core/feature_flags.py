@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
 import threading
@@ -29,6 +30,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
+
+_LOG = logging.getLogger(__name__)
 
 
 class FlagKey(str, Enum):
@@ -401,8 +404,8 @@ class AuditedFlagStore:
         for hook in self._hooks:
             try:
                 hook(key, result, ctx)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('feature flag hook error for %s: %s', key, exc)
         return result
 
     def is_enabled(self, key, ctx):

@@ -313,7 +313,7 @@ class BacktestEngine:
             try:
                 key = str(t.exit_time)[:7]
                 monthly[key] = monthly.get(key, 0.0) + t.pnl_usd
-            except Exception:
+            except (AttributeError, TypeError):
                 pass
         return {k: round(v, 2) for k, v in sorted(monthly.items())}
 

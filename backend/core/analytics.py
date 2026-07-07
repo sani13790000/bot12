@@ -17,6 +17,7 @@ import hmac
 import json
 import math
 import os
+import logging
 import threading
 import time
 import uuid
@@ -24,6 +25,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 class KPICategory(str, Enum):
     SUBSCRIPTION  = "subscription"
@@ -300,7 +303,8 @@ class AnomalyDetector:
             if self._audit is not None: self._audit.record(AuditAction.ANOMALY_RAISED, kpi_key=kpi_key, kind=anomaly.kind.value, severity=anomaly.severity.value, value=value, tenant_id=tenant_id)
             for hook in self._hooks:
                 try: hook(anomaly)
-                except: pass
+                except Exception as exc:
+                    _LOG.warning('anomaly hook error: %s', exc)
         return anomaly
     def _check_zscore(self, kpi_key, value, hist, tenant_id):
         if len(hist) < 5: return None

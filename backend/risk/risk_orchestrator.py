@@ -85,8 +85,10 @@ class RiskOrchestrator:
             try:
                 from backend.risk.margin_gate import MarginGate
                 self._margin_gate = MarginGate()
-            except Exception:
+            except ImportError:
                 pass
+            except Exception as exc:
+                log.warning("MarginGate init failed: %s", exc)
         return self._margin_gate
 
     async def assess(self, inp: RiskInput) -> RiskResult:

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import AsyncIterator, Callable, Dict, List, Optional
+
+_LOG = logging.getLogger(__name__)
 
 
 class ReplaySpeed(float, Enum):
@@ -172,8 +175,8 @@ class MarketReplayEngine:
             for cb in self._frame_callbacks:
                 try:
                     cb(frame)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _LOG.warning('market replay frame callback error: %s', exc)
 
             yield frame
 

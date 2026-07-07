@@ -16,6 +16,7 @@ import copy
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import threading
@@ -25,6 +26,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Tuple
+
+_LOG = logging.getLogger(__name__)
 
 
 class KeyType(str, Enum):
@@ -689,8 +692,8 @@ class KeyLifecycleManager:
         for fn in self._hooks:
             try:
                 fn(event, kv)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('secret rotation hook error: %s', exc)
 
     @property
     def store(self) -> KeyStore:
@@ -787,8 +790,8 @@ class RotationScheduler:
                 with self._lock:
                     self._jobs[job["job_id"]]["done"] = True
                 rotated.append(job["job_id"])
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('scheduled rotation failed for job=%s: %s', job["job_id"], exc)
         return rotated
 
     def scan_due_soon(self, warn_seconds: float = 86400.0) -> List[KeyVersion]:
@@ -805,8 +808,8 @@ class RotationScheduler:
                         trigger=RotationTrigger.POLICY_AGE, tenant_id=kv.tenant_id,
                     )
                     rotated.append(new_kv)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _LOG.warning('auto-rotation failed for key_type=%s: %s', kv.key_type, exc)
         return rotated
 
     def expire_grace_pass(self, actor: str = "scheduler") -> List[str]:
@@ -873,8 +876,8 @@ class SecretRotationAdmin:
             try:
                 _, new_kv = self._lc.rotate_key(kt, actor, reason, tenant_id=tenant_id)
                 result[kt.value if hasattr(kt,'value') else kt] = new_kv
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOG.warning('bulk rotation failed for key_type=%s: %s', kt, exc)
         return result
 
     def key_audit_trail(self, key_id: str) -> List[AuditEntry]:
