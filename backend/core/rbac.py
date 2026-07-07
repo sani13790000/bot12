@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set
+
+from .ttl_cache import TTLPermissionCache
 
 logger = logging.getLogger("core.rbac")
 
@@ -110,40 +110,7 @@ def _expand(role: str) -> FrozenSet[str]:
 
 
 _CACHE_TTL_SEC = 60
-_CACHE_MAX     = 2048
-
-
-class _PermCache:
-    def __init__(self, max_size: int = _CACHE_MAX, ttl: int = _CACHE_TTL_SEC) -> None:
-        self._store: OrderedDict[str, tuple] = OrderedDict()
-        self._max   = max_size
-        self._ttl   = ttl
-
-    def get(self, key: str) -> Optional[bool]:
-        entry = self._store.get(key)
-        if entry is None:
-            return None
-        value, ts = entry
-        if (datetime.now(timezone.utc) - ts).total_seconds() > self._ttl:
-            self._store.pop(key, None)
-            return None
-        self._store.move_to_end(key)
-        return value
-
-    def set(self, key: str, value: bool) -> None:
-        if key in self._store:
-            self._store.move_to_end(key)
-        self._store[key] = (value, datetime.now(timezone.utc))
-        while len(self._store) > self._max:
-            self._store.popitem(last=False)
-
-    def invalidate_user(self, user_id: str) -> None:
-        drop = [k for k in self._store if k.startswith(f"{user_id}:")]
-        for k in drop:
-            self._store.pop(k, None)
-
-    def clear(self) -> None:
-        self._store.clear()
+_CACHE_MAX = 2048
 
 
 @dataclass
@@ -184,7 +151,7 @@ class AuthContext:
 
 class RBACEngine:
     def __init__(self) -> None:
-        self._cache = _PermCache()
+        self._cache = TTLPermissionCache(max_size=_CACHE_MAX, ttl=_CACHE_TTL_SEC)
         self._lock  = asyncio.Lock()
         self._audit_hooks: List[Callable] = []
 

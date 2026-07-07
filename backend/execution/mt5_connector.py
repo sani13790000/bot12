@@ -95,14 +95,23 @@ class MT5Connector:
                 "MT5Connector is not connected — call await connect() first."
             )
 
-    async def _get(self, path: str, params: Optional[Dict] = None) -> Dict:
+    async def _request(self, method: str, path: str, *,
+                       params: Optional[Dict] = None,
+                       payload: Optional[Dict] = None) -> Dict:
         import aiohttp
         url = f"{self._base_url}{path}"
         headers = {"X-API-Key": self._api_key} if self._api_key else {}
+        kwargs: Dict[str, Any] = {
+            "headers": headers,
+            "timeout": aiohttp.ClientTimeout(total=self._timeout),
+        }
+        if method == "GET":
+            kwargs["params"] = params
+        else:
+            kwargs["json"] = payload or {}
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, headers=headers,
-                                       timeout=aiohttp.ClientTimeout(total=self._timeout)) as resp:
+                async with session.request(method, url, **kwargs) as resp:
                     if resp.status >= 400:
                         raise MT5Error(f"MT5 gateway error {resp.status}: {await resp.text()}")
                     return await resp.json()
@@ -110,20 +119,11 @@ class MT5Connector:
             self._connected = False
             raise MT5Error(f"Network error: {exc}") from exc
 
+    async def _get(self, path: str, params: Optional[Dict] = None) -> Dict:
+        return await self._request("GET", path, params=params)
+
     async def _post(self, path: str, payload: Optional[Dict] = None) -> Dict:
-        import aiohttp
-        url = f"{self._base_url}{path}"
-        headers = {"X-API-Key": self._api_key} if self._api_key else {}
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload or {}, headers=headers,
-                                        timeout=aiohttp.ClientTimeout(total=self._timeout)) as resp:
-                    if resp.status >= 400:
-                        raise MT5Error(f"MT5 gateway error {resp.status}: {await resp.text()}")
-                    return await resp.json()
-        except aiohttp.ClientError as exc:
-            self._connected = False
-            raise MT5Error(f"Network error: {exc}") from exc
+        return await self._request("POST", path, payload=payload)
 
     # ── Public API ────────────────────────────────────────────────────────────
 

@@ -432,51 +432,14 @@ class AuthContext:
             return False
 
 
-import asyncio
 import logging
-from collections import OrderedDict
-from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
+
+from .ttl_cache import TTLPermissionCache
 
 _log = logging.getLogger("core.rbac_v2")
 _CACHE_TTL = 60
-_CACHE_MAX  = 4096
-
-
-class _PermCache:
-    def __init__(self, max_size: int = _CACHE_MAX, ttl: int = _CACHE_TTL) -> None:
-        self._store: OrderedDict[str, tuple] = OrderedDict()
-        self._max = max_size
-        self._ttl = ttl
-
-    def get(self, key: str) -> Optional[bool]:
-        entry = self._store.get(key)
-        if entry is None:
-            return None
-        value, ts = entry
-        if (datetime.now(timezone.utc) - ts).total_seconds() > self._ttl:
-            self._store.pop(key, None)
-            return None
-        self._store.move_to_end(key)
-        return value
-
-    def set(self, key: str, value: bool) -> None:
-        if key in self._store:
-            self._store.move_to_end(key)
-        self._store[key] = (value, datetime.now(timezone.utc))
-        while len(self._store) > self._max:
-            self._store.popitem(last=False)
-
-    def invalidate_user(self, user_id: str) -> None:
-        drop = [k for k in self._store if k.startswith(f"{user_id}:")]
-        for k in drop:
-            self._store.pop(k, None)
-
-    def clear(self) -> None:
-        self._store.clear()
-
-    def __len__(self) -> int:
-        return len(self._store)
+_CACHE_MAX = 4096
 
 
 class PermissionDeniedError(Exception):
@@ -487,7 +450,7 @@ class RBACEngineV2:
     """P20: Fine-grained permission engine."""
 
     def __init__(self) -> None:
-        self._cache = _PermCache()
+        self._cache = TTLPermissionCache(max_size=_CACHE_MAX, ttl=_CACHE_TTL)
         self._deny_hooks: List[Callable] = []
 
     def check(self, ctx: AuthContext, perm: str) -> bool:
