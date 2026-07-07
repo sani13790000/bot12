@@ -11,7 +11,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-Helpers
+# Helpers
 # ────────────────────────────────────────────────────────────────────────────────
 
 def read_file(rel_path: str) -> str:
@@ -28,7 +28,7 @@ def is_valid_python(source: str) -> bool:
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-BUG-Y1: BacktestPage StatCard — named import from correct path + real API
+# BUG-Y1: BacktestPage StatCard — named import from correct path + real API
 # ────────────────────────────────────────────────────────────────────────────────
 
 class TestBugY1BacktestPageStatCard:
@@ -66,7 +66,7 @@ class TestBugY1BacktestPageStatCard:
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-BUG-Y2: MT5Connector silent fallback — critical log added
+# BUG-Y2: MT5Connector silent fallback — critical log added
 # ────────────────────────────────────────────────────────────────────────────────
 
 class TestBugY2MT5ConnectorSilentFallback:
@@ -104,7 +104,7 @@ class TestBugY2MT5ConnectorSilentFallback:
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-BUG-Y3: deps.py _stub_verify_token scope
+# BUG-Y3: deps.py _stub_verify_token scope
 # ────────────────────────────────────────────────────────────────────────────────
 
 class TestBugY3DepsStubScope:
@@ -134,7 +134,7 @@ class TestBugY3DepsStubScope:
 
 
 # ────────────────────────────────────────────────────────────────────────────────
-Summary
+# Summary
 # ────────────────────────────────────────────────────────────────────────────────
 
 class TestPhaseYSummary:

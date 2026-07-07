@@ -1,1 +1,160 @@
-IiIiClBoYXNlIEFJIEZpbmFsIFRlc3RzCkJVRy1BSTE6IG1haW4ucHkgd2FzIFRSVU5DQVRFRCAoNzcgbGluZXMsIDI3NjlCKSAtLSBfY3JlYXRlX2FwcCgpIGluY29tcGxldGUsIHplcm8gaW5jbHVkZV9yb3V0ZXIKQlVHLUFJMjogYW5hbHl0aWNzLnB5IEByb3V0ZXIuZ2V0KCIvYW5hbHl0aWNzL3NlY3VyaXR5L21ldHJpY3MiKSAtPiBkb3VibGUgcGF0aApmaXhlZDogQHJvdXRlci5nZXQoIi9zZWN1cml0eS9tZXRyaWNzIikgLT4gZWZmZWN0aXZlOiAvYW5hbHl0aWNzL3NlY3VyaXR5L21ldHJpY3MKQG5vdGU6IG1haW4ucHkgcmVzdG9yZWQgdG8gMjMyIGxpbmVzIHdpdGggMzggaW5jbHVkZV9yb3V0ZXIgY2FsbHMKIiIiCmltcG9ydCBhc3QKaW1wb3J0IG9zCmltcG9ydCByZQppbXBvcnQgc3lzCgppbXBvcnQgcHl0ZXN0CgpST09UID0gb3MucGF0aC5kaXJuYW1lKG9zLnBhdGguZGlybmFtZShvcy5wYXRoLmFic3BhdGgoX19maWxlX18pKSkKTUFJTl9QQVRIID0gb3MucGF0aC5qb2luKFJPT1QsICJiYWNrZW5kIiwgImFwaSIsICJtYWluLnB5IikKQU5BTEVUSUNTX1BBVEggPSBvcy5wYXRoLmpvaW4oUk9PVCwgImJhY2tlbmQiLCAiYXBpIiwgInJvdXRlcyIsICJhbmFseXRpY3MucHkiKQoKCmRlZiBnZXRfbWFpbl9jb250ZW50KCk6CiAgICB3aXRoIG9wZW4oTUFJTl9QQVRIKSBhcyBmOgogICAgICAgIHJldHVybiBmLnJlYWQoKQoKCmRlZiBnZXRfYW5hbHl0aWNzX2NvbnRlbnQoKToKICAgIHdpdGggb3BlbihBTkFMRVRJQ1NfUEFUSCkgYXMgZjoKICAgICAgICByZXR1cm4gZi5yZWFkKCkKCgpjbGFzcyBUZXN0QlVHQUkxTWFpblRydW5jYXRlZDoKICAgICIiIkJVRy1BSTE6IG1haW4ucHkgd2FzIHRydW5jYXRlZCAtLSByZXN0b3JlZC4iIiIKCiAgICBkZWYgdGVzdF9tYWluX2V4aXN0cyhzZWxmKToKICAgICAgICBhc3NlcnQgb3MucGF0aC5leGlzdHMoTUFJTl9QQVRIKSwgZiJtYWluLnB5IG5vdCBmb3VuZCBhdCB7TUFJTF9QQVRIfSIKCiAgICBkZWYgdGVzdF9tYWluX25vdF90cnVuY2F0ZWQoc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9tYWluX2NvbnRlbnQoKQogICAgICAgIGxpbmVzID0gY29udGVudC5zcGxpdCgiXG4iKQogICAgICAgIGFzc2VydCBsZW4obGluZXMpID49IDE1MCwgZiJtYWluLnB5IG9ubHkge2xlbihsaW5lcyl9IGxpbmVzIC0tIHN0aWxsIHRydW5jYXRlZCIKCiAgICBkZWYgdGVzdF9tYWluX2hhc19jcmVhdGVfYXBwKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBhc3NlcnQgImRlZiBfY3JlYXRlX2FwcCgpIiBpbiBjb250ZW50LCAiX2NyZWF0ZV9hcHAoKSBtaXNzaW5nIgoKICAgIGRlZiB0ZXN0X21haW5faGFzX3JldHVybl9hcHAoc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9tYWluX2NvbnRlbnQoKQogICAgICAgIGFzc2VydCAicmV0dXJuIGFwcCIgaW4gY29udGVudCwgInJldHVybiBhcHAgbWlzc2luZyAtLSBhcHAgbm90IHJldHVybmVkIgoKICAgIGRlZiB0ZXN0X21haW5faGFzX2FwcF9pbnN0YW5jZShzZWxmKToKICAgICAgICBjb250ZW50ID0gZ2V0X21haW5faW5zdGFuY2UoKQogICAgICAgIGFzc2VydCAiYXBwID0gX2NyZWF0ZV9hcHAoKSIgaW4gY29udGVudCwgImFwcCA9IF9jcmVhdGVfYXBwKCkgbWlzc2luZyIKCiAgICBkZWYgdGVzdF9tYWluX2hhc19jb3JzKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBhc3NlcnQgIkNPUlNNaWRkbGV3YXJlIiBpbiBjb250ZW50LCAiQ09SU01pZGRsZXdhcmUgbWlzc2luZyIKCiAgICBkZWYgdGVzdF9tYWluX2luY2x1ZGVfcm91dGVyX2NvdW50KHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBjb3VudCA9IGNvbnRlbnQuY291bnQoImluY2x1ZGVfcm91dGVyIikKICAgICAgICBhc3NlcnQgY291bnQgPj0gMzUsIGYiT25seSB7Y291bnR9IGluY2x1ZGVfcm91dGVyIGNhbGxzIC0tIGV4cGVjdGVkID49IDM1IgoKICAgIGRlZiB0ZXN0X21haW5fdmFsaWRfcHl0aG9uKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICB0cnk6CiAgICAgICAgICAgIGFzdC5wYXJzZShjb250ZW50KQogICAgICAgIGV4Y2VwdCBTeW50YXhFcnJvciBhcyBlOgogICAgICAgICAgICBweXRlc3QuZmFpbChmIm1haW4ucHkgaGFzIHN5bnRheCBlcnJvcjoge2V9IikKCgpjbGFzcyBUZXN0QlVHQUkxTWFpblJvdXRlcnM6CiAgICAiIiJCVUctQUkxOiBhbGwgMzgrIHJvdXRlcnMgbXVzdCBiZSByZWdpc3RlcmVkLiIiIgoKICAgIGRlZiB0ZXN0X2tleV9yb3V0ZXJzX3JlZ2lzdGVyZWQoc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9tYWluX2NvbnRlbnQoKQogICAgICAgIHJvdXRlcnMgPSBbCiAgICAgICAgICAgICJhdXRoLnJvdXRlciIsICJzaWduYWxzLnJvdXRlciIsICJ0cmFkZXMucm91dGVyIiwKICAgICAgICAgICAgImFuYWx5c2lzLnJvdXRlciIsICJkYXNoYm9hcmQucm91dGVyIiwgIm1ldHJpY3Mucm91dGVyIiwKICAgICAgICAgICAgInBvcnRmb2xpby5yb3V0ZXIiLCAicmlzay5yb3V0ZXIiLCAiYmlsbGluZy5yb3V0ZXIiLAogICAgICAgICAgICAiYWRtaW4ucm91dGVyIiwgIndlYnNvY2tldF9yb3V0ZXMucm91dGVyIiwgImhlYWx0aC5yb3V0ZXIiLAogICAgICAgICAgICAicGVybWlzc2lvbnNfcm91dGVzLnJvdXRlciIsICJyYXRlX2xpbWl0X3JvdXRlcy5yb3V0ZXIiLAogICAgICAgICAgICAib2JzZXJ2YWJpbGl0eV9yb3V0ZXMucm91dGVyIiwgImludGVsbGlnZW5jZS5yb3V0ZXIiLAogICAgICAgIF0KICAgICAgICBmb3Igcm91dGVyIGluIHJvdXRlcnM6CiAgICAgICAgICAgIGFzc2VydCByb3V0ZXIgaW4gY29udGVudCwgZiJ7cm91dGVyfSBub3QgcmVnaXN0ZXJlZCBpbiBtYWluLnB5IgoKICAgIGRlZiB0ZXN0X3NlY3VyaXR5X2FpX2xvYWRlcl9yZW1vdmVkKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBhc3NlcnQgImluY2x1ZGVfcm91dGVyKHNlY3VyaXR5X2FpX2xvYWRlciIgbm90IGluIGNvbnRlbnQsIFwKICAgICAgICAgICAgInNlY3VyaXR5X2FpX2xvYWRlci5yb3V0ZXIgc3RpbGwgcHJlc2VudCAtLSBCVUctQUczIHJlZ3Jlc3Npb24iCgogICAgZGVmIHRlc3Rfd3NfcHJlZml4X2luX21haW4oc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9tYWluX2NvbnRlbnQoKQogICAgICAgIGFzc2VydCAncHJlZml4PSIvd3MiJyBpbiBjb250ZW50IG9yICJwcmVmaXg9Jy93cyciIGluIGNvbnRlbnQsIFwKICAgICAgICAgICAgIi93cyBwcmVmaXggbWlzc2luZyBpbiBtYWluLnB5IC0tIEJVRy1BRzEgcmVncmVzc2lvbiIKCiAgICBkZWYgdGVzdF9vYnNlcnZhYmlsaXR5X2ltcG9ydGVkKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBhc3NlcnQgIm9ic2VydmFiaWxpdHlfcm91dGVzIiBpbiBjb250ZW50LCBcCiAgICAgICAgICAgICJvYnNlcnZhYmlsaXR5X3JvdXRlcyBub3QgaW4gbWFpbi5weSAtLSBCVUctQUgzIHJlZ3Jlc3Npb24iCgoKY2xhc3MgVGVzdEJVR0FJMkFuYWx5dGljc0RvdWJsZVBhdGg6CiAgICAiIiJCVUctQUkyOiBhbmFseXRpY3MucHkgL2FuYWx5dGljcy9zZWN1cml0eS9tZXRyaWNzIC0+IC9zZWN1cml0eS9tZXRyaWNzLiIiIgoKICAgIGRlZiB0ZXN0X2FuYWx5dGljc19leGlzdHMoc2VsZik6CiAgICAgICAgYXNzZXJ0IG9zLnBhdGguZXhpc3RzKEFOQUxFVElDU19QQVRIKQoKICAgIGRlZiB0ZXN0X25vX2RvdWJsZV9wYXRoKHNlbGYpOgogICAgICAgIGNvbnRlbnQgPSBnZXRfYW5hbHl0aWNzX2NvbnRlbnQoKQogICAgICAgIGFzc2VydCAiL2FuYWx5dGljcy9zZWN1cml0eS9tZXRyaWNzIiBub3QgaW4gY29udGVudCwgXAogICAgICAgICAgICAiRG91YmxlIHBhdGggc3RpbGwgcHJlc2VudDogL2FuYWx5dGljcy9zZWN1cml0eS9tZXRyaWNzIgoKICAgIGRlZiB0ZXN0X2NvcnJlY3RfcGF0aChzZWxmKToKICAgICAgICBjb250ZW50ID0gZ2V0X2FuYWx5dGljc19jb250ZW50KCkKICAgICAgICBhc3NlcnQgJy9zZWN1cml0eS9tZXRyaWNzJyBpbiBjb250ZW50LCBcCiAgICAgICAgICAgICIvc2VjdXJpdHkvbWV0cmljcyBub3QgZm91bmQgaW4gYW5hbHl0aWNzLnB5IgoKICAgIGRlZiB0ZXN0X3JvdXRlcl9ub19wcmVmaXgoc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9hbmFseXRpY3NfY29udGVudCgpCiAgICAgICAgYXNzZXJ0ICdBUElSb3V0ZXIodGFncz1bImFuYWx5dGljcyJdKScgaW4gY29udGVudCwgXAogICAgICAgICAgICAicm91dGVyIHNob3VsZCBoYXZlIG5vIHByZWZpeCIKCiAgICBkZWYgdGVzdF92YWxpZF9weXRob24oc2VsZik6CiAgICAgICAgY29udGVudCA9IGdldF9hbmFseXRpY3NfY29udGVudCgpCiAgICAgICAgdHJ5OgogICAgICAgICAgICBhc3QucGFyc2UoY29udGVudCkKICAgICAgICBleGNlcHQgU3ludGF4RXJyb3IgYXMgZToKICAgICAgICAgICAgcHl0ZXN0LmZhaWwoZiJhbmFseXRpY3MucHkgaGFzIHN5bnRheCBlcnJvcjoge2V9IikKCgpjbGFzcyBUZXN0UGhhc2VBSVN1bW1hcnk6CiAgICAiIiJTdW1tYXJ5IHRlc3RzIGZvciBQaGFzZSBBSSBidWcgZml4ZXMuIiIiCgogICAgZGVmIHRlc3RfbWFpbl9zaXplX2FkZXF1YXRlKHNlbGYpOgogICAgICAgIHNpemUgPSBvcy5wYXRoLmdldHNpemUoTUFJTl9QQVRIKQogICAgICAgIGFzc2VydCBzaXplID4gNTAwMCwgZiJtYWluLnB5IHRvbyBzbWFsbDoge3NpemV9IEIgLS0gbWF5IHN0aWxsIGJlIHRydW5jYXRlZCIKCiAgICBkZWYgdGVzdF9hbGxfcm91dGVfZmlsZXNfZXhpc3Qoc2VsZik6CiAgICAgICAgcm91dGVzX2RpciA9IG9zLnBhdGguam9pbihST09ULCAiYmFja2VuZCIsICJhcGkiLCAicm91dGVzIikKICAgICAgICByZXF1aXJlZCA9IFsKICAgICAgICAgICAgInNpZ25hbHMucHkiLCAidHJhZGVzLnB5IiwgImRhc2hib2FyZC5weSIsICJhbmFseXNpcy5weSIsCiAgICAgICAgICAgICJhbmFseXRpY3MucHkiLCAibWV0cmljcy5weSIsICJwb3J0Zm9saW8ucHkiLCAicmlzay5weSIsCiAgICAgICAgICAgICJiaWxsaW5nLnB5IiwgImFkbWluLnB5IiwgIndlYnNvY2tldF9yb3V0ZXMucHkiLCAiaGVhbHRoLnB5IiwKICAgICAgICBdCiAgICAgICAgZm9yIGYgaW4gcmVxdWlyZWQ6CiAgICAgICAgICAgIHBhdGggPSBvcy5wYXRoLmpvaW4ocm91dGVzX2RpciwgZikKICAgICAgICAgICAgYXNzZXJ0IG9zLnBhdGguZXhpc3RzKHBhdGgpLCBmIntmfSBtaXNzaW5nIGZyb20gcm91dGVzIgoKICAgIGRlZiB0ZXN0X3Bob25lX3Njb3JlXzEwMChzZWxmKToKICAgICAgICBtYWluX2NvbnRlbnQgPSBnZXRfbWFpbl9jb250ZW50KCkKICAgICAgICBhbmFseXRpY3NfY29udGVudCA9IGdldF9hbmFseXRpY3NfY29udGVudCgpCiAgICAgICAgYXNzZXJ0ICJfY3JlYXRlX2FwcCIgaW4gbWFpbl9jb250ZW50CiAgICAgICAgYXNzZXJ0ICJpbmNsdWRlX3JvdXRlciIgaW4gbWFpbl9jb250ZW50CiAgICAgICAgYXNzZXJ0ICIvYW5hbHl0aWNzL3NlY3VyaXR5L21ldHJpY3MiIG5vdCBpbiBhbmFseXRpY3NfY29udGVudAogICAgICAgIGFzc2VydCAiL3NlY3VyaXR5L21ldHJpY3MiIGluIGFuYWx5dGljc19jb250ZW50CgoKZGVmIGdldF9tYWluX2luc3RhbmNlKCk6CiAgICB3aXRoIG9wZW4oTUFJTl9QQVRIKSBhcyBmOgogICAgICAgIHJldHVybiBmLnJlYWQoKQo=
+"""
+Phase AI Final Tests
+BUG-AI1: main.py was TRUNCATED (77 lines, 2769B) -- _create_app() incomplete, zero include_router
+BUG-AI2: analytics.py @router.get("/analytics/security/metrics") -> double path
+fixed: @router.get("/security/metrics") -> effective: /analytics/security/metrics
+@note: main.py restored to 232 lines with 38 include_router calls
+"""
+import ast
+import os
+import re
+import sys
+
+import pytest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MAIN_PATH = os.path.join(ROOT, "backend", "api", "main.py")
+ANALETICS_PATH = os.path.join(ROOT, "backend", "api", "routes", "analytics.py")
+
+
+def get_main_content():
+    with open(MAIN_PATH) as f:
+        return f.read()
+
+
+def get_analytics_content():
+    with open(ANALETICS_PATH) as f:
+        return f.read()
+
+
+class TestBUGAI1MainTruncated:
+    """BUG-AI1: main.py was truncated -- restored."""
+
+    def test_main_exists(self):
+        assert os.path.exists(MAIN_PATH), f"main.py not found at {MAIL_PATH}"
+
+    def test_main_not_truncated(self):
+        content = get_main_content()
+        lines = content.split("\n")
+        assert len(lines) >= 150, f"main.py only {len(lines)} lines -- still truncated"
+
+    def test_main_has_create_app(self):
+        content = get_main_content()
+        assert "def _create_app()" in content, "_create_app() missing"
+
+    def test_main_has_return_app(self):
+        content = get_main_content()
+        assert "return app" in content, "return app missing -- app not returned"
+
+    def test_main_has_app_instance(self):
+        content = get_main_instance()
+        assert "app = _create_app()" in content, "app = _create_app() missing"
+
+    def test_main_has_cors(self):
+        content = get_main_content()
+        assert "CORSMiddleware" in content, "CORSMiddleware missing"
+
+    def test_main_include_router_count(self):
+        content = get_main_content()
+        count = content.count("include_router")
+        assert count >= 35, f"Only {count} include_router calls -- expected >= 35"
+
+    def test_main_valid_python(self):
+        content = get_main_content()
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            pytest.fail(f"main.py has syntax error: {e}")
+
+
+class TestBUGAI1MainRouters:
+    """BUG-AI1: all 38+ routers must be registered."""
+
+    def test_key_routers_registered(self):
+        content = get_main_content()
+        routers = [
+            "auth.router", "signals.router", "trades.router",
+            "analysis.router", "dashboard.router", "metrics.router",
+            "portfolio.router", "risk.router", "billing.router",
+            "admin.router", "websocket_routes.router", "health.router",
+            "permissions_routes.router", "rate_limit_routes.router",
+            "observability_routes.router", "intelligence.router",
+        ]
+        for router in routers:
+            assert router in content, f"{router} not registered in main.py"
+
+    def test_security_ai_loader_removed(self):
+        content = get_main_content()
+        assert "include_router(security_ai_loader" not in content, \
+            "security_ai_loader.router still present -- BUG-AG3 regression"
+
+    def test_ws_prefix_in_main(self):
+        content = get_main_content()
+        assert 'prefix="/ws"' in content or "prefix='/ws'" in content, \
+            "/ws prefix missing in main.py -- BUG-AG1 regression"
+
+    def test_observability_imported(self):
+        content = get_main_content()
+        assert "observability_routes" in content, \
+            "observability_routes not in main.py -- BUG-AH3 regression"
+
+
+class TestBUGAI2AnalyticsDoublePath:
+    """BUG-AI2: analytics.py /analytics/security/metrics -> /security/metrics."""
+
+    def test_analytics_exists(self):
+        assert os.path.exists(ANALETICS_PATH)
+
+    def test_no_double_path(self):
+        content = get_analytics_content()
+        assert "/analytics/security/metrics" not in content, \
+            "Double path still present: /analytics/security/metrics"
+
+    def test_correct_path(self):
+        content = get_analytics_content()
+        assert '/security/metrics' in content, \
+            "/security/metrics not found in analytics.py"
+
+    def test_router_no_prefix(self):
+        content = get_analytics_content()
+        assert 'APIRouter(tags=["analytics"])' in content, \
+            "router should have no prefix"
+
+    def test_valid_python(self):
+        content = get_analytics_content()
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            pytest.fail(f"analytics.py has syntax error: {e}")
+
+
+class TestPhaseAISummary:
+    """Summary tests for Phase AI bug fixes."""
+
+    def test_main_size_adequate(self):
+        size = os.path.getsize(MAIN_PATH)
+        assert size > 5000, f"main.py too small: {size} B -- may still be truncated"
+
+    def test_all_route_files_exist(self):
+        routes_dir = os.path.join(ROOT, "backend", "api", "routes")
+        required = [
+            "signals.py", "trades.py", "dashboard.py", "analysis.py",
+            "analytics.py", "metrics.py", "portfolio.py", "risk.py",
+            "billing.py", "admin.py", "websocket_routes.py", "health.py",
+        ]
+        for f in required:
+            path = os.path.join(routes_dir, f)
+            assert os.path.exists(path), f"{f} missing from routes"
+
+    def test_phone_score_100(self):
+        main_content = get_main_content()
+        analytics_content = get_analytics_content()
+        assert "_create_app" in main_content
+        assert "include_router" in main_content
+        assert "/analytics/security/metrics" not in analytics_content
+        assert "/security/metrics" in analytics_content
+
+
+def get_main_instance():
+    with open(MAIN_PATH) as f:
+        return f.read()
