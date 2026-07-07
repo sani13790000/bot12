@@ -84,7 +84,10 @@ class Settings(BaseSettings):
     CSP_REPORT_URI:  str  = "/api/v1/csp-report"
 
     # CORS & Hosts
-    ALLOWED_ORIGINS: List[str] = ["*"]
+    # SECURITY: default to no origins (deny) rather than "*". A wildcard default
+    # combined with credentialed requests is a common misconfiguration; operators
+    # must explicitly set ALLOWED_ORIGINS to the exact front-end domains.
+    ALLOWED_ORIGINS: List[str] = []
     TRUSTED_HOSTS:   List[str] = []
 
     # Rate limiting

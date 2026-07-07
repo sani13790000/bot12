@@ -79,19 +79,26 @@ async def require_super_admin(user: dict = Depends(get_current_active_user)) -> 
 
 # Phase 20: Permission-Based Gates
 
-def _stub_verify_token(token: str) -> dict:
-    import json, base64
-    try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            raise ValueError("Not a JWT")
-        padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        return json.loads(base64.urlsafe_b64decode(padded))
-    except Exception as exc:
-        raise ValueError(f"Invalid token: {exc}") from exc
+def _default_verify_token(token: str) -> dict:
+    """Default token verifier — cryptographically verifies the JWT.
+
+    SECURITY FIX: the previous implementation base64-decoded the JWT payload
+    WITHOUT checking the signature, so any client could forge a token (e.g.
+    ``role=super_admin``) and pass every permission gate. Since
+    ``set_token_verifier`` is never called at startup, that stub was the live
+    verifier for all permission-based routes. This delegates to the signed
+    verifier in ``core.auth`` (HMAC-SHA256 + ``exp``/``nbf`` enforcement) using
+    the configured secret, and raises on any invalid/expired/forged token.
+    """
+    from .auth import verify_jwt
+    secret = get_settings().JWT_SECRET_KEY
+    payload = verify_jwt(token, secret)
+    if not payload:
+        raise ValueError("Invalid or expired token signature")
+    return payload
 
 
-_verify_token_fn: Callable[[str], dict] = _stub_verify_token
+_verify_token_fn: Callable[[str], dict] = _default_verify_token
 
 
 def set_token_verifier(fn: Callable[[str], dict]) -> None:
