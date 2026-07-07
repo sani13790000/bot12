@@ -65,8 +65,13 @@ def make_jwt(payload: dict, secret: str) -> str:
     return f"{hdr}.{p}.{sig_b64}"
 
 
-def verify_jwt(token: str, secret: str) -> Optional[Dict[str, Any]]:
-    """Low-level HMAC-HS256 JWT verifier. Prefer verify_token() for new code."""
+def verify_jwt(token: str, secret: str, leeway: int = 0) -> Optional[Dict[str, Any]]:
+    """Low-level HMAC-HS256 JWT verifier. Prefer verify_token() for new code.
+
+    Verifies the HMAC-SHA256 signature AND enforces temporal claims (``exp`` /
+    ``nbf``). A token whose ``exp`` is in the past — or whose ``nbf`` is in the
+    future — is rejected. ``leeway`` (seconds) tolerates minor clock skew.
+    """
     try:
         parts = token.split(".")
         if len(parts) != 3:
@@ -80,6 +85,13 @@ def verify_jwt(token: str, secret: str) -> Optional[Dict[str, Any]]:
         if not hmac.compare_digest(exp_sig, act_sig):
             return None
         payload = json.loads(_b64d(p))
+        now = int(time.time())
+        exp = payload.get("exp")
+        if exp is not None and now > int(exp) + leeway:
+            return None
+        nbf = payload.get("nbf")
+        if nbf is not None and now + leeway < int(nbf):
+            return None
         return payload
     except Exception:
         return None
