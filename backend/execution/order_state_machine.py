@@ -14,6 +14,7 @@ State diagram
 
     ERROR -> PENDING  (retry allowed)
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,14 +27,14 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 _TRANSITIONS: Dict[str, List[str]] = {
-    "PENDING":   ["SUBMITTED", "CANCELLED", "REJECTED"],
-    "SUBMITTED": ["OPEN",      "REJECTED",  "CANCELLED"],
-    "OPEN":      ["CLOSING",   "CLOSED",    "ERROR"],
-    "CLOSING":   ["CLOSED",    "ERROR"],
-    "CLOSED":    [],
-    "REJECTED":  [],
+    "PENDING": ["SUBMITTED", "CANCELLED", "REJECTED"],
+    "SUBMITTED": ["OPEN", "REJECTED", "CANCELLED"],
+    "OPEN": ["CLOSING", "CLOSED", "ERROR"],
+    "CLOSING": ["CLOSED", "ERROR"],
+    "CLOSED": [],
+    "REJECTED": [],
     "CANCELLED": [],
-    "ERROR":     ["PENDING"],
+    "ERROR": ["PENDING"],
 }
 
 _TERMINAL = {"CLOSED", "REJECTED", "CANCELLED"}
@@ -49,14 +50,12 @@ class OrderStateMachine:
     # BUG-6 FIX: default TTL for non-terminal states
     _NON_TERMINAL_TTL_S: int = 3600  # 1 hour
 
-    def __init__(self, max_tickets: int = _MAX_TICKETS,
-                 non_terminal_ttl_s: int = 3600) -> None:
-        self._lock:    threading.Lock = threading.Lock()
-        self._max:     int = max_tickets
-        self._ttl_s:   int = non_terminal_ttl_s
+    def __init__(self, max_tickets: int = _MAX_TICKETS, non_terminal_ttl_s: int = 3600) -> None:
+        self._lock: threading.Lock = threading.Lock()
+        self._max: int = max_tickets
+        self._ttl_s: int = non_terminal_ttl_s
         # ticket -> (state, history, registered_at_monotonic)
-        self._store: OrderedDict[int, Tuple[str, List[Tuple[str, str]], float]] = \
-            OrderedDict()
+        self._store: OrderedDict[int, Tuple[str, List[Tuple[str, str]], float]] = OrderedDict()
 
     def register(self, ticket: int) -> None:
         """Register new ticket in PENDING state. No-op if already registered."""
@@ -118,17 +117,15 @@ class OrderStateMachine:
     def active_tickets(self) -> List[int]:
         """Return tickets not yet in terminal state."""
         with self._lock:
-            return [
-                t for t, (s, _, _reg) in self._store.items()
-                if s not in _TERMINAL
-            ]
+            return [t for t, (s, _, _reg) in self._store.items() if s not in _TERMINAL]
 
     def stale_tickets(self) -> List[int]:
         """Return non-terminal tickets that have exceeded TTL."""
         now = time.monotonic()
         with self._lock:
             return [
-                t for t, (s, _, reg) in self._store.items()
+                t
+                for t, (s, _, reg) in self._store.items()
                 if s not in _TERMINAL and s != "ERROR" and (now - reg) > self._ttl_s
             ]
 
@@ -149,7 +146,9 @@ class OrderStateMachine:
                         self._store[ticket] = ("ERROR", history, registered_at)
                         logger.warning(
                             "[OSM] ticket=%d expired after %.0fs in state %s -> ERROR",
-                            ticket, age_s, state,
+                            ticket,
+                            age_s,
+                            state,
                         )
                         expired += 1
         return expired

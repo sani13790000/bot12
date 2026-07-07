@@ -8,6 +8,7 @@ PHASE1-MERGE T-19..T-24 from rbac_patch.py:
   T-23: require_permission enforced before handler
   T-24: Rate limit on permission checks
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,8 +29,8 @@ class ProactivePermCache:
 
     def __init__(self, max_size: int = 128, ttl: int = 60) -> None:
         self._store: OrderedDict = OrderedDict()
-        self._max   = max_size
-        self._ttl   = ttl
+        self._max = max_size
+        self._ttl = ttl
         self._inserts = 0
 
     def get(self, key: str) -> Optional[Any]:
@@ -68,8 +69,8 @@ class _PermCheckRateLimiter:
     """T-24: Simple token-bucket rate limiter for permission checks."""
 
     def __init__(self, rate: int = 100, per: float = 1.0) -> None:
-        self._rate    = rate
-        self._per     = per
+        self._rate = rate
+        self._per = per
         self._counts: Dict[str, List[float]] = {}
         self._lock = asyncio.Lock()
 
@@ -77,8 +78,8 @@ class _PermCheckRateLimiter:
         async with self._lock:
             now = time.monotonic()
             window = now - self._per
-            calls  = self._counts.get(user_id, [])
-            calls  = [t for t in calls if t > window]
+            calls = self._counts.get(user_id, [])
+            calls = [t for t in calls if t > window]
             if len(calls) >= self._rate:
                 return False
             calls.append(now)
@@ -135,12 +136,15 @@ class RBACService:
             log.debug("unknown role assignment rejected", role=role, user_id=user_id)
             return False
         try:
-            await self._db.upsert("user_roles", {
-                "user_id":     user_id,
-                "role":        role,
-                "assigned_by": assigned_by,
-                "assigned_at": datetime.now(timezone.utc).isoformat(),
-            })
+            await self._db.upsert(
+                "user_roles",
+                {
+                    "user_id": user_id,
+                    "role": role,
+                    "assigned_by": assigned_by,
+                    "assigned_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
             _perm_cache.invalidate(user_id)
             return True
         except Exception as exc:

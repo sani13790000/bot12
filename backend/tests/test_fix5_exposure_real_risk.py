@@ -15,14 +15,14 @@ Critical scenario:
   New trade real risk = 2.0% -> projected 5.6% > 5.0% limit -> BLOCKED
   Old code: 3.6 + hardcoded 1.0 = 4.6 < 5.0 -> PASSED (WRONG)
 """
+
 from __future__ import annotations
+
 import asyncio
-import sys
 import os
+import sys
 import types
-import logging
 from dataclasses import dataclass
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -38,14 +38,14 @@ class ExposurePosition:
 
 @dataclass
 class LotSizeResult:
-    lot_size:       float
+    lot_size: float
     pip_value_used: float
-    risk_usd:       float
-    risk_percent:   float
-    kelly_lot:      float
-    source:         str
-    symbol:         str
-    method:         str
+    risk_usd: float
+    risk_percent: float
+    kelly_lot: float
+    source: str
+    symbol: str
+    method: str
 
 
 def _make_stub_packages():
@@ -65,8 +65,11 @@ def _make_stub_packages():
     def _price_to_pips(s, d):
         s = s.upper().strip()
         ps = {
-            "EURUSD": 0.0001, "GBPUSD": 0.0001, "USDJPY": 0.01,
-            "XAUUSD": 0.01,   "BTCUSD": 1.0,
+            "EURUSD": 0.0001,
+            "GBPUSD": 0.0001,
+            "USDJPY": 0.01,
+            "XAUUSD": 0.01,
+            "BTCUSD": 1.0,
         }.get(s, 0.0001)
         return round(d / ps, 6)
 
@@ -77,7 +80,7 @@ def _make_stub_packages():
         pip_val = 10.0
         return round((pips * lot * pip_val / bal) * 100.0, 4), "table"
 
-    pip_mod._price_to_pips   = _price_to_pips
+    pip_mod._price_to_pips = _price_to_pips
     pip_mod._estimate_risk_pct = _estimate_risk_pct
     sys.modules["backend.risk._pip_helpers"] = pip_mod
 
@@ -92,48 +95,58 @@ import importlib.util
 
 def _load_module(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
-    mod  = importlib.util.module_from_spec(spec)
+    mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
-_ORCH_PATH = os.path.join(
-    os.path.dirname(BASE_DIR), "risk", "risk_orchestrator.py"
-)
+_ORCH_PATH = os.path.join(os.path.dirname(BASE_DIR), "risk", "risk_orchestrator.py")
 orch_mod = _load_module(_ORCH_PATH, "risk_orchestrator_fix5")
 
-RiskOrchestrator     = orch_mod.RiskOrchestrator
-RiskDecision         = orch_mod.RiskDecision
-_clamp_risk          = orch_mod._clamp_risk
+RiskOrchestrator = orch_mod.RiskOrchestrator
+RiskDecision = orch_mod.RiskDecision
+_clamp_risk = orch_mod._clamp_risk
 _normalise_positions = orch_mod._normalise_positions
 
 BASE = dict(
-    symbol="EURUSD", direction="BUY",
-    entry_price=1.10000, stop_loss=1.09000,
+    symbol="EURUSD",
+    direction="BUY",
+    entry_price=1.10000,
+    stop_loss=1.09000,
     account_balance=10_000.0,
-    user_id="u1", signal_id="s1",
+    user_id="u1",
+    signal_id="s1",
 )
 
 
 def _make_lot_sizer(risk_percent=2.3, lot_size=0.23):
     ls = MagicMock()
-    ls.calculate = AsyncMock(return_value=LotSizeResult(
-        lot_size=lot_size, pip_value_used=10.0, risk_usd=230.0,
-        risk_percent=risk_percent, kelly_lot=0.20,
-        source="static", symbol="EURUSD", method="kelly_blend",
-    ))
+    ls.calculate = AsyncMock(
+        return_value=LotSizeResult(
+            lot_size=lot_size,
+            pip_value_used=10.0,
+            risk_usd=230.0,
+            risk_percent=risk_percent,
+            kelly_lot=0.20,
+            source="static",
+            symbol="EURUSD",
+            method="kelly_blend",
+        )
+    )
     return ls
 
 
 def _capture_exposure(allow=True):
     calls = []
+
     def _check(new_symbol, new_direction, new_risk_percent, open_positions):
         calls.append({"symbol": new_symbol, "risk": new_risk_percent, "positions": open_positions})
         r = MagicMock()
         r.can_trade = allow
         r.reason = "" if allow else f"BLOCKED:{new_risk_percent:.3f}%"
         return r
+
     exp = MagicMock()
     exp.check = _check
     return exp, calls
@@ -144,13 +157,26 @@ def _run(coro):
 
 
 class TestClampRisk:
-    def test_zero_stays_zero(self): assert _clamp_risk(0.0) == 0.0
-    def test_negative_clamped(self): assert _clamp_risk(-5.0) == 0.0
-    def test_slightly_negative(self): assert _clamp_risk(-0.001) == 0.0
-    def test_normal_unchanged(self): assert _clamp_risk(2.5) == pytest.approx(2.5)
-    def test_exactly_100(self): assert _clamp_risk(100.0) == pytest.approx(100.0)
-    def test_above_100(self): assert _clamp_risk(101.0) == pytest.approx(100.0)
-    def test_huge_clamped(self): assert _clamp_risk(9999.0) == pytest.approx(100.0)
+    def test_zero_stays_zero(self):
+        assert _clamp_risk(0.0) == 0.0
+
+    def test_negative_clamped(self):
+        assert _clamp_risk(-5.0) == 0.0
+
+    def test_slightly_negative(self):
+        assert _clamp_risk(-0.001) == 0.0
+
+    def test_normal_unchanged(self):
+        assert _clamp_risk(2.5) == pytest.approx(2.5)
+
+    def test_exactly_100(self):
+        assert _clamp_risk(100.0) == pytest.approx(100.0)
+
+    def test_above_100(self):
+        assert _clamp_risk(101.0) == pytest.approx(100.0)
+
+    def test_huge_clamped(self):
+        assert _clamp_risk(9999.0) == pytest.approx(100.0)
 
 
 class TestDefaultRiskPercent:
@@ -163,10 +189,12 @@ class TestDefaultRiskPercent:
         assert orc._default_risk == pytest.approx(2.5)
 
     def test_zero_raises(self):
-        with pytest.raises(ValueError): RiskOrchestrator(default_risk_percent=0.0)
+        with pytest.raises(ValueError):
+            RiskOrchestrator(default_risk_percent=0.0)
 
     def test_negative_raises(self):
-        with pytest.raises(ValueError): RiskOrchestrator(default_risk_percent=-1.0)
+        with pytest.raises(ValueError):
+            RiskOrchestrator(default_risk_percent=-1.0)
 
     def test_fallback_uses_default_not_1(self):
         exp, calls = _capture_exposure(allow=True)
@@ -230,6 +258,7 @@ class TestExposureReceivesRealRisk:
 class TestCriticalScenario:
     def _make_limit_exposure(self, limit=5.0, existing=3.6):
         calls = []
+
         def _check(new_symbol, new_direction, new_risk_percent, open_positions):
             projected = existing + new_risk_percent
             can = projected <= limit
@@ -238,7 +267,9 @@ class TestCriticalScenario:
             r.can_trade = can
             r.reason = "" if can else f"EXPOSURE:{projected:.2f}>{limit}"
             return r
-        exp = MagicMock(); exp.check = _check
+
+        exp = MagicMock()
+        exp.check = _check
         return exp, calls
 
     def test_old_1_wrongly_passes(self):
@@ -280,11 +311,13 @@ class TestDictPositionsNormalisation:
     def test_multiple_dicts(self):
         exp, calls = _capture_exposure(allow=True)
         orc = RiskOrchestrator(exposure_control=exp, lot_sizer=None)
-        ctx = {"open_positions": [
-            {"symbol": "GBPUSD",  "direction": "BUY",  "risk_percent": 1.0},
-            {"symbol": "EURUSD",  "direction": "SELL", "risk_percent": 1.5},
-            {"symbol": "XAUUSD",  "direction": "BUY",  "risk_percent": 0.8},
-        ]}
+        ctx = {
+            "open_positions": [
+                {"symbol": "GBPUSD", "direction": "BUY", "risk_percent": 1.0},
+                {"symbol": "EURUSD", "direction": "SELL", "risk_percent": 1.5},
+                {"symbol": "XAUUSD", "direction": "BUY", "risk_percent": 0.8},
+            ]
+        }
         _run(orc.check(**BASE, extra_context=ctx))
         assert len(calls[0]["positions"]) == 3
 
@@ -299,10 +332,12 @@ class TestDictPositionsNormalisation:
     def test_mixed(self):
         exp, calls = _capture_exposure(allow=True)
         orc = RiskOrchestrator(exposure_control=exp, lot_sizer=None)
-        ctx = {"open_positions": [
-            ExposurePosition("GBPUSD", "BUY", 1.0),
-            {"symbol": "USDJPY", "direction": "SELL", "risk_percent": 0.9},
-        ]}
+        ctx = {
+            "open_positions": [
+                ExposurePosition("GBPUSD", "BUY", 1.0),
+                {"symbol": "USDJPY", "direction": "SELL", "risk_percent": 0.9},
+            ]
+        }
         _run(orc.check(**BASE, extra_context=ctx))
         items = calls[0]["positions"]
         assert len(items) == 2
@@ -316,7 +351,7 @@ class TestDictPositionsNormalisation:
 
     def test_normalise_helper(self):
         raw = [
-            {"symbol": "EURUSD", "direction": "BUY",  "risk_percent": 1.0, "risk_usd": 100.0},
+            {"symbol": "EURUSD", "direction": "BUY", "risk_percent": 1.0, "risk_usd": 100.0},
             {"symbol": "XAUUSD", "direction": "SELL", "risk_percent": 2.0},
         ]
         result = _normalise_positions(raw)
@@ -357,24 +392,28 @@ class TestRiskSourceMetadata:
 
 class TestFailModes:
     def test_exposure_fail_closed(self):
-        exp = MagicMock(); exp.check = MagicMock(side_effect=RuntimeError("db down"))
+        exp = MagicMock()
+        exp.check = MagicMock(side_effect=RuntimeError("db down"))
         orc = RiskOrchestrator(exposure_control=exp, fail_mode_exposure="FAIL_CLOSED")
         result = _run(orc.check(**BASE))
         assert not result.approved
         assert "EXPOSURE_GATE_ERROR" in result.block_reason
 
     def test_exposure_fail_open(self):
-        exp = MagicMock(); exp.check = MagicMock(side_effect=RuntimeError("db down"))
+        exp = MagicMock()
+        exp.check = MagicMock(side_effect=RuntimeError("db down"))
         orc = RiskOrchestrator(exposure_control=exp, fail_mode_exposure="FAIL_OPEN")
         assert _run(orc.check(**BASE)).approved
 
     def test_correlation_fail_closed(self):
-        corr = MagicMock(); corr.check = MagicMock(side_effect=RuntimeError("corr fail"))
+        corr = MagicMock()
+        corr.check = MagicMock(side_effect=RuntimeError("corr fail"))
         orc = RiskOrchestrator(correlation_filter=corr, fail_mode_correlation="FAIL_CLOSED")
         assert not _run(orc.check(**BASE)).approved
 
     def test_correlation_fail_open(self):
-        corr = MagicMock(); corr.check = MagicMock(side_effect=RuntimeError("corr fail"))
+        corr = MagicMock()
+        corr.check = MagicMock(side_effect=RuntimeError("corr fail"))
         orc = RiskOrchestrator(correlation_filter=corr, fail_mode_correlation="FAIL_OPEN")
         assert _run(orc.check(**BASE)).approved
 
@@ -386,11 +425,17 @@ class TestBackwardCompat:
 
     def test_invalid_sl(self):
         orc = RiskOrchestrator()
-        result = _run(orc.check(
-            symbol="EURUSD", direction="BUY",
-            entry_price=1.10, stop_loss=1.10,
-            account_balance=10_000.0, user_id="u1", signal_id="s1",
-        ))
+        result = _run(
+            orc.check(
+                symbol="EURUSD",
+                direction="BUY",
+                entry_price=1.10,
+                stop_loss=1.10,
+                account_balance=10_000.0,
+                user_id="u1",
+                signal_id="s1",
+            )
+        )
         assert not result.approved
         assert result.block_reason == "INVALID_SL"
 
@@ -400,6 +445,7 @@ class TestBackwardCompat:
 
     def test_returns_risk_check_result(self):
         from risk_orchestrator_fix5 import RiskCheckResult
+
         orc = RiskOrchestrator()
         assert isinstance(_run(orc.check(**BASE)), RiskCheckResult)
 
@@ -417,4 +463,5 @@ class TestBackwardCompat:
 
 if __name__ == "__main__":
     import pytest as _p
+
     _p.main([__file__, "-v", "--tb=short"])

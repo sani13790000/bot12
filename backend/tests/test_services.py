@@ -6,20 +6,19 @@
 نویسنده: MT5 Trading Team
 """
 
-import pytest
-import numpy as np
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
-from typing import Dict, Any, List
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from backend.services.decision_service import DecisionService
 from backend.services.signal_service import SignalService
 from backend.services.trade_service import TradeService
 
-
 # =====================================================
 # Helper: mock database
 # =====================================================
+
 
 def make_mock_db():
     """ساخت mock database"""
@@ -74,6 +73,7 @@ def make_trade_data(user_id="user-001", symbol="EURUSD"):
 # تست DecisionService
 # =====================================================
 
+
 class TestDecisionService:
     """تست سرویس تصمیم‌گیری"""
 
@@ -118,7 +118,11 @@ class TestDecisionService:
                     "market_data": {},
                     "smc_data": {"trend": "bullish", "score": 75, "in_kill_zone": True},
                     "pa_data": {"overall_bias": "bullish", "score": 70},
-                    "license_info": {"is_valid": True, "features": ["auto_trading"], "license_type": "pro"},
+                    "license_info": {
+                        "is_valid": True,
+                        "features": ["auto_trading"],
+                        "license_type": "pro",
+                    },
                 }
                 result = await service.request_decision(request, user_id="user-001")
                 assert result is not None
@@ -203,6 +207,7 @@ class TestDecisionService:
 # =====================================================
 # تست SignalService
 # =====================================================
+
 
 class TestSignalService:
     """تست سرویس سیگنال"""
@@ -323,6 +328,7 @@ class TestSignalService:
 # تست TradeService
 # =====================================================
 
+
 class TestTradeService:
     """تست سرویس معاملات"""
 
@@ -398,10 +404,7 @@ class TestTradeService:
         mock_db.insert = AsyncMock(return_value={"id": "trade-001"})
 
         with patch("backend.services.trade_service.db", mock_db):
-            result = await service.report_trade(
-                user_id="user-001",
-                trade_data=trade_data
-            )
+            result = await service.report_trade(user_id="user-001", trade_data=trade_data)
             assert result is not None
 
     @pytest.mark.asyncio
@@ -411,14 +414,13 @@ class TestTradeService:
         mock_db = make_mock_db()
         trade = make_trade_data()
         mock_db.select_one = AsyncMock(return_value=trade)
-        mock_db.update = AsyncMock(return_value=[{**trade, "status": "closed", "exit_price": 1.0900}])
+        mock_db.update = AsyncMock(
+            return_value=[{**trade, "status": "closed", "exit_price": 1.0900}]
+        )
 
         with patch("backend.services.trade_service.db", mock_db):
             result = await service.close_trade(
-                trade_id="trade-001",
-                user_id="user-001",
-                exit_price=1.0900,
-                profit_money=50.0
+                trade_id="trade-001", user_id="user-001", exit_price=1.0900, profit_money=50.0
             )
             assert result is not None
 
@@ -431,10 +433,7 @@ class TestTradeService:
 
         with patch("backend.services.trade_service.db", mock_db):
             result = await service.close_trade(
-                trade_id="nonexistent",
-                user_id="user-001",
-                exit_price=1.0900,
-                profit_money=0.0
+                trade_id="nonexistent", user_id="user-001", exit_price=1.0900, profit_money=0.0
             )
             assert result is None or result == {} or result is False
 
@@ -444,11 +443,13 @@ class TestTradeService:
         service = TradeService()
         mock_db = make_mock_db()
         mock_db.count = AsyncMock(return_value=10)
-        mock_db.select_many = AsyncMock(return_value=[
-            {"profit_money": 100.0, "status": "closed"},
-            {"profit_money": -50.0, "status": "closed"},
-            {"profit_money": 75.0, "status": "closed"},
-        ])
+        mock_db.select_many = AsyncMock(
+            return_value=[
+                {"profit_money": 100.0, "status": "closed"},
+                {"profit_money": -50.0, "status": "closed"},
+                {"profit_money": 75.0, "status": "closed"},
+            ]
+        )
 
         with patch("backend.services.trade_service.db", mock_db):
             result = await service.get_trade_stats(user_id="user-001")
@@ -484,6 +485,7 @@ class TestTradeService:
 # =====================================================
 # تست آمار معاملات (بدون mock)
 # =====================================================
+
 
 class TestTradeStatsCalculation:
     """تست محاسبه آمار معاملات"""

@@ -2,12 +2,11 @@
 Phase 10 — Security Test Suite
 50 tests: SQL injection, XSS, path traversal, JWT, license, secrets
 """
+
 from __future__ import annotations
 
-import pytest
 import json
 import time
-from unittest.mock import MagicMock, patch, AsyncMock
 
 
 # ============================================================
@@ -16,6 +15,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 class TestSQLInjectionDetection:
     def setup_method(self):
         from backend.middleware.security import _check_sql, _scan_value
+
         self._check_sql = _check_sql
         self._scan_value = _scan_value
 
@@ -56,6 +56,7 @@ class TestSQLInjectionDetection:
 class TestXSSDetection:
     def setup_method(self):
         from backend.middleware.security import _check_xss, _scan_value
+
         self._check_xss = _check_xss
         self._scan_value = _scan_value
 
@@ -85,6 +86,7 @@ class TestXSSDetection:
 class TestPathTraversalDetection:
     def setup_method(self):
         from backend.middleware.security import _PATH_TRAVERSAL, _scan_value
+
         self._pat = _PATH_TRAVERSAL
         self._scan_value = _scan_value
 
@@ -110,56 +112,69 @@ class TestPathTraversalDetection:
 class TestJWTAuth:
     def setup_method(self):
         from backend.core.auth import TokenPayload, _parse_supabase_jwt
+
         self.TokenPayload = TokenPayload
         self._parse_supabase_jwt = _parse_supabase_jwt
 
     def _make_token(self, payload: dict) -> str:
         import base64
-        import json
-        header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).rstrip(b"=").decode()
+
+        header = (
+            base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+            .rstrip(b"=")
+            .decode()
+        )
         body = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
         return f"{header}.{body}.fakesig"
 
     def test_valid_token_parsed(self):
-        token = self._make_token({
-            "sub": "user-123",
-            "email": "test@example.com",
-            "role": "authenticated",
-            "exp": int(time.time()) + 3600,
-            "iat": int(time.time()),
-        })
+        token = self._make_token(
+            {
+                "sub": "user-123",
+                "email": "test@example.com",
+                "role": "authenticated",
+                "exp": int(time.time()) + 3600,
+                "iat": int(time.time()),
+            }
+        )
         result = self._parse_supabase_jwt(token)
         assert result is not None
         assert result.user_id == "user-123"
         assert result.email == "test@example.com"
 
     def test_expired_token_detected(self):
-        token = self._make_token({
-            "sub": "user-123",
-            "email": "test@example.com",
-            "exp": int(time.time()) - 100,
-            "iat": int(time.time()) - 3700,
-        })
+        token = self._make_token(
+            {
+                "sub": "user-123",
+                "email": "test@example.com",
+                "exp": int(time.time()) - 100,
+                "iat": int(time.time()) - 3700,
+            }
+        )
         result = self._parse_supabase_jwt(token)
         assert result is not None
         assert result.is_expired is True
 
     def test_admin_role_detected(self):
-        token = self._make_token({
-            "sub": "admin-1",
-            "email": "admin@example.com",
-            "exp": int(time.time()) + 3600,
-            "app_metadata": {"role": "admin"},
-        })
+        token = self._make_token(
+            {
+                "sub": "admin-1",
+                "email": "admin@example.com",
+                "exp": int(time.time()) + 3600,
+                "app_metadata": {"role": "admin"},
+            }
+        )
         result = self._parse_supabase_jwt(token)
         assert result is not None
         assert result.is_admin is True
 
     def test_missing_sub_returns_empty_user_id(self):
-        token = self._make_token({
-            "email": "test@example.com",
-            "exp": int(time.time()) + 3600,
-        })
+        token = self._make_token(
+            {
+                "email": "test@example.com",
+                "exp": int(time.time()) + 3600,
+            }
+        )
         result = self._parse_supabase_jwt(token)
         assert result is not None
         assert result.user_id == ""
@@ -193,10 +208,15 @@ class TestJWTAuth:
 class TestLicenseManager:
     def setup_method(self):
         from backend.core.license_manager import (
-            get_plan_limits, check_signal_limit, record_signal_usage,
-            check_backtest_limit, check_feature_access, get_usage_summary,
-            PlanTier
+            PlanTier,
+            check_backtest_limit,
+            check_feature_access,
+            check_signal_limit,
+            get_plan_limits,
+            get_usage_summary,
+            record_signal_usage,
         )
+
         self.get_plan_limits = get_plan_limits
         self.check_signal_limit = check_signal_limit
         self.record_signal_usage = record_signal_usage
@@ -256,6 +276,7 @@ class TestLicenseManager:
 class TestSecretManager:
     def test_validate_secrets_returns_result(self):
         from backend.middleware.secret_manager import validate_secrets
+
         result = validate_secrets()
         assert hasattr(result, "ok")
         assert hasattr(result, "missing_required")
@@ -263,17 +284,20 @@ class TestSecretManager:
 
     def test_get_secret_returns_default(self):
         from backend.middleware.secret_manager import get_secret
+
         val = get_secret("NONEXISTENT_SECRET_XYZ", "default_value")
         assert val == "default_value"
 
     def test_get_secret_returns_env_value(self, monkeypatch):
         from backend.middleware.secret_manager import get_secret
+
         monkeypatch.setenv("TEST_SECRET_PHASE10", "my_secret_value")
         val = get_secret("TEST_SECRET_PHASE10")
         assert val == "my_secret_value"
 
     def test_summary_has_valid_key(self):
         from backend.middleware.secret_manager import validate_secrets
+
         result = validate_secrets()
         summary = result.summary()
         assert "valid" in summary

@@ -1,12 +1,11 @@
-import os
 import json
-import threading
-import time
-import uuid
-import pytest
+
 from backend.core.audit_log_v21 import (
-    AuditEvent, Severity, AuditChain, AuditLogger, AuditRecord,
-    MissingReasonError, EVENT_META, REQUIRES_REASON
+    EVENT_META,
+    REQUIRES_REASON,
+    AuditEvent,
+    AuditRecord,
+    Severity,
 )
 
 

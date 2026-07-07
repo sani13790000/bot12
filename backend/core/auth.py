@@ -6,16 +6,17 @@ Fixes applied:
        Custom HMAC make_jwt/verify_jwt kept for backward compat but secret
        is ALWAYS sourced from settings — never from a caller-supplied param.
 """
+
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
-import base64
 import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 _DANGEROUS = {"changeme", "secret", "password", "test", "dev", "your-secret-key"}
 
@@ -53,6 +54,7 @@ def _b64d(s: str) -> bytes:
 def _get_secret() -> str:
     """Always load secret from settings — never from caller."""
     from backend.core.config import get_settings
+
     return get_settings().JWT_SECRET_KEY
 
 

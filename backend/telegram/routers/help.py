@@ -1,4 +1,5 @@
 """Help handler."""
+
 from __future__ import annotations
 
 from aiogram import Router

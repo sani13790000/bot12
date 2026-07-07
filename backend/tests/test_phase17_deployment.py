@@ -4,10 +4,12 @@ Test Phase 17 -- Deployment configuration validation.
 Checks Dockerfile structure, environment variables, health checks,
 and non-root user setup for production readiness.
 """
+
 from __future__ import annotations
 
 import os
 import re
+
 import pytest
 
 DOCKERFILE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "Dockerfile")

@@ -1,12 +1,14 @@
 """
 تست‌های CircuitBreaker
 """
+
 from __future__ import annotations
+
 import asyncio
 import time
-import pytest
 from enum import Enum
-from typing import Callable
+
+import pytest
 
 
 # ─── Inline CircuitBreaker (mirror of backend/circuit_breaker.py) ────────────────────
@@ -21,9 +23,13 @@ class CircuitBreakerOpenError(Exception):
 
 
 class CircuitBreaker:
-
-    def __init__(self, name: str, failure_threshold: int = 5,
-                 recovery_timeout: float = 30.0, half_open_max: int = 1):
+    def __init__(
+        self,
+        name: str,
+        failure_threshold: int = 5,
+        recovery_timeout: float = 30.0,
+        half_open_max: int = 1,
+    ):
         self.name = name
         self._failure_threshold = failure_threshold
         self._recovery_timeout = recovery_timeout
@@ -68,18 +74,22 @@ class CircuitBreaker:
                 raise CircuitBreakerOpenError(f"Circuit '{self.name}' HALF_OPEN max reached")
             self._half_open_attempts += 1
         try:
-            result = await fn(*args, **kwargs) if asyncio.iscoroutinefunction(fn) else fn(*args, **kwargs)
+            result = (
+                await fn(*args, **kwargs)
+                if asyncio.iscoroutinefunction(fn)
+                else fn(*args, **kwargs)
+            )
             self.record_success()
             return result
-        except Exception as exc:
+        except Exception:
             self.record_failure()
             raise
 
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestCircuitBreakerStates:
 
+class TestCircuitBreakerStates:
     def test_initial_state_closed(self):
         cb = CircuitBreaker("test")
         assert cb.state == CBState.CLOSED
@@ -123,12 +133,13 @@ class TestCircuitBreakerStates:
 
 
 class TestCircuitBreakerCall:
-
     @pytest.mark.asyncio
     async def test_successful_async_call(self):
         cb = CircuitBreaker("test")
+
         async def good():
             return 42
+
         result = await cb.call(good)
         assert result == 42
         assert cb.state == CBState.CLOSED
@@ -136,8 +147,10 @@ class TestCircuitBreakerCall:
     @pytest.mark.asyncio
     async def test_failed_async_call_increments(self):
         cb = CircuitBreaker("test", failure_threshold=5)
+
         async def bad():
             raise ValueError("fail")
+
         with pytest.raises(ValueError):
             await cb.call(bad)
         assert cb._failure_count == 1
@@ -146,24 +159,30 @@ class TestCircuitBreakerCall:
     async def test_open_circuit_raises_immediately(self):
         cb = CircuitBreaker("test", failure_threshold=1)
         cb.record_failure()  # open
+
         async def should_not_run():
             return "should not get here"
+
         with pytest.raises(CircuitBreakerOpenError):
             await cb.call(should_not_run)
 
     @pytest.mark.asyncio
     async def test_sync_call_works(self):
         cb = CircuitBreaker("test")
+
         def sync_fn():
             return "sync_result"
+
         result = await cb.call(sync_fn)
         assert result == "sync_result"
 
     @pytest.mark.asyncio
     async def test_multiple_failures_open_circuit(self):
         cb = CircuitBreaker("test", failure_threshold=3)
+
         async def bad():
             raise RuntimeError("error")
+
         for _ in range(3):
             with pytest.raises(RuntimeError):
                 await cb.call(bad)

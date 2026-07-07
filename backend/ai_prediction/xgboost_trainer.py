@@ -3,6 +3,7 @@ XGBoost Trainer — Phase R Fix
 BUG-R1: Removed internal DatasetBuilder (12 hardcoded features).
 Now imports from backend.ai_prediction.dataset_builder (38 features via FeaturePipeline).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TrainResult:
-    accuracy:  float
+    accuracy: float
     precision: float
-    recall:    float
-    f1:        float
+    recall: float
+    f1: float
     n_samples: int
     model_path: Optional[str] = None
     feature_names: List[str] = field(default_factory=list)
-    auc_roc:   float = 0.0
+    auc_roc: float = 0.0
 
 
 # BUG-R1 FIX: Internal DatasetBuilder with 12 hardcoded columns REMOVED.
@@ -36,15 +37,15 @@ class XGBoostTrainer:
     """Trains an XGBoost classifier to predict trade profitability."""
 
     DEFAULT_PARAMS: Dict[str, Any] = {
-        "n_estimators":        200,
-        "max_depth":           6,
-        "learning_rate":       0.05,
-        "subsample":           0.8,
-        "colsample_bytree":    0.8,
-        "use_label_encoder":   False,
-        "eval_metric":         "logloss",
-        "random_state":        42,
-        "n_jobs":              -1,
+        "n_estimators": 200,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "use_label_encoder": False,
+        "eval_metric": "logloss",
+        "random_state": 42,
+        "n_jobs": -1,
     }
 
     def __init__(
@@ -62,8 +63,8 @@ class XGBoostTrainer:
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val:   Optional[np.ndarray] = None,
-        y_val:   Optional[np.ndarray] = None,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
     ) -> TrainResult:
         """Train XGBoost classifier and return evaluation metrics."""
         try:
@@ -72,7 +73,7 @@ class XGBoostTrainer:
             logger.error("[XGBoostTrainer] xgboost not installed")
             return TrainResult(accuracy=0, precision=0, recall=0, f1=0, n_samples=0)
 
-        from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+        from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
         model = XGBClassifier(**self._params)
         eval_set = [(X_val, y_val)] if X_val is not None else []
@@ -122,19 +123,19 @@ class XGBoostTrainer:
 
         logger.info(
             "[XGBoostTrainer] Training on %d samples x %d features",
-            len(y), X.shape[1],
+            len(y),
+            X.shape[1],
         )
         result = self.train(X, y)
         result.feature_names = feature_cols
 
         try:
             from backend.ai_prediction.model_manager import ModelManager
+
             mm = ModelManager(model_dir=self._model_dir)
             sym = symbol or "ALL"
             loop = asyncio.get_event_loop()
-            path = await loop.run_in_executor(
-                None, mm.save, self._model, sym, result.auc_roc
-            )
+            path = await loop.run_in_executor(None, mm.save, self._model, sym, result.auc_roc)
             result.model_path = str(path)
         except Exception as exc:
             logger.warning("[XGBoostTrainer] ModelManager save failed: %s", exc)
@@ -145,6 +146,7 @@ class XGBoostTrainer:
         """Fallback synthetic training."""
         try:
             from backend.ai_prediction.feature_pipeline import FeaturePipeline
+
             feature_names = FeaturePipeline.feature_names()
         except Exception:
             feature_names = [f"feature_{i}" for i in range(38)]
@@ -159,7 +161,9 @@ class XGBoostTrainer:
         return result
 
     def save_model(self, path: Optional[str] = None) -> str:
-        import os, pickle
+        import os
+        import pickle
+
         if self._model is None:
             raise RuntimeError("No model trained yet")
         save_path = path or f"{self._model_dir}/xgboost_latest.pkl"
@@ -170,6 +174,7 @@ class XGBoostTrainer:
 
     def load_model(self, path: Optional[str] = None) -> None:
         import pickle
+
         load_path = path or f"{self._model_dir}/xgboost_latest.pkl"
         with open(load_path, "rb") as f:
             self._model = pickle.load(f)
@@ -194,6 +199,7 @@ class XGBoostTrainer:
             return self._feature_names
         try:
             from backend.ai_prediction.feature_pipeline import FeaturePipeline
+
             return FeaturePipeline.feature_names()
         except Exception:
             return []

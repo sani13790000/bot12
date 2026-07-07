@@ -4,7 +4,9 @@ CONFLICT-FIX-2 (2026-06-25): TrendDirection.UNDEFINED added to match
   decision_engine.TrendDirection.UNDEFINED. Without this, cross-module
   comparison fails with AttributeError.
 """
+
 from __future__ import annotations
+
 from enum import Enum, IntEnum
 
 
@@ -178,10 +180,10 @@ class FVGType(str, Enum):
 
 # ─── Trend / Direction ───────────────────────────────────────────────────────
 class TrendDirection(str, Enum):
-    BULLISH   = "bullish"
-    BEARISH   = "bearish"
-    NEUTRAL   = "neutral"
-    RANGING   = "ranging"
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+    NEUTRAL = "neutral"
+    RANGING = "ranging"
     UNDEFINED = "undefined"  # CONFLICT-FIX-2: added for decision_engine compatibility
 
 

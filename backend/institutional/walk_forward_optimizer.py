@@ -1,19 +1,19 @@
 """Walk-Forward Optimizer — Train / Validation / Test splits with parameter grid search."""
 
 from __future__ import annotations
+
 import itertools
-import math
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 
 @dataclass
 class WFOConfig:
-    n_windows: int = 5              # number of IS/OOS windows
-    is_pct: float = 0.70            # in-sample % of each window
-    val_pct: float = 0.15           # validation %
-    oos_pct: float = 0.15           # out-of-sample (test) %
-    optimization_metric: str = "sharpe_ratio"   # metric to maximize
+    n_windows: int = 5  # number of IS/OOS windows
+    is_pct: float = 0.70  # in-sample % of each window
+    val_pct: float = 0.15  # validation %
+    oos_pct: float = 0.15  # out-of-sample (test) %
+    optimization_metric: str = "sharpe_ratio"  # metric to maximize
     min_trades_per_window: int = 10
     parameter_grid: Dict[str, List[Any]] = field(default_factory=dict)
     # e.g. {"sl_pips": [10, 15, 20], "tp_multiplier": [1.5, 2.0, 2.5]}
@@ -22,7 +22,7 @@ class WFOConfig:
 @dataclass
 class WindowResult:
     window_idx: int
-    is_start: int       # candle index
+    is_start: int  # candle index
     is_end: int
     val_start: int
     val_end: int
@@ -49,8 +49,8 @@ class WFOResult:
     avg_val_metric: float
     avg_oos_metric: float
     avg_robustness_ratio: float
-    best_params_overall: Dict[str, Any]   # most frequent best params
-    is_robust: bool                        # avg robustness_ratio > 0.5
+    best_params_overall: Dict[str, Any]  # most frequent best params
+    is_robust: bool  # avg robustness_ratio > 0.5
     total_oos_trades: int
     oos_win_rate: float
     oos_profit_factor: float
@@ -64,7 +64,7 @@ class WalkForwardOptimizer:
       1. Grid-search parameters on IS (train) period
       2. Validate on VAL period
       3. Apply best params to OOS (test) period
-    
+
     Produces combined OOS equity curve — the only unbiased performance estimate.
     """
 
@@ -112,21 +112,26 @@ class WalkForwardOptimizer:
 
             robustness = oos_metric / is_metric if is_metric > 0 else 0
 
-            window_results.append(WindowResult(
-                window_idx=idx,
-                is_start=is_s, is_end=is_e,
-                val_start=val_s, val_end=val_e,
-                oos_start=oos_s, oos_end=oos_e,
-                best_params=best_params,
-                is_metric=round(is_metric, 4),
-                val_metric=round(val_metric, 4),
-                oos_metric=round(oos_metric, 4),
-                is_trades=len(backtest_fn(is_candles, best_params).get("trades", [])),
-                oos_trades=len(oos_trades),
-                is_equity_curve=backtest_fn(is_candles, best_params).get("equity_curve", []),
-                oos_equity_curve=oos_result.get("equity_curve", []),
-                robustness_ratio=round(robustness, 4),
-            ))
+            window_results.append(
+                WindowResult(
+                    window_idx=idx,
+                    is_start=is_s,
+                    is_end=is_e,
+                    val_start=val_s,
+                    val_end=val_e,
+                    oos_start=oos_s,
+                    oos_end=oos_e,
+                    best_params=best_params,
+                    is_metric=round(is_metric, 4),
+                    val_metric=round(val_metric, 4),
+                    oos_metric=round(oos_metric, 4),
+                    is_trades=len(backtest_fn(is_candles, best_params).get("trades", [])),
+                    oos_trades=len(oos_trades),
+                    is_equity_curve=backtest_fn(is_candles, best_params).get("equity_curve", []),
+                    oos_equity_curve=oos_result.get("equity_curve", []),
+                    robustness_ratio=round(robustness, 4),
+                )
+            )
             all_oos_trades.extend(oos_trades)
 
         avg_is = sum(w.is_metric for w in window_results) / len(window_results)
@@ -174,9 +179,7 @@ class WalkForwardOptimizer:
             windows.append((start, is_end, is_end, val_end, val_end, oos_end))
         return windows
 
-    def _grid_search(
-        self, candles: List[Dict], backtest_fn: Callable
-    ) -> Tuple[Dict, float]:
+    def _grid_search(self, candles: List[Dict], backtest_fn: Callable) -> Tuple[Dict, float]:
         """Exhaustive grid search over parameter_grid."""
         if not self.config.parameter_grid:
             result = backtest_fn(candles, {})

@@ -21,21 +21,23 @@ Admin routes  (require MANAGE_BILLING permission):
 Webhook routes  (NO auth -- signature verified internally):
   POST /billing/webhook/{provider}     -> receive payment provider callbacks
 """
+
 from __future__ import annotations
 
-import json
-import time
-from typing import Optional
-
 from fastapi import (
-    APIRouter, Body, Depends, Header,
-    HTTPException, Path, Request, status,
+    APIRouter,
+    Body,
+    Depends,
+    HTTPException,
+    Path,
+    Request,
+    status,
 )
 from pydantic import BaseModel, Field
 
-from ...billing.engine   import BillingEngine, PLANS
-from ...billing.provider import Currency, ProviderName
-from ...billing.webhook  import WebhookProcessor
+from ...billing.engine import PLANS, BillingEngine
+from ...billing.provider import Currency
+from ...billing.webhook import WebhookProcessor
 from ...core.deps import get_current_user
 
 # BUG-V2 fix: router always created — no None guard
@@ -44,26 +46,26 @@ router = APIRouter(tags=["billing"])
 
 
 class CheckoutRequest(BaseModel):
-    plan_id:  str = Field(..., description="Plan ID: trial/basic/pro/vip/annual")
+    plan_id: str = Field(..., description="Plan ID: trial/basic/pro/vip/annual")
     currency: str = Field("usd", description="usd or irr")
 
 
 class CheckoutResponse(BaseModel):
-    invoice_id:   str
+    invoice_id: str
     checkout_url: str
-    status:       str
-    plan_id:      str
-    amount:       int
-    currency:     str
+    status: str
+    plan_id: str
+    amount: int
+    currency: str
 
 
 class SubscriptionResponse(BaseModel):
-    sub_id:          str
-    plan_id:         str
-    status:          str
-    days_remaining:  int
-    license_key:     str
-    features:        list
+    sub_id: str
+    plan_id: str
+    status: str
+    days_remaining: int
+    license_key: str
+    features: list
 
 
 class AdminSuspendRequest(BaseModel):
@@ -85,6 +87,7 @@ def _get_billing_engine() -> BillingEngine:
     """
     try:
         from ...core.config import settings
+
         provider_name = getattr(settings, "BILLING_PROVIDER", "mock").lower()
     except Exception:
         provider_name = "mock"
@@ -92,63 +95,79 @@ def _get_billing_engine() -> BillingEngine:
     # --- Development / Testing ---
     if provider_name == "mock":
         from ...billing.provider import MockProvider
+
         return BillingEngine(provider=MockProvider())
 
     # --- ZarinPal (IRR payments) ---
     if provider_name == "zarinpal":
         try:
             from ...billing.provider import ZarinpalProvider
+
             merchant_id = getattr(settings, "ZARINPAL_MERCHANT_ID", "")
-            sandbox     = getattr(settings, "ZARINPAL_SANDBOX", True)
-            return BillingEngine(provider=ZarinpalProvider(
-                merchant_id=merchant_id,
-                sandbox=sandbox,
-            ))
+            sandbox = getattr(settings, "ZARINPAL_SANDBOX", True)
+            return BillingEngine(
+                provider=ZarinpalProvider(
+                    merchant_id=merchant_id,
+                    sandbox=sandbox,
+                )
+            )
         except Exception as exc:
             import logging
+
             logging.getLogger(__name__).error(
                 "ZarinpalProvider init failed, falling back to MockProvider: %s", exc
             )
             from ...billing.provider import MockProvider
+
             return BillingEngine(provider=MockProvider())
 
     # --- Stripe (international) ---
     if provider_name == "stripe":
         try:
             from ...billing.provider import StripeProvider
-            secret_key      = getattr(settings, "STRIPE_SECRET_KEY", "")
-            webhook_secret  = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
-            return BillingEngine(provider=StripeProvider(
-                secret_key=secret_key,
-                webhook_secret=webhook_secret,
-            ))
+
+            secret_key = getattr(settings, "STRIPE_SECRET_KEY", "")
+            webhook_secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
+            return BillingEngine(
+                provider=StripeProvider(
+                    secret_key=secret_key,
+                    webhook_secret=webhook_secret,
+                )
+            )
         except Exception as exc:
             import logging
+
             logging.getLogger(__name__).error(
                 "StripeProvider init failed, falling back to MockProvider: %s", exc
             )
             from ...billing.provider import MockProvider
+
             return BillingEngine(provider=MockProvider())
 
     # --- Manual (admin confirms payments directly) ---
     if provider_name == "manual":
         try:
             from ...billing.provider import ManualProvider
+
             return BillingEngine(provider=ManualProvider())
         except Exception as exc:
             import logging
+
             logging.getLogger(__name__).error(
                 "ManualProvider init failed, falling back to MockProvider: %s", exc
             )
             from ...billing.provider import MockProvider
+
             return BillingEngine(provider=MockProvider())
 
     # --- Unknown provider: log warning and fallback ---
     import logging
+
     logging.getLogger(__name__).warning(
         "Unknown BILLING_PROVIDER=%r, falling back to MockProvider", provider_name
     )
     from ...billing.provider import MockProvider
+
     return BillingEngine(provider=MockProvider())
 
 
@@ -156,6 +175,7 @@ def _get_billing_engine() -> BillingEngine:
 # BUG-X2 fix: Real JWT auth via get_current_user from backend.core.deps
 # The old stubs returned hardcoded strings without decoding the JWT.
 # ---------------------------------------------------------------------------
+
 
 def _get_current_user_id(current_user=Depends(get_current_user)) -> str:
     """BUG-X2 fix: extract real user_id from JWT via get_current_user dependency."""
@@ -168,7 +188,7 @@ def _get_current_user_id(current_user=Depends(get_current_user)) -> str:
 def _require_admin(current_user=Depends(get_current_user)) -> str:
     """BUG-X2 fix: check real JWT user has admin/billing role."""
     user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
-    role    = getattr(current_user, "role", "") or ""
+    role = getattr(current_user, "role", "") or ""
     if role.lower() not in ("admin", "superadmin", "billing_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -179,9 +199,9 @@ def _require_admin(current_user=Depends(get_current_user)) -> str:
 
 @router.post("/checkout", response_model=CheckoutResponse)
 async def checkout(
-    req:    CheckoutRequest,
-    user_id: str           = Depends(_get_current_user_id),
-    engine:  BillingEngine = Depends(_get_billing_engine),
+    req: CheckoutRequest,
+    user_id: str = Depends(_get_current_user_id),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     if req.plan_id not in PLANS:
         raise HTTPException(status_code=400, detail=f"Unknown plan: {req.plan_id!r}")
@@ -194,42 +214,48 @@ async def checkout(
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Billing service error") from exc
     return CheckoutResponse(
-        invoice_id=invoice.invoice_id, checkout_url=invoice.checkout_url,
-        status=invoice.status.value, plan_id=invoice.plan_id,
-        amount=invoice.amount, currency=invoice.currency.value,
+        invoice_id=invoice.invoice_id,
+        checkout_url=invoice.checkout_url,
+        status=invoice.status.value,
+        plan_id=invoice.plan_id,
+        amount=invoice.amount,
+        currency=invoice.currency.value,
     )
 
 
 @router.get("/subscription", response_model=SubscriptionResponse)
 async def get_subscription(
-    user_id: str           = Depends(_get_current_user_id),
-    engine:  BillingEngine = Depends(_get_billing_engine),
+    user_id: str = Depends(_get_current_user_id),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     sub = engine.get_subscription(user_id)
     if sub is None:
         raise HTTPException(status_code=404, detail="No subscription found")
     plan = PLANS.get(sub.plan_id, {})
     return SubscriptionResponse(
-        sub_id=sub.sub_id, plan_id=sub.plan_id, status=sub.status.value,
-        days_remaining=sub.days_remaining, license_key=sub.license_key,
+        sub_id=sub.sub_id,
+        plan_id=sub.plan_id,
+        status=sub.status.value,
+        days_remaining=sub.days_remaining,
+        license_key=sub.license_key,
         features=plan.get("features", []),
     )
 
 
 @router.get("/invoices")
 async def list_invoices(
-    user_id: str           = Depends(_get_current_user_id),
-    engine:  BillingEngine = Depends(_get_billing_engine),
+    user_id: str = Depends(_get_current_user_id),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     invoices = engine.list_invoices(user_id)
     return [
         {
-            "invoice_id":   i.invoice_id,
-            "plan_id":      i.plan_id,
-            "amount":       i.amount,
-            "currency":     i.currency.value,
-            "status":       i.status.value,
-            "created_at":   i.created_at,
+            "invoice_id": i.invoice_id,
+            "plan_id": i.plan_id,
+            "amount": i.amount,
+            "currency": i.currency.value,
+            "status": i.status.value,
+            "created_at": i.created_at,
             "confirmed_at": i.confirmed_at,
         }
         for i in invoices
@@ -238,8 +264,8 @@ async def list_invoices(
 
 @router.post("/cancel")
 async def cancel_subscription(
-    user_id: str           = Depends(_get_current_user_id),
-    engine:  BillingEngine = Depends(_get_billing_engine),
+    user_id: str = Depends(_get_current_user_id),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     try:
         sub = engine.cancel(user_id, reason="user_request")
@@ -250,27 +276,27 @@ async def cancel_subscription(
 
 @router.post("/admin/confirm/{invoice_id}")
 async def admin_confirm(
-    invoice_id: str           = Path(...),
-    actor:      str           = Depends(_require_admin),
-    engine:     BillingEngine = Depends(_get_billing_engine),
+    invoice_id: str = Path(...),
+    actor: str = Depends(_require_admin),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     try:
         invoice = engine.admin_confirm(invoice_id, actor=actor)
     except KeyError:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return {
-        "invoice_id":   invoice.invoice_id,
-        "status":       invoice.status.value,
+        "invoice_id": invoice.invoice_id,
+        "status": invoice.status.value,
         "confirmed_at": invoice.confirmed_at,
     }
 
 
 @router.post("/admin/suspend/{uid}")
 async def admin_suspend(
-    uid:    str                 = Path(...),
-    body:   AdminSuspendRequest = Body(...),
-    actor:  str                 = Depends(_require_admin),
-    engine: BillingEngine       = Depends(_get_billing_engine),
+    uid: str = Path(...),
+    body: AdminSuspendRequest = Body(...),
+    actor: str = Depends(_require_admin),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     try:
         sub = engine.suspend(uid, reason=body.reason)
@@ -283,10 +309,10 @@ async def admin_suspend(
 
 @router.post("/admin/revoke/{uid}")
 async def admin_revoke(
-    uid:    str               = Path(...),
-    body:   AdminRevokeRequest = Body(...),
-    actor:  str               = Depends(_require_admin),
-    engine: BillingEngine     = Depends(_get_billing_engine),
+    uid: str = Path(...),
+    body: AdminRevokeRequest = Body(...),
+    actor: str = Depends(_require_admin),
+    engine: BillingEngine = Depends(_get_billing_engine),
 ):
     try:
         sub = engine.revoke(uid, reason=body.reason)
@@ -299,16 +325,16 @@ async def admin_revoke(
 
 @router.get("/admin/subscriptions")
 async def list_all_subscriptions(
-    actor:  str           = Depends(_require_admin),
+    actor: str = Depends(_require_admin),
     engine: BillingEngine = Depends(_get_billing_engine),
 ):
     subs = [
         {
-            "user_id":        s.user_id,
-            "plan_id":        s.plan_id,
-            "status":         s.status.value,
+            "user_id": s.user_id,
+            "plan_id": s.plan_id,
+            "status": s.status.value,
             "days_remaining": s.days_remaining,
-            "dunning_count":  s.dunning_count,
+            "dunning_count": s.dunning_count,
         }
         for s in engine._subscriptions.values()
     ]
@@ -317,13 +343,13 @@ async def list_all_subscriptions(
 
 @router.post("/webhook/{provider}")
 async def webhook(
-    provider: str     = Path(...),
-    request:  Request = None,
+    provider: str = Path(...),
+    request: Request = None,
 ):
     """Webhook endpoint — NO auth, signature verified internally."""
     try:
         raw_body = await request.body()
-        headers  = dict(request.headers)
+        headers = dict(request.headers)
         processor = WebhookProcessor()
         result = await processor.process(
             provider=provider,
@@ -333,5 +359,6 @@ async def webhook(
         return {"status": "ok", "processed": result}
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).error("Webhook processing error: %s", exc)
         raise HTTPException(status_code=400, detail="Webhook processing failed") from exc

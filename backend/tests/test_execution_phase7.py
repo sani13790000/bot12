@@ -2,32 +2,38 @@
 Phase 7 execution tests
 Covers: MT5Connector, OrderStateMachine, FailureRecovery, PositionReconciliation
 """
+
 from __future__ import annotations
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.execution.order_state_machine import (
-    ManagedOrder, OrderState, OrderStateMachine, OrderTransition,
-)
 from backend.execution.failure_recovery import (
-    FailureRecoveryEngine, RecoveryStrategy,
+    FailureRecoveryEngine,
+    RecoveryStrategy,
 )
-
+from backend.execution.order_state_machine import (
+    ManagedOrder,
+    OrderState,
+    OrderStateMachine,
+)
 
 # ============================================================
 # OrderStateMachine
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_osm_create_order():
     osm = OrderStateMachine()
     order = ManagedOrder(
-        order_id="test-001", signal_id="sig-001",
-        symbol="XAUUSD", action="BUY",
-        requested_volume=0.01, requested_price=2000.0,
-        stop_loss=1990.0, take_profit=2020.0,
+        order_id="test-001",
+        signal_id="sig-001",
+        symbol="XAUUSD",
+        action="BUY",
+        requested_volume=0.01,
+        requested_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
     )
     await osm.create_order(order)
     found = await osm.get_order("test-001")
@@ -39,10 +45,14 @@ async def test_osm_create_order():
 async def test_osm_valid_transition():
     osm = OrderStateMachine()
     order = ManagedOrder(
-        order_id="test-002", signal_id="sig-002",
-        symbol="XAUUSD", action="SELL",
-        requested_volume=0.01, requested_price=2000.0,
-        stop_loss=2010.0, take_profit=1980.0,
+        order_id="test-002",
+        signal_id="sig-002",
+        symbol="XAUUSD",
+        action="SELL",
+        requested_volume=0.01,
+        requested_price=2000.0,
+        stop_loss=2010.0,
+        take_profit=1980.0,
     )
     await osm.create_order(order)
     ok = await osm.transition("test-002", OrderState.SUBMITTED, reason="test")
@@ -56,10 +66,14 @@ async def test_osm_valid_transition():
 async def test_osm_invalid_transition():
     osm = OrderStateMachine()
     order = ManagedOrder(
-        order_id="test-003", signal_id="sig-003",
-        symbol="XAUUSD", action="BUY",
-        requested_volume=0.01, requested_price=2000.0,
-        stop_loss=1990.0, take_profit=2020.0,
+        order_id="test-003",
+        signal_id="sig-003",
+        symbol="XAUUSD",
+        action="BUY",
+        requested_volume=0.01,
+        requested_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
     )
     await osm.create_order(order)
     # Cannot go PENDING -> FILLED directly
@@ -73,10 +87,14 @@ async def test_osm_invalid_transition():
 async def test_osm_full_lifecycle():
     osm = OrderStateMachine()
     order = ManagedOrder(
-        order_id="test-004", signal_id="sig-004",
-        symbol="XAUUSD", action="BUY",
-        requested_volume=0.01, requested_price=2000.0,
-        stop_loss=1990.0, take_profit=2020.0,
+        order_id="test-004",
+        signal_id="sig-004",
+        symbol="XAUUSD",
+        action="BUY",
+        requested_volume=0.01,
+        requested_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
     )
     await osm.create_order(order)
     await osm.transition("test-004", OrderState.SUBMITTED)
@@ -100,10 +118,14 @@ async def test_osm_callback_fired():
 
     osm.register_callback(cb)
     order = ManagedOrder(
-        order_id="test-005", signal_id="sig-005",
-        symbol="XAUUSD", action="BUY",
-        requested_volume=0.01, requested_price=2000.0,
-        stop_loss=1990.0, take_profit=2020.0,
+        order_id="test-005",
+        signal_id="sig-005",
+        symbol="XAUUSD",
+        action="BUY",
+        requested_volume=0.01,
+        requested_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
     )
     await osm.create_order(order)
     await osm.transition("test-005", OrderState.SUBMITTED)
@@ -116,10 +138,14 @@ async def test_osm_active_orders_filter():
     osm = OrderStateMachine()
     for i in range(3):
         o = ManagedOrder(
-            order_id=f"test-00{i+6}", signal_id=f"sig-00{i+6}",
-            symbol="XAUUSD", action="BUY",
-            requested_volume=0.01, requested_price=2000.0,
-            stop_loss=1990.0, take_profit=2020.0,
+            order_id=f"test-00{i + 6}",
+            signal_id=f"sig-00{i + 6}",
+            symbol="XAUUSD",
+            action="BUY",
+            requested_volume=0.01,
+            requested_price=2000.0,
+            stop_loss=1990.0,
+            take_profit=2020.0,
         )
         await osm.create_order(o)
 
@@ -135,12 +161,15 @@ async def test_osm_active_orders_filter():
 # FailureRecoveryEngine
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_recovery_transient_retcode():
     fr = FailureRecoveryEngine(max_retries=3)
     strategy = await fr.handle_failure(
-        order_id="ord-001", signal_id="sig-001",
-        error="requote", retcode=10004,
+        order_id="ord-001",
+        signal_id="sig-001",
+        error="requote",
+        retcode=10004,
     )
     assert strategy == RecoveryStrategy.RETRY
     assert fr.retry_queue_size == 1
@@ -150,8 +179,10 @@ async def test_recovery_transient_retcode():
 async def test_recovery_permanent_retcode():
     fr = FailureRecoveryEngine(max_retries=3)
     strategy = await fr.handle_failure(
-        order_id="ord-002", signal_id="sig-002",
-        error="invalid", retcode=10013,
+        order_id="ord-002",
+        signal_id="sig-002",
+        error="invalid",
+        retcode=10013,
     )
     assert strategy == RecoveryStrategy.DEAD_LETTER
     assert len(fr.dead_letter_queue) == 1
@@ -161,8 +192,10 @@ async def test_recovery_permanent_retcode():
 async def test_recovery_timeout_error():
     fr = FailureRecoveryEngine(max_retries=3)
     strategy = await fr.handle_failure(
-        order_id="ord-003", signal_id="sig-003",
-        error="connection timeout", retcode=0,
+        order_id="ord-003",
+        signal_id="sig-003",
+        error="connection timeout",
+        retcode=0,
     )
     assert strategy == RecoveryStrategy.RETRY
 
@@ -177,8 +210,10 @@ async def test_recovery_dead_letter_on_max_retries():
 
     fr._alert_callback = alert
     strategy = await fr.handle_failure(
-        order_id="ord-004", signal_id="sig-004",
-        error="timeout", retcode=0,
+        order_id="ord-004",
+        signal_id="sig-004",
+        error="timeout",
+        retcode=0,
     )
     assert strategy == RecoveryStrategy.RETRY
 

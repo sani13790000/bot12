@@ -1,1 +1,215 @@
-IiIiCmJhY2tlbmQvYXBpL21haW4ucHkKR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybSAtLSBGYXN0QVBJIEFwcGxpY2F0aW9uIEVudHJ5IFBvaW50CgpQaGFzZSBBQiBmaXg6IHJlc3RvcmUgZnJvbSBwbGFjZWhvbGRlciAiTUFJTl9DT05URU5UIiAoMTIgYnl0ZXMpIHRvIGZ1bGwgYXBwbGljYXRpb24uClBoYXNlIEFDIGZpeDogQlVHLUFDMSBiYWNrdGVzdCBkb3VibGUgcHJlZml4ICsgQlVHLUFDMiByZXNlYXJjaCByZWdpc3RlcmVkLgpQaGFzZSBBRCBmaXg6IEJVRy1BRDUgQ09SUyB3aWxkY2FyZCBkZWZhdWx0IC0+IE5vbmUgKyBwcm9kdWN0aW9uLXNhZmUgZmFsbGJhY2suClBoYXNlIEFHIGZpeDoKICBCVUctQUcxOiB3ZWJzb2NrZXRfcm91dGVzLnB5IG5vIGxvbmdlciBoYXMgcHJlZml4PSIvd3MiIC0tIG1haW4ucHkgcHJvdmlkZXMgaXQKICBCVUctQUcyOiBpbnN0aXR1dGlvbmFsX2JhY2t0ZXN0LnB5IG5vIGxvbmdlciBoYXMgYnJva2VuIHByZWZpeAogIEJVRy1BRzM6IHNlY3VyaXR5X2FpX2xvYWRlci5yb3V0ZXIgcmVtb3ZlZCAtLSBpdCBoYXMgbm8gLnJvdXRlciBhdHRyIChvbmx5IGZ1bmN0aW9uKQpQaGFzZSBBSCBmaXg6CiAgQlVHLUFIMzogb2JzZXJ2YWJpbGl0eV9yb3V0ZXMgaW1wb3J0ZWQgKyByZWdpc3RlcmVkIC0tIHdhcyBuZXZlciByZWdpc3RlcmVkIC0+IC9vYnNlcnZhYmlsaXR5LyogLT4gNDA0ClBoYXNlIEFJIGZpeDoKICBCVUctQUkxOiBtYWluLnB5IHdhcyBUUlVOQ0FURUQgKDc3IGxpbmVzLCAyNzY5QikgLS0gX2NyZWF0ZV9hcHAoKSBpbmNvbXBsZXRlLCB6ZXJvIGluY2x1ZGVfcm91dGVyCiAgQlVHLUFJMjogYW5hbHl0aWNzLnB5IEByb3V0ZXIuZ2V0KCIvYW5hbHl0aWNzL3NlY3VyaXR5L21ldHJpY3MiKSAtPiBkb3VibGUgcGF0aCBmaXhlZCBpbiBhbmFseXRpY3MucHkKIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBsb2dnaW5nCmltcG9ydCB0aW1lCmZyb20gY29udGV4dGxpYiBpbXBvcnQgYXN5bmNjb250ZXh0bWFuYWdlcgpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0Cgpmcm9tIGZhc3RhcGkgaW1wb3J0IEZhc3RBUEksIFJlcXVlc3QKZnJvbSBmYXN0YXBpLm1pZGRsZXdhcmUuY29ycyBpbXBvcnQgQ09SU01pZGRsZXdhcmUKZnJvbSBmYXN0YXBpLnJlc3BvbnNlcyBpbXBvcnQgSlNPTlJlc3BvbnNlCgpsb2dnZXIgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKCl9zdGFydHVwX3RpbWU6IGZsb2F0ID0gMC4wCgoKQGFzeW5jY29udGV4dG1hbmFnZXIKYXN5bmMgZGVmIGxpZmVzcGFuKGFwcDogRmFzdEFQSSk6CiAgICBnbG9iYWwgX3N0YXJ0dXBfdGltZQogICAgX3N0YXJ0dXBfdGltZSA9IHRpbWUudGltZSgpCiAgICBsb2dnZXIuaW5mbygiW3N0YXJ0dXBdIEdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0gc3RhcnRpbmcuLi4iKQoKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuc2VsZl9sZWFybmluZy5yZXRyYWluaW5nX3NlcnZpY2UgaW1wb3J0IHJldHJhaW5pbmdfc2VydmljZQogICAgICAgIGF3YWl0IHJldHJhaW5pbmdfc2VydmljZS5zdGFydCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzdGFydHVwXSBSZXRyYWluaW5nU2VydmljZSBzdGFydGVkIikKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci53YXJuaW5nKCJbc3RhcnR1cF0gUmV0cmFpbmluZ1NlcnZpY2Ugc3RhcnQgZmFpbGVkOiAlcyIsIGV4YykKCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLmFnZW50cy5zZWN1cml0eV9haV9hZ2VudCBpbXBvcnQgc2VjdXJpdHlfYWlfYWdlbnQKICAgICAgICBhd2FpdCBzZWN1cml0eV9haV9hZ2VudC5zdGFydCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzdGFydHVwXSBTZWN1cml0eUFJQWdlbnQgc3RhcnRlZCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIud2FybmluZygiW3N0YXJ0dXBdIFNlY3VyaXR5QUlBZ2VudCBzdGFydCBmYWlsZWQ6ICVzIiwgZXhjKQoKICAgIGxvZ2dlci5pbmZvKCJbc3RhcnR1cF0gQWxsIHNlcnZpY2VzIHN0YXJ0ZWQgLS0gcmVhZHkgdG8gc2VydmUuIikKICAgIHlpZWxkCgogICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gU2h1dHRpbmcgZG93biBHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtLi4uIikKCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLnNlbGZfbGVhcm5pbmcucmV0cmFpbmluZ19zZXJ2aWNlIGltcG9ydCByZXRyYWluaW5nX3NlcnZpY2UKICAgICAgICByZXRyYWluaW5nX3NlcnZpY2Uuc3RvcCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gUmV0cmFpbmluZ1NlcnZpY2Ugc3RvcHBlZCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzogICMgQlVHLUFBMiBmaXg6IHdhcyBiYXJlIHBhc3MKICAgICAgICBsb2dnZXIud2FybmluZygiW3NodXRkb3duXSBSZXRyYWluaW5nU2VydmljZS5zdG9wIGZhaWxlZDogJXMiLCBleGMpCgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hZ2VudHMuc2VjdXJpdHlfYWlfYWdlbnQgaW1wb3J0IHNlY3VyaXR5X2FpX2FnZW50CiAgICAgICAgYXdhaXQgc2VjdXJpdHlfYWlfYWdlbnQuc3RvcCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gU2VjdXJpdHlBSUFnZW50IHN0b3BwZWQiKQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6ICAjIEJVRy1BQTIgZml4OiB3YXMgYmFyZSBwYXNzCiAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltzaHV0ZG93bl0gU2VjdXJpdHlBSUFnZW50LnN0b3AgZmFpbGVkOiAlcyIsIGV4YykKCiAgICBsb2dnZXIuaW5mbygiW3NodXRkb3duXSBTaHV0ZG93biBjb21wbGV0ZS4iKQoKCmRlZiBfY3JlYXRlX2FwcCgpIC0+IEZhc3RBUEk6CiAgICBmcm9tIGJhY2tlbmQuY29yZS5jb25maWcgaW1wb3J0IHNldHRpbmdzCgogICAgYXBwID0gRmFzdEFQSSgKICAgICAgICB0aXRsZT0iR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybSIsCiAgICAgICAgZGVzY3JpcHRpb249IkVudGVycHJpc2UgTVQ1IFRyYWRpbmcgRWNvc3lzdGVtIHdpdGggU01DIEVuZ2luZSwgUHJpY2UgQWN0aW9uLCBEZWNpc2lvbiBFbmdpbmUiLAogICAgICAgIHZlcnNpb249IjEuMC4wIiwKICAgICAgICBsaWZlc3Bhbj1saWZlc3BhbiwKICAgICkKCiAgICAjIENPUlMgbWlkZGxld2FyZSAtIEJVRy1BRDUgZml4OiBubyB3aWxkY2FyZCBkZWZhdWx0IGluIHByb2R1Y3Rpb24KICAgIGNvcnNfb3JpZ2lucyA9IGdldGF0dHIoc2V0dGluZ3MsICJDT1JTX09SSUdJTlMiLCBOb25lKQogICAgaWYgbm90IGNvcnNfb3JpZ2luczoKICAgICAgICBlbnYgPSBnZXRhdHRyKHNldHRpbmdzLCAiRU5WSVJPTk1FTlQiLCAiZGV2ZWxvcG1lbnQiKQogICAgICAgIGlmIGVudiA9PSAicHJvZHVjdGlvbiI6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJbQ09SU10gQ09SU19PUklHSU5TIG5vdCBzZXQgaW4gcHJvZHVjdGlvbiAtLSBkZWZhdWx0aW5nIHRvIGxvY2FsaG9zdCBvbmx5IikKICAgICAgICAgICAgY29yc19vcmlnaW5zID0gWyJodHRwOi8vbG9jYWxob3N0OjMwMDAiLCAiaHR0cDovL2xvY2FsaG9zdDo1MTczIl0KICAgICAgICBlbHNlOgogICAgICAgICAgICBjb3JzX29yaWdpbnMgPSBbIioiXQoKICAgIGFwcC5hZGRfbWlkZGxld2FyZSgKICAgICAgICBDT1JTTWlkZGxld2FyZSwKICAgICAgICBhbGxvd19vcmlnaW5zPWNvcnNfb3JpZ2lucywKICAgICAgICBhbGxvd19jcmVkZW50aWFscz1UcnVlLAogICAgICAgIGFsbG93X21ldGhvZHM9WyIqIl0sCiAgICAgICAgYWxsb3dfaGVhZGVycz1bIioiXSwKICAgICkKCiAgICBAYXBwLmV4Y2VwdGlvbl9oYW5kbGVyKEV4Y2VwdGlvbikKICAgIGFzeW5jIGRlZiBnbG9iYWxfZXhjZXB0aW9uX2hhbmRsZXIocmVxdWVzdDogUmVxdWVzdCwgZXhjOiBFeGNlcHRpb24pIC0+IEpTT05SZXNwb25zZToKICAgICAgICBsb2dnZXIuZXJyb3IoIltleGNlcHRpb25dIFVuaGFuZGxlZCBlcnJvciBvbiAlczogJXMiLCByZXF1ZXN0LnVybC5wYXRoLCBleGMsIGV4Y19pbmZvPVRydWUpCiAgICAgICAgcmV0dXJuIEpTT05SZXNwb25zZShzdGF0dXNfY29kZT01MDAsIGNvbnRlbnQ9eyJkZXRhaWwiOiAiSW50ZXJuYWwgc2VydmVyIGVycm9yIiwgInBhdGgiOiBzdHIocmVxdWVzdC51cmwucGF0aCl9KQoKICAgIGZyb20gYmFja2VuZC5hcGkucm91dGVzIGltcG9ydCAoCiAgICAgICAgYWRtaW4sIGFkbWluX29ic2VydmFiaWxpdHksIGFkbWluX3VzZXJzLCBhZ2VudHMsIGFpX3ByZWRpY3Rpb24sCiAgICAgICAgYW5hbHlzaXMsIGFuYWx5dGljcywgYXV0aCwgYmFja3Rlc3QsIGJhY2t0ZXN0X2VuZ2luZSwgYmlsbGluZywKICAgICAgICBkYXNoYm9hcmQsIGRlY2lzaW9uLCBoZWFsdGgsIGluc3RpdHV0aW9uYWwsIGluc3RpdHV0aW9uYWxfYmFja3Rlc3QsCiAgICAgICAgaW50ZWxsaWdlbmNlLCBsZWFybmluZywgbGljZW5zZSwgbWV0cmljcywgcGVybWlzc2lvbnNfcm91dGVzLAogICAgICAgIHBvcnRmb2xpbywgcmF0ZV9saW1pdF9yb3V0ZXMsIHJlcG9ydHMsIHJlc2VhcmNoLCByaXNrLAogICAgICAgIHNlY3VyaXR5X2FpLCBzZWN1cml0eV9haV9leHRlbmRlZCwgc2VsZl9sZWFybmluZywgc2lnbmFscywKICAgICAgICB0cmFkZV9oaXN0b3J5LCB0cmFkZV9yZXBvcnQsIHRyYWRlcywgdXNlcnMsIHdlYnNvY2tldF9yb3V0ZXMsCiAgICApCiAgICBmcm9tIGJhY2tlbmQuYXBpIGltcG9ydCBvYnNlcnZhYmlsaXR5X3JvdXRlcwoKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhdXRoLnJvdXRlciwgICAgICAgICAgICAgICAgICBwcmVmaXg9Ii9hdXRoIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihzaWduYWxzLnJvdXRlciwgICAgICAgICAgICAgICBwcmVmaXg9Ii9zaWduYWxzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcih0cmFkZXMucm91dGVyLCAgICAgICAgICAgICAgICBwcmVmaXg9Ii90cmFkZXMiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGRlY2lzaW9uLnJvdXRlciwgICAgICAgICAgICAgIHByZWZpeD0iL2RlY2lzaW9uIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhbmFseXNpcy5yb3V0ZXIsICAgICAgICAgICAgICBwcmVmaXg9Ii9hbmFseXNpcyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWlfcHJlZGljdGlvbi5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvYWktcHJlZGljdGlvbiIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoZGFzaGJvYXJkLnJvdXRlciwgICAgICAgICAgICAgcHJlZml4PSIvZGFzaGJvYXJkIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihtZXRyaWNzLnJvdXRlciwgICAgICAgICAgICAgICBwcmVmaXg9Ii9tZXRyaWNzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhbmFseXRpY3Mucm91dGVyLCAgICAgICAgICAgICBwcmVmaXg9Ii9hbmFseXRpY3MiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHBvcnRmb2xpby5yb3V0ZXIsICAgICAgICAgICAgIHByZWZpeD0iL3BvcnRmb2xpbyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmlzay5yb3V0ZXIsICAgICAgICAgICAgICAgICAgcHJlZml4PSIvcmlzayIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmVwb3J0cy5yb3V0ZXIsICAgICAgICAgICAgICAgcHJlZml4PSIvcmVwb3J0cyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmVzZWFyY2gucm91dGVyLCAgICAgICAgICAgICAgcHJlZml4PSIvcmVzZWFyY2giKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGJhY2t0ZXN0LnJvdXRlciwgICAgICAgICAgICAgIHByZWZpeD0iL2JhY2t0ZXN0IikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihiYWNrdGVzdF9lbmdpbmUucm91dGVyLCAgICAgICBwcmVmaXg9Ii9iYWNrdGVzdC1lbmdpbmUiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGludGVsbGlnZW5jZS5yb3V0ZXIsICAgICAgICAgIHByZWZpeD0iL2ludGVsbGlnZW5jZSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWdlbnRzLnJvdXRlciwgICAgICAgICAgICAgICAgcHJlZml4PSIvYWdlbnRzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihsZWFybmluZy5yb3V0ZXIsICAgICAgICAgICAgICBwcmVmaXg9Ii9sZWFybmluZyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoc2VsZl9sZWFybmluZy5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvc2VsZi1sZWFybmluZyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaW5zdGl0dXRpb25hbC5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvaW5zdGl0dXRpb25hbCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaW5zdGl0dXRpb25hbF9iYWNrdGVzdC5yb3V0ZXIsIHByZWZpeD0iL2luc3RpdHV0aW9uYWwtYmFja3Rlc3QiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHNlY3VyaXR5X2FpLnJvdXRlciwgICAgICAgICAgIHByZWZpeD0iL3NlY3VyaXR5LWFpIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihzZWN1cml0eV9haV9leHRlbmRlZC5yb3V0ZXIsICBwcmVmaXg9Ii9zZWN1cml0eS1haS1leHQiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGJpbGxpbmcucm91dGVyLCAgICAgICAgICAgICAgICBwcmVmaXg9Ii9iaWxsaW5nIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihsaWNlbnNlLnJvdXRlciwgICAgICAgICAgICAgICAgcHJlZml4PSIvbGljZW5zZSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIodXNlcnMucm91dGVyLCAgICAgICAgICAgICAgICAgIHByZWZpeD0iL3VzZXJzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhZG1pbi5yb3V0ZXIsICAgICAgICAgICAgICAgICAgcHJlZml4PSIvYWRtaW4iKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGFkbWluX3VzZXJzLnJvdXRlciwgICAgICAgICAgICBwcmVmaXg9Ii9hZG1pbiIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWRtaW5fb2JzZXJ2YWJpbGl0eS5yb3V0ZXIsICAgIHByZWZpeD0iL2FkbWluIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihwZXJtaXNzaW9uc19yb3V0ZXMucm91dGVyLCAgICAgcHJlZml4PSIvcGVybWlzc2lvbnMiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHJhdGVfbGltaXRfcm91dGVzLnJvdXRlciwgICAgICBwcmVmaXg9Ii9yYXRlLWxpbWl0IikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcih0cmFkZV9oaXN0b3J5LnJvdXRlciwgICAgICAgICAgcHJlZml4PSIvdHJhZGUtaGlzdG9yeSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIodHJhZGVfcmVwb3J0LnJvdXRlciwgICAgICAgICAgIHByZWZpeD0iL3RyYWRlLXJlcG9ydCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaGVhbHRoLnJvdXRlciwgICAgICAgICAgICAgICAgIHByZWZpeD0iL2hlYWx0aCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIod2Vic29ja2V0X3JvdXRlcy5yb3V0ZXIsICAgICAgIHByZWZpeD0iL3dzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihvYnNlcnZhYmlsaXR5X3JvdXRlcy5yb3V0ZXIpCgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hcGkucm91dGVzIGltcG9ydCBhdWRpdF9yb3V0ZXNfdjIxCiAgICAgICAgYXBwLmluY2x1ZGVfcm91dGVyKGF1ZGl0X3JvdXRlc192MjEucm91dGVyLCBwcmVmaXg9Ii9hZG1pbi9hdWRpdCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIud2FybmluZygiW3N0YXJ0dXBdIGF1ZGl0X3JvdXRlc192MjEgbm90IGxvYWRlZDogJXMiLCBleGMpCgogICAgQGFwcC5nZXQoIi8iLCB0YWdzPVsiaGVhbHRoIl0pCiAgICBhc3luYyBkZWYgcm9vdCgpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgICAgIHVwdGltZSA9IHJvdW5kKHRpbWUudGltZSgpIC0gX3N0YXJ0dXBfdGltZSwgMikKICAgICAgICByZXR1cm4geyJzZXJ2aWNlIjogIkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0iLCAidmVyc2lvbiI6ICIxLjAuMCIsICJzdGF0dXMiOiAicnVubmluZyIsICJ1cHRpbWVfc2Vjb25kcyI6IHVwdGltZX0KCiAgICByZXR1cm4gYXBwCgoKYXBwID0gX2NyZWF0ZV9hcHAoKQo=
+"""
+backend/api/main.py
+Galaxy Vast AI Trading Platform -- FastAPI Application Entry Point
+
+Phase AB fix: restore from placeholder "MAIN_CONTENT" (12 bytes) to full application.
+Phase AC fix: BUG-AC1 backtest double prefix + BUG-AC2 research registered.
+Phase AD fix: BUG-AD5 CORS wildcard default -> None + production-safe fallback.
+Phase AG fix:
+  BUG-AG1: websocket_routes.py no longer has prefix="/ws" -- main.py provides it
+  BUG-AG2: institutional_backtest.py no longer has broken prefix
+  BUG-AG3: security_ai_loader.router removed -- it has no .router attr (only function)
+Phase AH fix:
+  BUG-AH3: observability_routes imported + registered -- was never registered -> /observability/* -> 404
+Phase AI fix:
+  BUG-AI1: main.py was TRUNCATED (77 lines, 2769B) -- _create_app() incomplete, zero include_router
+  BUG-AI2: analytics.py @router.get("/analytics/security/metrics") -> double path fixed in analytics.py
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Dict
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+_startup_time: float = 0.0
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _startup_time
+    _startup_time = time.time()
+    logger.info("[startup] Galaxy Vast AI Trading Platform starting...")
+
+    try:
+        from backend.self_learning.retraining_service import retraining_service
+
+        await retraining_service.start()
+        logger.info("[startup] RetrainingService started")
+    except Exception as exc:
+        logger.warning("[startup] RetrainingService start failed: %s", exc)
+
+    try:
+        from backend.agents.security_ai_agent import security_ai_agent
+
+        await security_ai_agent.start()
+        logger.info("[startup] SecurityAIAgent started")
+    except Exception as exc:
+        logger.warning("[startup] SecurityAIAgent start failed: %s", exc)
+
+    logger.info("[startup] All services started -- ready to serve.")
+    yield
+
+    logger.info("[shutdown] Shutting down Galaxy Vast AI Trading Platform...")
+
+    try:
+        from backend.self_learning.retraining_service import retraining_service
+
+        retraining_service.stop()
+        logger.info("[shutdown] RetrainingService stopped")
+    except Exception as exc:  # BUG-AA2 fix: was bare pass
+        logger.warning("[shutdown] RetrainingService.stop failed: %s", exc)
+
+    try:
+        from backend.agents.security_ai_agent import security_ai_agent
+
+        await security_ai_agent.stop()
+        logger.info("[shutdown] SecurityAIAgent stopped")
+    except Exception as exc:  # BUG-AA2 fix: was bare pass
+        logger.warning("[shutdown] SecurityAIAgent.stop failed: %s", exc)
+
+    logger.info("[shutdown] Shutdown complete.")
+
+
+def _create_app() -> FastAPI:
+    from backend.core.config import settings
+
+    app = FastAPI(
+        title="Galaxy Vast AI Trading Platform",
+        description="Enterprise MT5 Trading Ecosystem with SMC Engine, Price Action, Decision Engine",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+
+    # CORS middleware - BUG-AD5 fix: no wildcard default in production
+    cors_origins = getattr(settings, "CORS_ORIGINS", None)
+    if not cors_origins:
+        env = getattr(settings, "ENVIRONMENT", "development")
+        if env == "production":
+            logger.warning(
+                "[CORS] CORS_ORIGINS not set in production -- defaulting to localhost only"
+            )
+            cors_origins = ["http://localhost:3000", "http://localhost:5173"]
+        else:
+            cors_origins = ["*"]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error("[exception] Unhandled error on %s: %s", request.url.path, exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "path": str(request.url.path)},
+        )
+
+    from backend.api import observability_routes
+    from backend.api.routes import (
+        admin,
+        admin_observability,
+        admin_users,
+        agents,
+        ai_prediction,
+        analysis,
+        analytics,
+        auth,
+        backtest,
+        backtest_engine,
+        billing,
+        dashboard,
+        decision,
+        health,
+        institutional,
+        institutional_backtest,
+        intelligence,
+        learning,
+        license,
+        metrics,
+        permissions_routes,
+        portfolio,
+        rate_limit_routes,
+        reports,
+        research,
+        risk,
+        security_ai,
+        security_ai_extended,
+        self_learning,
+        signals,
+        trade_history,
+        trade_report,
+        trades,
+        users,
+        websocket_routes,
+    )
+
+    app.include_router(auth.router, prefix="/auth")
+    app.include_router(signals.router, prefix="/signals")
+    app.include_router(trades.router, prefix="/trades")
+    app.include_router(decision.router, prefix="/decision")
+    app.include_router(analysis.router, prefix="/analysis")
+    app.include_router(ai_prediction.router, prefix="/ai-prediction")
+    app.include_router(dashboard.router, prefix="/dashboard")
+    app.include_router(metrics.router, prefix="/metrics")
+    app.include_router(analytics.router, prefix="/analytics")
+    app.include_router(portfolio.router, prefix="/portfolio")
+    app.include_router(risk.router, prefix="/risk")
+    app.include_router(reports.router, prefix="/reports")
+    app.include_router(research.router, prefix="/research")
+    app.include_router(backtest.router, prefix="/backtest")
+    app.include_router(backtest_engine.router, prefix="/backtest-engine")
+    app.include_router(intelligence.router, prefix="/intelligence")
+    app.include_router(agents.router, prefix="/agents")
+    app.include_router(learning.router, prefix="/learning")
+    app.include_router(self_learning.router, prefix="/self-learning")
+    app.include_router(institutional.router, prefix="/institutional")
+    app.include_router(institutional_backtest.router, prefix="/institutional-backtest")
+    app.include_router(security_ai.router, prefix="/security-ai")
+    app.include_router(security_ai_extended.router, prefix="/security-ai-ext")
+    app.include_router(billing.router, prefix="/billing")
+    app.include_router(license.router, prefix="/license")
+    app.include_router(users.router, prefix="/users")
+    app.include_router(admin.router, prefix="/admin")
+    app.include_router(admin_users.router, prefix="/admin")
+    app.include_router(admin_observability.router, prefix="/admin")
+    app.include_router(permissions_routes.router, prefix="/permissions")
+    app.include_router(rate_limit_routes.router, prefix="/rate-limit")
+    app.include_router(trade_history.router, prefix="/trade-history")
+    app.include_router(trade_report.router, prefix="/trade-report")
+    app.include_router(health.router, prefix="/health")
+    app.include_router(websocket_routes.router, prefix="/ws")
+    app.include_router(observability_routes.router)
+
+    try:
+        from backend.api.routes import audit_routes_v21
+
+        app.include_router(audit_routes_v21.router, prefix="/admin/audit")
+    except Exception as exc:
+        logger.warning("[startup] audit_routes_v21 not loaded: %s", exc)
+
+    @app.get("/", tags=["health"])
+    async def root() -> Dict[str, Any]:
+        uptime = round(time.time() - _startup_time, 2)
+        return {
+            "service": "Galaxy Vast AI Trading Platform",
+            "version": "1.0.0",
+            "status": "running",
+            "uptime_seconds": uptime,
+        }
+
+    return app
+
+
+app = _create_app()

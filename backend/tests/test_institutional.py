@@ -1,7 +1,9 @@
 """Smoke tests for institutional modules."""
+
 from __future__ import annotations
 
 import importlib
+
 import pytest
 
 

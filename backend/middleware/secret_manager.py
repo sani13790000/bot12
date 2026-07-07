@@ -3,6 +3,7 @@ Phase 10 — Secret Manager
 Validates all required env vars at startup.
 Never logs secret values — only their presence/absence.
 """
+
 from __future__ import annotations
 
 import os
@@ -26,11 +27,20 @@ class SecretSpec:
 _SECRETS: List[SecretSpec] = [
     SecretSpec("SUPABASE_URL", required=True, min_length=20, description="Supabase project URL"),
     SecretSpec("SUPABASE_ANON_KEY", required=True, min_length=20, description="Supabase anon key"),
-    SecretSpec("SUPABASE_SERVICE_KEY", required=False, min_length=20, description="Supabase service role key"),
+    SecretSpec(
+        "SUPABASE_SERVICE_KEY",
+        required=False,
+        min_length=20,
+        description="Supabase service role key",
+    ),
     SecretSpec("JWT_SECRET", required=True, min_length=32, description="JWT signing secret"),
-    SecretSpec("ALLOWED_ORIGINS", required=False, min_length=5, description="Comma-separated CORS origins"),
+    SecretSpec(
+        "ALLOWED_ORIGINS", required=False, min_length=5, description="Comma-separated CORS origins"
+    ),
     SecretSpec("SENTRY_DSN", required=False, min_length=10, description="Sentry DSN"),
-    SecretSpec("TELEGRAM_BOT_TOKEN", required=False, min_length=20, description="Telegram bot token"),
+    SecretSpec(
+        "TELEGRAM_BOT_TOKEN", required=False, min_length=20, description="Telegram bot token"
+    ),
     SecretSpec("TELEGRAM_ADMIN_CHAT_ID", required=False, min_length=5, description="Admin chat ID"),
     SecretSpec("MT5_LOGIN", required=False, min_length=5, description="MT5 account login"),
     SecretSpec("MT5_PASSWORD", required=False, min_length=4, description="MT5 account password"),

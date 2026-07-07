@@ -14,13 +14,14 @@ Design:
   - No direct imports from intelligence/ package (avoids circular deps)
   - asyncio.to_thread() for all blocking ML calls (TECH-4 fix)
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LearningCycleResult:
     """Result of one complete learning cycle."""
+
     cycle_number: int = 0
     trades_processed: int = 0
     model_retrained: bool = False
@@ -48,6 +50,7 @@ class LearningCycleResult:
 @dataclass
 class LearningStats:
     """Aggregate statistics across all learning cycles."""
+
     total_cycles: int = 0
     successful_cycles: int = 0
     total_trades_processed: int = 0
@@ -148,7 +151,9 @@ class LearningService:
                     break
                 count = self._sample_count()
                 if count < self.MIN_SAMPLES_FOR_LEARN:
-                    logger.debug("LearningService: %d/%d samples -- skip", count, self.MIN_SAMPLES_FOR_LEARN)
+                    logger.debug(
+                        "LearningService: %d/%d samples -- skip", count, self.MIN_SAMPLES_FOR_LEARN
+                    )
                     continue
                 await self._run_cycle(force=self._is_force_retrain_due())
             except asyncio.CancelledError:
@@ -198,7 +203,9 @@ class LearningService:
                         self._stats.last_drift_detected_at = now
                     logger.info(
                         "Model retrained: acc=%.3f f1=%.3f drift=%.3f",
-                        result.training_accuracy, result.training_f1, drift_score,
+                        result.training_accuracy,
+                        result.training_f1,
+                        drift_score,
                     )
                 except Exception as exc:
                     result.errors.append(f"retrain: {exc}")
@@ -271,4 +278,6 @@ class LearningService:
     def _is_force_retrain_due(self) -> bool:
         if self._last_forced_retrain is None:
             return True
-        return (datetime.now(timezone.utc) - self._last_forced_retrain) >= timedelta(hours=self.FORCE_RETRAIN_HOURS)
+        return (datetime.now(timezone.utc) - self._last_forced_retrain) >= timedelta(
+            hours=self.FORCE_RETRAIN_HOURS
+        )

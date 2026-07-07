@@ -4,11 +4,12 @@ Galaxy Vast AI Trading Platform
 Agent 2: Liquidity Agent
 مسئولیت: تحلیل نقدینگی، Sweep، Internal/External Liquidity
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 
 class LiquidityAgent(BaseAgent):
@@ -24,10 +25,10 @@ class LiquidityAgent(BaseAgent):
         super().__init__(name="Liquidity", weight=weight, enabled=enabled)
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 30.0
+        score = 30.0
         confidence = 50.0
-        reasons    = []
-        direction  = context.get("direction", "NEUTRAL")
+        reasons = []
+        direction = context.get("direction", "NEUTRAL")
 
         # Liquidity Sweep
         sweep = context.get("liquidity_sweep", False)
@@ -52,14 +53,14 @@ class LiquidityAgent(BaseAgent):
 
         # موقعیت قیمت: Discount vs Premium
         in_discount = context.get("in_discount_zone", False)
-        in_premium  = context.get("in_premium_zone", False)
+        in_premium = context.get("in_premium_zone", False)
         dir_ok = (direction == "BUY" and in_discount) or (direction == "SELL" and in_premium)
         if dir_ok:
             score += 10.0
             confidence += 10.0
             reasons.append("Price in optimal zone for direction")
 
-        score      = min(score, 100.0)
+        score = min(score, 100.0)
         confidence = min(confidence, 100.0)
 
         return AgentVote(

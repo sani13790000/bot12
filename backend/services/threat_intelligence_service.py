@@ -176,7 +176,10 @@ class _CloudflareProvider:
         try:
             resp = await client.get(
                 self._URL.format(ip=ip),
-                headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {self._key}",
+                    "Content-Type": "application/json",
+                },
                 timeout=TIMEOUT,
             )
             resp.raise_for_status()
@@ -262,9 +265,7 @@ class ThreatIntelligenceService:
         self._stats["misses"] += 1
         try:
             client = await self._get_client()
-            report = await asyncio.wait_for(
-                self._provider.check(ip, client), timeout=TIMEOUT + 1.0
-            )
+            report = await asyncio.wait_for(self._provider.check(ip, client), timeout=TIMEOUT + 1.0)
         except asyncio.TimeoutError:
             self._stats["errors"] += 1
             report = ThreatReport(ip=ip, provider="local", error="timeout")

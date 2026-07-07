@@ -7,6 +7,7 @@ Run:
     cd /home/definable/phase10
     python -m pytest backend/tests/test_phase10_billing.py -v
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,27 +16,39 @@ import json
 import sys
 import time
 import uuid
-from typing import Dict
 
 import pytest
 
 sys.path.insert(0, "/home/definable/phase10")
 
+from backend.billing.engine import (
+    DUNNING_THRESHOLD,
+    PLANS,
+    BillingEngine,
+    Invoice,
+    Subscription,
+    SubscriptionStatus,
+    SubscriptionTransitionError,
+)
 from backend.billing.provider import (
-    Currency, ManualProvider, MockProvider,
-    PaymentRequest, PaymentStatus, ProviderName,
-    StripeProvider, ZarinpalProvider, WebhookEventType,
+    Currency,
+    ManualProvider,
+    MockProvider,
+    PaymentRequest,
+    PaymentStatus,
+    ProviderName,
+    StripeProvider,
+    WebhookEventType,
+    ZarinpalProvider,
     get_provider,
 )
-from backend.billing.engine import (
-    BillingEngine, Invoice, PLANS, Subscription,
-    SubscriptionStatus, SubscriptionTransitionError, DUNNING_THRESHOLD,
-)
 from backend.billing.webhook import (
+    MAX_PAYLOAD_BYTES,
+    TIMESTAMP_TOLERANCE,
+    InvalidSignatureError,
+    PayloadTooLargeError,
+    StaleTimestampError,
     WebhookProcessor,
-    InvalidSignatureError, PayloadTooLargeError,
-    ReplayAttackError, StaleTimestampError,
-    MAX_PAYLOAD_BYTES, TIMESTAMP_TOLERANCE,
 )
 
 
@@ -43,31 +56,40 @@ from backend.billing.webhook import (
 def mock_provider():
     return MockProvider(auto_succeed=True)
 
+
 @pytest.fixture
 def pending_provider():
     return MockProvider(auto_succeed=False)
+
 
 @pytest.fixture
 def engine(mock_provider):
     return BillingEngine(provider=mock_provider)
 
+
 @pytest.fixture
 def pending_engine(pending_provider):
     return BillingEngine(provider=pending_provider)
+
 
 @pytest.fixture
 def uid():
     return f"user_{uuid.uuid4().hex[:8]}"
 
+
 @pytest.fixture
 def webhook_secret():
     return "test-webhook-secret-32bytes-long!!"
 
+
 @pytest.fixture
 def processor(engine, webhook_secret):
     return WebhookProcessor(
-        engine=engine, provider=MockProvider(), webhook_secret=webhook_secret,
+        engine=engine,
+        provider=MockProvider(),
+        webhook_secret=webhook_secret,
     )
+
 
 def _make_signed_payload(data: dict, secret: str):
     payload = json.dumps(data).encode()
@@ -130,7 +152,12 @@ class TestPaymentProviderAbstraction:
 
     def test_mock_parse_webhook_succeeded(self):
         p = MockProvider()
-        data = {"event": "payment.succeeded", "invoice_id": "inv_1", "amount": 2900, "currency": "usd"}
+        data = {
+            "event": "payment.succeeded",
+            "invoice_id": "inv_1",
+            "amount": 2900,
+            "currency": "usd",
+        }
         evt = p.parse_webhook(json.dumps(data).encode())
         assert evt.event_type == WebhookEventType.PAYMENT_SUCCEEDED
         assert evt.invoice_id == "inv_1"
@@ -177,14 +204,14 @@ class TestPlanCatalogue:
         assert "mt5" in PLANS["basic"]["features"]
 
     def test_trial_features_have_signals(self):
-        assert "signals_read"  in PLANS["trial"]["features"]
+        assert "signals_read" in PLANS["trial"]["features"]
         assert "signals_write" in PLANS["trial"]["features"]
 
     def test_price_hierarchy_usd(self):
         assert PLANS["trial"]["price_usd"] < PLANS["basic"]["price_usd"]
         assert PLANS["basic"]["price_usd"] < PLANS["pro"]["price_usd"]
-        assert PLANS["pro"]["price_usd"]   < PLANS["vip"]["price_usd"]
-        assert PLANS["vip"]["price_usd"]   < PLANS["annual"]["price_usd"]
+        assert PLANS["pro"]["price_usd"] < PLANS["vip"]["price_usd"]
+        assert PLANS["vip"]["price_usd"] < PLANS["annual"]["price_usd"]
 
     def test_max_devices_grow(self):
         assert PLANS["trial"]["max_devices"] < PLANS["pro"]["max_devices"]
@@ -230,10 +257,12 @@ class TestBillingEngine:
 
     def test_idempotency_check_before_provider_call(self, uid):
         call_count = [0]
+
         class CountingProvider(MockProvider):
             def create_payment(self, req):
                 call_count[0] += 1
                 return super().create_payment(req)
+
         eng = BillingEngine(provider=CountingProvider())
         eng.checkout(uid, "basic")
         eng.checkout(uid, "basic")
@@ -350,11 +379,19 @@ class TestSubscriptionFSM:
         assert s.transitions[0]["from"] == SubscriptionStatus.ACTIVE
 
     def test_is_active_property(self):
-        for st in (SubscriptionStatus.TRIAL, SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE):
+        for st in (
+            SubscriptionStatus.TRIAL,
+            SubscriptionStatus.ACTIVE,
+            SubscriptionStatus.PAST_DUE,
+        ):
             assert self._sub(st).is_active
 
     def test_not_active_for_terminal(self):
-        for st in (SubscriptionStatus.REVOKED, SubscriptionStatus.CANCELLED, SubscriptionStatus.EXPIRED):
+        for st in (
+            SubscriptionStatus.REVOKED,
+            SubscriptionStatus.CANCELLED,
+            SubscriptionStatus.EXPIRED,
+        ):
             assert not self._sub(st).is_active
 
     def test_is_terminal(self):
@@ -413,9 +450,13 @@ class TestAdminActions:
         eng.admin_confirm(inv.invoice_id)
         assert eng.get_subscription(uid).status == SubscriptionStatus.ACTIVE
         fake_invoice = Invoice(
-            invoice_id="fake_fail", user_id=uid, plan_id="basic",
-            amount=2900, currency=Currency.USD,
-            provider=ProviderName.MOCK, status=PaymentStatus.FAILED,
+            invoice_id="fake_fail",
+            user_id=uid,
+            plan_id="basic",
+            amount=2900,
+            currency=Currency.USD,
+            provider=ProviderName.MOCK,
+            status=PaymentStatus.FAILED,
         )
         eng._invoices["fake_fail"] = fake_invoice
         eng._handle_payment_failure(fake_invoice)
@@ -431,9 +472,13 @@ class TestAdminActions:
         sub.status = SubscriptionStatus.PAST_DUE
         sub.dunning_count = DUNNING_THRESHOLD - 1
         fake_invoice = Invoice(
-            invoice_id="fake_fail2", user_id=uid, plan_id="basic",
-            amount=2900, currency=Currency.USD,
-            provider=ProviderName.MOCK, status=PaymentStatus.FAILED,
+            invoice_id="fake_fail2",
+            user_id=uid,
+            plan_id="basic",
+            amount=2900,
+            currency=Currency.USD,
+            provider=ProviderName.MOCK,
+            status=PaymentStatus.FAILED,
         )
         eng._invoices["fake_fail2"] = fake_invoice
         eng._handle_payment_failure(fake_invoice)
@@ -474,7 +519,13 @@ class TestAdminActions:
 
 class TestWebhookSecurity:
     def _make_payload(self, invoice_id: str, event: str = "payment.succeeded") -> dict:
-        return {"event": event, "invoice_id": invoice_id, "user_id": "user_1", "amount": 2900, "currency": "usd"}
+        return {
+            "event": event,
+            "invoice_id": invoice_id,
+            "user_id": "user_1",
+            "amount": 2900,
+            "currency": "usd",
+        }
 
     def test_valid_webhook_accepted(self, engine, webhook_secret, uid):
         inv = engine.checkout(uid, "basic")
@@ -563,9 +614,13 @@ class TestWebhookSecurity:
         sub = eng.get_subscription(uid)
         assert sub.status == SubscriptionStatus.ACTIVE
         fake_inv = Invoice(
-            invoice_id="fake_wh_fail", user_id=uid, plan_id="basic",
-            amount=2900, currency=Currency.USD,
-            provider=ProviderName.MOCK, status=PaymentStatus.FAILED,
+            invoice_id="fake_wh_fail",
+            user_id=uid,
+            plan_id="basic",
+            amount=2900,
+            currency=Currency.USD,
+            provider=ProviderName.MOCK,
+            status=PaymentStatus.FAILED,
         )
         eng._invoices["fake_wh_fail"] = fake_inv
         eng._handle_payment_failure(fake_inv)
@@ -610,8 +665,13 @@ class TestWebhookSecurity:
     def test_subscription_cancel_webhook(self, engine, webhook_secret, uid):
         engine.checkout(uid, "basic")
         sub = engine.get_subscription(uid)
-        data = {"event": "subscription.cancelled", "invoice_id": "inv_cancel",
-                "user_id": uid, "amount": 0, "currency": "usd"}
+        data = {
+            "event": "subscription.cancelled",
+            "invoice_id": "inv_cancel",
+            "user_id": uid,
+            "amount": 0,
+            "currency": "usd",
+        }
         payload, sig = _make_signed_payload(data, webhook_secret)
         proc = WebhookProcessor(engine, MockProvider(), webhook_secret)
         proc.process(payload, sig, event_id="evt_cancel")
@@ -660,15 +720,20 @@ class TestIntegration:
 
     def test_concurrent_idempotency_race(self):
         import threading
+
         uid = f"u_race_{uuid.uuid4().hex[:6]}"
         eng = BillingEngine(provider=MockProvider(auto_succeed=True))
         results = []
+
         def do_checkout():
             inv = eng.checkout(uid, "basic")
             results.append(inv.invoice_id)
+
         threads = [threading.Thread(target=do_checkout) for _ in range(5)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert len(set(results)) == 1
 
     def test_re_subscribe_after_cancelled(self, uid):
@@ -698,7 +763,8 @@ class TestIntegration:
     def test_stripe_parse_succeeded_event(self):
         p = StripeProvider(api_key="sk_test", webhook_secret="secret")
         data = {
-            "type": "checkout.session.completed", "id": "cs_test_123",
+            "type": "checkout.session.completed",
+            "id": "cs_test_123",
             "data": {"object": {"id": "cs_test_123", "amount_total": 2900, "currency": "usd"}},
         }
         evt = p.parse_webhook(json.dumps(data).encode())
@@ -724,9 +790,9 @@ class TestIntegration:
         assert r2.status == PaymentStatus.FAILED
 
     def test_get_provider_factory_all(self):
-        mock     = get_provider(ProviderName.MOCK,     {"auto_succeed": False})
-        manual   = get_provider(ProviderName.MANUAL,   {})
-        stripe   = get_provider(ProviderName.STRIPE,   {"api_key": "sk_test", "webhook_secret": "wh"})
+        mock = get_provider(ProviderName.MOCK, {"auto_succeed": False})
+        manual = get_provider(ProviderName.MANUAL, {})
+        stripe = get_provider(ProviderName.STRIPE, {"api_key": "sk_test", "webhook_secret": "wh"})
         zarinpal = get_provider(ProviderName.ZARINPAL, {"merchant_id": "m", "webhook_secret": "s"})
         assert isinstance(mock, MockProvider)
         assert isinstance(manual, ManualProvider)

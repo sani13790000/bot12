@@ -1,9 +1,10 @@
 """Institutional Performance Metrics — all standard quant finance KPIs."""
 
 from __future__ import annotations
+
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 
 @dataclass
@@ -12,7 +13,7 @@ class PerformanceReport:
     total_trades: int
     winning_trades: int
     losing_trades: int
-    win_rate: float           # %
+    win_rate: float  # %
     profit_factor: float
     total_net_profit: float
     total_gross_profit: float
@@ -44,7 +45,7 @@ class PerformanceReport:
     total_return_pct: float
     cagr_pct: float
     equity_curve: List[Tuple[float, float]]  # (timestamp, equity)
-    monthly_returns: Dict[str, float]        # {"2024-01": 3.2, ...}
+    monthly_returns: Dict[str, float]  # {"2024-01": 3.2, ...}
 
 
 class PerformanceMetrics:
@@ -77,7 +78,7 @@ class PerformanceMetrics:
 
         # Equity-based drawdown
         max_dd_usd, max_dd_pct = PerformanceMetrics._max_drawdown(equity_curve, initial_balance)
-        peak = max(e for _, e in equity_curve) if equity_curve else initial_balance
+        max(e for _, e in equity_curve) if equity_curve else initial_balance
 
         # Returns series
         returns = [p / initial_balance for p in pnls]
@@ -91,7 +92,11 @@ class PerformanceMetrics:
 
         total_return_pct = (total_net / initial_balance) * 100
         n_years = len(trades) / periods_per_year if periods_per_year > 0 else 1
-        cagr = ((initial_balance + total_net) / initial_balance) ** (1 / n_years) - 1 if n_years > 0 else 0
+        cagr = (
+            ((initial_balance + total_net) / initial_balance) ** (1 / n_years) - 1
+            if n_years > 0
+            else 0
+        )
         calmar = (cagr * 100) / max_dd_pct if max_dd_pct > 0 else 0
         recovery = total_net / max_dd_usd if max_dd_usd > 0 else 0
         ulcer = PerformanceMetrics._ulcer_index(equity_curve)
@@ -162,7 +167,9 @@ class PerformanceMetrics:
         return math.sqrt(variance)
 
     @staticmethod
-    def _max_drawdown(equity_curve: List[Tuple[float, float]], initial: float) -> Tuple[float, float]:
+    def _max_drawdown(
+        equity_curve: List[Tuple[float, float]], initial: float
+    ) -> Tuple[float, float]:
         if not equity_curve:
             return 0.0, 0.0
         peak = initial
@@ -188,7 +195,7 @@ class PerformanceMetrics:
             if e > peak:
                 peak = e
             dd_pct = (peak - e) / peak * 100 if peak > 0 else 0
-            drawdowns_sq.append(dd_pct ** 2)
+            drawdowns_sq.append(dd_pct**2)
         return math.sqrt(sum(drawdowns_sq) / len(drawdowns_sq))
 
     @staticmethod
@@ -230,6 +237,7 @@ class PerformanceMetrics:
     @staticmethod
     def _monthly_returns(trades: List[Dict]) -> Dict[str, float]:
         import datetime
+
         monthly: Dict[str, float] = {}
         for t in trades:
             if "close_time" not in t or not t["close_time"]:
@@ -245,16 +253,35 @@ class PerformanceMetrics:
     @staticmethod
     def _empty(initial_balance: float) -> PerformanceReport:
         return PerformanceReport(
-            total_trades=0, winning_trades=0, losing_trades=0,
-            win_rate=0.0, profit_factor=0.0, total_net_profit=0.0,
-            total_gross_profit=0.0, total_gross_loss=0.0,
-            sharpe_ratio=0.0, sortino_ratio=0.0, calmar_ratio=0.0,
-            max_drawdown_pct=0.0, max_drawdown_usd=0.0,
-            recovery_factor=0.0, ulcer_index=0.0,
-            avg_win_usd=0.0, avg_loss_usd=0.0, avg_trade_usd=0.0,
-            expectancy_usd=0.0, avg_risk_reward=0.0,
-            avg_trade_duration_bars=0.0, longest_win_streak=0, longest_loss_streak=0,
-            skewness=0.0, kurtosis=0.0,
-            initial_balance=initial_balance, final_balance=initial_balance,
-            total_return_pct=0.0, cagr_pct=0.0, equity_curve=[], monthly_returns={},
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            profit_factor=0.0,
+            total_net_profit=0.0,
+            total_gross_profit=0.0,
+            total_gross_loss=0.0,
+            sharpe_ratio=0.0,
+            sortino_ratio=0.0,
+            calmar_ratio=0.0,
+            max_drawdown_pct=0.0,
+            max_drawdown_usd=0.0,
+            recovery_factor=0.0,
+            ulcer_index=0.0,
+            avg_win_usd=0.0,
+            avg_loss_usd=0.0,
+            avg_trade_usd=0.0,
+            expectancy_usd=0.0,
+            avg_risk_reward=0.0,
+            avg_trade_duration_bars=0.0,
+            longest_win_streak=0,
+            longest_loss_streak=0,
+            skewness=0.0,
+            kurtosis=0.0,
+            initial_balance=initial_balance,
+            final_balance=initial_balance,
+            total_return_pct=0.0,
+            cagr_pct=0.0,
+            equity_curve=[],
+            monthly_returns={},
         )

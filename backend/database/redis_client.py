@@ -7,6 +7,7 @@ FIXES APPLIED:
   BUG-R4-7: _build_redis_url() now uses REDIS_URL_WITH_AUTH (password injected)
              instead of bare REDIS_URL — fixes NOAUTH error
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,6 +25,7 @@ def _build_redis_url() -> str:
     """
     try:
         from backend.core.config import get_settings
+
         s = get_settings()
         # BUG-R4-7 FIX: REDIS_URL_WITH_AUTH injects password automatically
         url = getattr(s, "REDIS_URL_WITH_AUTH", None)
@@ -48,6 +50,7 @@ async def get_redis():
 
     try:
         import redis.asyncio as aioredis
+
         url = _build_redis_url()
         client = aioredis.from_url(
             url,

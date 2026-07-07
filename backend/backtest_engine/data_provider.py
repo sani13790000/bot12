@@ -12,7 +12,6 @@ Supports:
 from __future__ import annotations
 
 import csv
-import math
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -22,22 +21,23 @@ from typing import Dict, List, Optional
 
 
 class Timeframe(str, Enum):
-    M1  = "M1"
-    M5  = "M5"
+    M1 = "M1"
+    M5 = "M5"
     M15 = "M15"
-    H1  = "H1"
-    H4  = "H4"
-    D1  = "D1"
+    H1 = "H1"
+    H4 = "H4"
+    D1 = "D1"
 
 
 @dataclass
 class CandleBar:
     """Single OHLCV candle bar."""
-    time:   datetime
-    open:   float
-    high:   float
-    low:    float
-    close:  float
+
+    time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
     volume: float = 0.0
     spread: float = 2.0  # in points
 
@@ -63,11 +63,11 @@ class CandleBar:
 
     def to_dict(self) -> dict:
         return {
-            "time":   self.time.isoformat(),
-            "open":   self.open,
-            "high":   self.high,
-            "low":    self.low,
-            "close":  self.close,
+            "time": self.time.isoformat(),
+            "open": self.open,
+            "high": self.high,
+            "low": self.low,
+            "close": self.close,
             "volume": self.volume,
             "spread": self.spread,
         }
@@ -76,9 +76,10 @@ class CandleBar:
 @dataclass
 class DataSet:
     """Typed dataset for one symbol + timeframe."""
-    symbol:    str
+
+    symbol: str
     timeframe: Timeframe
-    candles:   List[CandleBar] = field(default_factory=list)
+    candles: List[CandleBar] = field(default_factory=list)
 
     def slice(self, start: datetime, end: datetime) -> List[CandleBar]:
         return [c for c in self.candles if start <= c.time <= end]
@@ -88,7 +89,7 @@ class DataSet:
         if index < 0:
             index = len(self.candles) + index
         start = max(0, index - period)
-        bars = self.candles[start:index + 1]
+        bars = self.candles[start : index + 1]
         if len(bars) < 2:
             return 0.0
         trs = []
@@ -130,15 +131,17 @@ class CandleDataProvider:
         with open(path, newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                candles.append(CandleBar(
-                    time=datetime.fromisoformat(row["time"]),
-                    open=float(row["open"]),
-                    high=float(row["high"]),
-                    low=float(row["low"]),
-                    close=float(row["close"]),
-                    volume=float(row.get("volume", 0)),
-                    spread=float(row.get("spread", 2.0)),
-                ))
+                candles.append(
+                    CandleBar(
+                        time=datetime.fromisoformat(row["time"]),
+                        open=float(row["open"]),
+                        high=float(row["high"]),
+                        low=float(row["low"]),
+                        close=float(row["close"]),
+                        volume=float(row.get("volume", 0)),
+                        spread=float(row.get("spread", 2.0)),
+                    )
+                )
         self.register(symbol, timeframe, sorted(candles, key=lambda c: c.time))
         return len(candles)
 
@@ -166,8 +169,16 @@ class CandleDataProvider:
             hi = max(o, c) * (1 + abs(random.gauss(0, volatility * 0.5)))
             lo = min(o, c) * (1 - abs(random.gauss(0, volatility * 0.5)))
             vol = abs(random.gauss(1000, 300))
-            candles.append(CandleBar(time=t, open=round(o,5), high=round(hi,5),
-                                     low=round(lo,5), close=round(c,5), volume=round(vol,1)))
+            candles.append(
+                CandleBar(
+                    time=t,
+                    open=round(o, 5),
+                    high=round(hi, 5),
+                    low=round(lo, 5),
+                    close=round(c, 5),
+                    volume=round(vol, 1),
+                )
+            )
             price = c
             t += step
 

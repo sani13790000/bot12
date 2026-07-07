@@ -9,6 +9,7 @@ Checks:
   - Risk limits within bounds
   - No open circuit breakers
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -23,8 +24,9 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GateResult:
     """Result of a single acceptance gate check."""
-    name:    str
-    passed:  bool
+
+    name: str
+    passed: bool
     message: str = ""
     details: Dict[str, Any] = field(default_factory=dict)
 
@@ -32,31 +34,34 @@ class GateResult:
 @dataclass
 class AcceptanceReport:
     """Aggregated final acceptance report."""
-    timestamp:  str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    gates:      List[GateResult] = field(default_factory=list)
-    passed:     bool = False
-    blocker:    Optional[str] = None
+
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    gates: List[GateResult] = field(default_factory=list)
+    passed: bool = False
+    blocker: Optional[str] = None
 
     @property
-    def total(self)  -> int: return len(self.gates)
+    def total(self) -> int:
+        return len(self.gates)
+
     @property
-    def passed_count(self) -> int: return sum(1 for g in self.gates if g.passed)
+    def passed_count(self) -> int:
+        return sum(1 for g in self.gates if g.passed)
+
     @property
-    def failed_count(self) -> int: return sum(1 for g in self.gates if not g.passed)
+    def failed_count(self) -> int:
+        return sum(1 for g in self.gates if not g.passed)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "timestamp":    self.timestamp,
-            "passed":       self.passed,
-            "blocker":      self.blocker,
-            "total":        self.total,
+            "timestamp": self.timestamp,
+            "passed": self.passed,
+            "blocker": self.blocker,
+            "total": self.total,
             "passed_count": self.passed_count,
             "failed_count": self.failed_count,
-            "gates":        [
-                {"name": g.name, "passed": g.passed, "message": g.message}
-                for g in self.gates
+            "gates": [
+                {"name": g.name, "passed": g.passed, "message": g.message} for g in self.gates
             ],
         }
 
@@ -69,13 +74,13 @@ class FinalAcceptanceEngine:
 
     def __init__(
         self,
-        db:              Any = None,
+        db: Any = None,
         license_service: Any = None,
-        risk_manager:    Any = None,
+        risk_manager: Any = None,
     ) -> None:
-        self._db      = db
+        self._db = db
         self._license = license_service
-        self._risk    = risk_manager
+        self._risk = risk_manager
 
     async def run(self) -> AcceptanceReport:
         """Run all acceptance gates and return report."""
@@ -92,21 +97,24 @@ class FinalAcceptanceEngine:
         results = await asyncio.gather(*gates, return_exceptions=True)
         for result in results:
             if isinstance(result, BaseException):
-                report.gates.append(GateResult(
-                    name="unexpected_error",
-                    passed=False,
-                    message=str(result),
-                ))
+                report.gates.append(
+                    GateResult(
+                        name="unexpected_error",
+                        passed=False,
+                        message=str(result),
+                    )
+                )
             else:
                 report.gates.append(result)
 
         failed = [g for g in report.gates if not g.passed]
-        report.passed  = len(failed) == 0
+        report.passed = len(failed) == 0
         report.blocker = failed[0].name if failed else None
 
         logger.info(
             "[FinalAcceptance] %d/%d gates passed",
-            report.passed_count, report.total,
+            report.passed_count,
+            report.total,
         )
         return report
 

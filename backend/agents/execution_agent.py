@@ -4,11 +4,12 @@ Galaxy Vast AI Trading Platform
 Agent 7: Execution Agent
 مسئولیت: کیفیت اجرا، سشن، slippage، liquidity کافی
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 
 class ExecutionAgent(BaseAgent):
@@ -27,16 +28,17 @@ class ExecutionAgent(BaseAgent):
         super().__init__(name="Execution", weight=weight, enabled=enabled)
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 50.0
+        score = 50.0
         confidence = 60.0
-        reasons    = []
+        reasons = []
 
         # Mode Check
         trading_mode = context.get("trading_mode", "SIGNAL_ONLY")
         if trading_mode == "SIGNAL_ONLY":
             # در این mode execution بررسی نمی‌شود
             return AgentVote(
-                score=75.0, confidence=50.0,
+                score=75.0,
+                confidence=50.0,
                 direction=context.get("direction", "NEUTRAL"),
                 status=AgentStatus.OK,
                 reason="Signal-only mode: execution check skipped",
@@ -52,7 +54,7 @@ class ExecutionAgent(BaseAgent):
             reasons.append(f"Optimal session: {session} (q={session_quality:.2f})")
         elif session == "ASIAN":
             score += 10.0 * session_quality
-            reasons.append(f"Asian session (lower liquidity)")
+            reasons.append("Asian session (lower liquidity)")
         else:
             score += 5.0
             reasons.append(f"Off-session: {session}")
@@ -77,7 +79,7 @@ class ExecutionAgent(BaseAgent):
         market_depth = float(context.get("market_depth_score", 0.7))
         score += market_depth * 10.0
 
-        score      = max(0.0, min(100.0, score))
+        score = max(0.0, min(100.0, score))
         confidence = max(0.0, min(100.0, confidence))
 
         return AgentVote(

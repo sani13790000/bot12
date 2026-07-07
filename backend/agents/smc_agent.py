@@ -4,11 +4,12 @@ Galaxy Vast AI Trading Platform
 Agent 3: SMC Agent
 مسئولیت: Order Block، FVG، Breaker Block، Mitigation
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 
 class SMCAgent(BaseAgent):
@@ -25,15 +26,15 @@ class SMCAgent(BaseAgent):
         super().__init__(name="SMC", weight=weight, enabled=enabled)
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 20.0
+        score = 20.0
         confidence = 50.0
-        reasons    = []
+        reasons = []
         confluence = 0
 
         # Order Block
         ob_present = context.get("order_block_present", False)
         ob_quality = float(context.get("order_block_quality", 0.0))
-        ob_tested  = context.get("order_block_tested", False)
+        ob_tested = context.get("order_block_tested", False)
         if ob_present:
             score += 25.0 * ob_quality
             confluence += 1
@@ -52,7 +53,7 @@ class SMCAgent(BaseAgent):
         # FVG
         fvg_present = context.get("fvg_present", False)
         fvg_quality = float(context.get("fvg_quality", 0.0))
-        ifvg        = context.get("ifvg_present", False)
+        ifvg = context.get("ifvg_present", False)
         if fvg_present:
             score += 15.0 * fvg_quality
             confluence += 1
@@ -79,7 +80,7 @@ class SMCAgent(BaseAgent):
             score += 5.0
             confidence += 8.0
 
-        score      = min(score, 100.0)
+        score = min(score, 100.0)
         confidence = min(confidence, 100.0)
 
         return AgentVote(
@@ -89,8 +90,10 @@ class SMCAgent(BaseAgent):
             status=AgentStatus.OK,
             reason=" | ".join(reasons) if reasons else "No SMC signal",
             metadata={
-                "ob_present": ob_present, "fvg": fvg_present,
-                "breaker": breaker, "confluence": confluence,
+                "ob_present": ob_present,
+                "fvg": fvg_present,
+                "breaker": breaker,
+                "confluence": confluence,
                 "kill_zone": in_kill_zone,
             },
         )

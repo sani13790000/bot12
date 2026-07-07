@@ -8,6 +8,7 @@ P5-SR-2: Invalid rules are rejected with a clear error message.
 P5-SR-3: Rules are cached in-memory with a TTL.
 P5-SR-4: Hot-reload triggered by DB notification or config change.
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,18 +18,19 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL = 300.0   # 5 minutes
+_CACHE_TTL = 300.0  # 5 minutes
 
 
 @dataclass
 class SecurityRule:
     """A single security rule definition."""
-    rule_id:     str
-    name:        str
-    rule_type:   str       # "rate_limit" | "ip_block" | "pattern" | "threshold"
-    enabled:     bool = True
-    params:      Dict[str, Any] = field(default_factory=dict)
-    severity:    str = "medium"   # "low" | "medium" | "high" | "critical"
+
+    rule_id: str
+    name: str
+    rule_type: str  # "rate_limit" | "ip_block" | "pattern" | "threshold"
+    enabled: bool = True
+    params: Dict[str, Any] = field(default_factory=dict)
+    severity: str = "medium"  # "low" | "medium" | "high" | "critical"
     description: str = ""
 
     def validate(self) -> None:
@@ -47,8 +49,8 @@ class SecurityRulesLoader:
     """
 
     def __init__(self, db: Any = None) -> None:
-        self._db             = db
-        self._rules:  List[SecurityRule] = []
+        self._db = db
+        self._rules: List[SecurityRule] = []
         self._loaded_at: float = 0.0
 
     # ------------------------------------------------------------------ #
@@ -90,18 +92,18 @@ class SecurityRulesLoader:
         try:
             rows = await self._db.select("security_rules", {"enabled": True})
             rules = []
-            for row in (rows or []):
+            for row in rows or []:
                 try:
                     rule = SecurityRule(
-                        rule_id     = row["id"],
-                        name        = row.get("name", ""),
-                        rule_type   = row.get("rule_type", ""),
-                        enabled     = row.get("enabled", True),
-                        params      = row.get("params", {}),
-                        severity    = row.get("severity", "medium"),
-                        description = row.get("description", ""),
+                        rule_id=row["id"],
+                        name=row.get("name", ""),
+                        rule_type=row.get("rule_type", ""),
+                        enabled=row.get("enabled", True),
+                        params=row.get("params", {}),
+                        severity=row.get("severity", "medium"),
+                        description=row.get("description", ""),
                     )
-                    rule.validate()    # P5-SR-2
+                    rule.validate()  # P5-SR-2
                     rules.append(rule)
                 except (ValueError, KeyError) as exc:
                     logger.error("[SecurityRulesLoader] invalid rule %s: %s", row.get("id"), exc)

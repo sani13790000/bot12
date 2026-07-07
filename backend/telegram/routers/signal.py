@@ -1,4 +1,5 @@
 """Signal handler — fetches from API, never accepts signal data from user."""
+
 from __future__ import annotations
 
 import httpx
@@ -15,9 +16,19 @@ router = Router(name="signal")
 
 # Allowed symbols whitelist — prevents SSRF via user-supplied symbol
 _ALLOWED_SYMBOLS = {
-    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-    "AUDUSD", "NZDUSD", "USDCAD", "BTCUSD", "ETHUSD",
-    "US30", "NAS100", "SPX500",
+    "XAUUSD",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "AUDUSD",
+    "NZDUSD",
+    "USDCAD",
+    "BTCUSD",
+    "ETHUSD",
+    "US30",
+    "NAS100",
+    "SPX500",
 }
 
 _API_BASE = getattr(settings, "API_BASE_URL", "http://api:8000")
@@ -35,7 +46,9 @@ def _format_signal(data: dict) -> str:
     tp2 = data.get("take_profit_2", 0)
     rr = data.get("risk_reward", 0)
 
-    emoji = "\U0001f7e2" if direction == "BUY" else "\U0001f534" if direction == "SELL" else "\u26aa"
+    emoji = (
+        "\U0001f7e2" if direction == "BUY" else "\U0001f534" if direction == "SELL" else "\u26aa"
+    )
 
     return (
         f"{emoji} *{symbol} {direction}*\n"
@@ -55,7 +68,7 @@ async def cmd_signal(message: Message, **kwargs) -> None:
     parts = (message.text or "").split(maxsplit=1)
     symbol = "XAUUSD"
     if len(parts) > 1:
-        candidate = parts[1].strip().upper()[:10]   # length-cap
+        candidate = parts[1].strip().upper()[:10]  # length-cap
         if candidate in _ALLOWED_SYMBOLS:
             symbol = candidate
         else:

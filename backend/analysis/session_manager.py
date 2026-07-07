@@ -8,70 +8,74 @@ CHANGES vs previous version:
   P5-SM-4: FX weekend detection fix (closes Fri 22:00, opens Sun 22:00 UTC)
   P5-SM-5: replace(tzinfo) → ensure_utc() from timezone_utils
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone, time
+from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 from core.timezone_utils import (
-    UTC,
-    ensure_utc,
-    now as tz_now,
-    session_open_utc,
-    is_dst_active,
     broker_time_to_utc,
+    ensure_utc,
+    is_dst_active,
+)
+from core.timezone_utils import (
+    now as tz_now,
 )
 
 logger = logging.getLogger("analysis.session_manager")
 
 
 class SessionType(str, Enum):
-    SYDNEY        = "sydney"
-    TOKYO         = "tokyo"
-    LONDON        = "london"
-    NEW_YORK      = "new_york"
+    SYDNEY = "sydney"
+    TOKYO = "tokyo"
+    LONDON = "london"
+    NEW_YORK = "new_york"
     OVERLAP_LN_NY = "overlap_ln_ny"
-    CLOSED        = "closed"
-    WEEKEND       = "weekend"
+    CLOSED = "closed"
+    WEEKEND = "weekend"
 
 
 _TRADEABLE = {
-    SessionType.LONDON, SessionType.NEW_YORK,
-    SessionType.OVERLAP_LN_NY, SessionType.TOKYO, SessionType.SYDNEY,
+    SessionType.LONDON,
+    SessionType.NEW_YORK,
+    SessionType.OVERLAP_LN_NY,
+    SessionType.TOKYO,
+    SessionType.SYDNEY,
 }
 
 _SESSION_SCORE: Dict[SessionType, float] = {
     SessionType.OVERLAP_LN_NY: 1.0,
-    SessionType.LONDON:        0.9,
-    SessionType.NEW_YORK:      0.85,
-    SessionType.TOKYO:         0.7,
-    SessionType.SYDNEY:        0.6,
-    SessionType.CLOSED:        0.0,
-    SessionType.WEEKEND:       0.0,
+    SessionType.LONDON: 0.9,
+    SessionType.NEW_YORK: 0.85,
+    SessionType.TOKYO: 0.7,
+    SessionType.SYDNEY: 0.6,
+    SessionType.CLOSED: 0.0,
+    SessionType.WEEKEND: 0.0,
 }
 
 # DST-aware session zones
 _SESSION_ZONES = {
-    "london":   ZoneInfo("Europe/London"),
+    "london": ZoneInfo("Europe/London"),
     "new_york": ZoneInfo("America/New_York"),
-    "tokyo":    ZoneInfo("Asia/Tokyo"),
-    "sydney":   ZoneInfo("Australia/Sydney"),
+    "tokyo": ZoneInfo("Asia/Tokyo"),
+    "sydney": ZoneInfo("Australia/Sydney"),
 }
 
 
 @dataclass(frozen=True)
 class SessionInfo:
-    session:         SessionType
-    is_tradeable:    bool
-    score:           float
-    utc_hour:        int
-    is_weekend:      bool
-    dst_active:      bool = False   # P5-SM-1: DST info
-    broker_offset_h: int  = 0      # P5-SM-2: broker UTC offset
+    session: SessionType
+    is_tradeable: bool
+    score: float
+    utc_hour: int
+    is_weekend: bool
+    dst_active: bool = False  # P5-SM-1: DST info
+    broker_offset_h: int = 0  # P5-SM-2: broker UTC offset
 
 
 def _in_range_utc(utc_dt: datetime, zone: str, oh: int, om: int, ch: int, cm: int) -> bool:
@@ -83,7 +87,7 @@ def _in_range_utc(utc_dt: datetime, zone: str, oh: int, om: int, ch: int, cm: in
     local = utc_dt.astimezone(tz)
     t = local.hour * 60 + local.minute
     start = oh * 60 + om
-    end   = ch * 60 + cm
+    end = ch * 60 + cm
     if end > start:
         return start <= t < end
     # wraps midnight
@@ -120,7 +124,7 @@ class SessionManager:
         # P5-SM-4: Correct FX weekend detection
         weekday = dt.weekday()  # 0=Mon, 5=Sat, 6=Sun
         utc_hour = dt.hour
-        if weekday == 5:   # Saturday — always closed
+        if weekday == 5:  # Saturday — always closed
             return self._make(SessionType.WEEKEND, dt, broker_tz, True)
         if weekday == 6 and utc_hour < 22:  # Sunday before 22:00
             return self._make(SessionType.WEEKEND, dt, broker_tz, True)
@@ -128,9 +132,9 @@ class SessionManager:
             return self._make(SessionType.WEEKEND, dt, broker_tz, True)
 
         # P5-SM-1: DST-aware session detection using local clocks
-        ln_open  = _in_range_utc(dt, "Europe/London",    8, 0, 17, 0)
-        ny_open  = _in_range_utc(dt, "America/New_York", 8, 0, 17, 0)
-        tok_open = _in_range_utc(dt, "Asia/Tokyo",       9, 0, 18, 0)
+        ln_open = _in_range_utc(dt, "Europe/London", 8, 0, 17, 0)
+        ny_open = _in_range_utc(dt, "America/New_York", 8, 0, 17, 0)
+        tok_open = _in_range_utc(dt, "Asia/Tokyo", 9, 0, 18, 0)
         syd_open = _in_range_utc(dt, "Australia/Sydney", 8, 0, 17, 0)
 
         if ln_open and ny_open:
@@ -155,8 +159,10 @@ class SessionManager:
         broker_tz: str,
         is_weekend: bool,
     ) -> SessionInfo:
-        from core.timezone_utils import _BROKER_ZONES
         from zoneinfo import ZoneInfo
+
+        from core.timezone_utils import _BROKER_ZONES
+
         try:
             btz = ZoneInfo(_BROKER_ZONES.get(broker_tz.upper(), broker_tz))
             broker_offset_h = int(dt.astimezone(btz).utcoffset().total_seconds() / 3600)

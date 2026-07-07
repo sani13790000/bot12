@@ -10,31 +10,42 @@ Bugs fixed:
   P5-BUG-3: session_manager used local time instead of UTC
   P5-BUG-4: weekend detection off-by-one for Sunday
 """
+
 from __future__ import annotations
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'core'))
+import os
+import sys
 
-import pytest
-from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
+
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from timezone_utils import (
-    utcnow, ensure_utc, broker_time_to_utc, to_broker_time,
-    utc_date, next_midnight_utc, next_monday_midnight_utc,
-    next_month_start_utc, session_open_utc, is_dst_active,
-    dst_transition_warning, get_clock, set_clock, reset_clock,
-)
+import pytest
 from session_manager import SessionManager
-
+from timezone_utils import (
+    broker_time_to_utc,
+    dst_transition_warning,
+    ensure_utc,
+    get_clock,
+    is_dst_active,
+    next_midnight_utc,
+    next_monday_midnight_utc,
+    next_month_start_utc,
+    reset_clock,
+    session_open_utc,
+    set_clock,
+    to_broker_time,
+    utc_date,
+    utcnow,
+)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # T01-T12  timezone_utils core helpers
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestTimezoneUtilsCore:
 
+class TestTimezoneUtilsCore:
     def test_T01_utcnow_returns_aware(self):
         now = utcnow()
         assert now.tzinfo is not None
@@ -51,7 +62,7 @@ class TestTimezoneUtilsCore:
         assert result == dt
 
     def test_T04_ensure_utc_converts_tz(self):
-        eet = ZoneInfo('Europe/Helsinki')
+        eet = ZoneInfo("Europe/Helsinki")
         dt = datetime(2024, 6, 15, 12, 0, 0, tzinfo=eet)  # UTC+3 in summer
         result = ensure_utc(dt)
         assert result.tzinfo == timezone.utc
@@ -61,6 +72,7 @@ class TestTimezoneUtilsCore:
         dt = datetime(2024, 3, 15, 10, 30, tzinfo=timezone.utc)
         d = utc_date(dt)
         import datetime as dt_module
+
         assert isinstance(d, dt_module.date)
         assert d.month == 3 and d.day == 15
 
@@ -112,145 +124,145 @@ class TestTimezoneUtilsCore:
 # T13-T24  broker_time conversion
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestBrokerTimeConversion:
 
+class TestBrokerTimeConversion:
     def test_T13_broker_to_utc_winter_eet(self):
         # EET = UTC+2 in winter
         broker_dt = datetime(2024, 1, 15, 12, 0, 0)  # naive EET
-        utc_dt = broker_time_to_utc(broker_dt, 'EET')
+        utc_dt = broker_time_to_utc(broker_dt, "EET")
         assert utc_dt.hour == 10
         assert utc_dt.tzinfo == timezone.utc
 
     def test_T14_broker_to_utc_summer_eest(self):
         # EEST = UTC+3 in summer
         broker_dt = datetime(2024, 7, 15, 12, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'EET')  # EET auto-adjusts to EEST
+        utc_dt = broker_time_to_utc(broker_dt, "EET")  # EET auto-adjusts to EEST
         assert utc_dt.hour == 9
 
     def test_T15_broker_to_utc_gmt(self):
         broker_dt = datetime(2024, 1, 15, 10, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'GMT')
+        utc_dt = broker_time_to_utc(broker_dt, "GMT")
         assert utc_dt.hour == 10  # GMT = UTC+0
 
     def test_T16_broker_to_utc_gmt_plus2(self):
         broker_dt = datetime(2024, 1, 15, 12, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'GMT+2')
+        utc_dt = broker_time_to_utc(broker_dt, "GMT+2")
         assert utc_dt.hour == 10
 
     def test_T17_broker_to_utc_gmt_minus5(self):
         broker_dt = datetime(2024, 1, 15, 10, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'GMT-5')
+        utc_dt = broker_time_to_utc(broker_dt, "GMT-5")
         assert utc_dt.hour == 15
 
     def test_T18_to_broker_time_winter(self):
         utc_dt = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
-        broker = to_broker_time(utc_dt, 'EET')
+        broker = to_broker_time(utc_dt, "EET")
         assert broker.hour == 12
 
     def test_T19_to_broker_time_summer(self):
         utc_dt = datetime(2024, 7, 15, 9, 0, tzinfo=timezone.utc)
-        broker = to_broker_time(utc_dt, 'EET')
+        broker = to_broker_time(utc_dt, "EET")
         assert broker.hour == 12
 
     def test_T20_roundtrip_broker_utc_broker(self):
         original = datetime(2024, 3, 15, 14, 30, 0)
-        utc = broker_time_to_utc(original, 'EET')
-        back = to_broker_time(utc, 'EET')
+        utc = broker_time_to_utc(original, "EET")
+        back = to_broker_time(utc, "EET")
         assert back.hour == original.hour
         assert back.minute == original.minute
 
     def test_T21_midnight_boundary_winter(self):
         broker_dt = datetime(2024, 1, 16, 0, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'EET')
+        utc_dt = broker_time_to_utc(broker_dt, "EET")
         assert utc_dt.hour == 22
         assert utc_dt.day == 15
 
     def test_T22_midnight_boundary_summer(self):
         broker_dt = datetime(2024, 7, 16, 0, 0, 0)
-        utc_dt = broker_time_to_utc(broker_dt, 'EET')
+        utc_dt = broker_time_to_utc(broker_dt, "EET")
         assert utc_dt.hour == 21
         assert utc_dt.day == 15
 
     def test_T23_utc_broker_utc_preserves_date(self):
         utc_dt = datetime(2024, 6, 15, 23, 0, tzinfo=timezone.utc)
-        broker = to_broker_time(utc_dt, 'EET')  # +3 = 02:00 June 16
-        back = broker_time_to_utc(broker, 'EET')
+        broker = to_broker_time(utc_dt, "EET")  # +3 = 02:00 June 16
+        back = broker_time_to_utc(broker, "EET")
         assert back.hour == 23
         assert back.day == 15
 
     def test_T24_unknown_tz_raises(self):
         broker_dt = datetime(2024, 1, 15, 10, 0, 0)
         with pytest.raises((ValueError, KeyError)):
-            broker_time_to_utc(broker_dt, 'INVALID_TZ')
+            broker_time_to_utc(broker_dt, "INVALID_TZ")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # T25-T36  DST detection & transition warnings
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestDSTDetection:
 
+class TestDSTDetection:
     def test_T25_winter_not_dst(self):
         dt = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
-        assert not is_dst_active(dt, 'EET')
+        assert not is_dst_active(dt, "EET")
 
     def test_T26_summer_is_dst(self):
         dt = datetime(2024, 7, 15, 10, 0, tzinfo=timezone.utc)
-        assert is_dst_active(dt, 'EET')
+        assert is_dst_active(dt, "EET")
 
     def test_T27_dst_spring_forward_transition(self):
         # Last Sunday of March 2024 = March 31
         before = datetime(2024, 3, 30, 12, 0, tzinfo=timezone.utc)
         after = datetime(2024, 4, 1, 12, 0, tzinfo=timezone.utc)
-        assert not is_dst_active(before, 'EET')
-        assert is_dst_active(after, 'EET')
+        assert not is_dst_active(before, "EET")
+        assert is_dst_active(after, "EET")
 
     def test_T28_dst_fall_back_transition(self):
         # Last Sunday of October 2024 = October 27
         before = datetime(2024, 10, 26, 12, 0, tzinfo=timezone.utc)
         after = datetime(2024, 10, 28, 12, 0, tzinfo=timezone.utc)
-        assert is_dst_active(before, 'EET')
-        assert not is_dst_active(after, 'EET')
+        assert is_dst_active(before, "EET")
+        assert not is_dst_active(after, "EET")
 
     def test_T29_dst_warning_within_7_days(self):
         # March 31 is DST transition; March 26 is 5 days before
         dt = datetime(2024, 3, 26, 10, 0, tzinfo=timezone.utc)
-        warning = dst_transition_warning(dt, 'EET', days_ahead=7)
+        warning = dst_transition_warning(dt, "EET", days_ahead=7)
         assert warning is not None
 
     def test_T30_no_dst_warning_far_from_transition(self):
         dt = datetime(2024, 6, 15, 10, 0, tzinfo=timezone.utc)
-        warning = dst_transition_warning(dt, 'EET', days_ahead=7)
+        warning = dst_transition_warning(dt, "EET", days_ahead=7)
         assert warning is None
 
     def test_T31_gmt_no_dst(self):
         dt = datetime(2024, 7, 15, 10, 0, tzinfo=timezone.utc)
-        assert not is_dst_active(dt, 'GMT')
+        assert not is_dst_active(dt, "GMT")
 
     def test_T32_utc_no_dst(self):
         dt = datetime(2024, 7, 15, tzinfo=timezone.utc)
-        assert not is_dst_active(dt, 'UTC')
+        assert not is_dst_active(dt, "UTC")
 
     def test_T33_dst_warning_returns_transition_date(self):
         dt = datetime(2024, 3, 26, tzinfo=timezone.utc)
-        warning = dst_transition_warning(dt, 'EET', days_ahead=7)
+        warning = dst_transition_warning(dt, "EET", days_ahead=7)
         if warning:
-            assert 'date' in warning or isinstance(warning, dict)
+            assert "date" in warning or isinstance(warning, dict)
 
     def test_T34_fall_back_warning_within_7_days(self):
         dt = datetime(2024, 10, 22, tzinfo=timezone.utc)
-        warning = dst_transition_warning(dt, 'EET', days_ahead=7)
+        warning = dst_transition_warning(dt, "EET", days_ahead=7)
         assert warning is not None
 
     def test_T35_is_dst_gmt_plus2_no_dst(self):
         dt = datetime(2024, 7, 15, tzinfo=timezone.utc)
-        assert not is_dst_active(dt, 'GMT+2')
+        assert not is_dst_active(dt, "GMT+2")
 
     def test_T36_dst_active_changes_offset(self):
-        winter = datetime(2024, 1, 15, tzinfo=timezone.utc)
-        summer = datetime(2024, 7, 15, tzinfo=timezone.utc)
-        w = broker_time_to_utc(datetime(2024, 1, 15, 12, 0), 'EET')
-        s = broker_time_to_utc(datetime(2024, 7, 15, 12, 0), 'EET')
+        datetime(2024, 1, 15, tzinfo=timezone.utc)
+        datetime(2024, 7, 15, tzinfo=timezone.utc)
+        w = broker_time_to_utc(datetime(2024, 1, 15, 12, 0), "EET")
+        s = broker_time_to_utc(datetime(2024, 7, 15, 12, 0), "EET")
         assert w.hour != s.hour  # different offsets due to DST
 
 
@@ -258,10 +270,10 @@ class TestDSTDetection:
 # T37-T48  SessionManager DST-aware boundaries
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestSessionManagerDST:
 
+class TestSessionManagerDST:
     def _make_sm(self) -> SessionManager:
-        return SessionManager(broker_tz='EET')
+        return SessionManager(broker_tz="EET")
 
     def test_T37_london_open_winter(self):
         sm = self._make_sm()
@@ -319,8 +331,8 @@ class TestSessionManagerDST:
 
     def test_T46_dst_transition_london_open_shifts(self):
         sm = self._make_sm()
-        winter = datetime(2024, 1, 15, 8, 0, tzinfo=timezone.utc)   # London open UTC
-        summer = datetime(2024, 7, 15, 7, 0, tzinfo=timezone.utc)   # London open UTC (summer)
+        winter = datetime(2024, 1, 15, 8, 0, tzinfo=timezone.utc)  # London open UTC
+        summer = datetime(2024, 7, 15, 7, 0, tzinfo=timezone.utc)  # London open UTC (summer)
         assert sm.is_london_session(winter)
         assert sm.is_london_session(summer)
 
@@ -340,9 +352,10 @@ class TestSessionManagerDST:
 # T49-T60  Weekend detection (FX hours)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestWeekendDetection:
 
-    def _make_sm(self): return SessionManager(broker_tz='EET')
+class TestWeekendDetection:
+    def _make_sm(self):
+        return SessionManager(broker_tz="EET")
 
     def test_T49_friday_before_close_is_open(self):
         sm = self._make_sm()
@@ -416,8 +429,8 @@ class TestWeekendDetection:
 # T61-T72  Clock injection (testability)
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestClockInjection:
 
+class TestClockInjection:
     def setup_method(self):
         reset_clock()
 
@@ -444,13 +457,13 @@ class TestClockInjection:
     def test_T64_session_manager_uses_injected_clock(self):
         fixed = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)  # Monday 10am
         set_clock(lambda: fixed)
-        sm = SessionManager(broker_tz='EET')
+        sm = SessionManager(broker_tz="EET")
         assert sm.is_market_open(utcnow())
 
     def test_T65_time_travel_to_weekend(self):
         weekend = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)  # Saturday
         set_clock(lambda: weekend)
-        sm = SessionManager(broker_tz='EET')
+        sm = SessionManager(broker_tz="EET")
         assert not sm.is_market_open(utcnow())
 
     def test_T66_multiple_set_clock_calls(self):
@@ -465,21 +478,26 @@ class TestClockInjection:
         winter = datetime(2024, 1, 15, 12, tzinfo=timezone.utc)
         summer = datetime(2024, 7, 15, 12, tzinfo=timezone.utc)
         set_clock(lambda: winter)
-        assert not is_dst_active(utcnow(), 'EET')
+        assert not is_dst_active(utcnow(), "EET")
         set_clock(lambda: summer)
-        assert is_dst_active(utcnow(), 'EET')
+        assert is_dst_active(utcnow(), "EET")
 
     def test_T68_clock_thread_safety(self):
         import threading
+
         errors = []
+
         def check():
             try:
                 utcnow()
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=check) for _ in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert not errors
 
     def test_T69_next_midnight_uses_clock(self):
@@ -493,7 +511,7 @@ class TestClockInjection:
         fixed = datetime(2024, 1, 1, tzinfo=timezone.utc)
         set_clock(lambda: fixed)
         broker_dt = datetime(2024, 6, 15, 12, 0)
-        utc = broker_time_to_utc(broker_dt, 'EET')
+        utc = broker_time_to_utc(broker_dt, "EET")
         assert utc.hour == 9  # EEST (UTC+3), not affected by injected clock
 
     def test_T71_reset_clock_allows_real_time(self):
@@ -504,9 +522,11 @@ class TestClockInjection:
 
     def test_T72_clock_factory_called_each_time(self):
         calls = []
+
         def counting_clock():
             calls.append(1)
             return datetime.now(timezone.utc)
+
         set_clock(counting_clock)
         utcnow()
         utcnow()
@@ -518,8 +538,8 @@ class TestClockInjection:
 # T73-T80  Integration
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestIntegration:
 
+class TestIntegration:
     def setup_method(self):
         reset_clock()
 
@@ -527,13 +547,13 @@ class TestIntegration:
         reset_clock()
 
     def test_T73_london_session_winter_dst(self):
-        sm = SessionManager(broker_tz='EET')
+        sm = SessionManager(broker_tz="EET")
         # 09:00 UTC = 11:00 EET (winter, no DST) -> London open
         dt = datetime(2024, 1, 15, 9, 0, tzinfo=timezone.utc)
         assert sm.is_london_session(dt)
 
     def test_T74_dst_aware_session_boundary(self):
-        sm = SessionManager(broker_tz='EET')
+        sm = SessionManager(broker_tz="EET")
         # Day before DST change (March 30) and day after (April 1)
         before_dst = datetime(2024, 3, 30, 8, 0, tzinfo=timezone.utc)
         after_dst = datetime(2024, 4, 1, 7, 0, tzinfo=timezone.utc)
@@ -543,20 +563,21 @@ class TestIntegration:
 
     def test_T75_utcnow_is_monotonic(self):
         import time
+
         t1 = utcnow()
         time.sleep(0.01)
         t2 = utcnow()
         assert t2 > t1
 
     def test_T76_ensure_utc_eet_winter(self):
-        eet = ZoneInfo('Europe/Helsinki')
+        eet = ZoneInfo("Europe/Helsinki")
         dt = datetime(2024, 1, 15, 12, 0, tzinfo=eet)  # UTC+2
         utc = ensure_utc(dt)
         assert utc.hour == 10
 
     def test_T77_broker_conversion_preserves_minutes(self):
         broker_dt = datetime(2024, 1, 15, 14, 37, 0)
-        utc = broker_time_to_utc(broker_dt, 'EET')
+        utc = broker_time_to_utc(broker_dt, "EET")
         assert utc.minute == 37
 
     def test_T78_next_midnight_after_midnight(self):
@@ -565,14 +586,14 @@ class TestIntegration:
         assert nm.day == 16
 
     def test_T79_market_closed_saturday_all_day(self):
-        sm = SessionManager(broker_tz='EET')
+        sm = SessionManager(broker_tz="EET")
         for h in range(24):
             dt = datetime(2024, 1, 20, h, 0, tzinfo=timezone.utc)
-            assert not sm.is_market_open(dt), f'Should be closed at {h}:00 UTC Saturday'
+            assert not sm.is_market_open(dt), f"Should be closed at {h}:00 UTC Saturday"
 
     def test_T80_dst_transition_warning_content(self):
         dt = datetime(2024, 3, 26, tzinfo=timezone.utc)
-        warning = dst_transition_warning(dt, 'EET', days_ahead=7)
+        warning = dst_transition_warning(dt, "EET", days_ahead=7)
         if warning:
             # Warning should have meaningful content
             assert warning  # not empty
@@ -582,8 +603,8 @@ class TestIntegration:
 # T81-T84  Edge cases
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestEdgeCases:
 
+class TestEdgeCases:
     def test_T81_leap_year_feb_29(self):
         dt = datetime(2024, 2, 29, 10, 0, tzinfo=timezone.utc)  # 2024 is leap
         assert dt.month == 2 and dt.day == 29

@@ -2,9 +2,9 @@
 PHASE 32 -- Customer Lifecycle Automation
 Covers: onboarding / renewal reminder / expiry warning / churn detection.
 """
+
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -15,25 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 class LifecycleStage(Enum):
-    ONBOARDING  = auto()
-    ACTIVE      = auto()
-    AT_RISK     = auto()
-    CHURNED     = auto()
-    RENEWED     = auto()
-    EXPIRED     = auto()
+    ONBOARDING = auto()
+    ACTIVE = auto()
+    AT_RISK = auto()
+    CHURNED = auto()
+    RENEWED = auto()
+    EXPIRED = auto()
 
 
 @dataclass
 class CustomerRecord:
-    customer_id:  str
-    email:        str
-    plan:         str
-    stage:        LifecycleStage = LifecycleStage.ONBOARDING
-    created_at:   datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at:   Optional[datetime] = None
-    last_active:  Optional[datetime] = None
-    churn_score:  float = 0.0
-    notes:        list[str] = field(default_factory=list)
+    customer_id: str
+    email: str
+    plan: str
+    stage: LifecycleStage = LifecycleStage.ONBOARDING
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: Optional[datetime] = None
+    last_active: Optional[datetime] = None
+    churn_score: float = 0.0
+    notes: list[str] = field(default_factory=list)
 
     def days_to_expiry(self) -> Optional[int]:
         if self.expires_at is None:
@@ -59,21 +59,22 @@ class CustomerLifecycleManager:
     def __init__(
         self,
         renewal_warning_days: int = 14,
-        expiry_warning_days:  int = 3,
-        inactivity_days:      int = 14,
+        expiry_warning_days: int = 3,
+        inactivity_days: int = 14,
     ) -> None:
         self._customers: dict[str, CustomerRecord] = {}
         self._renewal_warning = renewal_warning_days
-        self._expiry_warning  = expiry_warning_days
-        self._inactivity      = inactivity_days
+        self._expiry_warning = expiry_warning_days
+        self._inactivity = inactivity_days
 
-    def register(self, customer_id: str, email: str, plan: str,
-                 expires_in_days: int = 365) -> CustomerRecord:
+    def register(
+        self, customer_id: str, email: str, plan: str, expires_in_days: int = 365
+    ) -> CustomerRecord:
         rec = CustomerRecord(
-            customer_id = customer_id,
-            email       = email,
-            plan        = plan,
-            expires_at  = datetime.now(timezone.utc) + timedelta(days=expires_in_days),
+            customer_id=customer_id,
+            email=email,
+            plan=plan,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=expires_in_days),
         )
         self._customers[customer_id] = rec
         logger.info("Registered customer %s (plan=%s)", customer_id, plan)

@@ -2,38 +2,52 @@
 PHASE 32 -- Customer Lifecycle Automation
 216 tests: T001-T216
 """
-import time
-import threading
-import pytest
-from unittest.mock import patch
 
-import sys, os
+import os
+import sys
+import threading
+import time
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.customer_lifecycle import (
-    LifecycleEvent, CustomerStatus, OnboardingStep,
-    NotificationChannel, TicketCategory, NotificationTemplate,
-    REQUIRES_REASON, TEMPLATES, SELF_SERVICE_ANSWERS,
-    CustomerRecord, LifecycleAuditEntry, NotificationRecord,
-    SupportTicket, ReactivationOffer,
+    REQUIRES_REASON,
+    SELF_SERVICE_ANSWERS,
+    TEMPLATES,
+    CustomerRecord,
+    CustomerStatus,
+    CustomerStore,
+    LifecycleAuditChain,
+    LifecycleAuditEntry,
+    LifecycleDashboard,
+    LifecycleEvent,
     MissingReasonError,
-    LifecycleAuditChain, CustomerStore, NotificationEngine,
-    OnboardingEngine, DeviceHeartbeatManager,
-    SubscriptionLifecycleManager, ReactivationEngine,
-    DunningManager, SupportTicketDeflector,
-    LifecycleScheduler, LifecycleAdmin, LifecycleDashboard,
+    NotificationChannel,
+    NotificationEngine,
+    NotificationRecord,
+    NotificationTemplate,
+    OnboardingStep,
+    ReactivationOffer,
+    TicketCategory,
     build_lifecycle_system,
 )
 
 
-def make_customer(cid="cust-1", tid="tenant-1",
-                  status=CustomerStatus.ACTIVE,
-                  expires_in_days: float = 30,
-                  plan: str = "pro") -> CustomerRecord:
+def make_customer(
+    cid="cust-1",
+    tid="tenant-1",
+    status=CustomerStatus.ACTIVE,
+    expires_in_days: float = 30,
+    plan: str = "pro",
+) -> CustomerRecord:
     return CustomerRecord(
-        customer_id=cid, tenant_id=tid,
+        customer_id=cid,
+        tenant_id=tid,
         email=f"{cid}@example.com",
-        status=status, plan=plan,
+        status=status,
+        plan=plan,
         expires_at=time.time() + expires_in_days * 86400,
     )
 
@@ -73,9 +87,13 @@ class TestEnumsAndConstants:
             assert isinstance(b, str) and len(b) > 0
 
     def test_T009_self_service_answers_coverage(self):
-        for cat in [TicketCategory.DEVICE_SETUP, TicketCategory.LICENSE_ISSUE,
-                    TicketCategory.HEARTBEAT_FAIL, TicketCategory.DOWNLOAD_HELP,
-                    TicketCategory.PAYMENT_ISSUE]:
+        for cat in [
+            TicketCategory.DEVICE_SETUP,
+            TicketCategory.LICENSE_ISSUE,
+            TicketCategory.HEARTBEAT_FAIL,
+            TicketCategory.DOWNLOAD_HELP,
+            TicketCategory.PAYMENT_ISSUE,
+        ]:
             assert cat.value in SELF_SERVICE_ANSWERS
 
     def test_T010_lifecycle_event_values_are_dotted(self):
@@ -143,17 +161,20 @@ class TestLifecycleAuditChain:
 
     def test_T024_requires_reason_enforced(self):
         with pytest.raises(MissingReasonError):
-            self.audit.record(LifecycleEvent.SUBSCRIPTION_CANCELLED.value,
-                              "c1", "t1", "admin", reason="")
+            self.audit.record(
+                LifecycleEvent.SUBSCRIPTION_CANCELLED.value, "c1", "t1", "admin", reason=""
+            )
 
     def test_T025_requires_reason_whitespace_rejected(self):
         with pytest.raises(MissingReasonError):
-            self.audit.record(LifecycleEvent.SUBSCRIPTION_CANCELLED.value,
-                              "c1", "t1", "admin", reason="   ")
+            self.audit.record(
+                LifecycleEvent.SUBSCRIPTION_CANCELLED.value, "c1", "t1", "admin", reason="   "
+            )
 
     def test_T026_requires_reason_satisfied(self):
-        e = self.audit.record(LifecycleEvent.SUBSCRIPTION_CANCELLED.value,
-                              "c1", "t1", "admin", reason="user request")
+        e = self.audit.record(
+            LifecycleEvent.SUBSCRIPTION_CANCELLED.value, "c1", "t1", "admin", reason="user request"
+        )
         assert e.reason == "user request"
 
     def test_T027_seq_increments(self):
@@ -169,8 +190,7 @@ class TestLifecycleAuditChain:
     def test_T029_query_by_event(self):
         self.audit.record("account.created", "c1", "t1", "s")
         self.audit.record("onboarding.started", "c1", "t1", "s")
-        assert all(e.event == "account.created"
-                   for e in self.audit.query(event="account.created"))
+        assert all(e.event == "account.created" for e in self.audit.query(event="account.created"))
 
     def test_T030_query_limit(self):
         for i in range(20):
@@ -190,17 +210,22 @@ class TestLifecycleAuditChain:
 
     def test_T033_concurrent_records_unique_seqs(self):
         seqs = []
+
         def worker():
             seqs.append(self.audit.record("account.created", "cx", "tx", "s").seq)
+
         threads = [threading.Thread(target=worker) for _ in range(20)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert len(set(seqs)) == 20
 
     def test_T034_verify_chain_after_concurrent(self):
         def worker():
             self.audit.record("account.created", "cx", "tx", "s")
+
         threads = [threading.Thread(target=worker) for _ in range(10)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert self.audit.verify_chain() is True
 
     def test_T035_chain_hash_different_per_entry(self):
@@ -218,14 +243,16 @@ class TestCustomerStore:
         self.store = CustomerStore()
 
     def test_T037_upsert_and_get(self):
-        c = make_customer("c1"); self.store.upsert(c)
+        c = make_customer("c1")
+        self.store.upsert(c)
         assert self.store.get("c1") is c
 
     def test_T038_get_missing_returns_none(self):
         assert self.store.get("missing") is None
 
     def test_T039_len(self):
-        self.store.upsert(make_customer("c1")); self.store.upsert(make_customer("c2"))
+        self.store.upsert(make_customer("c1"))
+        self.store.upsert(make_customer("c2"))
         assert len(self.store) == 2
 
     def test_T040_list_by_status(self):
@@ -237,20 +264,27 @@ class TestCustomerStore:
     def test_T041_list_by_status_tenant_filter(self):
         self.store.upsert(make_customer("c1", tid="T1", status=CustomerStatus.ACTIVE))
         self.store.upsert(make_customer("c2", tid="T2", status=CustomerStatus.ACTIVE))
-        assert all(c.tenant_id == "T1" for c in
-                   self.store.list_by_status(CustomerStatus.ACTIVE, tenant_id="T1"))
+        assert all(
+            c.tenant_id == "T1"
+            for c in self.store.list_by_status(CustomerStatus.ACTIVE, tenant_id="T1")
+        )
 
     def test_T042_list_expiring(self):
-        c = make_customer("c1", expires_in_days=3); self.store.upsert(c)
+        c = make_customer("c1", expires_in_days=3)
+        self.store.upsert(c)
         assert c in self.store.list_expiring(within_days=7)
         assert c not in self.store.list_expiring(within_days=2)
 
     def test_T043_list_heartbeat_overdue(self):
-        c = make_customer("c1"); c.last_heartbeat = time.time() - 400; self.store.upsert(c)
+        c = make_customer("c1")
+        c.last_heartbeat = time.time() - 400
+        self.store.upsert(c)
         assert c in self.store.list_heartbeat_overdue(threshold_s=300)
 
     def test_T044_list_heartbeat_not_overdue(self):
-        c = make_customer("c1"); c.last_heartbeat = time.time() - 100; self.store.upsert(c)
+        c = make_customer("c1")
+        c.last_heartbeat = time.time() - 100
+        self.store.upsert(c)
         assert c not in self.store.list_heartbeat_overdue(threshold_s=300)
 
     def test_T045_count_by_status(self):
@@ -261,34 +295,49 @@ class TestCustomerStore:
         assert counts["active"] == 2 and counts["expired"] == 1
 
     def test_T046_upsert_updates_record(self):
-        c = make_customer("c1"); self.store.upsert(c); c.plan = "enterprise"; self.store.upsert(c)
+        c = make_customer("c1")
+        self.store.upsert(c)
+        c.plan = "enterprise"
+        self.store.upsert(c)
         assert self.store.get("c1").plan == "enterprise"
 
     def test_T047_thread_safe_upsert(self):
         results = []
+
         def worker(i):
-            self.store.upsert(make_customer(f"c{i}")); results.append(i)
+            self.store.upsert(make_customer(f"c{i}"))
+            results.append(i)
+
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert len(self.store) == 20
 
     def test_T048_list_expiring_excludes_expired(self):
-        c = make_customer("c1", expires_in_days=-1); self.store.upsert(c)
+        c = make_customer("c1", expires_in_days=-1)
+        self.store.upsert(c)
         assert c not in self.store.list_expiring(within_days=7)
 
     def test_T049_heartbeat_overdue_no_last_heartbeat(self):
-        c = make_customer("c1"); c.last_heartbeat = None; self.store.upsert(c)
+        c = make_customer("c1")
+        c.last_heartbeat = None
+        self.store.upsert(c)
         assert c not in self.store.list_heartbeat_overdue()
 
     def test_T050_multiple_tenant_isolation(self):
         for i in range(5):
-            self.store.upsert(make_customer(f"c{i}", tid=f"T{i%2}", status=CustomerStatus.ACTIVE))
-        assert all(c.tenant_id == "T0" for c in
-                   self.store.list_by_status(CustomerStatus.ACTIVE, tenant_id="T0"))
+            self.store.upsert(make_customer(f"c{i}", tid=f"T{i % 2}", status=CustomerStatus.ACTIVE))
+        assert all(
+            c.tenant_id == "T0"
+            for c in self.store.list_by_status(CustomerStatus.ACTIVE, tenant_id="T0")
+        )
 
     def test_T051_updated_at_changes(self):
-        c = make_customer("c1"); old = c.updated_at; time.sleep(0.01)
-        self.store.upsert(c); assert c.updated_at >= old
+        c = make_customer("c1")
+        old = c.updated_at
+        time.sleep(0.01)
+        self.store.upsert(c)
+        assert c.updated_at >= old
 
     def test_T052_count_by_status_empty(self):
         assert self.store.count_by_status() == {}
@@ -317,14 +366,15 @@ class TestNotificationEngine:
         c2 = make_customer("c2")
         self.notif.send(self.customer, NotificationTemplate.WELCOME)
         self.notif.send(c2, NotificationTemplate.WELCOME)
-        assert all(n.customer_id == "cust-1" for n in
-                   self.notif.list_sent(customer_id="cust-1"))
+        assert all(n.customer_id == "cust-1" for n in self.notif.list_sent(customer_id="cust-1"))
 
     def test_T057_list_sent_by_template(self):
         self.notif.send(self.customer, NotificationTemplate.WELCOME)
         self.notif.send(self.customer, NotificationTemplate.DOWNLOAD_GUIDE)
-        assert all(n.event == NotificationTemplate.WELCOME.value for n in
-                   self.notif.list_sent(template=NotificationTemplate.WELCOME.value))
+        assert all(
+            n.event == NotificationTemplate.WELCOME.value
+            for n in self.notif.list_sent(template=NotificationTemplate.WELCOME.value)
+        )
 
     def test_T058_audit_record_created(self):
         self.notif.send(self.customer, NotificationTemplate.WELCOME)
@@ -337,25 +387,32 @@ class TestNotificationEngine:
         assert len(called) == 1
 
     def test_T060_hook_exception_does_not_raise(self):
-        self.notif.add_hook(lambda r: 1/0)
+        self.notif.add_hook(lambda r: 1 / 0)
         self.notif.send(self.customer, NotificationTemplate.WELCOME)
 
     def test_T061_params_injected(self):
-        r = self.notif.send(self.customer, NotificationTemplate.DEVICE_REGISTERED,
-                            params={"device_id": "DEV-1", "count": 1, "max": 3})
+        r = self.notif.send(
+            self.customer,
+            NotificationTemplate.DEVICE_REGISTERED,
+            params={"device_id": "DEV-1", "count": 1, "max": 3},
+        )
         assert "DEV-1" in r.body
 
     def test_T062_channel_stored(self):
-        r = self.notif.send(self.customer, NotificationTemplate.WELCOME,
-                            channel=NotificationChannel.TELEGRAM)
+        r = self.notif.send(
+            self.customer, NotificationTemplate.WELCOME, channel=NotificationChannel.TELEGRAM
+        )
         assert r.channel == NotificationChannel.TELEGRAM.value
 
     def test_T063_concurrent_send_safe(self):
         results = []
+
         def worker():
             results.append(self.notif.send(self.customer, NotificationTemplate.WELCOME))
+
         threads = [threading.Thread(target=worker) for _ in range(10)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert len(results) == 10
 
     def test_T064_no_audit_still_works(self):
@@ -367,8 +424,11 @@ class TestNotificationEngine:
         assert "docs.bot12.io" in r.body
 
     def test_T066_heartbeat_fail_contains_minutes(self):
-        r = self.notif.send(self.customer, NotificationTemplate.HEARTBEAT_FAIL,
-                            params={"device_id": "D1", "minutes": 5})
+        r = self.notif.send(
+            self.customer,
+            NotificationTemplate.HEARTBEAT_FAIL,
+            params={"device_id": "D1", "minutes": 5},
+        )
         assert "5" in r.body
 
     def test_T067_notification_id_unique(self):
@@ -380,45 +440,61 @@ class TestNotificationEngine:
         assert self.notif.send(self.customer, NotificationTemplate.WELCOME).sent_at > 0
 
     def test_T069_customer_id_in_record(self):
-        assert self.notif.send(self.customer,
-                               NotificationTemplate.WELCOME).customer_id == self.customer.customer_id
+        assert (
+            self.notif.send(self.customer, NotificationTemplate.WELCOME).customer_id
+            == self.customer.customer_id
+        )
 
     def test_T070_tenant_id_in_record(self):
-        assert self.notif.send(self.customer,
-                               NotificationTemplate.WELCOME).tenant_id == self.customer.tenant_id
+        assert (
+            self.notif.send(self.customer, NotificationTemplate.WELCOME).tenant_id
+            == self.customer.tenant_id
+        )
 
     def test_T071_reactivation_offer_template(self):
-        r = self.notif.send(self.customer, NotificationTemplate.REACTIVATION_OFFER,
-                            params={"discount": 20, "valid_until": "2027-01-01"})
+        r = self.notif.send(
+            self.customer,
+            NotificationTemplate.REACTIVATION_OFFER,
+            params={"discount": 20, "valid_until": "2027-01-01"},
+        )
         assert "20%" in r.body
 
     def test_T072_cancellation_confirm_template(self):
-        r = self.notif.send(self.customer, NotificationTemplate.CANCELLATION_CONFIRM,
-                            params={"plan": "pro", "date": "2027-01-01"})
+        r = self.notif.send(
+            self.customer,
+            NotificationTemplate.CANCELLATION_CONFIRM,
+            params={"plan": "pro", "date": "2027-01-01"},
+        )
         assert "pro" in r.body
 
 
 class TestOnboardingEngine:
     def setup_method(self):
         sys_ = make_sys()
-        self.audit = sys_["audit"]; self.store = sys_["store"]
-        self.notif = sys_["notif"]; self.onboard = sys_["onboard"]
+        self.audit = sys_["audit"]
+        self.store = sys_["store"]
+        self.notif = sys_["notif"]
+        self.onboard = sys_["onboard"]
         self.customer = make_customer(status=CustomerStatus.ONBOARDING)
 
     def test_T073_start_sets_onboarding_status(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         assert self.customer.status == CustomerStatus.ONBOARDING
 
     def test_T074_start_sends_welcome(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         assert len(self.notif.list_sent(template=NotificationTemplate.WELCOME.value)) >= 1
 
     def test_T075_start_sends_download_guide(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         assert len(self.notif.list_sent(template=NotificationTemplate.DOWNLOAD_GUIDE.value)) >= 1
 
     def test_T076_start_records_audit(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         assert len(self.audit.query(event=LifecycleEvent.ONBOARDING_STARTED.value)) >= 1
 
     def test_T077_complete_step_records(self):
@@ -442,16 +518,18 @@ class TestOnboardingEngine:
         self.store.upsert(self.customer)
         for step in OnboardingStep:
             self.onboard.complete_step(self.customer, step)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.ONBOARDING_COMPLETE.value)) >= 1
+        assert (
+            len(self.notif.list_sent(template=NotificationTemplate.ONBOARDING_COMPLETE.value)) >= 1
+        )
 
     def test_T081_stall_nudge_sends_notification(self):
-        self.store.upsert(self.customer); self.onboard.send_stall_nudge(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.ONBOARDING_STEP.value)) >= 1
+        self.store.upsert(self.customer)
+        self.onboard.send_stall_nudge(self.customer)
+        assert len(self.notif.list_sent(template=NotificationTemplate.ONBOARDING_STEP.value)) >= 1
 
     def test_T082_audit_chain_valid_after_onboarding(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         for step in OnboardingStep:
             self.onboard.complete_step(self.customer, step)
         assert self.audit.verify_chain() is True
@@ -464,13 +542,17 @@ class TestOnboardingEngine:
 
     def test_T084_concurrent_step_completion_safe(self):
         self.store.upsert(self.customer)
-        threads = [threading.Thread(target=self.onboard.complete_step,
-                                    args=(self.customer, s)) for s in OnboardingStep]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        threads = [
+            threading.Thread(target=self.onboard.complete_step, args=(self.customer, s))
+            for s in OnboardingStep
+        ]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert self.customer.is_onboarding_complete()
 
     def test_T085_start_audit_event(self):
-        self.store.upsert(self.customer); self.onboard.start(self.customer)
+        self.store.upsert(self.customer)
+        self.onboard.start(self.customer)
         assert len(self.audit.query(event=LifecycleEvent.ONBOARDING_STARTED.value)) >= 1
 
     def test_T086_partial_steps_not_complete(self):
@@ -482,8 +564,10 @@ class TestOnboardingEngine:
 class TestDeviceHeartbeatManager:
     def setup_method(self):
         sys_ = make_sys(heartbeat_timeout_s=10.0)
-        self.audit = sys_["audit"]; self.store = sys_["store"]
-        self.notif = sys_["notif"]; self.heartbeat = sys_["heartbeat"]
+        self.audit = sys_["audit"]
+        self.store = sys_["store"]
+        self.notif = sys_["notif"]
+        self.heartbeat = sys_["heartbeat"]
         self.customer = make_customer()
         self.store.upsert(self.customer)
 
@@ -493,8 +577,7 @@ class TestDeviceHeartbeatManager:
 
     def test_T088_register_device_notification(self):
         self.heartbeat.register_device(self.customer, "D1")
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.DEVICE_REGISTERED.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.DEVICE_REGISTERED.value)) >= 1
 
     def test_T089_register_device_limit_reached(self):
         self.customer.device_count = self.customer.max_devices
@@ -503,13 +586,11 @@ class TestDeviceHeartbeatManager:
     def test_T090_device_limit_notification_sent(self):
         self.customer.device_count = self.customer.max_devices
         self.heartbeat.register_device(self.customer, "EXTRA")
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.DEVICE_LIMIT.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.DEVICE_LIMIT.value)) >= 1
 
     def test_T091_send_download_guide(self):
         self.heartbeat.send_download_guide(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.DOWNLOAD_GUIDE.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.DOWNLOAD_GUIDE.value)) >= 1
 
     def test_T092_flag_heartbeat_fail_increments(self):
         self.heartbeat.flag_heartbeat_fail(self.customer, "D1")
@@ -517,8 +598,7 @@ class TestDeviceHeartbeatManager:
 
     def test_T093_heartbeat_fail_notification(self):
         self.heartbeat.flag_heartbeat_fail(self.customer, "D1")
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.HEARTBEAT_FAIL.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.HEARTBEAT_FAIL.value)) >= 1
 
     def test_T094_record_heartbeat_clears_fail(self):
         self.customer.heartbeat_fail_count = 3
@@ -530,8 +610,9 @@ class TestDeviceHeartbeatManager:
         self.customer.heartbeat_fail_count = 2
         self.customer.last_heartbeat = time.time() - 400
         self.heartbeat.record_heartbeat(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.HEARTBEAT_RECOVERED.value)) >= 1
+        assert (
+            len(self.notif.list_sent(template=NotificationTemplate.HEARTBEAT_RECOVERED.value)) >= 1
+        )
 
     def test_T096_device_audit_recorded(self):
         self.heartbeat.register_device(self.customer, "D1")
@@ -561,15 +642,16 @@ class TestDeviceHeartbeatManager:
 class TestSubscriptionLifecycle:
     def setup_method(self):
         sys_ = make_sys()
-        self.audit = sys_["audit"]; self.store = sys_["store"]
-        self.notif = sys_["notif"]; self.sub = sys_["sub"]
+        self.audit = sys_["audit"]
+        self.store = sys_["store"]
+        self.notif = sys_["notif"]
+        self.sub = sys_["sub"]
         self.customer = make_customer(expires_in_days=5)
         self.store.upsert(self.customer)
 
     def test_T101_send_renewal_reminder(self):
         self.sub.send_renewal_reminder(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.RENEWAL_REMINDER.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.RENEWAL_REMINDER.value)) >= 1
 
     def test_T102_send_expiry_warning_sets_status(self):
         self.sub.send_expiry_warning(self.customer)
@@ -577,14 +659,12 @@ class TestSubscriptionLifecycle:
 
     def test_T103_expiry_warning_notification_sent(self):
         self.sub.send_expiry_warning(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.EXPIRY_WARNING.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.EXPIRY_WARNING.value)) >= 1
 
     def test_T104_trial_warning_uses_trial_template(self):
         self.customer.plan = "trial"
         self.sub.send_expiry_warning(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.TRIAL_WARNING.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.TRIAL_WARNING.value)) >= 1
 
     def test_T105_expire_subscription_sets_status(self):
         self.sub.expire_subscription(self.customer)
@@ -592,8 +672,9 @@ class TestSubscriptionLifecycle:
 
     def test_T106_expire_sends_notification(self):
         self.sub.expire_subscription(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.SUBSCRIPTION_EXPIRED.value)) >= 1
+        assert (
+            len(self.notif.list_sent(template=NotificationTemplate.SUBSCRIPTION_EXPIRED.value)) >= 1
+        )
 
     def test_T107_renew_sets_active(self):
         self.customer.status = CustomerStatus.EXPIRED
@@ -612,8 +693,9 @@ class TestSubscriptionLifecycle:
 
     def test_T110_cancel_notification_sent(self):
         self.sub.cancel_subscription(self.customer, reason="moving to competitor")
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.CANCELLATION_CONFIRM.value)) >= 1
+        assert (
+            len(self.notif.list_sent(template=NotificationTemplate.CANCELLATION_CONFIRM.value)) >= 1
+        )
 
     def test_T111_cancel_audit_recorded(self):
         self.sub.cancel_subscription(self.customer, reason="user request")
@@ -643,8 +725,10 @@ class TestSubscriptionLifecycle:
 class TestReactivationEngine:
     def setup_method(self):
         sys_ = make_sys()
-        self.audit = sys_["audit"]; self.store = sys_["store"]
-        self.notif = sys_["notif"]; self.reactivate = sys_["reactivate"]
+        self.audit = sys_["audit"]
+        self.store = sys_["store"]
+        self.notif = sys_["notif"]
+        self.reactivate = sys_["reactivate"]
         self.customer = make_customer(status=CustomerStatus.EXPIRED)
         self.store.upsert(self.customer)
 
@@ -656,8 +740,9 @@ class TestReactivationEngine:
 
     def test_T118_offer_notification_sent(self):
         self.reactivate.create_offer(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.REACTIVATION_OFFER.value)) >= 1
+        assert (
+            len(self.notif.list_sent(template=NotificationTemplate.REACTIVATION_OFFER.value)) >= 1
+        )
 
     def test_T119_accept_offer_reactivates(self):
         offer = self.reactivate.create_offer(self.customer)
@@ -682,14 +767,12 @@ class TestReactivationEngine:
     def test_T123_decline_audit_recorded(self):
         offer = self.reactivate.create_offer(self.customer)
         self.reactivate.decline_offer(offer.offer_id, reason="too expensive")
-        assert len(self.audit.query(
-            event=LifecycleEvent.REACTIVATION_DECLINED.value)) >= 1
+        assert len(self.audit.query(event=LifecycleEvent.REACTIVATION_DECLINED.value)) >= 1
 
     def test_T124_accept_audit_recorded(self):
         offer = self.reactivate.create_offer(self.customer)
         self.reactivate.accept_offer(offer.offer_id, time.time() + 86400)
-        assert len(self.audit.query(
-            event=LifecycleEvent.REACTIVATION_ACCEPTED.value)) >= 1
+        assert len(self.audit.query(event=LifecycleEvent.REACTIVATION_ACCEPTED.value)) >= 1
 
     def test_T125_list_offers_by_customer(self):
         c2 = make_customer("c2", status=CustomerStatus.EXPIRED)
@@ -704,8 +787,7 @@ class TestReactivationEngine:
 
     def test_T127_offer_audit_created(self):
         self.reactivate.create_offer(self.customer)
-        assert len(self.audit.query(
-            event=LifecycleEvent.REACTIVATION_OFFERED.value)) >= 1
+        assert len(self.audit.query(event=LifecycleEvent.REACTIVATION_OFFERED.value)) >= 1
 
     def test_T128_audit_chain_valid(self):
         offer = self.reactivate.create_offer(self.customer)
@@ -716,8 +798,10 @@ class TestReactivationEngine:
 class TestDunningManager:
     def setup_method(self):
         sys_ = make_sys()
-        self.audit = sys_["audit"]; self.store = sys_["store"]
-        self.notif = sys_["notif"]; self.dunning = sys_["dunning"]
+        self.audit = sys_["audit"]
+        self.store = sys_["store"]
+        self.notif = sys_["notif"]
+        self.dunning = sys_["dunning"]
         self.customer = make_customer()
         self.store.upsert(self.customer)
 
@@ -727,8 +811,7 @@ class TestDunningManager:
 
     def test_T130_payment_failed_notification(self):
         self.dunning.payment_failed(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.PAYMENT_FAILED.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.PAYMENT_FAILED.value)) >= 1
 
     def test_T131_payment_recovered_sets_active(self):
         self.dunning.payment_failed(self.customer)
@@ -737,13 +820,11 @@ class TestDunningManager:
 
     def test_T132_payment_recovered_notification(self):
         self.dunning.payment_recovered(self.customer)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.PAYMENT_RECOVERED.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.PAYMENT_RECOVERED.value)) >= 1
 
     def test_T133_start_dunning_notification(self):
         self.dunning.start_dunning(self.customer, days_remaining=5)
-        assert len(self.notif.list_sent(
-            template=NotificationTemplate.DUNNING_STARTED.value)) >= 1
+        assert len(self.notif.list_sent(template=NotificationTemplate.DUNNING_STARTED.value)) >= 1
 
     def test_T134_payment_fail_audit(self):
         self.dunning.payment_failed(self.customer)
@@ -767,7 +848,8 @@ class TestDunningManager:
 class TestSupportTicketDeflector:
     def setup_method(self):
         sys_ = make_sys()
-        self.audit = sys_["audit"]; self.deflector = sys_["deflector"]
+        self.audit = sys_["audit"]
+        self.deflector = sys_["deflector"]
         self.customer = make_customer()
 
     def test_T138_auto_deflect_known_category(self):
@@ -793,8 +875,11 @@ class TestSupportTicketDeflector:
         assert result.status == "closed"
 
     def test_T143_deflection_rate_all_self_served(self):
-        for cat in [TicketCategory.DEVICE_SETUP, TicketCategory.HEARTBEAT_FAIL,
-                    TicketCategory.LICENSE_ISSUE]:
+        for cat in [
+            TicketCategory.DEVICE_SETUP,
+            TicketCategory.HEARTBEAT_FAIL,
+            TicketCategory.LICENSE_ISSUE,
+        ]:
             self.deflector.auto_deflect(self.customer, cat, "S", "B")
         assert self.deflector.deflection_rate() == 1.0
 
@@ -812,14 +897,12 @@ class TestSupportTicketDeflector:
 
     def test_T147_self_served_audit(self):
         self.deflector.auto_deflect(self.customer, TicketCategory.DEVICE_SETUP, "S", "B")
-        assert len(self.audit.query(
-            event=LifecycleEvent.SELF_SERVICE_RESOLVED.value)) >= 1
+        assert len(self.audit.query(event=LifecycleEvent.SELF_SERVICE_RESOLVED.value)) >= 1
 
     def test_T148_close_audit_recorded(self):
         t = self.deflector.auto_deflect(self.customer, TicketCategory.OTHER, "S", "B")
         self.deflector.close_ticket(t.ticket_id, "resolved", reason="agent resolved")
-        assert len(self.audit.query(
-            event=LifecycleEvent.SUPPORT_TICKET_CLOSED.value)) >= 1
+        assert len(self.audit.query(event=LifecycleEvent.SUPPORT_TICKET_CLOSED.value)) >= 1
 
     def test_T149_close_missing_ticket_returns_none(self):
         assert self.deflector.close_ticket("nonexistent", "res", reason="r") is None
@@ -830,11 +913,15 @@ class TestSupportTicketDeflector:
 
     def test_T151_concurrent_deflect_safe(self):
         results = []
+
         def worker():
-            results.append(self.deflector.auto_deflect(
-                self.customer, TicketCategory.DEVICE_SETUP, "S", "B"))
+            results.append(
+                self.deflector.auto_deflect(self.customer, TicketCategory.DEVICE_SETUP, "S", "B")
+            )
+
         threads = [threading.Thread(target=worker) for _ in range(10)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert len(results) == 10
 
     def test_T152_audit_chain_valid_after_deflect(self):
@@ -893,8 +980,10 @@ class TestLifecycleScheduler:
 class TestLifecycleAdmin:
     def setup_method(self):
         self.sys_ = make_sys()
-        self.admin = self.sys_["admin"]; self.store = self.sys_["store"]
-        self.audit = self.sys_["audit"]; self.deflector = self.sys_["deflector"]
+        self.admin = self.sys_["admin"]
+        self.store = self.sys_["store"]
+        self.audit = self.sys_["audit"]
+        self.deflector = self.sys_["deflector"]
 
     def _populate(self, n_active=3, n_expired=2):
         for i in range(n_active):
@@ -940,6 +1029,7 @@ class TestLifecycleAdmin:
 
     def test_T169_to_dict_serializable(self):
         import json
+
         self._populate()
         assert len(json.dumps(self.admin.dashboard().to_dict())) > 0
 
@@ -954,8 +1044,11 @@ class TestLifecycleAdmin:
 
     def test_T172_self_service_rate_high(self):
         c = make_customer("c1")
-        for cat in [TicketCategory.DEVICE_SETUP, TicketCategory.HEARTBEAT_FAIL,
-                    TicketCategory.LICENSE_ISSUE]:
+        for cat in [
+            TicketCategory.DEVICE_SETUP,
+            TicketCategory.HEARTBEAT_FAIL,
+            TicketCategory.LICENSE_ISSUE,
+        ]:
             self.deflector.auto_deflect(c, cat, "S", "B")
         assert self.admin.dashboard().self_service_rate >= 0.8
 
@@ -963,6 +1056,7 @@ class TestLifecycleAdmin:
 class TestSQLMigration:
     def setup_method(self):
         import pathlib
+
         p = pathlib.Path(__file__).parents[2] / "supabase" / "migrations"
         sql_files = sorted(p.glob("*phase32*")) if p.exists() else []
         if not sql_files:
@@ -1105,13 +1199,14 @@ class TestIntegrationFlows:
     def test_T196_200_event_audit_chain(self):
         sys_ = self.sys_
         for i in range(200):
-            sys_["audit"].record(LifecycleEvent.ACCOUNT_CREATED.value,
-                                 f"c{i}", "t1", "system")
+            sys_["audit"].record(LifecycleEvent.ACCOUNT_CREATED.value, f"c{i}", "t1", "system")
         assert sys_["audit"].verify_chain()
         assert len(sys_["audit"].detect_tampered()) == 0
 
     def test_T197_concurrent_full_lifecycle(self):
-        sys_ = self.sys_; errors = []
+        sys_ = self.sys_
+        errors = []
+
         def worker(i):
             try:
                 c = make_customer(f"cc{i}")
@@ -1121,8 +1216,10 @@ class TestIntegrationFlows:
                 sys_["sub"].send_renewal_reminder(c)
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
-        [t.start() for t in threads]; [t.join() for t in threads]
+        [t.start() for t in threads]
+        [t.join() for t in threads]
         assert len(errors) == 0 and sys_["audit"].verify_chain()
 
 
@@ -1149,8 +1246,10 @@ class TestEdgeCasesAndAcceptance:
         assert len(NotificationTemplate) >= 17
 
     def test_T203_download_guide_contains_platform_info(self):
-        assert "MT4" in TEMPLATES[NotificationTemplate.DOWNLOAD_GUIDE][1] or \
-               "MT5" in TEMPLATES[NotificationTemplate.DOWNLOAD_GUIDE][1]
+        assert (
+            "MT4" in TEMPLATES[NotificationTemplate.DOWNLOAD_GUIDE][1]
+            or "MT5" in TEMPLATES[NotificationTemplate.DOWNLOAD_GUIDE][1]
+        )
 
     def test_T204_welcome_template_has_support_email(self):
         assert "support@bot12.io" in TEMPLATES[NotificationTemplate.WELCOME][1]
@@ -1169,19 +1268,33 @@ class TestEdgeCasesAndAcceptance:
         assert sys_["reactivate"].create_offer(c, valid_days=7).valid_until > time.time()
 
     def test_T208_build_system_returns_all_keys(self):
-        keys = {"audit","store","notif","onboard","sub","heartbeat",
-                "reactivate","dunning","deflector","scheduler","admin"}
+        keys = {
+            "audit",
+            "store",
+            "notif",
+            "onboard",
+            "sub",
+            "heartbeat",
+            "reactivate",
+            "dunning",
+            "deflector",
+            "scheduler",
+            "admin",
+        }
         assert keys.issubset(set(self.sys_.keys()))
 
     def test_T209_audit_chain_genesis_correct(self):
         import hmac as hm
+
         secret = "lifecycle-audit-secret-v32".encode()
         genesis = hm.new(secret, LifecycleAuditChain.GENESIS_MSG.encode(), "sha256").hexdigest()
         assert len(genesis) == 64
 
     def test_T210_customer_status_onboarding_default(self):
-        assert CustomerRecord(customer_id="x", tenant_id="t",
-                              email="x@e.com").status == CustomerStatus.ONBOARDING
+        assert (
+            CustomerRecord(customer_id="x", tenant_id="t", email="x@e.com").status
+            == CustomerStatus.ONBOARDING
+        )
 
     def test_T211_notification_record_has_id(self):
         sys_ = self.sys_
@@ -1200,12 +1313,15 @@ class TestEdgeCasesAndAcceptance:
         assert len(t.ticket_id) == 36
 
     def test_T214_cancellation_whitespace_reason_fails(self):
-        sys_ = self.sys_; c = make_customer(); sys_["store"].upsert(c)
+        sys_ = self.sys_
+        c = make_customer()
+        sys_["store"].upsert(c)
         with pytest.raises(MissingReasonError):
             sys_["sub"].cancel_subscription(c, reason="   ")
 
     def test_T215_decline_reactivation_whitespace_fails(self):
-        sys_ = self.sys_; c = make_customer(status=CustomerStatus.EXPIRED)
+        sys_ = self.sys_
+        c = make_customer(status=CustomerStatus.EXPIRED)
         sys_["store"].upsert(c)
         offer = sys_["reactivate"].create_offer(c)
         with pytest.raises(MissingReasonError):
@@ -1214,12 +1330,17 @@ class TestEdgeCasesAndAcceptance:
     def test_T216_acceptance_customer_journey_smooth(self):
         """T216 -- Acceptance: customer journey is smooth end-to-end."""
         sys_ = build_lifecycle_system()
-        audit = sys_["audit"]; store = sys_["store"]
-        onboard = sys_["onboard"]; sub = sys_["sub"]
-        hb = sys_["heartbeat"]; react = sys_["reactivate"]
-        deflector = sys_["deflector"]; admin = sys_["admin"]
+        audit = sys_["audit"]
+        store = sys_["store"]
+        onboard = sys_["onboard"]
+        sub = sys_["sub"]
+        hb = sys_["heartbeat"]
+        react = sys_["reactivate"]
+        deflector = sys_["deflector"]
+        admin = sys_["admin"]
         c = make_customer("journey-1", status=CustomerStatus.ONBOARDING)
-        store.upsert(c); onboard.start(c)
+        store.upsert(c)
+        onboard.start(c)
         for step in OnboardingStep:
             onboard.complete_step(c, step)
         assert c.status == CustomerStatus.TRIAL and c.is_onboarding_complete()
@@ -1230,12 +1351,18 @@ class TestEdgeCasesAndAcceptance:
         assert c.heartbeat_fail_count == 0
         t = deflector.auto_deflect(c, TicketCategory.HEARTBEAT_FAIL, "EA offline", "Not sending")
         assert t.self_served is True
-        c.status = CustomerStatus.ACTIVE; c.expires_at = time.time() + 2 * 86400; store.upsert(c)
-        sub.send_expiry_warning(c); assert c.status == CustomerStatus.EXPIRING
-        sub.renew_subscription(c, time.time() + 30 * 86400); assert c.status == CustomerStatus.ACTIVE
+        c.status = CustomerStatus.ACTIVE
+        c.expires_at = time.time() + 2 * 86400
+        store.upsert(c)
+        sub.send_expiry_warning(c)
+        assert c.status == CustomerStatus.EXPIRING
+        sub.renew_subscription(c, time.time() + 30 * 86400)
+        assert c.status == CustomerStatus.ACTIVE
         sub.cancel_subscription(c, reason="switching to manual trading")
         assert c.status == CustomerStatus.CANCELLED
-        c.status = CustomerStatus.EXPIRED; c.expires_at = time.time() - 1; store.upsert(c)
+        c.status = CustomerStatus.EXPIRED
+        c.expires_at = time.time() - 1
+        store.upsert(c)
         offer = react.create_offer(c, discount_pct=20)
         result = react.accept_offer(offer.offer_id, time.time() + 30 * 86400)
         assert result.accepted is True and c.status == CustomerStatus.ACTIVE

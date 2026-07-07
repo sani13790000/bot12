@@ -1,6 +1,7 @@
 """AI Explainability Service — human-readable reasons for every trade decision."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -16,9 +17,9 @@ class SMCSignal:
     fvg_bottom: Optional[float] = None
     liquidity_sweep: bool = False
     sweep_level: Optional[float] = None
-    in_premium_zone: Optional[bool] = None   # True=premium, False=discount, None=neutral
-    pd_zone_pct: float = 0.0                 # 0-100, position in premium/discount range
-    structure_score: float = 0.0             # 0-100
+    in_premium_zone: Optional[bool] = None  # True=premium, False=discount, None=neutral
+    pd_zone_pct: float = 0.0  # 0-100, position in premium/discount range
+    structure_score: float = 0.0  # 0-100
 
 
 @dataclass
@@ -31,7 +32,7 @@ class PASignal:
 
 @dataclass
 class MLSignal:
-    prediction: Optional[str] = None   # "BUY" | "SELL" | "NEUTRAL"
+    prediction: Optional[str] = None  # "BUY" | "SELL" | "NEUTRAL"
     confidence: float = 0.0
     top_features: List[Dict] = field(default_factory=list)
     # [{feature: "atr_14", importance: 0.23, value: 12.5}, ...]
@@ -49,9 +50,10 @@ class RiskSignal:
 @dataclass
 class TradeExplanation:
     """Complete human-readable explanation for a trade decision."""
-    decision: str              # "BUY" | "SELL" | "NO_TRADE"
-    confidence_score: float    # 0-100
-    total_score: float         # 0-100
+
+    decision: str  # "BUY" | "SELL" | "NO_TRADE"
+    confidence_score: float  # 0-100
+    total_score: float  # 0-100
 
     # SMC reasons
     smc_reasons: List[str] = field(default_factory=list)
@@ -84,7 +86,11 @@ class TradeExplanation:
             "total_score": self.total_score,
             "smc": {"score": self.smc_score, "reasons": self.smc_reasons},
             "price_action": {"score": self.pa_score, "reasons": self.pa_reasons},
-            "ml": {"score": self.ml_score, "reasons": self.ml_reasons, "top_features": self.ml_top_features},
+            "ml": {
+                "score": self.ml_score,
+                "reasons": self.ml_reasons,
+                "top_features": self.ml_top_features,
+            },
             "risk": {"ok": self.risk_ok, "reasons": self.risk_reasons},
             "blockers": self.blockers,
             "summary": self.summary,
@@ -124,10 +130,10 @@ class AIExplainabilityService:
         blockers = cls._find_blockers(smc, pa, ml, risk, decision)
 
         total_score = (
-            smc_score * cls.SMC_WEIGHT +
-            pa_score * cls.PA_WEIGHT +
-            ml_score * cls.ML_WEIGHT +
-            (100 if risk_ok else 0) * cls.RISK_WEIGHT
+            smc_score * cls.SMC_WEIGHT
+            + pa_score * cls.PA_WEIGHT
+            + ml_score * cls.ML_WEIGHT
+            + (100 if risk_ok else 0) * cls.RISK_WEIGHT
         )
 
         summary = cls._build_summary(decision, smc_reasons, pa_reasons, ml_reasons, blockers)
@@ -164,10 +170,14 @@ class AIExplainabilityService:
             score += 20
         if smc.order_block_price is not None:
             strength_label = "strong" if smc.order_block_strength > 70 else "moderate"
-            reasons.append(f"✅ Order Block at {smc.order_block_price:.2f} ({strength_label}, score={smc.order_block_strength:.0f})")
+            reasons.append(
+                f"✅ Order Block at {smc.order_block_price:.2f} ({strength_label}, score={smc.order_block_strength:.0f})"
+            )
             score += min(25, smc.order_block_strength * 0.25)
         if smc.fvg_detected:
-            reasons.append(f"✅ Fair Value Gap (FVG) between {smc.fvg_bottom:.2f} – {smc.fvg_top:.2f}")
+            reasons.append(
+                f"✅ Fair Value Gap (FVG) between {smc.fvg_bottom:.2f} – {smc.fvg_top:.2f}"
+            )
             score += 15
         if smc.liquidity_sweep:
             reasons.append(f"✅ Liquidity Sweep at {smc.sweep_level:.2f} — stop hunt detected")
@@ -176,7 +186,9 @@ class AIExplainabilityService:
             reasons.append(f"⚠️ Price in Premium Zone ({smc.pd_zone_pct:.0f}%) — favorable for SELL")
             score += 10
         elif smc.in_premium_zone is False:
-            reasons.append(f"✅ Price in Discount Zone ({smc.pd_zone_pct:.0f}%) — favorable for BUY")
+            reasons.append(
+                f"✅ Price in Discount Zone ({smc.pd_zone_pct:.0f}%) — favorable for BUY"
+            )
             score += 10
 
         if not reasons:
@@ -191,7 +203,9 @@ class AIExplainabilityService:
 
         if pa.pattern_name:
             strength_label = "strong" if pa.pattern_strength > 70 else "moderate"
-            reasons.append(f"✅ {pa.pattern_name} pattern ({strength_label}, score={pa.pattern_strength:.0f})")
+            reasons.append(
+                f"✅ {pa.pattern_name} pattern ({strength_label}, score={pa.pattern_strength:.0f})"
+            )
             score += min(60, pa.pattern_strength * 0.6)
         if pa.trend_alignment:
             reasons.append("✅ Pattern aligned with higher-timeframe trend")
@@ -211,7 +225,9 @@ class AIExplainabilityService:
         score = 0.0
 
         if ml.prediction:
-            reasons.append(f"✅ ML model predicts: {ml.prediction} (confidence {ml.confidence:.1f}%)")
+            reasons.append(
+                f"✅ ML model predicts: {ml.prediction} (confidence {ml.confidence:.1f}%)"
+            )
             score += ml.confidence * 0.7
         if ml.drift_status == "STABLE":
             reasons.append("✅ Model is STABLE (no concept drift)")
@@ -224,7 +240,9 @@ class AIExplainabilityService:
             score -= 20
         if ml.top_features:
             top = ml.top_features[0]
-            reasons.append(f"📊 Top feature: {top.get('feature', 'N/A')} (importance {top.get('importance', 0):.2f})")
+            reasons.append(
+                f"📊 Top feature: {top.get('feature', 'N/A')} (importance {top.get('importance', 0):.2f})"
+            )
 
         return reasons, max(0, min(score, 100))
 
@@ -261,7 +279,9 @@ class AIExplainabilityService:
 
     @staticmethod
     def _build_summary(decision, smc_reasons, pa_reasons, ml_reasons, blockers):
-        action = {"BUY": "Enter LONG", "SELL": "Enter SHORT", "NO_TRADE": "Skip trade"}.get(decision, decision)
+        action = {"BUY": "Enter LONG", "SELL": "Enter SHORT", "NO_TRADE": "Skip trade"}.get(
+            decision, decision
+        )
         key_smc = next((r for r in smc_reasons if "✅" in r), "")
         key_pa = next((r for r in pa_reasons if "✅" in r), "")
         key_ml = next((r for r in ml_reasons if "✅" in r), "")

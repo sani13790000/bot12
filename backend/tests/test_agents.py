@@ -1,4 +1,5 @@
 """Smoke tests for the voting engine."""
+
 from __future__ import annotations
 
 import importlib

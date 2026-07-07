@@ -6,6 +6,7 @@ Fixes:
 - ARCH: set_trainer() method added so main.py lifespan can inject trainer
 - ARCH: start()/stop() lifecycle management
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +27,7 @@ class RetrainingService:
     def __init__(self, interval_hours: float = 6.0) -> None:
         self._interval_hours = interval_hours
         self._trainer: Optional[Any] = None
-        self._task:    Optional[asyncio.Task] = None
+        self._task: Optional[asyncio.Task] = None
         self._running: bool = False
         self._last_run: Optional[datetime] = None
         self._last_result: Optional[Any] = None
@@ -42,9 +43,7 @@ class RetrainingService:
             return
         self._running = True
         self._task = asyncio.create_task(self._loop(), name="retraining_loop")
-        logger.info(
-            "[RetrainingService] started — interval=%.1fh", self._interval_hours
-        )
+        logger.info("[RetrainingService] started — interval=%.1fh", self._interval_hours)
 
     async def stop(self) -> None:
         """Stop background retraining loop gracefully."""
@@ -74,12 +73,14 @@ class RetrainingService:
             # BUG-G9 FIX: correct import path
             try:
                 from backend.ai_prediction.xgboost_trainer import XGBoostTrainer
+
                 self._trainer = XGBoostTrainer()
                 logger.info("[RetrainingService] auto-created XGBoostTrainer")
             except ImportError as exc:
                 logger.error(
                     "[RetrainingService] cannot import XGBoostTrainer — "
-                    "check backend.ai_prediction.xgboost_trainer exists: %s", exc
+                    "check backend.ai_prediction.xgboost_trainer exists: %s",
+                    exc,
                 )
                 return
 
@@ -88,7 +89,7 @@ class RetrainingService:
 
         result = await self._trainer.train_latest()
 
-        self._last_run    = start_ts
+        self._last_run = start_ts
         self._last_result = result
 
         logger.info(
@@ -102,11 +103,11 @@ class RetrainingService:
     def stats(self) -> dict:
         """Return service statistics for health endpoint."""
         return {
-            "running":      self._running,
-            "interval_h":  self._interval_hours,
-            "last_run":     self._last_run.isoformat() if self._last_run else None,
+            "running": self._running,
+            "interval_h": self._interval_hours,
+            "last_run": self._last_run.isoformat() if self._last_run else None,
             "last_accuracy": round(self._last_result.accuracy, 4) if self._last_result else None,
-            "last_f1":       round(self._last_result.f1, 4)       if self._last_result else None,
+            "last_f1": round(self._last_result.f1, 4) if self._last_result else None,
         }
 
 

@@ -1,11 +1,12 @@
 """
 تست‌های Rate Limiting
 """
+
 from __future__ import annotations
+
 import time
-import pytest
 from collections import defaultdict, deque
-from typing import Dict, Deque
+from typing import Deque, Dict
 
 
 # ─── InMemoryRateLimiter (mirror of backend/middleware/rate_limit.py) ──────────────────
@@ -37,8 +38,8 @@ class InMemoryRateLimiter:
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestInMemoryRateLimiter:
 
+class TestInMemoryRateLimiter:
     def test_allows_within_limit(self):
         rl = InMemoryRateLimiter()
         for i in range(5):
@@ -88,19 +89,18 @@ class TestInMemoryRateLimiter:
 
 
 class TestRateLimitEndpointRules:
-
     def test_auth_rule_5_per_minute(self):
         rl = InMemoryRateLimiter()
         key = "auth:ip"
         for i in range(5):
-            assert rl.is_allowed(key, 5, 60.0) is True, f"Request {i+1} blocked early"
+            assert rl.is_allowed(key, 5, 60.0) is True, f"Request {i + 1} blocked early"
         assert rl.is_allowed(key, 5, 60.0) is False, "6th request should be blocked"
 
     def test_signals_rule_30_per_minute(self):
         rl = InMemoryRateLimiter()
         key = "signals:ip"
         for i in range(30):
-            assert rl.is_allowed(key, 30, 60.0) is True, f"Request {i+1} blocked early"
+            assert rl.is_allowed(key, 30, 60.0) is True, f"Request {i + 1} blocked early"
         assert rl.is_allowed(key, 30, 60.0) is False
 
     def test_research_rule_5_per_minute(self):

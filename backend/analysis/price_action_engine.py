@@ -30,14 +30,15 @@
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 from ..core.enums import (
-    TrendDirection, TradeDirection, TradingSession,
-    MarketStructure, BlockType, FVGType
+    TradingSession,
+    TrendDirection,
 )
 from ..core.logger import get_logger
 
@@ -48,8 +49,10 @@ logger = get_logger("price_action_engine")
 # ثابت‌ها و کدها
 # =====================================================
 
+
 class PatternReasonCode(str, Enum):
     """کدهای دلیل برای الگوهای Price Action"""
+
     # کندلی
     WICK_REJECTION = "wick_rejection"
     BODY_ENGULF = "body_engulf"
@@ -83,6 +86,7 @@ class PatternReasonCode(str, Enum):
 
 class PatternStrength(str, Enum):
     """قدرت الگو"""
+
     WEAK = "weak"
     MODERATE = "moderate"
     STRONG = "strong"
@@ -91,6 +95,7 @@ class PatternStrength(str, Enum):
 
 class PatternType(str, Enum):
     """نوع الگو"""
+
     # Single candle
     PIN_BAR = "pin_bar"
     DOJI = "doji"
@@ -122,6 +127,7 @@ class PatternType(str, Enum):
 # ساختارهای داده استاندارد
 # =====================================================
 
+
 @dataclass
 class StandardPASignal:
     """
@@ -142,6 +148,7 @@ class StandardPASignal:
         created_at: زمان ایجاد
         metadata: اطلاعات اضافی
     """
+
     symbol: str
     timeframe: str
     pattern: PatternType
@@ -167,13 +174,14 @@ class StandardPASignal:
             "invalidation_level": self.invalidation_level,
             "reason_codes": [rc.value for rc in self.reason_codes],
             "created_at": self.created_at.isoformat(),
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
 @dataclass
 class CandleData:
     """داده کندل با اطلاعات کامل"""
+
     index: int
     time: datetime
     open: float
@@ -205,6 +213,7 @@ class MarketContext:
 
     شامل تمام اطلاعات محیطی که بر اعتبار الگو تأثیر می‌گذارد.
     """
+
     # روند
     trend: TrendDirection = TrendDirection.NEUTRAL
     trend_strength: float = 0.0
@@ -250,6 +259,7 @@ class PatternAnalysis:
     """
     نتیجه تحلیل یک الگو با تمام جزئیات
     """
+
     pattern: PatternType
     detected: bool = False
     direction: str = "neutral"
@@ -270,6 +280,7 @@ class PatternAnalysis:
 # =====================================================
 # تحلیلگر Context
 # =====================================================
+
 
 class ContextAnalyzer:
     """
@@ -295,7 +306,7 @@ class ContextAnalyzer:
         self,
         candles: List[Dict[str, Any]],
         times: List[datetime],
-        smc_context: Optional[Dict[str, Any]] = None
+        smc_context: Optional[Dict[str, Any]] = None,
     ) -> MarketContext:
         """
         تحلیل کامل context بازار
@@ -338,11 +349,7 @@ class ContextAnalyzer:
 
         return context
 
-    def _calculate_volatility(
-        self,
-        candles: List[Dict[str, Any]],
-        context: MarketContext
-    ) -> None:
+    def _calculate_volatility(self, candles: List[Dict[str, Any]], context: MarketContext) -> None:
         """محاسبه volatility و ATR"""
         n = len(candles)
         period = min(self.atr_period, n - 1)
@@ -353,15 +360,11 @@ class ContextAnalyzer:
         # محاسبه True Range برای هر کندل
         true_ranges = []
         for i in range(max(1, n - period), n):
-            high = candles[i]['high']
-            low = candles[i]['low']
-            prev_close = candles[i - 1]['close']
+            high = candles[i]["high"]
+            low = candles[i]["low"]
+            prev_close = candles[i - 1]["close"]
 
-            tr = max(
-                high - low,
-                abs(high - prev_close),
-                abs(low - prev_close)
-            )
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
             true_ranges.append(tr)
 
         if true_ranges:
@@ -372,23 +375,18 @@ class ContextAnalyzer:
         if len(true_ranges) >= 10:
             all_ranges = []
             for i in range(max(1, n - self.range_period), n):
-                high = candles[i]['high']
-                low = candles[i]['low']
-                prev_close = candles[i - 1]['close']
+                high = candles[i]["high"]
+                low = candles[i]["low"]
+                prev_close = candles[i - 1]["close"]
                 tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
                 all_ranges.append(tr)
 
             if all_ranges and context.atr > 0:
                 context.volatility_percentile = min(
-                    100,
-                    max(0, np.percentile(all_ranges, 80) / context.atr * 50)
+                    100, max(0, np.percentile(all_ranges, 80) / context.atr * 50)
                 )
 
-    def _detect_trend(
-        self,
-        candles: List[Dict[str, Any]],
-        context: MarketContext
-    ) -> None:
+    def _detect_trend(self, candles: List[Dict[str, Any]], context: MarketContext) -> None:
         """تشخیص روند با چند دوره"""
         n = len(candles)
         lookbacks = [20, 50]
@@ -403,7 +401,7 @@ class ContextAnalyzer:
             recent = candles[-lookback:]
 
             # بررسیEMA
-            closes = [c['close'] for c in recent]
+            closes = [c["close"] for c in recent]
             ema_fast = np.mean(closes[-10:])
             ema_slow = np.mean(closes)
 
@@ -413,8 +411,8 @@ class ContextAnalyzer:
                 bearish_votes += 1
 
             # بررسی swing highs/lows
-            highs = [c['high'] for c in recent]
-            lows = [c['low'] for c in recent]
+            highs = [c["high"] for c in recent]
+            lows = [c["low"] for c in recent]
 
             # ساختار HH/HL یا LH/LL
             mid = len(recent) // 2
@@ -431,19 +429,19 @@ class ContextAnalyzer:
         # تعیین روند
         if bullish_votes >= 2:
             context.trend = TrendDirection.BULLISH
-            context.trend_strength = min(bullish_votes / max(bullish_votes + bearish_votes, 1) * 100, 100)
+            context.trend_strength = min(
+                bullish_votes / max(bullish_votes + bearish_votes, 1) * 100, 100
+            )
         elif bearish_votes >= 2:
             context.trend = TrendDirection.BEARISH
-            context.trend_strength = min(bearish_votes / max(bullish_votes + bearish_votes, 1) * 100, 100)
+            context.trend_strength = min(
+                bearish_votes / max(bullish_votes + bearish_votes, 1) * 100, 100
+            )
         else:
             context.trend = TrendDirection.NEUTRAL
             context.trend_strength = 30
 
-    def _determine_session(
-        self,
-        current_time: datetime,
-        context: MarketContext
-    ) -> None:
+    def _determine_session(self, current_time: datetime, context: MarketContext) -> None:
         """تعیین سشن معاملاتی"""
         hour = current_time.hour
 
@@ -452,15 +450,11 @@ class ContextAnalyzer:
             TradingSession.SYDNEY: (22, 7),
             TradingSession.TOKYO: (0, 9),
             TradingSession.LONDON: (8, 17),
-            TradingSession.NEW_YORK: (13, 22)
+            TradingSession.NEW_YORK: (13, 22),
         }
 
         # Kill zones
-        killzones = {
-            "london": (8.0, 11.0),
-            "new_york": (13.5, 16.0),
-            "tokyo": (0.5, 2.0)
-        }
+        killzones = {"london": (8.0, 11.0), "new_york": (13.5, 16.0), "tokyo": (0.5, 2.0)}
 
         current_decimal_hour = hour + current_time.minute / 60
 
@@ -482,11 +476,7 @@ class ContextAnalyzer:
                 context.killzone_name = kz_name
                 break
 
-    def _extract_smc_context(
-        self,
-        smc_context: Dict[str, Any],
-        context: MarketContext
-    ) -> None:
+    def _extract_smc_context(self, smc_context: Dict[str, Any], context: MarketContext) -> None:
         """استخراج اطلاعات از SMC Engine"""
         context.last_structure_event = smc_context.get("last_event_type")
         context.liquidity_swept = smc_context.get("liquidity_swept", False)
@@ -500,7 +490,7 @@ class ContextAnalyzer:
                 "high": block.get("high", 0),
                 "low": block.get("low", 0),
                 "mid": block.get("mid", 0),
-                "strength": block.get("score", 5)
+                "strength": block.get("score", 5),
             }
             context.active_blocks.append(block_data)
 
@@ -516,7 +506,7 @@ class ContextAnalyzer:
                 "type": fvg.get("fvg_type", "bullish_fvg"),
                 "high": fvg.get("high", 0),
                 "low": fvg.get("low", 0),
-                "mid": fvg.get("mid", 0)
+                "mid": fvg.get("mid", 0),
             }
             context.active_fvgs.append(fvg_data)
 
@@ -527,11 +517,7 @@ class ContextAnalyzer:
             if isinstance(eq, (list, tuple)) and len(eq) == 2:
                 context.equilibrium_zone = (eq[0], eq[1])
 
-    def _extract_levels(
-        self,
-        candles: List[Dict[str, Any]],
-        context: MarketContext
-    ) -> None:
+    def _extract_levels(self, candles: List[Dict[str, Any]], context: MarketContext) -> None:
         """استخراج سطوح کلیدی"""
         n = len(candles)
         lookback = min(50, n)
@@ -540,19 +526,23 @@ class ContextAnalyzer:
 
         # سقف‌های اخیر
         for i in range(2, len(recent) - 2):
-            if (recent[i]['high'] > recent[i-1]['high'] and
-                recent[i]['high'] > recent[i-2]['high'] and
-                recent[i]['high'] > recent[i+1]['high'] and
-                recent[i]['high'] > recent[i+2]['high']):
-                context.resistance_levels.append(recent[i]['high'])
+            if (
+                recent[i]["high"] > recent[i - 1]["high"]
+                and recent[i]["high"] > recent[i - 2]["high"]
+                and recent[i]["high"] > recent[i + 1]["high"]
+                and recent[i]["high"] > recent[i + 2]["high"]
+            ):
+                context.resistance_levels.append(recent[i]["high"])
 
         # کف‌های اخیر
         for i in range(2, len(recent) - 2):
-            if (recent[i]['low'] < recent[i-1]['low'] and
-                recent[i]['low'] < recent[i-2]['low'] and
-                recent[i]['low'] < recent[i+1]['low'] and
-                recent[i]['low'] < recent[i+2]['low']):
-                context.support_levels.append(recent[i]['low'])
+            if (
+                recent[i]["low"] < recent[i - 1]["low"]
+                and recent[i]["low"] < recent[i - 2]["low"]
+                and recent[i]["low"] < recent[i + 1]["low"]
+                and recent[i]["low"] < recent[i + 2]["low"]
+            ):
+                context.support_levels.append(recent[i]["low"])
 
         # حذف تکراری‌ها و مرتب‌سازی
         context.resistance_levels = sorted(set(context.resistance_levels), reverse=True)[:10]
@@ -562,6 +552,7 @@ class ContextAnalyzer:
 # =====================================================
 # تشخیص الگوهای کندلی
 # =====================================================
+
 
 class CandlePatternDetector:
     """
@@ -584,10 +575,7 @@ class CandlePatternDetector:
         logger.debug("CandlePatternDetector مقداردهی شد")
 
     def detect_pin_bar(
-        self,
-        candles: List[CandleData],
-        context: MarketContext,
-        index: int = -1
+        self, candles: List[CandleData], context: MarketContext, index: int = -1
     ) -> PatternAnalysis:
         """
         تشخیص الگوی Pin Bar با context
@@ -621,32 +609,34 @@ class CandlePatternDetector:
         body_pct = candle.body_ratio
 
         # Bullish Pin Bar (lower wick)
-        if (lower_wick_pct >= self.pin_wick_min_ratio and
-            body_pct <= self.pin_body_max_ratio and
-            upper_wick_pct <= 0.15):
-
+        if (
+            lower_wick_pct >= self.pin_wick_min_ratio
+            and body_pct <= self.pin_body_max_ratio
+            and upper_wick_pct <= 0.15
+        ):
             analysis.detected = True
             analysis.direction = "bullish"
             analysis.base_score = 8.0
             analysis.details = {
                 "wick_level": candle.low,
                 "wick_ratio": lower_wick_pct,
-                "body_ratio": body_pct
+                "body_ratio": body_pct,
             }
             analysis.reason_codes.append(PatternReasonCode.WICK_REJECTION)
 
         # Bearish Pin Bar (upper wick)
-        elif (upper_wick_pct >= self.pin_wick_min_ratio and
-              body_pct <= self.pin_body_max_ratio and
-              lower_wick_pct <= 0.15):
-
+        elif (
+            upper_wick_pct >= self.pin_wick_min_ratio
+            and body_pct <= self.pin_body_max_ratio
+            and lower_wick_pct <= 0.15
+        ):
             analysis.detected = True
             analysis.direction = "bearish"
             analysis.base_score = 8.0
             analysis.details = {
                 "wick_level": candle.high,
                 "wick_ratio": upper_wick_pct,
-                "body_ratio": body_pct
+                "body_ratio": body_pct,
             }
             analysis.reason_codes.append(PatternReasonCode.WICK_REJECTION)
 
@@ -676,9 +666,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_engulfing(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص الگوی Engulfing با context
@@ -706,34 +694,38 @@ class CandlePatternDetector:
         curr_body_end = max(curr.open, curr.close)
 
         # Bullish Engulfing
-        if (curr.is_bullish and not prev.is_bullish and
-            curr_body_start <= prev_body_start and
-            curr_body_end >= prev_body_end and
-            curr.body >= prev.body * self.engulf_min_ratio):
-
+        if (
+            curr.is_bullish
+            and not prev.is_bullish
+            and curr_body_start <= prev_body_start
+            and curr_body_end >= prev_body_end
+            and curr.body >= prev.body * self.engulf_min_ratio
+        ):
             analysis.detected = True
             analysis.direction = "bullish"
             analysis.base_score = 10.0
             analysis.details = {
                 "engulf_ratio": curr.body / max(prev.body, 0.0001),
                 "prev_body": prev.body,
-                "curr_body": curr.body
+                "curr_body": curr.body,
             }
             analysis.reason_codes.append(PatternReasonCode.BODY_ENGULF)
 
         # Bearish Engulfing
-        elif (not curr.is_bullish and prev.is_bullish and
-              curr_body_start <= prev_body_start and
-              curr_body_end >= prev_body_end and
-              curr.body >= prev.body * self.engulf_min_ratio):
-
+        elif (
+            not curr.is_bullish
+            and prev.is_bullish
+            and curr_body_start <= prev_body_start
+            and curr_body_end >= prev_body_end
+            and curr.body >= prev.body * self.engulf_min_ratio
+        ):
             analysis.detected = True
             analysis.direction = "bearish"
             analysis.base_score = 10.0
             analysis.details = {
                 "engulf_ratio": curr.body / max(prev.body, 0.0001),
                 "prev_body": prev.body,
-                "curr_body": curr.body
+                "curr_body": curr.body,
             }
             analysis.reason_codes.append(PatternReasonCode.BODY_ENGULF)
 
@@ -769,11 +761,7 @@ class CandlePatternDetector:
 
         return analysis
 
-    def detect_fakey(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
-    ) -> PatternAnalysis:
+    def detect_fakey(self, candles: List[CandleData], context: MarketContext) -> PatternAnalysis:
         """
         تشخیص الگوی Fakey با context
 
@@ -785,10 +773,7 @@ class CandlePatternDetector:
 
         این الگو یکی از قدرتمندترین الگوهای reversal است.
         """
-        analysis = PatternAnalysis(
-            pattern=PatternType.FAKEY,
-            base_score=15.0
-        )
+        analysis = PatternAnalysis(pattern=PatternType.FAKEY, base_score=15.0)
 
         if len(candles) < 4:
             return analysis
@@ -799,8 +784,7 @@ class CandlePatternDetector:
         signal_candle = candles[-1]
 
         # بررسی Inside Bar
-        is_inside = (inside.high <= mother.high and
-                    inside.low >= mother.low)
+        is_inside = inside.high <= mother.high and inside.low >= mother.low
 
         if not is_inside:
             return analysis
@@ -810,30 +794,32 @@ class CandlePatternDetector:
             return analysis
 
         # Bearish Fakey (false break up)
-        if (test_candle.high > inside.high and
-            signal_candle.close < inside.high and
-            signal_candle.close < mother.high):
-
+        if (
+            test_candle.high > inside.high
+            and signal_candle.close < inside.high
+            and signal_candle.close < mother.high
+        ):
             analysis.detected = True
             analysis.direction = "bearish"
             analysis.details = {
                 "mother_range": mother.total_range,
                 "false_break_level": inside.high,
-                "test_high": test_candle.high
+                "test_high": test_candle.high,
             }
             analysis.reason_codes.append(PatternReasonCode.FALSE_BREAK)
 
         # Bullish Fakey (false break down)
-        elif (test_candle.low < inside.low and
-              signal_candle.close > inside.low and
-              signal_candle.close > mother.low):
-
+        elif (
+            test_candle.low < inside.low
+            and signal_candle.close > inside.low
+            and signal_candle.close > mother.low
+        ):
             analysis.detected = True
             analysis.direction = "bullish"
             analysis.details = {
                 "mother_range": mother.total_range,
                 "false_break_level": inside.low,
-                "test_low": test_candle.low
+                "test_low": test_candle.low,
             }
             analysis.reason_codes.append(PatternReasonCode.FALSE_BREAK)
 
@@ -845,8 +831,9 @@ class CandlePatternDetector:
 
         # Fakey در جهت مخالف روند قوی‌تر است (reversal)
         if context.trend != TrendDirection.NEUTRAL:
-            if (context.trend == TrendDirection.BULLISH and analysis.direction == "bearish") or \
-               (context.trend == TrendDirection.BEARISH and analysis.direction == "bullish"):
+            if (context.trend == TrendDirection.BULLISH and analysis.direction == "bearish") or (
+                context.trend == TrendDirection.BEARISH and analysis.direction == "bullish"
+            ):
                 analysis.context_bonuses["counter_trend_reversal"] = 15
                 analysis.reason_codes.append(PatternReasonCode.REVERSAL_CANDIDATE)
 
@@ -862,7 +849,12 @@ class CandlePatternDetector:
             analysis.entry_price = signal_candle.close
             analysis.stop_loss = mother.high
 
-        analysis.candle_indices = [mother.index, inside.index, test_candle.index, signal_candle.index]
+        analysis.candle_indices = [
+            mother.index,
+            inside.index,
+            test_candle.index,
+            signal_candle.index,
+        ]
         analysis.candle_times = [mother.time, inside.time, test_candle.time, signal_candle.time]
 
         logger.info(
@@ -873,9 +865,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_inside_bar(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص Inside Bar با context
@@ -902,7 +892,7 @@ class CandlePatternDetector:
                 "mother_high": mother.high,
                 "mother_low": mother.low,
                 "mother_range": mother.total_range,
-                "inside_range": inside.total_range
+                "inside_range": inside.total_range,
             }
             analysis.reason_codes.append(PatternReasonCode.INSIDE_STRUCTURE)
 
@@ -939,9 +929,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_outside_bar(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص Outside Bar با context
@@ -960,7 +948,7 @@ class CandlePatternDetector:
         curr = candles[-1]
 
         # بررسی خارج شدن از محدوده قبلی
-        is_outside = (curr.high > prev.high and curr.low < prev.low)
+        is_outside = curr.high > prev.high and curr.low < prev.low
 
         if not is_outside:
             return analysis
@@ -978,7 +966,7 @@ class CandlePatternDetector:
                 "curr_high": curr.high,
                 "curr_low": curr.low,
                 "expansion_up": curr.high - prev.high,
-                "expansion_down": prev.low - curr.low
+                "expansion_down": prev.low - curr.low,
             }
 
         if not analysis.detected:
@@ -989,8 +977,9 @@ class CandlePatternDetector:
 
         # قوی‌تر در جهت روند
         if context.trend != TrendDirection.NEUTRAL:
-            if (context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or \
-               (context.trend == TrendDirection.BEARISH and analysis.direction == "bearish"):
+            if (context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or (
+                context.trend == TrendDirection.BEARISH and analysis.direction == "bearish"
+            ):
                 analysis.context_bonuses["trend_aligned"] = 15
                 analysis.reason_codes.append(PatternReasonCode.TREND_ALIGNED)
 
@@ -1013,10 +1002,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_doji(
-        self,
-        candles: List[CandleData],
-        context: MarketContext,
-        index: int = -1
+        self, candles: List[CandleData], context: MarketContext, index: int = -1
     ) -> PatternAnalysis:
         """
         تشخیص Doji با context
@@ -1042,7 +1028,7 @@ class CandlePatternDetector:
             analysis.details = {
                 "mid_level": (candle.high + candle.low) / 2,
                 "body_ratio": candle.body_ratio,
-                "range": candle.total_range
+                "range": candle.total_range,
             }
 
         if not analysis.detected:
@@ -1082,9 +1068,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_star_pattern(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص Morning Star و Evening Star با context
@@ -1111,12 +1095,13 @@ class CandlePatternDetector:
         last_body = last.body
 
         # Morning Star (bullish reversal)
-        if (not first.is_bullish and  # نزولی
-            middle_body < first_body * 0.4 and  # کوچک
-            last.is_bullish and  # صعودی
-            last_body > middle_body * 2 and  # بزرگ
-            last.close > (first.open + first.close) / 2):  # بالاتر از mid first
-
+        if (
+            not first.is_bullish  # نزولی
+            and middle_body < first_body * 0.4  # کوچک
+            and last.is_bullish  # صعودی
+            and last_body > middle_body * 2  # بزرگ
+            and last.close > (first.open + first.close) / 2
+        ):  # بالاتر از mid first
             analysis.detected = True
             analysis.pattern = PatternType.MORNING_STAR
             analysis.direction = "bullish"
@@ -1127,16 +1112,17 @@ class CandlePatternDetector:
                 "first_body": first_body,
                 "middle_body": middle_body,
                 "last_body": last_body,
-                "reversal_strength": last_body / max(middle_body, 0.0001)
+                "reversal_strength": last_body / max(middle_body, 0.0001),
             }
 
         # Evening Star (bearish reversal)
-        elif (first.is_bullish and  # صعودی
-              middle_body < first_body * 0.4 and  # کوچک
-              not last.is_bullish and  # نزولی
-              last_body > middle_body * 2 and  # بزرگ
-              last.close < (first.open + first.close) / 2):  # پایین‌تر از mid first
-
+        elif (
+            first.is_bullish  # صعودی
+            and middle_body < first_body * 0.4  # کوچک
+            and not last.is_bullish  # نزولی
+            and last_body > middle_body * 2  # بزرگ
+            and last.close < (first.open + first.close) / 2
+        ):  # پایین‌تر از mid first
             analysis.detected = True
             analysis.pattern = PatternType.EVENING_STAR
             analysis.direction = "bearish"
@@ -1147,7 +1133,7 @@ class CandlePatternDetector:
                 "first_body": first_body,
                 "middle_body": middle_body,
                 "last_body": last_body,
-                "reversal_strength": last_body / max(middle_body, 0.0001)
+                "reversal_strength": last_body / max(middle_body, 0.0001),
             }
 
         if not analysis.detected:
@@ -1168,7 +1154,9 @@ class CandlePatternDetector:
         if analysis.direction == "bullish":
             analysis.invalidation_level = min(first.low, middle.low, last.low) - context.atr * 0.3
         else:
-            analysis.invalidation_level = max(first.high, middle.high, last.high) + context.atr * 0.3
+            analysis.invalidation_level = (
+                max(first.high, middle.high, last.high) + context.atr * 0.3
+            )
 
         analysis.candle_indices = [first.index, middle.index, last.index]
         analysis.candle_times = [first.time, middle.time, last.time]
@@ -1182,9 +1170,7 @@ class CandlePatternDetector:
         return analysis
 
     def detect_three_soldiers_crows(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص Three White Soldiers و Three Black Crows با context
@@ -1204,14 +1190,18 @@ class CandlePatternDetector:
         c3 = candles[-1]
 
         # Three White Soldiers
-        if (c1.is_bullish and c2.is_bullish and c3.is_bullish and
-            c2.close > c1.close and c3.close > c2.close):
-
+        if (
+            c1.is_bullish
+            and c2.is_bullish
+            and c3.is_bullish
+            and c2.close > c1.close
+            and c3.close > c2.close
+        ):
             # بررسی سایه‌های کوچک
             small_wicks = (
-                c1.upper_wick < c1.body * 0.5 and
-                c2.upper_wick < c2.body * 0.5 and
-                c3.upper_wick < c3.body * 0.5
+                c1.upper_wick < c1.body * 0.5
+                and c2.upper_wick < c2.body * 0.5
+                and c3.upper_wick < c3.body * 0.5
             )
 
             if small_wicks:
@@ -1225,17 +1215,21 @@ class CandlePatternDetector:
                 analysis.details = {
                     "total_move": total_move,
                     "avg_body": (c1.body + c2.body + c3.body) / 3,
-                    "small_wicks": True
+                    "small_wicks": True,
                 }
 
         # Three Black Crows
-        elif (not c1.is_bullish and not c2.is_bullish and not c3.is_bullish and
-              c2.close < c1.close and c3.close < c2.close):
-
+        elif (
+            not c1.is_bullish
+            and not c2.is_bullish
+            and not c3.is_bullish
+            and c2.close < c1.close
+            and c3.close < c2.close
+        ):
             small_wicks = (
-                c1.lower_wick < c1.body * 0.5 and
-                c2.lower_wick < c2.body * 0.5 and
-                c3.lower_wick < c3.body * 0.5
+                c1.lower_wick < c1.body * 0.5
+                and c2.lower_wick < c2.body * 0.5
+                and c3.lower_wick < c3.body * 0.5
             )
 
             if small_wicks:
@@ -1249,7 +1243,7 @@ class CandlePatternDetector:
                 analysis.details = {
                     "total_move": total_move,
                     "avg_body": (c1.body + c2.body + c3.body) / 3,
-                    "small_wicks": True
+                    "small_wicks": True,
                 }
 
         if not analysis.detected:
@@ -1259,8 +1253,9 @@ class CandlePatternDetector:
         self._apply_context_bonuses(analysis, context, c3)
 
         # قوی‌تر اگر با روند هماهنگ باشد
-        if ((context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or
-            (context.trend == TrendDirection.BEARISH and analysis.direction == "bearish")):
+        if (context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or (
+            context.trend == TrendDirection.BEARISH and analysis.direction == "bearish"
+        ):
             analysis.context_bonuses["trend_continuation"] = 15
 
         self._calculate_final_scores(analysis, context)
@@ -1283,10 +1278,7 @@ class CandlePatternDetector:
         return analysis
 
     def _apply_context_bonuses(
-        self,
-        analysis: PatternAnalysis,
-        context: MarketContext,
-        signal_candle: CandleData
+        self, analysis: PatternAnalysis, context: MarketContext, signal_candle: CandleData
     ) -> None:
         """
         اعمال bonuses بر اساس context بازار
@@ -1295,12 +1287,14 @@ class CandlePatternDetector:
 
         # با روند
         if context.trend != TrendDirection.NEUTRAL:
-            if ((context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or
-                (context.trend == TrendDirection.BEARISH and analysis.direction == "bearish")):
+            if (context.trend == TrendDirection.BULLISH and analysis.direction == "bullish") or (
+                context.trend == TrendDirection.BEARISH and analysis.direction == "bearish"
+            ):
                 analysis.context_bonuses["trend_aligned"] = 15
                 analysis.reason_codes.append(PatternReasonCode.TREND_ALIGNED)
-            elif ((context.trend == TrendDirection.BULLISH and analysis.direction == "bearish") or
-                  (context.trend == TrendDirection.BEARISH and analysis.direction == "bullish")):
+            elif (context.trend == TrendDirection.BULLISH and analysis.direction == "bearish") or (
+                context.trend == TrendDirection.BEARISH and analysis.direction == "bullish"
+            ):
                 analysis.context_bonuses["counter_trend"] = 5
                 analysis.reason_codes.append(PatternReasonCode.TREND_OPPOSING)
 
@@ -1322,8 +1316,9 @@ class CandlePatternDetector:
         # در Order Block
         for block in context.active_blocks:
             if block["low"] <= candle_mid <= block["high"]:
-                if ((block["direction"] == "bullish" and analysis.direction == "bullish") or
-                    (block["direction"] == "bearish" and analysis.direction == "bearish")):
+                if (block["direction"] == "bullish" and analysis.direction == "bullish") or (
+                    block["direction"] == "bearish" and analysis.direction == "bearish"
+                ):
                     analysis.context_bonuses["in_block_zone"] = 15
                     analysis.reason_codes.append(PatternReasonCode.IN_BLOCK_ZONE)
                 break
@@ -1337,8 +1332,9 @@ class CandlePatternDetector:
 
         # بعد از liquidity sweep
         if context.liquidity_swept:
-            if ((context.sweep_direction == "sell_side_hit" and analysis.direction == "bullish") or
-                (context.sweep_direction == "buy_side_hit" and analysis.direction == "bearish")):
+            if (context.sweep_direction == "sell_side_hit" and analysis.direction == "bullish") or (
+                context.sweep_direction == "buy_side_hit" and analysis.direction == "bearish"
+            ):
                 analysis.context_bonuses["after_sweep"] = 20
                 analysis.reason_codes.append(PatternReasonCode.AFTER_LIQUIDITY_SWEEP)
 
@@ -1356,11 +1352,7 @@ class CandlePatternDetector:
         if signal_candle.volume > 0:
             analysis.details["volume"] = signal_candle.volume
 
-    def _calculate_final_scores(
-        self,
-        analysis: PatternAnalysis,
-        context: MarketContext
-    ) -> None:
+    def _calculate_final_scores(self, analysis: PatternAnalysis, context: MarketContext) -> None:
         """
         محاسبه امتیازهای نهایی confidence و quality
         """
@@ -1392,6 +1384,7 @@ class CandlePatternDetector:
 # تحلیلگر ساختار قیمت
 # =====================================================
 
+
 class PriceStructureAnalyzer:
     """
     تحلیلگر ساختار قیمت
@@ -1419,10 +1412,7 @@ class PriceStructureAnalyzer:
         logger.debug("PriceStructureAnalyzer مقداردهی شد")
 
     def analyze(
-        self,
-        candles: List[CandleData],
-        context: MarketContext,
-        times: List[datetime]
+        self, candles: List[CandleData], context: MarketContext, times: List[datetime]
     ) -> List[PatternAnalysis]:
         """
         تحلیل کامل ساختار قیمت
@@ -1466,9 +1456,7 @@ class PriceStructureAnalyzer:
         return structures
 
     def _detect_breakout(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """تشخیص شکست سطوح"""
         analysis = PatternAnalysis(pattern=PatternType.BREAKOUT)
@@ -1492,16 +1480,18 @@ class PriceStructureAnalyzer:
                     analysis.details = {
                         "level": resistance,
                         "break_type": "resistance",
-                        "candle_body_ratio": curr.body_ratio
+                        "candle_body_ratio": curr.body_ratio,
                     }
                     analysis.invalidation_level = resistance - context.atr
 
-                    self.recent_breakouts.append({
-                        "level": resistance,
-                        "direction": "bullish",
-                        "time": curr.time,
-                        "candle_index": curr.index
-                    })
+                    self.recent_breakouts.append(
+                        {
+                            "level": resistance,
+                            "direction": "bullish",
+                            "time": curr.time,
+                            "candle_index": curr.index,
+                        }
+                    )
 
                     logger.info(f"Breakout صعودی از سطح {resistance:.5f}")
                     break
@@ -1519,16 +1509,18 @@ class PriceStructureAnalyzer:
                         analysis.details = {
                             "level": support,
                             "break_type": "support",
-                            "candle_body_ratio": curr.body_ratio
+                            "candle_body_ratio": curr.body_ratio,
                         }
                         analysis.invalidation_level = support + context.atr
 
-                        self.recent_breakouts.append({
-                            "level": support,
-                            "direction": "bearish",
-                            "time": curr.time,
-                            "candle_index": curr.index
-                        })
+                        self.recent_breakouts.append(
+                            {
+                                "level": support,
+                                "direction": "bearish",
+                                "time": curr.time,
+                                "candle_index": curr.index,
+                            }
+                        )
 
                         logger.info(f"Breakout نزولی از سطح {support:.5f}")
                         break
@@ -1550,11 +1542,7 @@ class PriceStructureAnalyzer:
 
         return analysis
 
-    def _detect_retest(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
-    ) -> PatternAnalysis:
+    def _detect_retest(self, candles: List[CandleData], context: MarketContext) -> PatternAnalysis:
         """تشخیص تست مجدد سطح شکسته شده"""
         analysis = PatternAnalysis(pattern=PatternType.RETEST)
 
@@ -1564,8 +1552,7 @@ class PriceStructureAnalyzer:
         curr = candles[-1]
 
         # فقط breakouts اخیر (حداکثر 5 کندل قبل)
-        recent_breaks = [b for b in self.recent_breakouts
-                       if curr.index - b["candle_index"] <= 5]
+        recent_breaks = [b for b in self.recent_breakouts if curr.index - b["candle_index"] <= 5]
 
         for breakout in recent_breaks:
             level = breakout["level"]
@@ -1586,7 +1573,7 @@ class PriceStructureAnalyzer:
                     analysis.details = {
                         "level": level,
                         "original_breakout_time": breakout["time"],
-                        "retest_type": "support_flip"
+                        "retest_type": "support_flip",
                     }
 
                 elif direction == "bearish" and not curr.is_bullish:
@@ -1599,15 +1586,13 @@ class PriceStructureAnalyzer:
                     analysis.details = {
                         "level": level,
                         "original_breakout_time": breakout["time"],
-                        "retest_type": "resistance_flip"
+                        "retest_type": "resistance_flip",
                     }
 
                 if analysis.detected:
                     analysis.invalidation_level = level
 
-                    logger.info(
-                        f"Retest سطح {level:.5f} ({analysis.details.get('retest_type')})"
-                    )
+                    logger.info(f"Retest سطح {level:.5f} ({analysis.details.get('retest_type')})")
                     break
 
         if analysis.detected:
@@ -1621,9 +1606,7 @@ class PriceStructureAnalyzer:
         return analysis
 
     def _detect_compression(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> PatternAnalysis:
         """
         تشخیص فشردگی
@@ -1645,7 +1628,7 @@ class PriceStructureAnalyzer:
         recent_avg_range = np.mean(recent_ranges)
 
         # رنج قبلی
-        prev = candles[-lookback * 2:-lookback]
+        prev = candles[-lookback * 2 : -lookback]
         prev_ranges = [c.total_range for c in prev]
         prev_avg_range = np.mean(prev_ranges)
 
@@ -1673,7 +1656,7 @@ class PriceStructureAnalyzer:
                 "prev_avg_range": prev_avg_range,
                 "high": recent_high,
                 "low": recent_low,
-                "mid_level": mid_level
+                "mid_level": mid_level,
             }
 
             # Context bonuses
@@ -1687,17 +1670,12 @@ class PriceStructureAnalyzer:
             analysis.candle_indices = [c.index for c in recent[-3:]]
             analysis.candle_times = [c.time for c in recent[-3:]]
 
-            logger.info(
-                f"Compression تشخیص داده شد | نسبت: {compression_ratio:.2f}"
-            )
+            logger.info(f"Compression تشخیص داده شد | نسبت: {compression_ratio:.2f}")
 
         return analysis
 
     def _detect_expansion(
-        self,
-        candles: List[CandleData],
-        context: MarketContext,
-        times: List[datetime]
+        self, candles: List[CandleData], context: MarketContext, times: List[datetime]
     ) -> PatternAnalysis:
         """
         تشخیص گسترش نوسانات
@@ -1712,8 +1690,10 @@ class PriceStructureAnalyzer:
 
         # بررسی زمان компресс (حداکثر 10 کندل بعد)
         curr_time = times[-1] if times else datetime.utcnow()
-        if (self.compression_detected_time and
-            (curr_time - self.compression_detected_time).total_seconds() > 3600 * 4):
+        if (
+            self.compression_detected_time
+            and (curr_time - self.compression_detected_time).total_seconds() > 3600 * 4
+        ):
             # خیلی گذشته - reset
             self.compression_detected_time = None
             return analysis
@@ -1742,7 +1722,7 @@ class PriceStructureAnalyzer:
                 analysis.details = {
                     "expansion_ratio": expansion_ratio,
                     "avg_expansion_range": recent_avg_range,
-                    "total_move": total_move
+                    "total_move": total_move,
                 }
 
                 # Context bonuses
@@ -1759,9 +1739,7 @@ class PriceStructureAnalyzer:
                 analysis.candle_indices = [c.index for c in recent]
                 analysis.candle_times = [c.time for c in recent]
 
-                logger.info(
-                    f"Expansion {analysis.direction} | نسبت: {expansion_ratio:.2f}"
-                )
+                logger.info(f"Expansion {analysis.direction} | نسبت: {expansion_ratio:.2f}")
 
         return analysis
 
@@ -1769,6 +1747,7 @@ class PriceStructureAnalyzer:
 # =====================================================
 # موتور اصلی Price Action
 # =====================================================
+
 
 class PriceActionEngine:
     """
@@ -1815,7 +1794,7 @@ class PriceActionEngine:
             PatternType.BREAKOUT: 1.2,
             PatternType.RETEST: 1.0,
             PatternType.COMPRESSION: 0.6,
-            PatternType.EXPANSION: 1.0
+            PatternType.EXPANSION: 1.0,
         }
 
         # Symbol و Timeframe جاری
@@ -1829,7 +1808,7 @@ class PriceActionEngine:
         symbol: str,
         data: Dict[str, Any],
         timeframe: str = "H1",
-        smc_context: Optional[Dict[str, Any]] = None
+        smc_context: Optional[Dict[str, Any]] = None,
     ) -> "PriceActionResult":
         """
         تحلیل کامل Price Action
@@ -1844,7 +1823,7 @@ class PriceActionEngine:
         Returns:
             PriceActionResult: نتیجه کامل تحلیل
         """
-        logger.info(f"{'='*50}")
+        logger.info(f"{'=' * 50}")
         logger.info(f"شروع تحلیل Price Action برای {symbol} [{timeframe}]")
 
         self._symbol = symbol
@@ -1871,19 +1850,13 @@ class PriceActionEngine:
             return self._get_empty_result()
 
         # تبدیل به CandleData
-        candles = self._convert_to_candle_data(
-            opens, highs, lows, closes, times, volumes
-        )
+        candles = self._convert_to_candle_data(opens, highs, lows, closes, times, volumes)
 
         if not times:
-            times = [datetime.utcnow() - timedelta(minutes=i*15) for i in range(len(candles))]
+            times = [datetime.utcnow() - timedelta(minutes=i * 15) for i in range(len(candles))]
 
         # تحلیل Context
-        context = self.context_analyzer.analyze(
-            [c.__dict__ for c in candles],
-            times,
-            smc_context
-        )
+        context = self.context_analyzer.analyze([c.__dict__ for c in candles], times, smc_context)
         context.current_price = closes[-1]
 
         # تشخیص الگوهای کندلی
@@ -1906,7 +1879,7 @@ class PriceActionEngine:
             f"امتیاز: {total_score:.2f} | الگوها: {len(patterns)} | "
             f"ساختارها: {len(structures)}"
         )
-        logger.info(f"{'='*50}")
+        logger.info(f"{'=' * 50}")
 
         return PriceActionResult(
             symbol=symbol,
@@ -1926,9 +1899,9 @@ class PriceActionEngine:
                     "volatility": context.volatility_percentile,
                     "session": context.current_session.value,
                     "is_killzone": context.is_killzone,
-                    "liquidity_swept": context.liquidity_swept
-                }
-            }
+                    "liquidity_swept": context.liquidity_swept,
+                },
+            },
         )
 
     def _convert_to_candle_data(
@@ -1938,7 +1911,7 @@ class PriceActionEngine:
         lows: List[float],
         closes: List[float],
         times: List[datetime],
-        volumes: List[float]
+        volumes: List[float],
     ) -> List[CandleData]:
         """تبدیل داده‌ها به CandleData"""
         candles = []
@@ -1952,16 +1925,14 @@ class PriceActionEngine:
                 high=highs[i],
                 low=lows[i],
                 close=closes[i],
-                volume=volumes[i] if volumes and i < len(volumes) else 0
+                volume=volumes[i] if volumes and i < len(volumes) else 0,
             )
             candles.append(candle)
 
         return candles
 
     def _detect_all_patterns(
-        self,
-        candles: List[CandleData],
-        context: MarketContext
+        self, candles: List[CandleData], context: MarketContext
     ) -> List[PatternAnalysis]:
         """تشخیص تمام الگوهای کندلی"""
         patterns = []
@@ -2009,9 +1980,7 @@ class PriceActionEngine:
         return patterns
 
     def _create_standard_signals(
-        self,
-        patterns: List[PatternAnalysis],
-        structures: List[PatternAnalysis]
+        self, patterns: List[PatternAnalysis], structures: List[PatternAnalysis]
     ) -> List[StandardPASignal]:
         """ایجاد سیگنال‌های استاندارد"""
         signals = []
@@ -2029,14 +1998,18 @@ class PriceActionEngine:
                 quality_score=pattern.quality_score,
                 entry_context={
                     "pattern_type": pattern.pattern.value,
-                    "entry_price": pattern.entry_price if pattern.entry_price > 0 else pattern.details.get("mid_level", 0),
-                    "stop_loss": pattern.stop_loss if pattern.stop_loss > 0 else pattern.invalidation_level,
-                    "take_profit": pattern.take_profit if pattern.take_profit > 0 else 0
+                    "entry_price": pattern.entry_price
+                    if pattern.entry_price > 0
+                    else pattern.details.get("mid_level", 0),
+                    "stop_loss": pattern.stop_loss
+                    if pattern.stop_loss > 0
+                    else pattern.invalidation_level,
+                    "take_profit": pattern.take_profit if pattern.take_profit > 0 else 0,
                 },
                 invalidation_level=pattern.invalidation_level,
                 reason_codes=pattern.reason_codes,
                 created_at=datetime.utcnow(),
-                metadata=pattern.details
+                metadata=pattern.details,
             )
             signals.append(signal)
 
@@ -2052,22 +2025,22 @@ class PriceActionEngine:
                 confidence_score=structure.confidence_score,
                 quality_score=structure.quality_score,
                 entry_context={
-                    "structure_type": structure.structure_type if hasattr(structure, 'structure_type') else structure.pattern.value,
-                    "level": structure.details.get("level", 0)
+                    "structure_type": structure.structure_type
+                    if hasattr(structure, "structure_type")
+                    else structure.pattern.value,
+                    "level": structure.details.get("level", 0),
                 },
                 invalidation_level=structure.invalidation_level,
                 reason_codes=structure.reason_codes,
                 created_at=datetime.utcnow(),
-                metadata=structure.details
+                metadata=structure.details,
             )
             signals.append(signal)
 
         return signals
 
     def _calculate_total_score(
-        self,
-        patterns: List[PatternAnalysis],
-        structures: List[PatternAnalysis]
+        self, patterns: List[PatternAnalysis], structures: List[PatternAnalysis]
     ) -> Tuple[float, str]:
         """محاسبه امتیاز کل و تعیین جهت"""
         bullish_score = 0.0
@@ -2107,7 +2080,7 @@ class PriceActionEngine:
         self,
         candles: List[CandleData],
         patterns: List[PatternAnalysis],
-        structures: List[PatternAnalysis]
+        structures: List[PatternAnalysis],
     ) -> Dict[str, List[float]]:
         """استخراج سطوح کلیدی"""
         supports = []
@@ -2149,7 +2122,7 @@ class PriceActionEngine:
 
         return {
             "supports": sorted(set(supports), reverse=True)[:5],
-            "resistances": sorted(set(resistances), reverse=True)[:5]
+            "resistances": sorted(set(resistances), reverse=True)[:5],
         }
 
     def _get_empty_result(self) -> "PriceActionResult":
@@ -2164,13 +2137,14 @@ class PriceActionEngine:
             structures=[],
             standard_signals=[],
             key_levels={"supports": [], "resistances": []},
-            details={"error": "Insufficient data"}
+            details={"error": "Insufficient data"},
         )
 
 
 # =====================================================
 # نتیجه تحلیل Price Action
 # =====================================================
+
 
 @dataclass
 class PriceActionResult:
@@ -2179,6 +2153,7 @@ class PriceActionResult:
 
     خروجی استاندارد برای مصرف توسط Decision Engine.
     """
+
     symbol: str
     timeframe: str
     total_score: float
@@ -2190,10 +2165,7 @@ class PriceActionResult:
     key_levels: Dict[str, List[float]]
     details: Dict[str, Any] = field(default_factory=dict)
 
-    def get_entry_signals(
-        self,
-        min_confidence: float = 60.0
-    ) -> List[StandardPASignal]:
+    def get_entry_signals(self, min_confidence: float = 60.0) -> List[StandardPASignal]:
         """
         دریافت سیگنال‌های ورود با حداقل اعتماد
 
@@ -2204,9 +2176,9 @@ class PriceActionResult:
             لیست سیگنال‌های qualified
         """
         return [
-            s for s in self.standard_signals
-            if s.confidence_score >= min_confidence
-            and s.direction != "neutral"
+            s
+            for s in self.standard_signals
+            if s.confidence_score >= min_confidence and s.direction != "neutral"
         ]
 
     def get_strongest_signal(self) -> Optional[StandardPASignal]:
@@ -2215,8 +2187,7 @@ class PriceActionResult:
             return None
 
         return max(
-            self.standard_signals,
-            key=lambda s: s.confidence_score * (1 + s.quality_score / 200)
+            self.standard_signals, key=lambda s: s.confidence_score * (1 + s.quality_score / 200)
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -2230,5 +2201,5 @@ class PriceActionResult:
             "structures_detected": len(self.structures),
             "signals": [s.to_dict() for s in self.standard_signals],
             "key_levels": self.key_levels,
-            "details": self.details
+            "details": self.details,
         }

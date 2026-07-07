@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Optional
 
 from .metrics_engine import AnalyticsResult
 
@@ -31,21 +30,22 @@ class ReportGenerator:
 
         def badge(value: float, good_above: float, bad_below: float) -> str:
             if value >= good_above:
-                color = "#00e676"   # green
+                color = "#00e676"  # green
             elif value < bad_below:
-                color = "#ef5350"   # red
+                color = "#ef5350"  # red
             else:
-                color = "#ffca28"   # amber
+                color = "#ffca28"  # amber
             return f'<span style="color:{color};font-weight:700">{value}</span>'
 
-        sharpe_badge  = badge(d["sharpe_ratio"],  1.5,  0.5)
-        sortino_badge = badge(d["sortino_ratio"], 2.0,  0.8)
-        calmar_badge  = badge(d["calmar_ratio"],  2.0,  0.5)
-        pf_badge      = badge(d["profit_factor"], 1.5,  1.0)
-        wr_badge      = badge(round(d["win_rate"] * 100, 1), 55, 45)
-        dd_badge      = badge(
+        sharpe_badge = badge(d["sharpe_ratio"], 1.5, 0.5)
+        sortino_badge = badge(d["sortino_ratio"], 2.0, 0.8)
+        calmar_badge = badge(d["calmar_ratio"], 2.0, 0.5)
+        pf_badge = badge(d["profit_factor"], 1.5, 1.0)
+        wr_badge = badge(round(d["win_rate"] * 100, 1), 55, 45)
+        badge(
             round(d["max_drawdown_pct"] * 100, 2),
-            0, 10   # drawdown: lower is better — invert logic
+            0,
+            10,  # drawdown: lower is better — invert logic
         )
 
         html = f"""<!DOCTYPE html>
@@ -78,7 +78,7 @@ class ReportGenerator:
 <body>
   <h1>🌌 {self.BRAND_NAME}</h1>
   <div class="sub">Symbol: <strong>{symbol}</strong> &nbsp;|&nbsp;
-       Period: {d.get("period_start","—")} → {d.get("period_end","—")} &nbsp;|&nbsp;
+       Period: {d.get("period_start", "—")} → {d.get("period_end", "—")} &nbsp;|&nbsp;
        Generated: {datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")}
   </div>
 
@@ -95,15 +95,15 @@ class ReportGenerator:
     <div class="card"><div class="label">Win Rate</div>
       <div class="value">{wr_badge}%</div></div>
     <div class="card"><div class="label">Recovery Factor</div>
-      <div class="value">{round(d["recovery_factor"],2) if d["recovery_factor"] != float("inf") else "∞"}</div></div>
+      <div class="value">{round(d["recovery_factor"], 2) if d["recovery_factor"] != float("inf") else "∞"}</div></div>
     <div class="card"><div class="label">Max Drawdown</div>
-      <div class="value red">{round(d["max_drawdown_pct"]*100, 2)}%</div></div>
+      <div class="value red">{round(d["max_drawdown_pct"] * 100, 2)}%</div></div>
     <div class="card"><div class="label">Expectancy (R)</div>
       <div class="value">{d["expectancy_r"]}R</div></div>
     <div class="card"><div class="label">CAGR</div>
-      <div class="value">{round(d["cagr"]*100, 2)}%</div></div>
+      <div class="value">{round(d["cagr"] * 100, 2)}%</div></div>
     <div class="card"><div class="label">Net Profit</div>
-      <div class="value {'green' if d['net_profit']>=0 else 'red'}">${d["net_profit"]}</div></div>
+      <div class="value {"green" if d["net_profit"] >= 0 else "red"}">${d["net_profit"]}</div></div>
     <div class="card"><div class="label">Total Trades</div>
       <div class="value">{d["total_trades"]}</div></div>
     <div class="card"><div class="label">Avg Hold (min)</div>
@@ -117,7 +117,7 @@ class ReportGenerator:
       <tr><td>Gross Profit</td><td class="green">${d["gross_profit"]}</td></tr>
       <tr><td>Gross Loss</td><td class="red">-${d["gross_loss"]}</td></tr>
       <tr><td>Net Profit</td>
-          <td class="{'green' if d['net_profit']>=0 else 'red'}">${d["net_profit"]}</td></tr>
+          <td class="{"green" if d["net_profit"] >= 0 else "red"}">${d["net_profit"]}</td></tr>
       <tr><td>Average Win</td><td class="green">${d["average_win"]}</td></tr>
       <tr><td>Average Loss</td><td class="red">${d["average_loss"]}</td></tr>
       <tr><td>Average RR</td><td>1:{d["average_rr"]}</td></tr>
@@ -146,16 +146,16 @@ class ReportGenerator:
     def to_summary_dict(self, result: AnalyticsResult) -> dict:
         """Compact summary for dashboard cards."""
         return {
-            "sharpe_ratio":          round(result.sharpe_ratio, 3),
-            "sortino_ratio":         round(result.sortino_ratio, 3),
-            "calmar_ratio":          round(result.calmar_ratio, 3),
-            "profit_factor":         round(result.profit_factor, 3),
-            "recovery_factor":       round(result.recovery_factor, 3),
-            "win_rate_pct":          round(result.win_rate * 100, 2),
-            "max_drawdown_pct":      round(result.max_drawdown_pct * 100, 2),
-            "net_profit":            round(result.net_profit, 2),
-            "expectancy_r":          round(result.expectancy_r, 3),
-            "total_trades":          result.total_trades,
-            "cagr_pct":              round(result.cagr * 100, 2),
-            "avg_rr":                round(result.average_rr, 2),
+            "sharpe_ratio": round(result.sharpe_ratio, 3),
+            "sortino_ratio": round(result.sortino_ratio, 3),
+            "calmar_ratio": round(result.calmar_ratio, 3),
+            "profit_factor": round(result.profit_factor, 3),
+            "recovery_factor": round(result.recovery_factor, 3),
+            "win_rate_pct": round(result.win_rate * 100, 2),
+            "max_drawdown_pct": round(result.max_drawdown_pct * 100, 2),
+            "net_profit": round(result.net_profit, 2),
+            "expectancy_r": round(result.expectancy_r, 3),
+            "total_trades": result.total_trades,
+            "cagr_pct": round(result.cagr * 100, 2),
+            "avg_rr": round(result.average_rr, 2),
         }

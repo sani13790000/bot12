@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
 from ...core.logger import get_logger
-from ..backtest.engine import CandleData
 from .engine import ReplayConfig, ReplayEngine, ReplayFrame, ReplaySpeed, ReplayStatus
 
 logger = get_logger("research.replay.controller")
@@ -49,9 +48,7 @@ class ReplaySession:
     async def start(self, candles: list, config: ReplayConfig) -> None:
         """شروع Replay در یک task جداگانه"""
         await self.engine.load(candles, config)
-        self._task = asyncio.create_task(
-            self.engine.play(on_frame=self._on_frame, config=config)
-        )
+        self._task = asyncio.create_task(self.engine.play(on_frame=self._on_frame, config=config))
         logger.info(f"Replay session شروع شد | user: {self.user_id}")
 
     def pause(self) -> None:
@@ -97,7 +94,7 @@ class ReplayController:
     def __init__(self) -> None:
         """مقداردهی اولیه کنترلر"""
         self._sessions: Dict[str, ReplaySession] = {}
-        self._max_sessions = 10   # حداکثر session همزمان
+        self._max_sessions = 10  # حداکثر session همزمان
         logger.info("ReplayController راه‌اندازی شد")
 
     async def create_session(
@@ -130,12 +127,11 @@ class ReplayController:
 
         # ─── بررسی محدودیت ───
         if len(self._sessions) >= self._max_sessions:
-            raise RuntimeError(
-                f"حداکثر session همزمان ({self._max_sessions}) رسیده"
-            )
+            raise RuntimeError(f"حداکثر session همزمان ({self._max_sessions}) رسیده")
 
         # ─── ساخت session جدید ───
         import uuid
+
         session_id = str(uuid.uuid4())[:8]
         session = ReplaySession(session_id=session_id, user_id=user_id)
 
@@ -145,9 +141,7 @@ class ReplayController:
         await session.start(candles, config)
         self._sessions[existing_key] = session
 
-        logger.info(
-            f"Session جدید ایجاد شد | id: {session_id} | user: {user_id}"
-        )
+        logger.info(f"Session جدید ایجاد شد | id: {session_id} | user: {user_id}")
         return session
 
     def get_session(self, user_id: int) -> Optional[ReplaySession]:
@@ -171,8 +165,7 @@ class ReplayController:
     def cleanup_finished(self) -> int:
         """پاکسازی session های تمام‌شده"""
         finished_keys = [
-            k for k, s in self._sessions.items()
-            if s.engine.state.status == ReplayStatus.FINISHED
+            k for k, s in self._sessions.items() if s.engine.state.status == ReplayStatus.FINISHED
         ]
         for k in finished_keys:
             del self._sessions[k]

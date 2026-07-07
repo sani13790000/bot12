@@ -4,40 +4,45 @@ Galaxy Vast AI Trading Platform — Enterprise Base Agent
 Fix STRESS-1: AgentVote, AgentResult, AgentStatus were missing.
 Fix STRESS-6: enabled=True added to BaseAgent — VotingEngine._normalise_weights requires it.
 """
+
 from __future__ import annotations
 
 import abc
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 _LOG = logging.getLogger(__name__)
 
 
 # ─── AgentStatus ─────────────────────────────────────────────────────────────
 
+
 class AgentStatus(str, Enum):
     """Lifecycle status of a single agent vote."""
-    OK    = "ok"
-    SKIP  = "skip"
+
+    OK = "ok"
+    SKIP = "skip"
     ERROR = "error"
-    VETO  = "veto"  # blocks all other agents
+    VETO = "veto"  # blocks all other agents
 
 
 # ─── AgentVote (per-agent raw vote) ──────────────────────────────────────────
 
+
 @dataclass
 class AgentVote:
     """Raw vote produced by a single agent."""
-    agent_id:   str
-    direction:  str            # "BUY" | "SELL" | "HOLD"
-    confidence: float          # 0.0 – 1.0
-    weight:     float = 1.0
-    score:      float = 0.0    # weighted score (filled by VotingEngine)
-    reason:     str   = ""
-    status:     AgentStatus = AgentStatus.OK
-    metadata:   Dict[str, Any] = field(default_factory=dict)
+
+    agent_id: str
+    direction: str  # "BUY" | "SELL" | "HOLD"
+    confidence: float  # 0.0 – 1.0
+    weight: float = 1.0
+    score: float = 0.0  # weighted score (filled by VotingEngine)
+    reason: str = ""
+    status: AgentStatus = AgentStatus.OK
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def weighted_confidence(self) -> float:
@@ -46,37 +51,41 @@ class AgentVote:
 
 # ─── AgentResult (enriched result from VotingEngine) ─────────────────────────
 
+
 @dataclass
 class AgentResult:
     """Enriched result wrapping a raw AgentVote with agent name and timing."""
+
     agent_name: str
-    vote:       AgentVote
+    vote: AgentVote
     latency_ms: float = 0.0
     elapsed_ms: float = 0.0
-    error:      Optional[str] = None
+    error: Optional[str] = None
 
 
 # ─── VoteSignal (legacy compat) ───────────────────────────────────────────────
 
+
 class VoteSignal(str, Enum):
-    BUY     = "BUY"
-    SELL    = "SELL"
+    BUY = "BUY"
+    SELL = "SELL"
     NEUTRAL = "NEUTRAL"
     ABSTAIN = "ABSTAIN"
 
 
 # ─── VoteResult (legacy per-agent result) ────────────────────────────────────
 
+
 @dataclass
 class VoteResult:
-    agent_id:   str
-    signal:     VoteSignal
+    agent_id: str
+    signal: VoteSignal
     confidence: float
-    weight:     float
+    weight: float
     latency_ms: float = 0.0
-    reason:     str   = ""
-    metadata:   Dict[str, Any] = field(default_factory=dict)
-    error:      Optional[str]  = None
+    reason: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
 
     @property
     def weighted_confidence(self) -> float:
@@ -84,32 +93,33 @@ class VoteResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "agent_id":            self.agent_id,
-            "signal":              self.signal.value,
-            "confidence":          round(self.confidence, 4),
-            "weight":              round(self.weight, 4),
+            "agent_id": self.agent_id,
+            "signal": self.signal.value,
+            "confidence": round(self.confidence, 4),
+            "weight": round(self.weight, 4),
             "weighted_confidence": round(self.weighted_confidence, 4),
-            "latency_ms":          round(self.latency_ms, 2),
-            "reason":              self.reason,
-            "metadata":            self.metadata,
-            "error":               self.error,
+            "latency_ms": round(self.latency_ms, 2),
+            "reason": self.reason,
+            "metadata": self.metadata,
+            "error": self.error,
         }
 
 
 # ─── BaseAgent ───────────────────────────────────────────────────────────────
 
+
 class BaseAgent(abc.ABC):
     """Abstract base for all trading agents."""
 
-    agent_id:  str   = "base"
-    weight:    float = 1.0
-    has_veto:  bool  = False
-    enabled:   bool  = True   # STRESS-6: required by VotingEngine._normalise_weights()
+    agent_id: str = "base"
+    weight: float = 1.0
+    has_veto: bool = False
+    enabled: bool = True  # STRESS-6: required by VotingEngine._normalise_weights()
 
     def __init__(
         self,
-        agent_id: Optional[str]   = None,
-        weight:   Optional[float] = None,
+        agent_id: Optional[str] = None,
+        weight: Optional[float] = None,
     ) -> None:
         if agent_id is not None:
             self.agent_id = agent_id
@@ -129,20 +139,28 @@ class BaseAgent(abc.ABC):
         except Exception as exc:
             _LOG.error("agent_error agent=%s: %s", self.agent_id, exc)
             return VoteResult(
-                agent_id=self.agent_id, signal=VoteSignal.ABSTAIN,
-                confidence=0.0, weight=self.weight,
-                reason=f"agent_error: {exc}", error=str(exc),
+                agent_id=self.agent_id,
+                signal=VoteSignal.ABSTAIN,
+                confidence=0.0,
+                weight=self.weight,
+                reason=f"agent_error: {exc}",
+                error=str(exc),
             )
 
     def _emit_metrics(self, result: VoteResult) -> None:
         """Emit vote metrics. Metrics are optional — never crash agent on failure."""
         try:
             from ..observability.metrics import metrics_registry
+
             metrics_registry.increment(f"agent.{self.agent_id}.votes.{result.signal.value.lower()}")
             metrics_registry.histogram(f"agent.{self.agent_id}.latency_ms", result.latency_ms)
         except Exception as _me:  # noqa: BLE001 — metrics optional, never crash agent
             _LOG.debug("agent_metrics failed agent=%s: %s", self.agent_id, _me)
 
     async def health(self) -> Dict[str, Any]:
-        return {"agent_id": self.agent_id, "weight": self.weight,
-                "enabled": self.enabled, "status": "ok"}
+        return {
+            "agent_id": self.agent_id,
+            "weight": self.weight,
+            "enabled": self.enabled,
+            "status": "ok",
+        }

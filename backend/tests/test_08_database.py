@@ -8,14 +8,15 @@ Galaxy Vast AI Trading Platform
 - CRUD operations
 - connection pool
 """
+
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestDatabaseWrapper:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         self.mock_client = MagicMock()
@@ -52,12 +53,14 @@ class TestDatabaseWrapper:
 
     def test_wrapper_initializes(self) -> None:
         from backend.database.connection import DatabaseWrapper
+
         with patch("backend.database.connection.create_client", return_value=self.mock_client):
             db = DatabaseWrapper()
             assert db is not None
 
     def test_ping_returns_true(self) -> None:
         from backend.database.connection import DatabaseWrapper
+
         with patch("backend.database.connection.create_client", return_value=self.mock_client):
             db = DatabaseWrapper()
             result = db.ping()
@@ -65,6 +68,7 @@ class TestDatabaseWrapper:
 
     def test_select_returns_list(self) -> None:
         from backend.database.connection import DatabaseWrapper
+
         with patch("backend.database.connection.create_client", return_value=self.mock_client):
             db = DatabaseWrapper()
             result = db.select("trades")
@@ -72,6 +76,7 @@ class TestDatabaseWrapper:
 
     def test_insert_returns_dict(self) -> None:
         from backend.database.connection import DatabaseWrapper
+
         with patch("backend.database.connection.create_client", return_value=self.mock_client):
             db = DatabaseWrapper()
             result = db.insert("trades", {"symbol": "EURUSD", "direction": "buy"})
@@ -79,6 +84,7 @@ class TestDatabaseWrapper:
 
     def test_update_called(self) -> None:
         from backend.database.connection import DatabaseWrapper
+
         with patch("backend.database.connection.create_client", return_value=self.mock_client):
             db = DatabaseWrapper()
             db.update("trades", "t001", {"status": "closed"})
@@ -86,64 +92,72 @@ class TestDatabaseWrapper:
 
 
 class TestConnectionHealth:
-
     def test_health_module_importable(self) -> None:
         from backend.database import connection_health
+
         assert connection_health is not None
 
     def test_health_checker_exists(self) -> None:
         from backend.database.connection_health import ConnectionHealthChecker
+
         checker = ConnectionHealthChecker()
         assert checker is not None
 
     def test_health_report_structure(self) -> None:
         from backend.database.connection_health import ConnectionHealthChecker
+
         checker = ConnectionHealthChecker()
         report = checker.get_report()
         assert isinstance(report, dict)
 
 
 class TestQueryOptimizer:
-
     def test_optimizer_importable(self) -> None:
         from backend.database import query_optimizer
+
         assert query_optimizer is not None
 
     def test_optimizer_class_exists(self) -> None:
         from backend.database.query_optimizer import QueryOptimizer
+
         opt = QueryOptimizer()
         assert opt is not None
 
 
 class TestConnectionPoolMonitor:
-
     def test_pool_monitor_importable(self) -> None:
         from backend.database import connection_pool_monitor
+
         assert connection_pool_monitor is not None
 
     def test_pool_monitor_class_exists(self) -> None:
         from backend.database.connection_pool_monitor import ConnectionPoolMonitor
+
         monitor = ConnectionPoolMonitor()
         assert monitor is not None
 
     def test_pool_stats_structure(self) -> None:
         from backend.database.connection_pool_monitor import ConnectionPoolMonitor
+
         monitor = ConnectionPoolMonitor()
         stats = monitor.get_stats()
         assert isinstance(stats, dict)
 
 
 class TestGetDbDependency:
-
     def test_get_db_importable(self) -> None:
         from backend.database.connection import get_db
+
         assert callable(get_db)
 
     def test_db_singleton_importable(self) -> None:
         from backend.database.connection import db
+
         assert db is not None
 
     def test_get_db_is_generator(self) -> None:
-        from backend.database.connection import get_db
         import inspect
+
+        from backend.database.connection import get_db
+
         assert inspect.isgeneratorfunction(get_db)

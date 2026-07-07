@@ -4,8 +4,7 @@
 نویسنده: MT5 Trading Team
 """
 
-from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 
 def format_welcome_message(username: str) -> str:
@@ -43,14 +42,16 @@ def format_analysis_result(result: Dict[str, Any]) -> str:
     score = decision.get("total_score", 0)
     entry_allowed = decision.get("entry_allowed", False)
 
-    direction_emoji = "🟢 خرید" if direction == "buy" else "🔴 فروش" if direction == "sell" else "⚪ خنثی"
+    direction_emoji = (
+        "🟢 خرید" if direction == "buy" else "🔴 فروش" if direction == "sell" else "⚪ خنثی"
+    )
     entry_emoji = "✅" if entry_allowed else "❌"
 
     text = f"""
 📊 <b>تحلیل جامع</b>
 <b>{symbol}</b> | {timeframe}
 
-{'='*30}
+{"=" * 30}
 
 🎯 <b>تصمیم:</b>
 • جهت: {direction_emoji}
@@ -64,9 +65,9 @@ def format_analysis_result(result: Dict[str, Any]) -> str:
         structure = smc.get("structure", {})
         text += f"""
 📈 <b>SMC:</b>
-• ساختار: {structure.get('trend', 'نامشخص')}
-• BOS: {'✅' if structure.get('bos') else '❌'}
-• CHOCH: {'✅' if structure.get('choch') else '❌'}
+• ساختار: {structure.get("trend", "نامشخص")}
+• BOS: {"✅" if structure.get("bos") else "❌"}
+• CHOCH: {"✅" if structure.get("choch") else "❌"}
 """
 
         liquidity = smc.get("liquidity", {})
@@ -77,7 +78,7 @@ def format_analysis_result(result: Dict[str, Any]) -> str:
     if pa:
         patterns = pa.get("patterns", [])
         if patterns:
-            text += f"\n📉 <b>Price Action:</b>\n"
+            text += "\n📉 <b>Price Action:</b>\n"
             for p in patterns[:3]:
                 text += f"• {p.get('name', '---')}: {p.get('bias', '---')}\n"
 
@@ -86,9 +87,9 @@ def format_analysis_result(result: Dict[str, Any]) -> str:
     if levels:
         text += f"""
 📍 <b>سطوح:</b>
-• ورود: {levels.get('entry', '---')}
-• حد سود: {levels.get('tp', '---')}
-• حد ضرر: {levels.get('sl', '---')}
+• ورود: {levels.get("entry", "---")}
+• حد سود: {levels.get("tp", "---")}
+• حد ضرر: {levels.get("sl", "---")}
 """
 
     # فیلترها
@@ -114,7 +115,7 @@ def format_trade_list(trades: list, title: str = "معاملات") -> str:
         symbol = trade.get("symbol", "---")
         direction = trade.get("direction", "---")
         profit = trade.get("profit_money", 0) or 0
-        status = trade.get("status", "---")
+        trade.get("status", "---")
 
         dir_emoji = "🟢" if direction == "buy" else "🔴"
         profit_emoji = "💰" if profit >= 0 else "📉"
@@ -162,7 +163,7 @@ def format_trade_detail(trade: Dict[str, Any]) -> str:
 
 📅 <b>زمان:</b>
 • باز شده: {opened_at}
-• {'بسته شده: ' + closed_at if closed_at != '---' else ''}
+• {"بسته شده: " + closed_at if closed_at != "---" else ""}
 """
     return text
 
@@ -234,7 +235,7 @@ def format_error_message(error_type: str, details: str = "") -> str:
         "not_found": "❌ اطلاعات یافت نشد",
         "unauthorized": "❌ دسترسی غیرمجاز",
         "validation": "❌ اطلاعات وارد شده نامعتبر است",
-        "unknown": "❌ خطای ناشناخته رخ داد"
+        "unknown": "❌ خطای ناشناخته رخ داد",
     }
 
     text = messages.get(error_type, messages["unknown"])

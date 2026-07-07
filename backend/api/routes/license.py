@@ -6,12 +6,13 @@ Endpointهای مربوط به اعتبارسنجی و مدیریت لایسنس
 نویسنده: MT5 Trading Team
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from ...core.logger import get_logger
 from ...core.exceptions import LicenseError, LicenseExpiredError
+from ...core.logger import get_logger
 from ...services.license_service import license_service
 from .auth import get_current_user
 
@@ -23,14 +24,17 @@ router = APIRouter()
 # مدل‌های Pydantic
 # =====================================================
 
+
 class LicenseValidateRequest(BaseModel):
     """درخواست اعتبارسنجی لایسنس"""
+
     license_key: str = Field(..., description="کلید لایسنس")
     device_id: Optional[str] = Field(default=None, description="شناسه دستگاه")
 
 
 class DeviceActivateRequest(BaseModel):
     """درخواست فعال‌سازی دستگاه"""
+
     license_key: str = Field(..., description="کلید لایسنس")
     device_id: str = Field(..., description="شناسه دستگاه")
     device_name: Optional[str] = Field(default=None, description="نام دستگاه")
@@ -38,6 +42,7 @@ class DeviceActivateRequest(BaseModel):
 
 class LicenseResponse(BaseModel):
     """پاسخ لایسنس"""
+
     success: bool
     data: Dict[str, Any]
     message: Optional[str] = None
@@ -47,11 +52,9 @@ class LicenseResponse(BaseModel):
 # Public Endpoints (بدون احراز هویت)
 # =====================================================
 
+
 @router.post("/validate", response_model=LicenseResponse)
-async def validate_license(
-    request: Request,
-    data: LicenseValidateRequest
-):
+async def validate_license(request: Request, data: LicenseValidateRequest):
     """
     اعتبارسنجی لایسنس
 
@@ -71,36 +74,19 @@ async def validate_license(
 
     try:
         result = await license_service.validate(
-            license_key=data.license_key,
-            device_id=data.device_id,
-            ip_address=ip_address
+            license_key=data.license_key, device_id=data.device_id, ip_address=ip_address
         )
 
-        return {
-            "success": True,
-            "data": result,
-            "message": "لایسنس معتبر است"
-        }
+        return {"success": True, "data": result, "message": "لایسنس معتبر است"}
 
     except LicenseExpiredError as e:
-        return {
-            "success": False,
-            "data": {"valid": False, "reason": "expired"},
-            "message": str(e)
-        }
+        return {"success": False, "data": {"valid": False, "reason": "expired"}, "message": str(e)}
     except LicenseError as e:
-        return {
-            "success": False,
-            "data": {"valid": False, "reason": "invalid"},
-            "message": str(e)
-        }
+        return {"success": False, "data": {"valid": False, "reason": "invalid"}, "message": str(e)}
 
 
 @router.post("/activate", response_model=LicenseResponse)
-async def activate_device(
-    request: Request,
-    data: DeviceActivateRequest
-):
+async def activate_device(request: Request, data: DeviceActivateRequest):
     """
     فعال‌سازی دستگاه
 
@@ -115,28 +101,17 @@ async def activate_device(
             license_key=data.license_key,
             device_id=data.device_id,
             device_name=data.device_name,
-            ip_address=ip_address
+            ip_address=ip_address,
         )
 
-        return {
-            "success": True,
-            "data": result,
-            "message": "دستگاه با موفقیت فعال شد"
-        }
+        return {"success": True, "data": result, "message": "دستگاه با موفقیت فعال شد"}
 
     except LicenseError as e:
-        return {
-            "success": False,
-            "data": {},
-            "message": str(e)
-        }
+        return {"success": False, "data": {}, "message": str(e)}
 
 
 @router.post("/deactivate", response_model=LicenseResponse)
-async def deactivate_device(
-    request: Request,
-    data: DeviceActivateRequest
-):
+async def deactivate_device(request: Request, data: DeviceActivateRequest):
     """
     غیرفعال‌سازی دستگاه
 
@@ -147,23 +122,14 @@ async def deactivate_device(
     ip_address = request.client.host if request.client else None
 
     result = await license_service.deactivate_device(
-        license_key=data.license_key,
-        device_id=data.device_id,
-        ip_address=ip_address
+        license_key=data.license_key, device_id=data.device_id, ip_address=ip_address
     )
 
-    return {
-        "success": result["success"],
-        "data": {},
-        "message": result["message"]
-    }
+    return {"success": result["success"], "data": {}, "message": result["message"]}
 
 
 @router.post("/feature-check")
-async def check_feature_access(
-    license_key: str,
-    feature: str
-):
+async def check_feature_access(license_key: str, feature: str):
     """
     بررسی دسترسی به ویژگی
 
@@ -171,23 +137,16 @@ async def check_feature_access(
     """
     has_access = await license_service.has_feature(license_key, feature)
 
-    return {
-        "success": True,
-        "data": {
-            "feature": feature,
-            "has_access": has_access
-        }
-    }
+    return {"success": True, "data": {"feature": feature, "has_access": has_access}}
 
 
 # =====================================================
 # Protected Endpoints (با احراز هویت)
 # =====================================================
 
+
 @router.get("/my")
-async def get_my_license(
-    user: dict = Depends(get_current_user)
-):
+async def get_my_license(user: dict = Depends(get_current_user)):
     """
     دریافت لایسنس کاربر جاری
 
@@ -196,11 +155,7 @@ async def get_my_license(
     license_data = await license_service.get_user_license(user.get("id"))
 
     if not license_data:
-        return {
-            "success": True,
-            "data": None,
-            "message": "لایسنس فعالی یافت نشد"
-        }
+        return {"success": True, "data": None, "message": "لایسنس فعالی یافت نشد"}
 
     # حذف اطلاعات حساس
     safe_data = {
@@ -211,20 +166,15 @@ async def get_my_license(
         "features": license_data.get("features", []),
         "devices": {
             "limit": license_data.get("devices_limit", 1),
-            "used": license_data.get("devices_used", 0)
-        }
+            "used": license_data.get("devices_used", 0),
+        },
     }
 
-    return {
-        "success": True,
-        "data": safe_data
-    }
+    return {"success": True, "data": safe_data}
 
 
 @router.get("/stats")
-async def get_license_stats(
-    user: dict = Depends(get_current_user)
-):
+async def get_license_stats(user: dict = Depends(get_current_user)):
     """
     آمار لایسنس
     """
@@ -233,14 +183,9 @@ async def get_license_stats(
     if not license_data:
         raise HTTPException(status_code=404, detail="لایسنس یافت نشد")
 
-    stats = await license_service.get_license_stats(
-        license_key=license_data.get("license_key")
-    )
+    stats = await license_service.get_license_stats(license_key=license_data.get("license_key"))
 
     # پاک کردن کلید کامل
     stats["license_key"] = stats.get("license_key", "")[:12] + "****"
 
-    return {
-        "success": True,
-        "data": stats
-    }
+    return {"success": True, "data": stats}

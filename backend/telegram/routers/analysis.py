@@ -1,4 +1,5 @@
 """Analysis handler."""
+
 from __future__ import annotations
 
 import httpx
@@ -13,9 +14,19 @@ logger = get_logger(__name__)
 router = Router(name="analysis")
 
 _ALLOWED_SYMBOLS = {
-    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-    "AUDUSD", "NZDUSD", "USDCAD", "BTCUSD", "ETHUSD",
-    "US30", "NAS100", "SPX500",
+    "XAUUSD",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "AUDUSD",
+    "NZDUSD",
+    "USDCAD",
+    "BTCUSD",
+    "ETHUSD",
+    "US30",
+    "NAS100",
+    "SPX500",
 }
 _API_BASE = getattr(settings, "API_BASE_URL", "http://api:8000")
 

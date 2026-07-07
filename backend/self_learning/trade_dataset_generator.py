@@ -26,115 +26,120 @@ logger = get_logger("self_learning.dataset_generator")
 # Enums
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TradeDirection(str, Enum):
-    BUY  = "BUY"
+    BUY = "BUY"
     SELL = "SELL"
 
 
 class TradeResult(str, Enum):
-    WIN  = "WIN"
+    WIN = "WIN"
     LOSS = "LOSS"
-    BE   = "BE"          # Break Even
+    BE = "BE"  # Break Even
 
 
 class MarketSession(str, Enum):
-    ASIAN   = "ASIAN"
-    LONDON  = "LONDON"
+    ASIAN = "ASIAN"
+    LONDON = "LONDON"
     NEW_YORK = "NEW_YORK"
-    OVERLAP  = "OVERLAP"
-    OFF      = "OFF"
+    OVERLAP = "OVERLAP"
+    OFF = "OFF"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data Models
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SMCFeatures:
     """ویژگی‌های Smart Money Concept در زمان ورود."""
-    bos_detected:          bool  = False
-    bos_strength:          float = 0.0   # 0.0 – 1.0
-    choch_detected:        bool  = False
-    choch_strength:        float = 0.0
-    order_block_present:   bool  = False
-    order_block_quality:   float = 0.0
-    order_block_tested:    bool  = False
-    breaker_block:         bool  = False
-    fvg_present:           bool  = False
-    fvg_quality:           float = 0.0
-    ifvg_present:          bool  = False
-    liquidity_sweep:       bool  = False
-    sweep_quality:         float = 0.0
-    internal_liquidity:    bool  = False
-    external_liquidity:    bool  = False
-    in_premium_zone:       bool  = False
-    in_discount_zone:      bool  = False
-    equilibrium_distance:  float = 0.0
-    structure_score:       float = 0.0
+
+    bos_detected: bool = False
+    bos_strength: float = 0.0  # 0.0 – 1.0
+    choch_detected: bool = False
+    choch_strength: float = 0.0
+    order_block_present: bool = False
+    order_block_quality: float = 0.0
+    order_block_tested: bool = False
+    breaker_block: bool = False
+    fvg_present: bool = False
+    fvg_quality: float = 0.0
+    ifvg_present: bool = False
+    liquidity_sweep: bool = False
+    sweep_quality: float = 0.0
+    internal_liquidity: bool = False
+    external_liquidity: bool = False
+    in_premium_zone: bool = False
+    in_discount_zone: bool = False
+    equilibrium_distance: float = 0.0
+    structure_score: float = 0.0
 
 
 @dataclass
 class MarketConditions:
     """شرایط بازار در زمان ورود به معامله."""
-    symbol:            str          = "XAUUSD"
-    session:           MarketSession = MarketSession.OFF
-    in_kill_zone:      bool         = False
-    atr_value:         float        = 0.0
-    atr_normalized:    float        = 0.0   # ATR / price
-    spread_pips:       float        = 0.0
-    spread_ratio:      float        = 0.0   # spread / ATR
-    volatility_ratio:  float        = 1.0   # current / avg volatility
-    trend_direction:   int          = 0     # 1=UP, -1=DOWN, 0=NEUTRAL
-    trend_strength:    float        = 0.0
-    htf_alignment:     bool         = False
-    htf_score:         float        = 0.0
-    hour_of_day:       int          = 0
-    day_of_week:       int          = 0     # 0=Monday
-    news_active:       bool         = False
+
+    symbol: str = "XAUUSD"
+    session: MarketSession = MarketSession.OFF
+    in_kill_zone: bool = False
+    atr_value: float = 0.0
+    atr_normalized: float = 0.0  # ATR / price
+    spread_pips: float = 0.0
+    spread_ratio: float = 0.0  # spread / ATR
+    volatility_ratio: float = 1.0  # current / avg volatility
+    trend_direction: int = 0  # 1=UP, -1=DOWN, 0=NEUTRAL
+    trend_strength: float = 0.0
+    htf_alignment: bool = False
+    htf_score: float = 0.0
+    hour_of_day: int = 0
+    day_of_week: int = 0  # 0=Monday
+    news_active: bool = False
 
 
 @dataclass
 class TradeRecord:
     """رکورد کامل یک معامله بسته‌شده."""
+
     # شناسه‌ها
-    trade_id:         str       = field(default_factory=lambda: str(uuid.uuid4()))
-    mt5_ticket:       int       = 0
+    trade_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    mt5_ticket: int = 0
 
     # اطلاعات معامله
-    symbol:           str       = "XAUUSD"
-    direction:        TradeDirection = TradeDirection.BUY
-    result:           TradeResult   = TradeResult.LOSS
+    symbol: str = "XAUUSD"
+    direction: TradeDirection = TradeDirection.BUY
+    result: TradeResult = TradeResult.LOSS
 
     # قیمت‌ها
-    entry_price:      float = 0.0
-    exit_price:       float = 0.0
-    stop_loss:        float = 0.0
-    take_profit:      float = 0.0
-    lot_size:         float = 0.01
+    entry_price: float = 0.0
+    exit_price: float = 0.0
+    stop_loss: float = 0.0
+    take_profit: float = 0.0
+    lot_size: float = 0.01
 
     # نتیجه مالی
-    profit_loss:      float = 0.0
-    profit_pips:      float = 0.0
+    profit_loss: float = 0.0
+    profit_pips: float = 0.0
     risk_reward_actual: float = 0.0
 
     # زمان
-    entry_time:       datetime = field(default_factory=datetime.utcnow)
-    exit_time:        datetime = field(default_factory=datetime.utcnow)
-    duration_minutes: int      = 0
+    entry_time: datetime = field(default_factory=datetime.utcnow)
+    exit_time: datetime = field(default_factory=datetime.utcnow)
+    duration_minutes: int = 0
 
     # امتیاز سیستم
     confidence_score: float = 0.0
-    decision_score:   float = 0.0
+    decision_score: float = 0.0
 
     # ویژگی‌های ML
-    smc:              SMCFeatures     = field(default_factory=SMCFeatures)
-    market:           MarketConditions = field(default_factory=MarketConditions)
+    smc: SMCFeatures = field(default_factory=SMCFeatures)
+    market: MarketConditions = field(default_factory=MarketConditions)
 
     # متادیتا
-    model_version:    str = "unknown"
+    model_version: str = "unknown"
     is_rule_violation: bool = False
-    violation_reason: str  = ""
-    created_at:       datetime = field(default_factory=datetime.utcnow)
+    violation_reason: str = ""
+    created_at: datetime = field(default_factory=datetime.utcnow)
 
     def to_ml_features(self) -> Dict[str, float]:
         """تبدیل رکورد به ۳۸ ویژگی عددی برای ML."""
@@ -142,62 +147,66 @@ class TradeRecord:
         m = self.market
         return {
             # SMC
-            "bos":              float(s.bos_detected),
-            "bos_strength":     s.bos_strength,
-            "choch":            float(s.choch_detected),
-            "choch_strength":   s.choch_strength,
-            "structure_score":  s.structure_score,
-            "structure_count":  float(s.bos_detected) + float(s.choch_detected),
+            "bos": float(s.bos_detected),
+            "bos_strength": s.bos_strength,
+            "choch": float(s.choch_detected),
+            "choch_strength": s.choch_strength,
+            "structure_score": s.structure_score,
+            "structure_count": float(s.bos_detected) + float(s.choch_detected),
             # Order Block
-            "ob_present":       float(s.order_block_present),
-            "ob_quality":       s.order_block_quality,
-            "ob_tested":        float(s.order_block_tested),
-            "breaker":          float(s.breaker_block),
+            "ob_present": float(s.order_block_present),
+            "ob_quality": s.order_block_quality,
+            "ob_tested": float(s.order_block_tested),
+            "breaker": float(s.breaker_block),
             # FVG
-            "fvg_present":      float(s.fvg_present),
-            "fvg_quality":      s.fvg_quality,
-            "ifvg":             float(s.ifvg_present),
+            "fvg_present": float(s.fvg_present),
+            "fvg_quality": s.fvg_quality,
+            "ifvg": float(s.ifvg_present),
             # نقدینگی
-            "sweep":            float(s.liquidity_sweep),
-            "sweep_quality":    s.sweep_quality,
-            "internal_liq":     float(s.internal_liquidity),
-            "external_liq":     float(s.external_liquidity),
+            "sweep": float(s.liquidity_sweep),
+            "sweep_quality": s.sweep_quality,
+            "internal_liq": float(s.internal_liquidity),
+            "external_liq": float(s.external_liquidity),
             # موقعیت قیمت
-            "in_discount":      float(s.in_discount_zone),
-            "in_premium":       float(s.in_premium_zone),
-            "eq_distance":      s.equilibrium_distance,
+            "in_discount": float(s.in_discount_zone),
+            "in_premium": float(s.in_premium_zone),
+            "eq_distance": s.equilibrium_distance,
             # بازار
-            "atr_norm":         m.atr_normalized,
-            "spread_ratio":     m.spread_ratio,
+            "atr_norm": m.atr_normalized,
+            "spread_ratio": m.spread_ratio,
             "volatility_ratio": m.volatility_ratio,
-            "trend_strength":   m.trend_strength,
-            "htf_aligned":      float(m.htf_alignment),
-            "htf_score":        m.htf_score,
+            "trend_strength": m.trend_strength,
+            "htf_aligned": float(m.htf_alignment),
+            "htf_score": m.htf_score,
             # زمان
-            "session_quality":  self._session_quality(m.session),
-            "kill_zone":        float(m.in_kill_zone),
-            "hour_sin":         np.sin(2 * np.pi * m.hour_of_day / 24),
-            "hour_cos":         np.cos(2 * np.pi * m.hour_of_day / 24),
-            "day_of_week":      float(m.day_of_week),
+            "session_quality": self._session_quality(m.session),
+            "kill_zone": float(m.in_kill_zone),
+            "hour_sin": np.sin(2 * np.pi * m.hour_of_day / 24),
+            "hour_cos": np.cos(2 * np.pi * m.hour_of_day / 24),
+            "day_of_week": float(m.day_of_week),
             # کلی
             "confidence_score": self.confidence_score / 100.0,
-            "decision_score":   self.decision_score / 100.0,
-            "duration_min":     float(min(self.duration_minutes, 1440)) / 1440.0,
-            "news_active":      float(m.news_active),
-            "lot_norm":         min(self.lot_size, 10.0) / 10.0,
-            "rr_planned":       min(abs(self.take_profit - self.entry_price) /
-                                    max(abs(self.stop_loss - self.entry_price), 0.0001), 10.0) / 10.0,
+            "decision_score": self.decision_score / 100.0,
+            "duration_min": float(min(self.duration_minutes, 1440)) / 1440.0,
+            "news_active": float(m.news_active),
+            "lot_norm": min(self.lot_size, 10.0) / 10.0,
+            "rr_planned": min(
+                abs(self.take_profit - self.entry_price)
+                / max(abs(self.stop_loss - self.entry_price), 0.0001),
+                10.0,
+            )
+            / 10.0,
             "is_rule_violation": float(self.is_rule_violation),
         }
 
     @staticmethod
     def _session_quality(session: MarketSession) -> float:
         weights = {
-            MarketSession.OVERLAP:  1.0,
-            MarketSession.LONDON:   0.85,
+            MarketSession.OVERLAP: 1.0,
+            MarketSession.LONDON: 0.85,
             MarketSession.NEW_YORK: 0.80,
-            MarketSession.ASIAN:    0.40,
-            MarketSession.OFF:      0.10,
+            MarketSession.ASIAN: 0.40,
+            MarketSession.OFF: 0.10,
         }
         return weights.get(session, 0.10)
 
@@ -208,6 +217,7 @@ class TradeRecord:
 # ─────────────────────────────────────────────────────────────────────────────
 # Trade Dataset Generator
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TradeDatasetGenerator:
     """
@@ -301,31 +311,44 @@ class TradeDatasetGenerator:
                     ml_features       = EXCLUDED.ml_features
                 RETURNING trade_id
                 """,
-                record.trade_id, record.mt5_ticket,
-                record.symbol, record.direction.value, record.result.value,
-                record.entry_price, record.exit_price,
-                record.stop_loss, record.take_profit, record.lot_size,
-                record.profit_loss, record.profit_pips, record.risk_reward_actual,
-                record.entry_time, record.exit_time, record.duration_minutes,
-                record.confidence_score, record.decision_score,
+                record.trade_id,
+                record.mt5_ticket,
+                record.symbol,
+                record.direction.value,
+                record.result.value,
+                record.entry_price,
+                record.exit_price,
+                record.stop_loss,
+                record.take_profit,
+                record.lot_size,
+                record.profit_loss,
+                record.profit_pips,
+                record.risk_reward_actual,
+                record.entry_time,
+                record.exit_time,
+                record.duration_minutes,
+                record.confidence_score,
+                record.decision_score,
                 json.dumps(asdict(record.smc)),
-                json.dumps({
-                    "symbol":          record.market.symbol,
-                    "session":         record.market.session.value,
-                    "in_kill_zone":    record.market.in_kill_zone,
-                    "atr_value":       record.market.atr_value,
-                    "atr_normalized":  record.market.atr_normalized,
-                    "spread_pips":     record.market.spread_pips,
-                    "spread_ratio":    record.market.spread_ratio,
-                    "volatility_ratio":record.market.volatility_ratio,
-                    "trend_direction": record.market.trend_direction,
-                    "trend_strength":  record.market.trend_strength,
-                    "htf_alignment":   record.market.htf_alignment,
-                    "htf_score":       record.market.htf_score,
-                    "hour_of_day":     record.market.hour_of_day,
-                    "day_of_week":     record.market.day_of_week,
-                    "news_active":     record.market.news_active,
-                }),
+                json.dumps(
+                    {
+                        "symbol": record.market.symbol,
+                        "session": record.market.session.value,
+                        "in_kill_zone": record.market.in_kill_zone,
+                        "atr_value": record.market.atr_value,
+                        "atr_normalized": record.market.atr_normalized,
+                        "spread_pips": record.market.spread_pips,
+                        "spread_ratio": record.market.spread_ratio,
+                        "volatility_ratio": record.market.volatility_ratio,
+                        "trend_direction": record.market.trend_direction,
+                        "trend_strength": record.market.trend_strength,
+                        "htf_alignment": record.market.htf_alignment,
+                        "htf_score": record.market.htf_score,
+                        "hour_of_day": record.market.hour_of_day,
+                        "day_of_week": record.market.day_of_week,
+                        "news_active": record.market.news_active,
+                    }
+                ),
                 json.dumps(ml_features),
                 record.model_version,
                 record.is_rule_violation,
@@ -333,19 +356,21 @@ class TradeDatasetGenerator:
             )
 
         trade_id = str(row["trade_id"])
-        logger.info(f"Trade saved: {trade_id} | {record.symbol} {record.result.value} | P/L={record.profit_loss:.2f}")
+        logger.info(
+            f"Trade saved: {trade_id} | {record.symbol} {record.result.value} | P/L={record.profit_loss:.2f}"
+        )
         return trade_id
 
     # ─── Dataset ──────────────────────────────────────────────────────────────
 
     async def build_dataset(
         self,
-        symbol:              Optional[str]      = None,
-        valid_only:          bool               = True,
-        min_confidence:      float              = 0.0,
-        start_date:          Optional[datetime] = None,
-        end_date:            Optional[datetime] = None,
-        exclude_be:          bool               = True,
+        symbol: Optional[str] = None,
+        valid_only: bool = True,
+        min_confidence: float = 0.0,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        exclude_be: bool = True,
     ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
         """
         ساخت (X, y, feature_names) برای training.
@@ -361,7 +386,8 @@ class TradeDatasetGenerator:
 
         if symbol:
             conditions.append(f"symbol = ${idx}")
-            params.append(symbol); idx += 1
+            params.append(symbol)
+            idx += 1
 
         if valid_only:
             conditions.append("is_rule_violation = FALSE")
@@ -371,15 +397,18 @@ class TradeDatasetGenerator:
 
         if min_confidence > 0:
             conditions.append(f"confidence_score >= ${idx}")
-            params.append(min_confidence); idx += 1
+            params.append(min_confidence)
+            idx += 1
 
         if start_date:
             conditions.append(f"entry_time >= ${idx}")
-            params.append(start_date); idx += 1
+            params.append(start_date)
+            idx += 1
 
         if end_date:
             conditions.append(f"entry_time <= ${idx}")
-            params.append(end_date); idx += 1
+            params.append(end_date)
+            idx += 1
 
         where = " AND ".join(conditions)
         query = f"""
@@ -411,7 +440,9 @@ class TradeDatasetGenerator:
         )
         y = np.array(labels, dtype=np.int32)
 
-        logger.info(f"Dataset built: {len(X)} samples | symbol={symbol or 'ALL'} | win_rate={y.mean():.2%}")
+        logger.info(
+            f"Dataset built: {len(X)} samples | symbol={symbol or 'ALL'} | win_rate={y.mean():.2%}"
+        )
         return X, y, feature_names
 
     # ─── آمار ─────────────────────────────────────────────────────────────────
@@ -445,17 +476,17 @@ class TradeDatasetGenerator:
 
         total = row["total"] or 1
         return {
-            "total_trades":    row["total"],
-            "wins":            row["wins"],
-            "losses":          row["losses"],
-            "be_count":        row["be_count"],
-            "win_rate":        round(row["wins"] / total, 4),
-            "avg_pips":        float(row["avg_pips"] or 0),
-            "avg_confidence":  float(row["avg_confidence"] or 0),
-            "avg_rr":          float(row["avg_rr"] or 0),
-            "first_trade":     row["first_trade"].isoformat() if row["first_trade"] else None,
-            "last_trade":      row["last_trade"].isoformat()  if row["last_trade"]  else None,
-            "symbol":          symbol or "ALL",
+            "total_trades": row["total"],
+            "wins": row["wins"],
+            "losses": row["losses"],
+            "be_count": row["be_count"],
+            "win_rate": round(row["wins"] / total, 4),
+            "avg_pips": float(row["avg_pips"] or 0),
+            "avg_confidence": float(row["avg_confidence"] or 0),
+            "avg_rr": float(row["avg_rr"] or 0),
+            "first_trade": row["first_trade"].isoformat() if row["first_trade"] else None,
+            "last_trade": row["last_trade"].isoformat() if row["last_trade"] else None,
+            "symbol": symbol or "ALL",
         }
 
     async def count_trades(self, symbol: Optional[str] = None, valid_only: bool = True) -> int:

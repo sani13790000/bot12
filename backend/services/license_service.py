@@ -6,12 +6,11 @@ Wrapper برای LicenseManager با قابلیت‌های اضافی.
 نویسنده: MT5 Trading Team
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from ..core.logger import get_logger
-from ..core.exceptions import LicenseError
-from ..license.manager import license_manager, Feature
-from .audit_service import audit_service, AuditAction
+from ..license.manager import Feature, license_manager
+from .audit_service import AuditAction, audit_service
 
 logger = get_logger("license_service")
 
@@ -31,7 +30,7 @@ class LicenseService:
         license_key: str,
         device_id: Optional[str] = None,
         user_id: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         اعتبارسنجی لایسنس
@@ -58,7 +57,7 @@ class LicenseService:
                 user_id=user_id or result.get("user_id"),
                 device_id=device_id,
                 success=True,
-                ip_address=ip_address
+                ip_address=ip_address,
             )
 
             return {
@@ -69,8 +68,8 @@ class LicenseService:
                 "features": result.get("features", []),
                 "devices": {
                     "limit": result.get("devices_limit", 1),
-                    "used": result.get("devices_used", 0)
-                }
+                    "used": result.get("devices_used", 0),
+                },
             }
 
         except Exception as e:
@@ -82,15 +81,11 @@ class LicenseService:
                 device_id=device_id,
                 success=False,
                 error_message=str(e),
-                ip_address=ip_address
+                ip_address=ip_address,
             )
             raise
 
-    async def has_feature(
-        self,
-        license_key: str,
-        feature: str
-    ) -> bool:
+    async def has_feature(self, license_key: str, feature: str) -> bool:
         """
         بررسی دسترسی به ویژگی
 
@@ -115,7 +110,7 @@ class LicenseService:
         device_id: str,
         device_name: Optional[str] = None,
         user_id: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         فعال‌سازی دستگاه
@@ -131,10 +126,8 @@ class LicenseService:
             نتیجه
         """
         try:
-            result = await license_manager.activate_device(
-                license_key=license_key,
-                device_id=device_id,
-                device_name=device_name
+            await license_manager.activate_device(
+                license_key=license_key, device_id=device_id, device_name=device_name
             )
 
             # ثبت لاگ
@@ -144,14 +137,10 @@ class LicenseService:
                 user_id=user_id,
                 device_id=device_id,
                 success=True,
-                ip_address=ip_address
+                ip_address=ip_address,
             )
 
-            return {
-                "success": True,
-                "device_id": device_id,
-                "message": "دستگاه با موفقیت فعال شد"
-            }
+            return {"success": True, "device_id": device_id, "message": "دستگاه با موفقیت فعال شد"}
 
         except Exception as e:
             await audit_service.log_license(
@@ -161,7 +150,7 @@ class LicenseService:
                 device_id=device_id,
                 success=False,
                 error_message=str(e),
-                ip_address=ip_address
+                ip_address=ip_address,
             )
             raise
 
@@ -170,7 +159,7 @@ class LicenseService:
         license_key: str,
         device_id: str,
         user_id: Optional[str] = None,
-        ip_address: Optional[str] = None
+        ip_address: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         غیرفعال‌سازی دستگاه
@@ -192,18 +181,12 @@ class LicenseService:
             user_id=user_id,
             device_id=device_id,
             success=True,
-            ip_address=ip_address
+            ip_address=ip_address,
         )
 
-        return {
-            "success": result,
-            "message": "دستگاه غیرفعال شد" if result else "دستگاه یافت نشد"
-        }
+        return {"success": result, "message": "دستگاه غیرفعال شد" if result else "دستگاه یافت نشد"}
 
-    async def get_user_license(
-        self,
-        user_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_user_license(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
         دریافت لایسنس کاربر
 
@@ -215,10 +198,7 @@ class LicenseService:
         """
         return await license_manager.get_user_license(user_id)
 
-    async def get_license_stats(
-        self,
-        license_key: str
-    ) -> Dict[str, Any]:
+    async def get_license_stats(self, license_key: str) -> Dict[str, Any]:
         """
         آمار لایسنس
 
@@ -236,6 +216,7 @@ class LicenseService:
             return 0
 
         from datetime import datetime
+
         try:
             expiry = datetime.fromisoformat(expires_at)
             remaining = (expiry - datetime.utcnow()).days

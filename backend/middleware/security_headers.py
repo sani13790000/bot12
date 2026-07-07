@@ -21,6 +21,7 @@ Usage::
     from backend.middleware.security_headers import SecurityHeadersMiddleware
     app.add_middleware(SecurityHeadersMiddleware)
 """
+
 from __future__ import annotations
 
 from typing import Awaitable, Callable
@@ -28,7 +29,6 @@ from typing import Awaitable, Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-
 
 # ── Header values ────────────────────────────────────────────────────────── #
 
@@ -50,12 +50,7 @@ _CSP = (
 )
 
 # Permissions-Policy: disable features not needed by the app
-_PERMISSIONS = (
-    "camera=(), "
-    "microphone=(), "
-    "geolocation=(), "
-    "interest-cohort=()"
-)
+_PERMISSIONS = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
 
 # Cache-Control for API responses (prevents caching of sensitive data)
 _CACHE_CONTROL = "no-store, no-cache, must-revalidate, private"
@@ -63,12 +58,12 @@ _CACHE_CONTROL = "no-store, no-cache, must-revalidate, private"
 # Security headers to set on every response
 _SECURITY_HEADERS: dict[str, str] = {
     "Strict-Transport-Security": _HSTS,
-    "Content-Security-Policy":   _CSP,
-    "X-Content-Type-Options":    "nosniff",
-    "X-Frame-Options":           "DENY",
-    "X-XSS-Protection":          "0",          # modern browsers ignore this; set to 0
-    "Referrer-Policy":           "strict-origin-when-cross-origin",
-    "Permissions-Policy":        _PERMISSIONS,
+    "Content-Security-Policy": _CSP,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "0",  # modern browsers ignore this; set to 0
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": _PERMISSIONS,
 }
 
 

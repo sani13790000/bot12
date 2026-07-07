@@ -7,12 +7,12 @@ Galaxy Vast AI Trading Platform
 - PositionReconciler (GHOST / ORPHAN)
 - SignalProcessor pipeline کامل
 """
+
 from __future__ import annotations
 
-import asyncio
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any, Dict, List
 
 
 # ═══════════════════════════════════════════════════════════════════════════ #
@@ -24,6 +24,7 @@ class TestFullTradeFlow:
     @pytest.fixture(autouse=True)
     def setup(self, mock_broker, mock_db):
         from backend.execution.execution_service import ExecutionService, TradeSignal
+
         self.svc = ExecutionService(connector=mock_broker, db=mock_db)
         self.TradeSignal = TradeSignal
         self.broker = mock_broker
@@ -32,9 +33,13 @@ class TestFullTradeFlow:
     @pytest.mark.asyncio
     async def test_execute_opens_position(self) -> None:
         sig = self.TradeSignal(
-            symbol="EURUSD", direction="buy",
-            volume=0.10, sl=1.1000, tp=1.1150,
-            confidence=0.82, source="test",
+            symbol="EURUSD",
+            direction="buy",
+            volume=0.10,
+            sl=1.1000,
+            tp=1.1150,
+            confidence=0.82,
+            source="test",
         )
         result = await self.svc.execute(sig)
         assert result.success
@@ -44,9 +49,13 @@ class TestFullTradeFlow:
     @pytest.mark.asyncio
     async def test_execute_persists_to_db(self) -> None:
         sig = self.TradeSignal(
-            symbol="GBPUSD", direction="sell",
-            volume=0.05, sl=1.2800, tp=1.2650,
-            confidence=0.78, source="test",
+            symbol="GBPUSD",
+            direction="sell",
+            volume=0.05,
+            sl=1.2800,
+            tp=1.2650,
+            confidence=0.78,
+            source="test",
         )
         await self.svc.execute(sig)
         self.db.insert.assert_called()
@@ -60,9 +69,13 @@ class TestFullTradeFlow:
     @pytest.mark.asyncio
     async def test_execute_sell_signal(self) -> None:
         sig = self.TradeSignal(
-            symbol="USDJPY", direction="sell",
-            volume=0.10, sl=150.50, tp=149.00,
-            confidence=0.75, source="test",
+            symbol="USDJPY",
+            direction="sell",
+            volume=0.10,
+            sl=150.50,
+            tp=149.00,
+            confidence=0.75,
+            source="test",
         )
         result = await self.svc.execute(sig)
         assert result.success
@@ -71,9 +84,13 @@ class TestFullTradeFlow:
     async def test_broker_failure_returns_error(self) -> None:
         self.broker.place_order = AsyncMock(side_effect=Exception("Gateway timeout"))
         sig = self.TradeSignal(
-            symbol="EURUSD", direction="buy",
-            volume=0.10, sl=1.1000, tp=1.1150,
-            confidence=0.80, source="test",
+            symbol="EURUSD",
+            direction="buy",
+            volume=0.10,
+            sl=1.1000,
+            tp=1.1150,
+            confidence=0.80,
+            source="test",
         )
         result = await self.svc.execute(sig)
         assert not result.success
@@ -88,8 +105,9 @@ class TestReconciliationIntegration:
 
     @pytest.fixture(autouse=True)
     def setup(self, mock_broker):
-        from backend.execution.position_reconciliation import PositionReconciler
         from backend.execution.order_state_machine import OrderStateMachine
+        from backend.execution.position_reconciliation import PositionReconciler
+
         self.osm = OrderStateMachine()
         self.reconciler = PositionReconciler(
             connector=mock_broker,
@@ -108,9 +126,9 @@ class TestReconciliationIntegration:
 
     @pytest.mark.asyncio
     async def test_orphan_detection(self) -> None:
-        self.broker.get_open_positions = AsyncMock(return_value=[
-            {"ticket": 88001, "symbol": "EURUSD", "volume": 0.10}
-        ])
+        self.broker.get_open_positions = AsyncMock(
+            return_value=[{"ticket": 88001, "symbol": "EURUSD", "volume": 0.10}]
+        )
         result = await self.reconciler.run()
         assert result.orphans >= 1
 
@@ -118,9 +136,9 @@ class TestReconciliationIntegration:
     async def test_no_mismatch_when_in_sync(self) -> None:
         self.osm.register(99001)
         self.osm.transition(99001, "OPEN")
-        self.broker.get_open_positions = AsyncMock(return_value=[
-            {"ticket": 99001, "symbol": "EURUSD", "volume": 0.10}
-        ])
+        self.broker.get_open_positions = AsyncMock(
+            return_value=[{"ticket": 99001, "symbol": "EURUSD", "volume": 0.10}]
+        )
         result = await self.reconciler.run()
         assert result.ghosts == 0
         assert result.orphans == 0
@@ -137,27 +155,36 @@ class TestReconciliationIntegration:
 # SignalProcessor Pipeline                                                     #
 # ═══════════════════════════════════════════════════════════════════════════ #
 class TestSignalProcessorPipeline:
-
     @pytest.mark.asyncio
     async def test_reject_no_trade_direction(self) -> None:
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         proc = SignalProcessor()
         sig = RawSignal(
-            symbol="EURUSD", direction="NO_TRADE",
-            confidence=0.85, entry=1.1050,
-            sl=1.1000, tp=1.1150, lot=0.10,
+            symbol="EURUSD",
+            direction="NO_TRADE",
+            confidence=0.85,
+            entry=1.1050,
+            sl=1.1000,
+            tp=1.1150,
+            lot=0.10,
         )
         result = await proc.process(sig)
         assert not result.executed
 
     @pytest.mark.asyncio
     async def test_reject_low_confidence(self) -> None:
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         proc = SignalProcessor()
         sig = RawSignal(
-            symbol="EURUSD", direction="BUY",
-            confidence=0.30, entry=1.1050,
-            sl=1.1000, tp=1.1150, lot=0.10,
+            symbol="EURUSD",
+            direction="BUY",
+            confidence=0.30,
+            entry=1.1050,
+            sl=1.1000,
+            tp=1.1150,
+            lot=0.10,
         )
         result = await proc.process(sig)
         assert not result.executed
@@ -165,12 +192,17 @@ class TestSignalProcessorPipeline:
 
     @pytest.mark.asyncio
     async def test_reject_bad_rr(self) -> None:
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         proc = SignalProcessor()
         sig = RawSignal(
-            symbol="EURUSD", direction="BUY",
-            confidence=0.85, entry=1.1050,
-            sl=1.1048, tp=1.1053, lot=0.10,
+            symbol="EURUSD",
+            direction="BUY",
+            confidence=0.85,
+            entry=1.1050,
+            sl=1.1048,
+            tp=1.1053,
+            lot=0.10,
         )
         result = await proc.process(sig)
         assert not result.executed

@@ -5,13 +5,13 @@
 """
 
 from .manager import (
-    license_manager,
+    LICENSE_DURATION,
+    LICENSE_FEATURES,
+    Feature,
     LicenseManager,
     LicenseType,
     PermissionLevel,
-    Feature,
-    LICENSE_FEATURES,
-    LICENSE_DURATION
+    license_manager,
 )
 
 __all__ = [
@@ -21,5 +21,5 @@ __all__ = [
     "PermissionLevel",
     "Feature",
     "LICENSE_FEATURES",
-    "LICENSE_DURATION"
+    "LICENSE_DURATION",
 ]

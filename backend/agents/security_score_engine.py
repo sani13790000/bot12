@@ -8,12 +8,13 @@ AFTER:  Canonical stays in security_reporting/security_score_engine.py.
 
 DO NOT add logic here.
 """
+
 from __future__ import annotations
 
 from backend.security_reporting.security_score_engine import (  # noqa: F401
-    SecurityScoreEngine,
-    SecurityScore,
     ScoreDimension,
+    SecurityScore,
+    SecurityScoreEngine,
     security_score_engine,
 )
 

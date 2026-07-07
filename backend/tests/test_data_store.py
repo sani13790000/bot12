@@ -1,4 +1,5 @@
 """Tests for InstitutionalDataStore."""
+
 from __future__ import annotations
 
 import pytest
@@ -8,9 +9,11 @@ import pytest
 async def test_data_store_initialize_no_creds() -> None:
     """initialize() should not raise even without Supabase credentials."""
     import os
+
     os.environ.pop("SUPABASE_URL", None)
     os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
     from backend.institutional.data_store import InstitutionalDataStore
+
     store = InstitutionalDataStore()
     await store.initialize()  # should not raise
     assert store._available is False
@@ -20,6 +23,7 @@ async def test_data_store_initialize_no_creds() -> None:
 async def test_memory_fallback() -> None:
     """Data should be stored in memory when Supabase is unavailable."""
     from backend.institutional.data_store import InstitutionalDataStore
+
     store = InstitutionalDataStore()
     store._available = False  # force in-memory
     result = await store.save_backtest_result({"symbol": "XAUUSD", "net_pnl": 100.0})
@@ -31,7 +35,8 @@ async def test_memory_fallback() -> None:
 @pytest.mark.asyncio
 async def test_memory_cap_enforced() -> None:
     """Memory store should not exceed MAX_MEMORY_RECORDS."""
-    from backend.institutional.data_store import InstitutionalDataStore, MAX_MEMORY_RECORDS
+    from backend.institutional.data_store import MAX_MEMORY_RECORDS, InstitutionalDataStore
+
     store = InstitutionalDataStore()
     store._available = False
     # Insert MAX + 10 records
@@ -42,6 +47,7 @@ async def test_memory_cap_enforced() -> None:
 
 def test_utc_now_iso() -> None:
     from backend.institutional.data_store import _utc_now_iso
+
     ts = _utc_now_iso()
     assert "T" in ts  # ISO 8601 format
     assert "+" in ts or "Z" in ts or ts.endswith("+00:00")
@@ -49,6 +55,7 @@ def test_utc_now_iso() -> None:
 
 def test_memory_stats() -> None:
     from backend.institutional.data_store import InstitutionalDataStore
+
     store = InstitutionalDataStore()
     store._memory_store = {"table_a": [{}, {}], "table_b": [{}]}
     stats = store.memory_stats()

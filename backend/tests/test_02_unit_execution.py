@@ -8,13 +8,12 @@ Galaxy Vast AI Trading Platform
 - SMCEngine
 - DecisionEngine
 """
+
 from __future__ import annotations
 
 import os
+
 import pytest
-import asyncio
-from unittest.mock import patch, AsyncMock, MagicMock
-from typing import List
 
 
 # ═══════════════════════════════════════════════════════════════════════════ #
@@ -25,6 +24,7 @@ class TestOrderStateMachine:
 
     def setup_method(self):
         from backend.execution.order_state_machine import OrderStateMachine
+
         self.osm = OrderStateMachine()
 
     def test_register_and_initial_state(self) -> None:
@@ -52,6 +52,7 @@ class TestOrderStateMachine:
 
     def test_active_tickets(self) -> None:
         from backend.execution.order_state_machine import OrderStateMachine
+
         osm = OrderStateMachine()
         osm.register(20001)
         osm.register(20002)
@@ -71,6 +72,7 @@ class TestOrderStateMachine:
 
     def test_module_level_singleton(self) -> None:
         from backend.execution.order_state_machine import order_state_machine
+
         assert order_state_machine is not None
 
     def test_cancelled_path(self) -> None:
@@ -95,6 +97,7 @@ class TestMT5ConnectorDemo:
     def setup(self):
         os.environ["MT5_DEMO_MODE"] = "true"
         from backend.execution.mt5_connector import MT5Connector
+
         self.connector = MT5Connector(demo=True)
 
     @pytest.mark.asyncio
@@ -106,8 +109,7 @@ class TestMT5ConnectorDemo:
     async def test_place_order_returns_ticket(self) -> None:
         await self.connector.connect()
         result = await self.connector.place_order(
-            symbol="EURUSD", direction="buy",
-            volume=0.10, sl=1.1000, tp=1.1150
+            symbol="EURUSD", direction="buy", volume=0.10, sl=1.1000, tp=1.1150
         )
         assert "ticket" in result
         assert isinstance(result["ticket"], int)
@@ -149,6 +151,7 @@ class TestMT5ConnectorDemo:
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
         from backend.execution.mt5_connector import MT5Connector
+
         async with MT5Connector(demo=True) as conn:
             assert conn.connected is True
 
@@ -161,7 +164,8 @@ class TestSMCEngine:
 
     @pytest.fixture(autouse=True)
     def setup(self):
-        from backend.analysis.smc_engine import SMCEngine, Candle
+        from backend.analysis.smc_engine import Candle, SMCEngine
+
         self.engine = SMCEngine()
         self.Candle = Candle
         self.candles = [
@@ -178,6 +182,7 @@ class TestSMCEngine:
 
     def test_analyse_returns_result(self) -> None:
         from backend.analysis.smc_engine import SMCAnalysis
+
         result = self.engine.analyse(self.candles)
         assert isinstance(result, SMCAnalysis)
 
@@ -212,6 +217,7 @@ class TestDecisionEngine:
     @pytest.fixture(autouse=True)
     def setup(self):
         from backend.analysis.decision_engine import DecisionEngine, EngineVote, TradeDirection
+
         self.engine = DecisionEngine(min_confidence=0.65, min_votes=2, min_rr=1.5)
         self.EngineVote = EngineVote
         self.TradeDirection = TradeDirection
@@ -219,7 +225,7 @@ class TestDecisionEngine:
     def test_all_agree_buy(self) -> None:
         votes = [
             self.EngineVote("SMC", self.TradeDirection.BUY, 0.80, 1.1050, 1.1000, 1.1150),
-            self.EngineVote("PA",  self.TradeDirection.BUY, 0.75, 1.1050, 1.1000, 1.1150),
+            self.EngineVote("PA", self.TradeDirection.BUY, 0.75, 1.1050, 1.1000, 1.1150),
             self.EngineVote("XGB", self.TradeDirection.BUY, 0.85, 1.1050, 1.1000, 1.1150),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1")
@@ -228,8 +234,8 @@ class TestDecisionEngine:
 
     def test_conflicting_votes_no_trade(self) -> None:
         votes = [
-            self.EngineVote("SMC", self.TradeDirection.BUY,  0.80),
-            self.EngineVote("PA",  self.TradeDirection.SELL, 0.80),
+            self.EngineVote("SMC", self.TradeDirection.BUY, 0.80),
+            self.EngineVote("PA", self.TradeDirection.SELL, 0.80),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1")
         assert not d.should_trade
@@ -237,7 +243,7 @@ class TestDecisionEngine:
     def test_kill_switch_overrides(self) -> None:
         votes = [
             self.EngineVote("SMC", self.TradeDirection.BUY, 0.95, 1.1050, 1.1000, 1.1200),
-            self.EngineVote("PA",  self.TradeDirection.BUY, 0.90, 1.1050, 1.1000, 1.1200),
+            self.EngineVote("PA", self.TradeDirection.BUY, 0.90, 1.1050, 1.1000, 1.1200),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1", kill_switch_active=True)
         assert not d.should_trade
@@ -245,7 +251,7 @@ class TestDecisionEngine:
     def test_low_confidence_no_trade(self) -> None:
         votes = [
             self.EngineVote("SMC", self.TradeDirection.BUY, 0.40),
-            self.EngineVote("PA",  self.TradeDirection.BUY, 0.35),
+            self.EngineVote("PA", self.TradeDirection.BUY, 0.35),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1")
         assert not d.should_trade
@@ -253,7 +259,7 @@ class TestDecisionEngine:
     def test_to_dict(self) -> None:
         votes = [
             self.EngineVote("SMC", self.TradeDirection.SELL, 0.80, 1.1050, 1.1100, 1.1000),
-            self.EngineVote("PA",  self.TradeDirection.SELL, 0.75, 1.1050, 1.1100, 1.1000),
+            self.EngineVote("PA", self.TradeDirection.SELL, 0.75, 1.1050, 1.1100, 1.1000),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1")
         result = d.to_dict()
@@ -264,7 +270,7 @@ class TestDecisionEngine:
     def test_minimum_rr_enforced(self) -> None:
         votes = [
             self.EngineVote("SMC", self.TradeDirection.BUY, 0.80, 1.1050, 1.1048, 1.1060),
-            self.EngineVote("PA",  self.TradeDirection.BUY, 0.80, 1.1050, 1.1048, 1.1060),
+            self.EngineVote("PA", self.TradeDirection.BUY, 0.80, 1.1050, 1.1048, 1.1060),
         ]
         d = self.engine.decide(votes, "EURUSD", "H1")
         assert not d.should_trade

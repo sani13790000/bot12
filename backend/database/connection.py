@@ -5,9 +5,8 @@ import logging
 import time
 from typing import Optional
 
-from supabase import Client, create_client
-
 from backend.core.config import get_settings as _get_settings
+from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +50,7 @@ async def _create_client_with_retry() -> Client:
     global _last_healthy
     for attempt, delay in enumerate([1, 2, 4], start=1):
         try:
-            client = await asyncio.get_running_loop().run_in_executor(
-                None, _create_client_sync
-            )
+            client = await asyncio.get_running_loop().run_in_executor(None, _create_client_sync)
             await asyncio.wait_for(_probe(client), timeout=5.0)
             _last_healthy = time.monotonic()
             logger.info("DB client connected (attempt %d)", attempt)

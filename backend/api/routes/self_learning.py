@@ -1,1 +1,125 @@
-IiIiClNlbGYtTGVhcm5pbmcgcm91dGVzLgpCVUctQUY1IEZJWDogcmVtb3ZlZCBwcmVmaXg9Ii9hcGkvdjEvc2VsZi1sZWFybmluZyIgLS0gZG91YmxlIHByZWZpeCB3YXMgY2F1c2luZyAvc2VsZi1sZWFybmluZy9hcGkvdjEvc2VsZi1sZWFybmluZy8qCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERpY3QsIExpc3QsIE9wdGlvbmFsCmZyb20gZmFzdGFwaSBpbXBvcnQgQVBJUm91dGVyLCBEZXBlbmRzLCBIVFRQRXhjZXB0aW9uLCBRdWVyeSwgc3RhdHVzCmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbCwgRmllbGQKZnJvbSAuLi5jb3JlLmxvZ2dlciBpbXBvcnQgZ2V0X2xvZ2dlcgpmcm9tIC4uLnNlbGZfbGVhcm5pbmcgaW1wb3J0IChQZXJmb3JtYW5jZVRyYWNrZXIsIFJldHJhaW5pbmdTZXJ2aWNlLCBUcmFkZURhdGFzZXRHZW5lcmF0b3IsIFRyYWluaW5nUGlwZWxpbmUpCmZyb20gLi4uc2VsZl9sZWFybmluZy50cmFkZV9kYXRhc2V0X2dlbmVyYXRvciBpbXBvcnQgKE1hcmtldENvbmRpdGlvbnMsIE1hcmtldFNlc3Npb24sIFNNQ0ZlYXR1cmVzLCBUcmFkZURpcmVjdGlvbiwgVHJhZGVSZWNvcmQsIFRyYWRlUmVzdWx0KQoKbG9nZ2VyID0gZ2V0X2xvZ2dlcigiYXBpLnJvdXRlcy5zZWxmX2xlYXJuaW5nIikKcm91dGVyID0gQVBJUm91dGVyKHRhZ3M9WyJTZWxmLUxlYXJuaW5nIl0pCgoKZGVmIGdldF9kYXRhc2V0X2dlbmVyYXRvcigpIC0+IFRyYWRlRGF0YXNldEdlbmVyYXRvcjoKICAgIGZyb20gLi4uYXBpLm1haW4gaW1wb3J0IGFwcAogICAgZ2VuID0gZ2V0YXR0cihhcHAuc3RhdGUsICJkYXRhc2V0X2dlbmVyYXRvciIsIE5vbmUpCiAgICBpZiBnZW4gaXMgTm9uZTogcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDMsIGRldGFpbD0iRGF0YXNldEdlbmVyYXRvciBub3QgaW5pdGlhbGl6ZWQiKQogICAgcmV0dXJuIGdlbgoKCmRlZiBnZXRfcmV0cmFpbmluZ19zZXJ2aWNlKCkgLT4gUmV0cmFpbmluZ1NlcnZpY2U6CiAgICBmcm9tIC4uLmFwaS5tYWluIGltcG9ydCBhcHAKICAgIHN2YyA9IGdldGF0dHIoYXBwLnN0YXRlLCAicmV0cmFpbmluZ19zZXJ2aWNlIiwgTm9uZSkKICAgIGlmIHN2YyBpcyBOb25lOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMywgZGV0YWlsPSJSZXRyYWluaW5nU2VydmljZSBub3QgaW5pdGlhbGl6ZWQiKQogICAgcmV0dXJuIHN2YwoKCmRlZiBnZXRfcGVyZm9ybWFuY2VfdHJhY2tlcigpIC0+IFBlcmZvcm1hbmNlVHJhY2tlcjoKICAgIGZyb20gLi4uYXBpLm1haW4gaW1wb3J0IGFwcAogICAgdHJhY2tlciA9IGdldGF0dHIoYXBwLnN0YXRlLCAicGVyZm9ybWFuY2VfdHJhY2tlciIsIE5vbmUpCiAgICBpZiB0cmFja2VyIGlzIE5vbmU6IHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAzLCBkZXRhaWw9IlBlcmZvcm1hbmNlVHJhY2tlciBub3QgaW5pdGlhbGl6ZWQiKQogICAgcmV0dXJuIHRyYWNrZXIKCgpAcm91dGVyLmdldCgiL3N0YXRzIikKYXN5bmMgZGVmIGdldF9zdGF0cyhzdmM6IFJldHJhaW5pbmdTZXJ2aWNlID0gRGVwZW5kcyhnZXRfcmV0cmFpbmluZ19zZXJ2aWNlKSwgdHJhY2tlcjogUGVyZm9ybWFuY2VUcmFja2VyID0gRGVwZW5kcyhnZXRfcGVyZm9ybWFuY2VfdHJhY2tlcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIHN0YXR1c19kYXRhID0gc3ZjLmdldF9zdGF0dXMoKQogICAgICAgIHBlcmZfZGF0YSA9IHRyYWNrZXIuZ2V0X3N1bW1hcnkoKSBpZiBoYXNhdHRyKHRyYWNrZXIsICJnZXRfc3VtbWFyeSIpIGVsc2Uge30KICAgICAgICByZXR1cm4geyJ0b3RhbF9yZXRyYWluaW5nX2N5Y2xlcyI6IHN0YXR1c19kYXRhLmdldCgidG90YWxfY3ljbGVzIiwgMCksICJsYXN0X3JldHJhaW5fYXQiOiBzdGF0dXNfZGF0YS5nZXQoImxhc3RfcmV0cmFpbl9hdCIpLCAibGFzdF9yZXRyYWluX3N0YXR1cyI6IHN0YXR1c19kYXRhLmdldCgibGFzdF9zdGF0dXMiKSwgIm5leHRfcmV0cmFpbl9pbl9zZWNvbmRzIjogc3RhdHVzX2RhdGEuZ2V0KCJuZXh0X3JldHJhaW5faW5fc2Vjb25kcyIpLCAibW9kZWxfdmVyc2lvbiI6IHN0YXR1c19kYXRhLmdldCgibW9kZWxfdmVyc2lvbiIpLCAiY3VycmVudF9hdWMiOiBwZXJmX2RhdGEuZ2V0KCJhdWMiKSwgImN1cnJlbnRfYWNjdXJhY3kiOiBwZXJmX2RhdGEuZ2V0KCJhY2N1cmFjeSIpLCAiaW1wcm92ZW1lbnRfcGN0IjogcGVyZl9kYXRhLmdldCgiaW1wcm92ZW1lbnRfcGN0IiksICJ0cmFpbmluZ19zYW1wbGVzIjogc3RhdHVzX2RhdGEuZ2V0KCJ0cmFpbmluZ19zYW1wbGVzIiksICJpc19ydW5uaW5nIjogc3RhdHVzX2RhdGEuZ2V0KCJpc19ydW5uaW5nIiwgRmFsc2UpfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmVycm9yKCJnZXRfc3RhdHMgZmFpbGVkOiAlcyIsIGV4YykKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihleGMpKQoKCkByb3V0ZXIuZ2V0KCIvc3RhdHVzIikKYXN5bmMgZGVmIGdldF9zdGF0dXMoc3ZjOiBSZXRyYWluaW5nU2VydmljZSA9IERlcGVuZHMoZ2V0X3JldHJhaW5pbmdfc2VydmljZSkpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgcmV0dXJuIHN2Yy5nZXRfc3RhdHVzKCkKCgpAcm91dGVyLnBvc3QoIi90cmlnZ2VyIikKYXN5bmMgZGVmIHRyaWdnZXJfcmV0cmFpbmluZyhzdmM6IFJldHJhaW5pbmdTZXJ2aWNlID0gRGVwZW5kcyhnZXRfcmV0cmFpbmluZ19zZXJ2aWNlKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICB0cnk6CiAgICAgICAgcmVzdWx0ID0gYXdhaXQgc3ZjLnRyaWdnZXJfcmV0cmFpbigpCiAgICAgICAgcmV0dXJuIHsidHJpZ2dlcmVkIjogVHJ1ZSwgInJlc3VsdCI6IHJlc3VsdH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigidHJpZ2dlcl9yZXRyYWluaW5nIGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkKCgpAcm91dGVyLmdldCgiL2hpc3RvcnkiKQphc3luYyBkZWYgZ2V0X2hpc3RvcnkobGltaXQ6IGludCA9IFF1ZXJ5KDIwLCBnZT0xLCBsZT0xMDApLCBzdmM6IFJldHJhaW5pbmdTZXJ2aWNlID0gRGVwZW5kcyhnZXRfcmV0cmFpbmluZ19zZXJ2aWNlKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICB0cnk6CiAgICAgICAgaGlzdG9yeSA9IHN2Yy5nZXRfaGlzdG9yeShsaW1pdD1saW1pdCkKICAgICAgICByZXR1cm4geyJoaXN0b3J5IjogaGlzdG9yeSwgImNvdW50IjogbGVuKGhpc3RvcnkpfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmVycm9yKCJnZXRfaGlzdG9yeSBmYWlsZWQ6ICVzIiwgZXhjKQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGV4YykpCgoKQHJvdXRlci5wb3N0KCIvc2F2ZS10cmFkZSIpCmFzeW5jIGRlZiBzYXZlX3RyYWRlKHRyYWRlOiBEaWN0W3N0ciwgQW55XSwgZ2VuOiBUcmFkZURhdGFzZXRHZW5lcmF0b3IgPSBEZXBlbmRzKGdldF9kYXRhc2V0X2dlbmVyYXRvcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIHNhdmVkID0gYXdhaXQgZ2VuLnNhdmVfdHJhZGUodHJhZGUpCiAgICAgICAgcmV0dXJuIHsic2F2ZWQiOiBzYXZlZH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigic2F2ZV90cmFkZSBmYWlsZWQ6ICVzIiwgZXhjKQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGV4YykpCgoKQHJvdXRlci5nZXQoIi9wZXJmb3JtYW5jZSIpCmFzeW5jIGRlZiBnZXRfcGVyZm9ybWFuY2UodHJhY2tlcjogUGVyZm9ybWFuY2VUcmFja2VyID0gRGVwZW5kcyhnZXRfcGVyZm9ybWFuY2VfdHJhY2tlcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIHN1bW1hcnkgPSB0cmFja2VyLmdldF9zdW1tYXJ5KCkgaWYgaGFzYXR0cih0cmFja2VyLCAiZ2V0X3N1bW1hcnkiKSBlbHNlIHt9CiAgICAgICAgcmV0dXJuIHN1bW1hcnkKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcigiZ2V0X3BlcmZvcm1hbmNlIGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkK
+"""
+Self-Learning routes.
+BUG-AF5 FIX: removed prefix="/api/v1/self-learning" -- double prefix was causing /self-learning/api/v1/self-learning/*
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ...core.logger import get_logger
+from ...self_learning import (
+    PerformanceTracker,
+    RetrainingService,
+    TradeDatasetGenerator,
+)
+
+logger = get_logger("api.routes.self_learning")
+router = APIRouter(tags=["Self-Learning"])
+
+
+def get_dataset_generator() -> TradeDatasetGenerator:
+    from ...api.main import app
+
+    gen = getattr(app.state, "dataset_generator", None)
+    if gen is None:
+        raise HTTPException(status_code=503, detail="DatasetGenerator not initialized")
+    return gen
+
+
+def get_retraining_service() -> RetrainingService:
+    from ...api.main import app
+
+    svc = getattr(app.state, "retraining_service", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="RetrainingService not initialized")
+    return svc
+
+
+def get_performance_tracker() -> PerformanceTracker:
+    from ...api.main import app
+
+    tracker = getattr(app.state, "performance_tracker", None)
+    if tracker is None:
+        raise HTTPException(status_code=503, detail="PerformanceTracker not initialized")
+    return tracker
+
+
+@router.get("/stats")
+async def get_stats(
+    svc: RetrainingService = Depends(get_retraining_service),
+    tracker: PerformanceTracker = Depends(get_performance_tracker),
+) -> Dict[str, Any]:
+    try:
+        status_data = svc.get_status()
+        perf_data = tracker.get_summary() if hasattr(tracker, "get_summary") else {}
+        return {
+            "total_retraining_cycles": status_data.get("total_cycles", 0),
+            "last_retrain_at": status_data.get("last_retrain_at"),
+            "last_retrain_status": status_data.get("last_status"),
+            "next_retrain_in_seconds": status_data.get("next_retrain_in_seconds"),
+            "model_version": status_data.get("model_version"),
+            "current_auc": perf_data.get("auc"),
+            "current_accuracy": perf_data.get("accuracy"),
+            "improvement_pct": perf_data.get("improvement_pct"),
+            "training_samples": status_data.get("training_samples"),
+            "is_running": status_data.get("is_running", False),
+        }
+    except Exception as exc:
+        logger.error("get_stats failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/status")
+async def get_status(svc: RetrainingService = Depends(get_retraining_service)) -> Dict[str, Any]:
+    return svc.get_status()
+
+
+@router.post("/trigger")
+async def trigger_retraining(
+    svc: RetrainingService = Depends(get_retraining_service),
+) -> Dict[str, Any]:
+    try:
+        result = await svc.trigger_retrain()
+        return {"triggered": True, "result": result}
+    except Exception as exc:
+        logger.error("trigger_retraining failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/history")
+async def get_history(
+    limit: int = Query(20, ge=1, le=100), svc: RetrainingService = Depends(get_retraining_service)
+) -> Dict[str, Any]:
+    try:
+        history = svc.get_history(limit=limit)
+        return {"history": history, "count": len(history)}
+    except Exception as exc:
+        logger.error("get_history failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/save-trade")
+async def save_trade(
+    trade: Dict[str, Any], gen: TradeDatasetGenerator = Depends(get_dataset_generator)
+) -> Dict[str, Any]:
+    try:
+        saved = await gen.save_trade(trade)
+        return {"saved": saved}
+    except Exception as exc:
+        logger.error("save_trade failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/performance")
+async def get_performance(
+    tracker: PerformanceTracker = Depends(get_performance_tracker),
+) -> Dict[str, Any]:
+    try:
+        summary = tracker.get_summary() if hasattr(tracker, "get_summary") else {}
+        return summary
+    except Exception as exc:
+        logger.error("get_performance failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))

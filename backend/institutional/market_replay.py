@@ -1,8 +1,8 @@
 """Market Replay Engine — candle-by-candle playback with full speed control."""
 
 from __future__ import annotations
+
 import asyncio
-import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import AsyncIterator, Callable, Dict, List, Optional
@@ -37,6 +37,7 @@ class Candle:
 @dataclass
 class ReplayTrade:
     """A trade marker overlaid on the replay chart."""
+
     entry_time: float
     exit_time: Optional[float]
     entry_price: float
@@ -50,6 +51,7 @@ class ReplayTrade:
 @dataclass
 class ReplayFrame:
     """Single frame emitted during replay."""
+
     candle: Candle
     index: int
     total: int
@@ -190,7 +192,8 @@ class MarketReplayEngine:
     def _build_frame(self, index: int) -> ReplayFrame:
         candle = self._candles[index]
         trades_on_bar = [
-            t for t in self._trades
+            t
+            for t in self._trades
             if t.entry_time <= candle.timestamp < (t.exit_time or float("inf"))
         ]
 

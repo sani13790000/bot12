@@ -1,33 +1,34 @@
 from __future__ import annotations
+
 import asyncio
-import sys
 import os
+import sys
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, "..", "risk"))
+import lot_sizing as ls
 import portfolio_risk as pr
-import lot_sizing   as ls
 
-_get_pip_value           = pr._get_pip_value
-_get_pip_value_with_src  = pr._get_pip_value_with_source
-_get_pip_value_async     = pr._get_pip_value_async
-_resolve_canonical       = pr._resolve_canonical
-OpenTradeRisk            = pr.OpenTradeRisk
-TradeDirection           = pr.TradeDirection
-PortfolioRiskManager     = pr.PortfolioRiskManager
-RiskLevel                = pr.RiskLevel
-FailMode                 = pr.FailMode
-PipValueSource           = pr.PipValueSource
-_PIP_VALUE_TABLE         = pr._PIP_VALUE_TABLE
-_UpdatedTradeProxy       = pr._UpdatedTradeProxy
+_get_pip_value = pr._get_pip_value
+_get_pip_value_with_src = pr._get_pip_value_with_source
+_get_pip_value_async = pr._get_pip_value_async
+_resolve_canonical = pr._resolve_canonical
+OpenTradeRisk = pr.OpenTradeRisk
+TradeDirection = pr.TradeDirection
+PortfolioRiskManager = pr.PortfolioRiskManager
+RiskLevel = pr.RiskLevel
+FailMode = pr.FailMode
+PipValueSource = pr.PipValueSource
+_PIP_VALUE_TABLE = pr._PIP_VALUE_TABLE
+_UpdatedTradeProxy = pr._UpdatedTradeProxy
 
-LotSizer                 = ls.LotSizer
-LotSizingConfig          = ls.LotSizingConfig
-UnknownSymbolError       = ls.UnknownSymbolError
-_LS_PIP_TABLE            = ls._PIP_VALUE_TABLE
-_LS_ALIASES              = ls._SYMBOL_ALIASES
+LotSizer = ls.LotSizer
+LotSizingConfig = ls.LotSizingConfig
+UnknownSymbolError = ls.UnknownSymbolError
+_LS_PIP_TABLE = ls._PIP_VALUE_TABLE
+_LS_ALIASES = ls._SYMBOL_ALIASES
 
 
 def _run(coro):
@@ -36,9 +37,13 @@ def _run(coro):
 
 def _trade(symbol, lot=1.0, entry=1.10000, sl=1.09000, balance=10_000.0, pip_override=None):
     return OpenTradeRisk(
-        symbol=symbol, direction=TradeDirection.BUY,
-        lot_size=lot, entry_price=entry, stop_loss=sl,
-        account_balance=balance, pip_value_per_lot=pip_override,
+        symbol=symbol,
+        direction=TradeDirection.BUY,
+        lot_size=lot,
+        entry_price=entry,
+        stop_loss=sl,
+        account_balance=balance,
+        pip_value_per_lot=pip_override,
     )
 
 
@@ -53,14 +58,19 @@ class TestGoldPipValue(unittest.TestCase):
     def test_xauusd_risk_amount_correct(self):
         # lot=1, entry=1900, SL=1895 -> distance=$5, pip_val=1.0 -> risk=$5
         t = _trade("XAUUSD", lot=1.0, entry=1900.00, sl=1895.00, balance=10_000.0)
-        self.assertAlmostEqual(t.risk_amount,  5.00, places=4)
+        self.assertAlmostEqual(t.risk_amount, 5.00, places=4)
         self.assertAlmostEqual(t.risk_percent, 0.05, places=4)
 
     def test_xauusd_source_is_table(self):
         t = _trade("XAUUSD", entry=1900.0, sl=1895.0)
-        self.assertIn(t.pip_value_source, (
-            PipValueSource.TABLE, PipValueSource.ALIAS, PipValueSource.SUFFIX,
-        ))
+        self.assertIn(
+            t.pip_value_source,
+            (
+                PipValueSource.TABLE,
+                PipValueSource.ALIAS,
+                PipValueSource.SUFFIX,
+            ),
+        )
 
 
 # ===========================================================================
@@ -76,8 +86,8 @@ class TestSilverPipValue(unittest.TestCase):
         """lot=2, entry=25.00, SL=24.50 -> dist=$0.50, pip_val=50.0 -> risk=$50"""
         t = _trade("XAGUSD", lot=2.0, entry=25.00, sl=24.50, balance=10_000.0)
         # price_distance=0.50, lot=2.0, pip_value=50.0 -> 0.50*2.0*50.0 = $50
-        self.assertAlmostEqual(t.risk_amount,  50.0, places=4)
-        self.assertAlmostEqual(t.risk_percent,  0.5, places=4)
+        self.assertAlmostEqual(t.risk_amount, 50.0, places=4)
+        self.assertAlmostEqual(t.risk_percent, 0.5, places=4)
 
     def test_silver_alias_resolves_to_50(self):
         """'SILVER' alias must give 50.0"""
@@ -93,10 +103,17 @@ class TestSilverPipValue(unittest.TestCase):
 # FIX #4-C: Crypto pip value
 # ===========================================================================
 class TestCryptoPipValue(unittest.TestCase):
-    def test_btcusd(self): self.assertEqual(_get_pip_value("BTCUSD"), 1.0)
-    def test_ethusd(self): self.assertEqual(_get_pip_value("ETHUSD"), 1.0)
-    def test_ltcusd(self): self.assertEqual(_get_pip_value("LTCUSD"), 1.0)
-    def test_xrpusd(self): self.assertEqual(_get_pip_value("XRPUSD"), 1.0)
+    def test_btcusd(self):
+        self.assertEqual(_get_pip_value("BTCUSD"), 1.0)
+
+    def test_ethusd(self):
+        self.assertEqual(_get_pip_value("ETHUSD"), 1.0)
+
+    def test_ltcusd(self):
+        self.assertEqual(_get_pip_value("LTCUSD"), 1.0)
+
+    def test_xrpusd(self):
+        self.assertEqual(_get_pip_value("XRPUSD"), 1.0)
 
     def test_btc_risk_amount(self):
         # lot=0.1, entry=30000, SL=29500 -> dist=500, pip_val=1.0 -> risk=50
@@ -109,12 +126,23 @@ class TestCryptoPipValue(unittest.TestCase):
 # FIX #4-D: Index pip value
 # ===========================================================================
 class TestIndexPipValue(unittest.TestCase):
-    def test_us30(self):    self.assertEqual(_get_pip_value("US30"),   1.0)
-    def test_nas100(self):  self.assertEqual(_get_pip_value("NAS100"), 1.0)
-    def test_us500(self):   self.assertEqual(_get_pip_value("US500"),  1.0)
-    def test_jpn225(self):  self.assertEqual(_get_pip_value("JPN225"), 0.1)
-    def test_ger40(self):   self.assertEqual(_get_pip_value("GER40"),  1.0)
-    def test_aus200(self):  self.assertEqual(_get_pip_value("AUS200"), 1.0)
+    def test_us30(self):
+        self.assertEqual(_get_pip_value("US30"), 1.0)
+
+    def test_nas100(self):
+        self.assertEqual(_get_pip_value("NAS100"), 1.0)
+
+    def test_us500(self):
+        self.assertEqual(_get_pip_value("US500"), 1.0)
+
+    def test_jpn225(self):
+        self.assertEqual(_get_pip_value("JPN225"), 0.1)
+
+    def test_ger40(self):
+        self.assertEqual(_get_pip_value("GER40"), 1.0)
+
+    def test_aus200(self):
+        self.assertEqual(_get_pip_value("AUS200"), 1.0)
 
     def test_index_risk_amount(self):
         # lot=1, entry=34000, SL=33950 -> dist=50, pip_val=1.0 -> risk=50
@@ -126,10 +154,17 @@ class TestIndexPipValue(unittest.TestCase):
 # FIX #4-E: Forex pip value
 # ===========================================================================
 class TestForexPipValue(unittest.TestCase):
-    def test_eurusd(self):  self.assertEqual(_get_pip_value("EURUSD"), 10.0)
-    def test_gbpusd(self):  self.assertEqual(_get_pip_value("GBPUSD"), 10.0)
-    def test_usdjpy(self):  self.assertAlmostEqual(_get_pip_value("USDJPY"), 6.7, places=1)
-    def test_usdchf(self):  self.assertAlmostEqual(_get_pip_value("USDCHF"), 10.7, places=1)
+    def test_eurusd(self):
+        self.assertEqual(_get_pip_value("EURUSD"), 10.0)
+
+    def test_gbpusd(self):
+        self.assertEqual(_get_pip_value("GBPUSD"), 10.0)
+
+    def test_usdjpy(self):
+        self.assertAlmostEqual(_get_pip_value("USDJPY"), 6.7, places=1)
+
+    def test_usdchf(self):
+        self.assertAlmostEqual(_get_pip_value("USDCHF"), 10.7, places=1)
 
     def test_eurusd_risk_amount(self):
         # lot=1, entry=1.10000, SL=1.09500 -> dist=0.005, pip_val=10.0 -> risk=0.05
@@ -164,11 +199,20 @@ class TestBrokerSuffixStripping(unittest.TestCase):
 # FIX #4-G: Alias resolution
 # ===========================================================================
 class TestAliasResolution(unittest.TestCase):
-    def test_gold_alias(self):   self.assertEqual(_get_pip_value("GOLD"),   1.0)
-    def test_silver_alias(self): self.assertEqual(_get_pip_value("SILVER"), 50.0)  # FIX #4
-    def test_btc_alias(self):    self.assertEqual(_get_pip_value("BTC"),    1.0)
-    def test_dax_alias(self):    self.assertEqual(_get_pip_value("DAX"),    1.0)
-    def test_nikkei_alias(self): self.assertEqual(_get_pip_value("NIKKEI"), 0.1)
+    def test_gold_alias(self):
+        self.assertEqual(_get_pip_value("GOLD"), 1.0)
+
+    def test_silver_alias(self):
+        self.assertEqual(_get_pip_value("SILVER"), 50.0)  # FIX #4
+
+    def test_btc_alias(self):
+        self.assertEqual(_get_pip_value("BTC"), 1.0)
+
+    def test_dax_alias(self):
+        self.assertEqual(_get_pip_value("DAX"), 1.0)
+
+    def test_nikkei_alias(self):
+        self.assertEqual(_get_pip_value("NIKKEI"), 0.1)
 
     def test_canonical_resolve_alias(self):
         canonical, method = _resolve_canonical("GOLD")
@@ -247,25 +291,25 @@ class TestLotSizerIntegration(unittest.TestCase):
     def test_check_async_uses_lot_sizer(self):
         mock_lot_sizer = MagicMock()
         mock_lot_sizer.get_pip_value = AsyncMock(return_value=(2.0, "mt5_tick_value"))
-        mgr   = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
+        mgr = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
         trade = _trade("XAUUSD", lot=1.0, entry=1900.0, sl=1895.0, balance=10_000.0)
-        snap  = _run(mgr.check_async(trade, []))
+        snap = _run(mgr.check_async(trade, []))
         mock_lot_sizer.get_pip_value.assert_called_once_with("XAUUSD")
         self.assertAlmostEqual(snap.total_risk_percent, 0.1, places=4)
 
     def test_check_async_lot_sizer_failure_falls_back(self):
         mock_lot_sizer = MagicMock()
         mock_lot_sizer.get_pip_value = AsyncMock(side_effect=RuntimeError("MT5 offline"))
-        mgr   = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
+        mgr = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
         trade = _trade("XAUUSD", lot=1.0, entry=1900.0, sl=1895.0, balance=10_000.0)
-        snap  = _run(mgr.check_async(trade, []))
+        snap = _run(mgr.check_async(trade, []))
         self.assertAlmostEqual(snap.total_risk_percent, 0.05, places=4)
         self.assertNotEqual(snap.risk_level, RiskLevel.BLOCKED)
 
     def test_check_async_no_lot_sizer_uses_static(self):
-        mgr        = PortfolioRiskManager()
-        trade      = _trade("XAUUSD", lot=1.0, entry=1900.0, sl=1895.0, balance=10_000.0)
-        snap_sync  = mgr.check(trade, [])
+        mgr = PortfolioRiskManager()
+        trade = _trade("XAUUSD", lot=1.0, entry=1900.0, sl=1895.0, balance=10_000.0)
+        snap_sync = mgr.check(trade, [])
         snap_async = _run(mgr.check_async(trade, []))
         self.assertAlmostEqual(
             snap_sync.total_risk_percent, snap_async.total_risk_percent, places=6
@@ -274,9 +318,9 @@ class TestLotSizerIntegration(unittest.TestCase):
     def test_check_async_same_value_no_rebuild(self):
         mock_lot_sizer = MagicMock()
         mock_lot_sizer.get_pip_value = AsyncMock(return_value=(1.0, "static_table"))
-        mgr   = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
+        mgr = PortfolioRiskManager(lot_sizer=mock_lot_sizer)
         trade = _trade("XAUUSD", lot=1.0, entry=1900.0, sl=1895.0, balance=10_000.0)
-        snap  = _run(mgr.check_async(trade, []))
+        snap = _run(mgr.check_async(trade, []))
         self.assertAlmostEqual(snap.total_risk_percent, 0.05, places=4)
 
 
@@ -285,16 +329,16 @@ class TestLotSizerIntegration(unittest.TestCase):
 # ===========================================================================
 class TestSyncCheckBackwardCompat(unittest.TestCase):
     def test_sync_check_signature_unchanged(self):
-        mgr  = PortfolioRiskManager()
-        t1   = _trade("EURUSD", lot=1.0, entry=1.10, sl=1.09, balance=10_000.0)
-        t2   = _trade("GBPUSD", lot=0.5, entry=1.25, sl=1.24, balance=10_000.0)
+        mgr = PortfolioRiskManager()
+        t1 = _trade("EURUSD", lot=1.0, entry=1.10, sl=1.09, balance=10_000.0)
+        t2 = _trade("GBPUSD", lot=0.5, entry=1.25, sl=1.24, balance=10_000.0)
         snap = mgr.check(t1, [t2])
-        self.assertIsInstance(snap.risk_level,         RiskLevel)
-        self.assertIsInstance(snap.can_add_new,        bool)
+        self.assertIsInstance(snap.risk_level, RiskLevel)
+        self.assertIsInstance(snap.can_add_new, bool)
         self.assertIsInstance(snap.total_risk_percent, float)
 
     def test_fail_closed_on_internal_error(self):
-        mgr   = PortfolioRiskManager(fail_mode=FailMode.FAIL_CLOSED)
+        mgr = PortfolioRiskManager(fail_mode=FailMode.FAIL_CLOSED)
         trade = _trade("EURUSD", lot=1.0, entry=1.10, sl=1.09)
         with patch.object(mgr, "_check_inner", side_effect=RuntimeError("boom")):
             snap = mgr.check(trade, [])
@@ -302,7 +346,7 @@ class TestSyncCheckBackwardCompat(unittest.TestCase):
         self.assertEqual(snap.risk_level, RiskLevel.BLOCKED)
 
     def test_fail_open_allows_on_error(self):
-        mgr   = PortfolioRiskManager(fail_mode=FailMode.FAIL_OPEN)
+        mgr = PortfolioRiskManager(fail_mode=FailMode.FAIL_OPEN)
         trade = _trade("EURUSD", lot=1.0, entry=1.10, sl=1.09)
         with patch.object(mgr, "_check_inner", side_effect=RuntimeError("boom")):
             snap = mgr.check(trade, [])
@@ -319,7 +363,7 @@ class TestDRYConsistency(unittest.TestCase):
     def test_xagusd_tables_match(self):
         """FIX #4: Both tables must have XAGUSD=50.0."""
         self.assertEqual(_PIP_VALUE_TABLE.get("XAGUSD"), 50.0)
-        self.assertEqual(_LS_PIP_TABLE.get("XAGUSD"),    50.0)
+        self.assertEqual(_LS_PIP_TABLE.get("XAGUSD"), 50.0)
 
     def test_aus200_in_both_tables(self):
         """FIX #4: AUS200 added to lot_sizing."""
@@ -328,10 +372,15 @@ class TestDRYConsistency(unittest.TestCase):
 
     def test_all_common_symbols_present(self):
         required = [
-            "EURUSD", "GBPUSD",
-            "XAUUSD", "XAGUSD",
-            "BTCUSD", "ETHUSD",
-            "US30",   "NAS100", "GER40",
+            "EURUSD",
+            "GBPUSD",
+            "XAUUSD",
+            "XAGUSD",
+            "BTCUSD",
+            "ETHUSD",
+            "US30",
+            "NAS100",
+            "GER40",
             "USOIL",
         ]
         for sym in required:
@@ -391,41 +440,53 @@ class TestLotSizerAliasResolution(unittest.TestCase):
 class TestOpenTradeRiskPercent(unittest.TestCase):
     def test_gold_risk_percent(self):
         t = pr.OpenTradeRisk(
-            symbol="XAUUSD", direction=TradeDirection.BUY,
-            lot_size=1.0, entry_price=1910.0, stop_loss=1900.0,
+            symbol="XAUUSD",
+            direction=TradeDirection.BUY,
+            lot_size=1.0,
+            entry_price=1910.0,
+            stop_loss=1900.0,
             account_balance=10_000.0,
         )
-        self.assertAlmostEqual(t.risk_amount,  10.0, places=4)
-        self.assertAlmostEqual(t.risk_percent,  0.1, places=4)
+        self.assertAlmostEqual(t.risk_amount, 10.0, places=4)
+        self.assertAlmostEqual(t.risk_percent, 0.1, places=4)
 
     def test_silver_risk_percent(self):
         """FIX #4: Silver risk must be 10x higher than before fix."""
         t = pr.OpenTradeRisk(
-            symbol="XAGUSD", direction=TradeDirection.BUY,
-            lot_size=1.0, entry_price=25.50, stop_loss=25.00,
+            symbol="XAGUSD",
+            direction=TradeDirection.BUY,
+            lot_size=1.0,
+            entry_price=25.50,
+            stop_loss=25.00,
             account_balance=10_000.0,
         )
         # dist=0.50, pip_val=50.0 -> risk=$25, pct=0.25%
-        self.assertAlmostEqual(t.risk_amount,  25.0, places=4)
-        self.assertAlmostEqual(t.risk_percent,  0.25, places=4)
+        self.assertAlmostEqual(t.risk_amount, 25.0, places=4)
+        self.assertAlmostEqual(t.risk_percent, 0.25, places=4)
 
     def test_crypto_risk_percent(self):
         t = pr.OpenTradeRisk(
-            symbol="BTCUSD", direction=TradeDirection.BUY,
-            lot_size=0.1, entry_price=31_000.0, stop_loss=30_000.0,
+            symbol="BTCUSD",
+            direction=TradeDirection.BUY,
+            lot_size=0.1,
+            entry_price=31_000.0,
+            stop_loss=30_000.0,
             account_balance=10_000.0,
         )
-        self.assertAlmostEqual(t.risk_amount,  100.0, places=4)
-        self.assertAlmostEqual(t.risk_percent,   1.0, places=4)
+        self.assertAlmostEqual(t.risk_amount, 100.0, places=4)
+        self.assertAlmostEqual(t.risk_percent, 1.0, places=4)
 
     def test_index_risk_percent(self):
         t = pr.OpenTradeRisk(
-            symbol="NAS100", direction=TradeDirection.SELL,
-            lot_size=1.0, entry_price=14_100.0, stop_loss=14_200.0,
+            symbol="NAS100",
+            direction=TradeDirection.SELL,
+            lot_size=1.0,
+            entry_price=14_100.0,
+            stop_loss=14_200.0,
             account_balance=10_000.0,
         )
-        self.assertAlmostEqual(t.risk_amount,  100.0, places=4)
-        self.assertAlmostEqual(t.risk_percent,   1.0, places=4)
+        self.assertAlmostEqual(t.risk_amount, 100.0, places=4)
+        self.assertAlmostEqual(t.risk_percent, 1.0, places=4)
 
 
 # ===========================================================================
@@ -433,20 +494,29 @@ class TestOpenTradeRiskPercent(unittest.TestCase):
 # ===========================================================================
 class TestPortfolioTotalRisk(unittest.TestCase):
     def test_multi_asset_total_risk(self):
-        mgr          = PortfolioRiskManager()
+        mgr = PortfolioRiskManager()
         existing_eur = pr.OpenTradeRisk(
-            symbol="EURUSD", direction=TradeDirection.BUY,
-            lot_size=1.0, entry_price=1.10500, stop_loss=1.09500,
+            symbol="EURUSD",
+            direction=TradeDirection.BUY,
+            lot_size=1.0,
+            entry_price=1.10500,
+            stop_loss=1.09500,
             account_balance=10_000.0,
         )
         existing_gold = pr.OpenTradeRisk(
-            symbol="XAUUSD", direction=TradeDirection.BUY,
-            lot_size=1.0, entry_price=1910.0, stop_loss=1900.0,
+            symbol="XAUUSD",
+            direction=TradeDirection.BUY,
+            lot_size=1.0,
+            entry_price=1910.0,
+            stop_loss=1900.0,
             account_balance=10_000.0,
         )
         new_btc = pr.OpenTradeRisk(
-            symbol="BTCUSD", direction=TradeDirection.BUY,
-            lot_size=0.1, entry_price=31_000.0, stop_loss=30_000.0,
+            symbol="BTCUSD",
+            direction=TradeDirection.BUY,
+            lot_size=0.1,
+            entry_price=31_000.0,
+            stop_loss=30_000.0,
             account_balance=10_000.0,
         )
         snap = mgr.check(new_btc, [existing_eur, existing_gold])

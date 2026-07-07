@@ -10,6 +10,7 @@ BUG-R6-5: XAUUSD hardcode 100,000 was WRONG.
 BUG-R8: asyncio.to_thread(async_coroutine) removed.
   Fix: direct await on async method.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,10 +26,10 @@ _FALLBACK_CONTRACT_SIZES: Dict[str, float] = {
     "XAGUSD": 5000.0,
     "BTCUSD": 1.0,
     "ETHUSD": 1.0,
-    "USOIL":  1000.0,
-    "UKOIL":  1000.0,
+    "USOIL": 1000.0,
+    "UKOIL": 1000.0,
     "NAS100": 1.0,
-    "US30":   1.0,
+    "US30": 1.0,
     "SPX500": 1.0,
 }
 _FOREX_DEFAULT_CONTRACT = 100_000.0
@@ -63,6 +64,7 @@ class MarginGate:
         if self._mt5 is None:
             try:
                 from backend.execution.mt5_connector import mt5_connector
+
                 self._mt5 = mt5_connector
             except ImportError:
                 pass
@@ -73,9 +75,7 @@ class MarginGate:
         mt5 = self._get_mt5()
         if mt5 is not None:
             try:
-                info = await asyncio.wait_for(
-                    mt5.get_symbol_info(symbol), timeout=2.0
-                )
+                info = await asyncio.wait_for(mt5.get_symbol_info(symbol), timeout=2.0)
                 if info:
                     cs = float(
                         info.trade_contract_size
@@ -150,7 +150,9 @@ class MarginGate:
                     reject_reason=f"free margin {free_pct:.1%} below minimum {self._min_free_pct:.1%}",
                 )
 
-        margin_level = (equity / (used_margin + required) * 100) if (used_margin + required) > 0 else 9999.0
+        margin_level = (
+            (equity / (used_margin + required) * 100) if (used_margin + required) > 0 else 9999.0
+        )
         return MarginCheckResult(
             approved=True,
             required_margin=required,

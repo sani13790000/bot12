@@ -27,6 +27,7 @@ Usage::
         interval_s=3600,  # check every hour
     )
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -58,16 +59,16 @@ class TrainingSample:
 
     def __init__(
         self,
-        features:  List[float],
-        label:     int,
-        pnl:       float = 0.0,
-        symbol:    str   = "unknown",
+        features: List[float],
+        label: int,
+        pnl: float = 0.0,
+        symbol: str = "unknown",
         closed_at: Optional[str] = None,
     ) -> None:
-        self.features  = features
-        self.label     = label
-        self.pnl       = pnl
-        self.symbol    = symbol
+        self.features = features
+        self.label = label
+        self.pnl = pnl
+        self.symbol = symbol
         self.closed_at = closed_at or datetime.now(timezone.utc).isoformat()
 
 
@@ -88,15 +89,15 @@ class LearningService:
 
     def __init__(
         self,
-        min_new_samples: int   = 50,
-        hold_out_ratio:  float = 0.2,
+        min_new_samples: int = 50,
+        hold_out_ratio: float = 0.2,
     ) -> None:
         self._min_new_samples = min_new_samples
-        self._hold_out_ratio  = hold_out_ratio
+        self._hold_out_ratio = hold_out_ratio
         self._buffer: List[TrainingSample] = []
         self._total_retrains = 0
-        self._last_retrain:  Optional[str] = None
-        self._champion_auc:  float = 0.0
+        self._last_retrain: Optional[str] = None
+        self._champion_auc: float = 0.0
 
     # ── Public API ───────────────────────────────────────────────────────── #
 
@@ -105,7 +106,9 @@ class LearningService:
         self._buffer.append(sample)
         logger.debug(
             "[learning] buffer size=%d label=%d pnl=%.2f",
-            len(self._buffer), sample.label, sample.pnl,
+            len(self._buffer),
+            sample.label,
+            sample.pnl,
         )
 
     async def run(self) -> None:
@@ -117,13 +120,12 @@ class LearningService:
         if len(self._buffer) < self._min_new_samples:
             logger.debug(
                 "[learning] %d/%d samples — skipping retrain",
-                len(self._buffer), self._min_new_samples,
+                len(self._buffer),
+                self._min_new_samples,
             )
             return
 
-        logger.info(
-            "[learning] starting retrain with %d samples", len(self._buffer)
-        )
+        logger.info("[learning] starting retrain with %d samples", len(self._buffer))
         samples = list(self._buffer)
         self._buffer.clear()
 
@@ -136,12 +138,14 @@ class LearningService:
                 self._last_retrain = datetime.now(timezone.utc).isoformat()
                 logger.info(
                     "[learning] new champion AUC=%.4f (retrain #%d)",
-                    new_auc, self._total_retrains,
+                    new_auc,
+                    self._total_retrains,
                 )
             else:
                 logger.info(
                     "[learning] challenger AUC=%.4f did not beat champion=%.4f",
-                    new_auc, self._champion_auc,
+                    new_auc,
+                    self._champion_auc,
                 )
         except Exception as exc:
             logger.error("[learning] retrain failed: %s", exc, exc_info=True)
@@ -151,10 +155,10 @@ class LearningService:
     def stats(self) -> Dict[str, Any]:
         """Return current learning statistics (useful for the dashboard)."""
         return {
-            "buffer_size":    len(self._buffer),
+            "buffer_size": len(self._buffer),
             "total_retrains": self._total_retrains,
-            "champion_auc":   self._champion_auc,
-            "last_retrain":   self._last_retrain,
+            "champion_auc": self._champion_auc,
+            "last_retrain": self._last_retrain,
         }
 
     # ── Internals (run in executor) ──────────────────────────────────────── #
@@ -169,21 +173,22 @@ class LearningService:
         try:
             import numpy as np
             import xgboost as xgb
-            from sklearn.model_selection import train_test_split
             from sklearn.metrics import roc_auc_score
+            from sklearn.model_selection import train_test_split
         except ImportError as exc:
             logger.warning("[learning] optional dep missing: %s", exc)
             return 0.0
 
         X = np.array([s.features for s in samples], dtype=np.float32)
-        y = np.array([s.label    for s in samples], dtype=np.int32)
+        y = np.array([s.label for s in samples], dtype=np.int32)
 
         if len(set(y)) < 2:
             logger.warning("[learning] only one class in sample — skipping")
             return 0.0
 
         X_train, X_val, y_train, y_val = train_test_split(
-            X, y,
+            X,
+            y,
             test_size=self._hold_out_ratio,
             random_state=42,
             stratify=y,
@@ -202,7 +207,7 @@ class LearningService:
         model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
 
         proba = model.predict_proba(X_val)[:, 1]
-        auc   = float(roc_auc_score(y_val, proba))
+        auc = float(roc_auc_score(y_val, proba))
         logger.info("[learning] challenger AUC=%.4f on %d val samples", auc, len(y_val))
         return auc
 

@@ -7,6 +7,7 @@ Exports security reports in multiple formats:
 - CSV (summary)
 - PDF (via reportlab if available, else text fallback)
 """
+
 from __future__ import annotations
 
 import csv
@@ -30,9 +31,9 @@ class SecurityReportExporter:
 
     def to_json(
         self,
-        report:  Dict[str, Any],
-        indent:  int  = 2,
-        pretty:  bool = True,
+        report: Dict[str, Any],
+        indent: int = 2,
+        pretty: bool = True,
     ) -> str:
         """Serialise report to JSON string."""
         return json.dumps(report, indent=indent if pretty else None, default=str)
@@ -43,8 +44,8 @@ class SecurityReportExporter:
 
     def to_csv(
         self,
-        events:  List[Dict[str, Any]],
-        fields:  Optional[List[str]] = None,
+        events: List[Dict[str, Any]],
+        fields: Optional[List[str]] = None,
     ) -> str:
         """
         Export a list of security events to CSV.
@@ -56,9 +57,7 @@ class SecurityReportExporter:
         if not events:
             return ""
 
-        columns = fields or sorted(
-            {k for event in events for k in event}
-        )
+        columns = fields or sorted({k for event in events for k in event})
 
         buf = io.StringIO()
         writer = csv.DictWriter(
@@ -83,13 +82,13 @@ class SecurityReportExporter:
         """
         try:
             from reportlab.lib.pagesizes import A4
-            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
             from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-            buf     = io.BytesIO()
-            doc     = SimpleDocTemplate(buf, pagesize=A4)
-            styles  = getSampleStyleSheet()
-            story   = [
+            buf = io.BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=A4)
+            styles = getSampleStyleSheet()
+            story = [
                 Paragraph(title, styles["Title"]),
                 Spacer(1, 12),
                 Paragraph(

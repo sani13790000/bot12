@@ -6,23 +6,23 @@ Decorator و Middleware برای Authorization
 نویسنده: MT5 Trading Team
 """
 
-from functools import wraps
-from typing import Callable, Optional, Awaitable, Any
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
+from functools import wraps
+from typing import Callable
 
-from aiogram import types, Dispatcher
+from aiogram import types
 from aiogram.filters import BaseFilter
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
-from ..telegram.rbac import (
-    Permission, UserRole, has_permission,
-    COMMAND_PERMISSIONS, get_permission_denied_message,
-    get_min_role_for_permission
-)
-from ..services.rbac_service import rbac_service
-from ..services.audit_service import audit_service, AuditAction
 from ..core.logger import get_logger
+from ..services.audit_service import AuditAction, audit_service
+from ..services.rbac_service import rbac_service
+from ..telegram.rbac import (
+    Permission,
+    UserRole,
+    get_permission_denied_message,
+)
 
 logger = get_logger("telegram.auth")
 
@@ -30,6 +30,7 @@ logger = get_logger("telegram.auth")
 # =====================================================
 # Rate Limiting
 # =====================================================
+
 
 class RateLimiter:
     """
@@ -41,9 +42,9 @@ class RateLimiter:
     def __init__(self):
         self._requests: dict = defaultdict(list)
         self.limits = {
-            "default": {"max": 30, "window": 60},      # 30 پیام در 60 ثانیه
-            "command": {"max": 10, "window": 60},      # 10 دستور در 60 ثانیه
-            "sensitive": {"max": 5, "window": 60},      # 5 دستور حساس در 60 ثانیه
+            "default": {"max": 30, "window": 60},  # 30 پیام در 60 ثانیه
+            "command": {"max": 10, "window": 60},  # 10 دستور در 60 ثانیه
+            "sensitive": {"max": 5, "window": 60},  # 5 دستور حساس در 60 ثانیه
         }
 
     def check(self, user_id: int, command_type: str = "default") -> bool:
@@ -63,10 +64,7 @@ class RateLimiter:
         # پاک کردن درخواست‌های قدیمی
         user_requests = self._requests[user_id]
         window_start = now - timedelta(seconds=limit["window"])
-        self._requests[user_id] = [
-            r for r in user_requests
-            if r > window_start
-        ]
+        self._requests[user_id] = [r for r in user_requests if r > window_start]
 
         # بررسی تعداد
         if len(self._requests[user_id]) >= limit["max"]:
@@ -98,6 +96,7 @@ rate_limiter = RateLimiter()
 # Decorators
 # =====================================================
 
+
 def require_permission(permission: Permission) -> Callable:
     """
     Decorator برای بررسی دسترسی command
@@ -110,6 +109,7 @@ def require_permission(permission: Permission) -> Callable:
         async def close_all_trades(message: types.Message):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(event: types.Message | types.CallbackQuery, *args, **kwargs):
@@ -125,26 +125,26 @@ def require_permission(permission: Permission) -> Callable:
                 return await func(event, *args, **kwargs)
 
             # بررسی rate limit
-            command_type = "sensitive" if permission in [
-                Permission.CLOSE_ALL_TRADES,
-                Permission.CLOSE_BUY_TRADES,
-                Permission.CLOSE_SELL_TRADES,
-                Permission.START_BOT,
-                Permission.STOP_BOT,
-            ] else "command"
+            command_type = (
+                "sensitive"
+                if permission
+                in [
+                    Permission.CLOSE_ALL_TRADES,
+                    Permission.CLOSE_BUY_TRADES,
+                    Permission.CLOSE_SELL_TRADES,
+                    Permission.START_BOT,
+                    Permission.STOP_BOT,
+                ]
+                else "command"
+            )
 
             if not rate_limiter.check(telegram_user_id, command_type):
                 remaining = rate_limiter.get_remaining_time(telegram_user_id, command_type)
-                await reply_func(
-                    f"⏳ لطفاً {remaining} ثانیه صبر کنید.",
-                    parse_mode="HTML"
-                )
+                await reply_func(f"⏳ لطفاً {remaining} ثانیه صبر کنید.", parse_mode="HTML")
                 return
 
             # بررسی دسترسی
-            check_result = await rbac_service.check_permission(
-                telegram_user_id, permission
-            )
+            check_result = await rbac_service.check_permission(telegram_user_id, permission)
 
             if not check_result.get("allowed"):
                 # ثبت لاگ تلاش غیرمجاز
@@ -154,18 +154,19 @@ def require_permission(permission: Permission) -> Callable:
                 )
 
                 await reply_func(
-                    check_result.get("message", "🚫 دسترسی غیرمجاز"),
-                    parse_mode="HTML"
+                    check_result.get("message", "🚫 دسترسی غیرمجاز"), parse_mode="HTML"
                 )
                 return
 
             # ثبت audit log
             await audit_service.log(
-                action=AuditAction.TRADE_CLOSE if "close" in permission.value else AuditAction.SETTINGS_CHANGE,
+                action=AuditAction.TRADE_CLOSE
+                if "close" in permission.value
+                else AuditAction.SETTINGS_CHANGE,
                 user_id=check_result.get("user_id"),
                 resource_type="telegram_command",
                 resource_id=permission.value,
-                details={"telegram_user_id": telegram_user_id}
+                details={"telegram_user_id": telegram_user_id},
             )
 
             # ذخیره info در event برای استفاده بعدی
@@ -177,6 +178,7 @@ def require_permission(permission: Permission) -> Callable:
             return await func(event, *args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -192,6 +194,7 @@ def require_role(min_role: UserRole) -> Callable:
         async def manage_users(message: types.Message):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(event: types.Message | types.CallbackQuery, *args, **kwargs):
@@ -209,27 +212,26 @@ def require_role(min_role: UserRole) -> Callable:
             user_role = await rbac_service.get_user_role(telegram_user_id)
 
             if not user_role:
-                await reply_func(
-                    get_permission_denied_message("not_registered"),
-                    parse_mode="HTML"
-                )
+                await reply_func(get_permission_denied_message("not_registered"), parse_mode="HTML")
                 return
 
             # مقایسه سطح نقش
             from ..telegram.rbac import get_role_level
+
             user_level = get_role_level(user_role)
             required_level = get_role_level(min_role)
 
             if user_level < required_level:
                 await reply_func(
                     get_permission_denied_message("no_permission", user_role.value, min_role.value),
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
                 return
 
             return await func(event, *args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -240,6 +242,7 @@ def rate_limit(limit_type: str = "command") -> Callable:
     Args:
         limit_type: نوع محدودیت
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(event: types.Message | types.CallbackQuery, *args, **kwargs):
@@ -255,15 +258,13 @@ def rate_limit(limit_type: str = "command") -> Callable:
 
             if not rate_limiter.check(telegram_user_id, limit_type):
                 remaining = rate_limiter.get_remaining_time(telegram_user_id, limit_type)
-                await reply_func(
-                    f"⏳ لطفاً {remaining} ثانیه صبر کنید.",
-                    parse_mode="HTML"
-                )
+                await reply_func(f"⏳ لطفاً {remaining} ثانیه صبر کنید.", parse_mode="HTML")
                 return
 
             return await func(event, *args, **kwargs)
 
         return wrapper
+
     return decorator
 
 
@@ -274,6 +275,7 @@ def audit_log(action_type: str) -> Callable:
     Args:
         action_type: نوع عملیات
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(event: types.Message | types.CallbackQuery, *args, **kwargs):
@@ -301,18 +303,20 @@ def audit_log(action_type: str) -> Callable:
                 user_id=db_user_id,
                 resource_type="telegram_command",
                 resource_id=command[:50],
-                details={"telegram_user_id": telegram_user_id, "action_type": action_type}
+                details={"telegram_user_id": telegram_user_id, "action_type": action_type},
             )
 
             return result
 
         return wrapper
+
     return decorator
 
 
 # =====================================================
 # Filters
 # =====================================================
+
 
 class PermissionFilter(BaseFilter):
     """
@@ -325,9 +329,7 @@ class PermissionFilter(BaseFilter):
     async def __call__(self, message: Message) -> bool:
         telegram_user_id = message.from_user.id
 
-        check = await rbac_service.check_permission(
-            telegram_user_id, self.permission
-        )
+        check = await rbac_service.check_permission(telegram_user_id, self.permission)
 
         return check.get("allowed", False)
 
@@ -365,6 +367,7 @@ class RegisteredUserFilter(BaseFilter):
 # Middleware
 # =====================================================
 
+
 class AuthorizationMiddleware:
     """
     میان‌افزار برای بررسی دسترسی همه پیام‌ها
@@ -399,21 +402,13 @@ class AuthorizationMiddleware:
 
         # بررسی دسترسی اگر command است
         if command.startswith("/"):
-            check = await rbac_service.check_command_permission(
-                telegram_user_id, command
-            )
+            check = await rbac_service.check_command_permission(telegram_user_id, command)
 
             if not check.get("allowed"):
-                logger.warning(
-                    f"تلاش دسترسی غیرمجاز به command: {command} "
-                    f"توسط {telegram_user_id}"
-                )
+                logger.warning(f"تلاش دسترسی غیرمجاز به command: {command} توسط {telegram_user_id}")
 
                 if isinstance(event, Message):
-                    await event.answer(
-                        check.get("message", "🚫 دسترسی غیرمجاز"),
-                        parse_mode="HTML"
-                    )
+                    await event.answer(check.get("message", "🚫 دسترسی غیرمجاز"), parse_mode="HTML")
                 return
 
         # اجرای هندلر

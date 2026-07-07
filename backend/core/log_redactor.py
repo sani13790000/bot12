@@ -8,6 +8,7 @@ P11-LR-3: structlog و stdlib logging هر دو پوشش داده می‌شون�
 P11-LR-4: Redacted value → [REDACTED:TYPE] برای debugging
 P11-LR-5: False positive rate پایین — فقط key=value patterns
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,11 +40,11 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     (
         "secret",
         re.compile(
-            r'((?:secret|api_?key|api_?token|access_?token|refresh_?token|'
-            r'client_?secret|private_?key|signing_?key|license_?key|license_?secret|'
-            r'license_?salt|mql5_?api_?token|telegram_?bot_?token|telegram_?webhook_?secret|'
-            r'jwt_?secret(?:_?key)?|supabase_?(?:service_?)?key|master_?key|'
-            r'\w+_secret(?:_key)?|\w+_?password|\w+_?api_?(?:key|token))'
+            r"((?:secret|api_?key|api_?token|access_?token|refresh_?token|"
+            r"client_?secret|private_?key|signing_?key|license_?key|license_?secret|"
+            r"license_?salt|mql5_?api_?token|telegram_?bot_?token|telegram_?webhook_?secret|"
+            r"jwt_?secret(?:_?key)?|supabase_?(?:service_?)?key|master_?key|"
+            r"\w+_secret(?:_key)?|\w+_?password|\w+_?api_?(?:key|token))"
             r')(\s*[:=]\s*)["\']?([^\s"\']&,;}{]{4,})["\']?',
             re.IGNORECASE,
         ),
@@ -74,23 +75,44 @@ _PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ),
 ]
 
-_SENSITIVE_KEYS = frozenset({
-    "password", "passwd", "pwd", "pass",
-    "secret", "jwt_secret", "jwt_secret_key",
-    "api_key", "apikey", "api_token",
-    "access_token", "refresh_token", "id_token",
-    "client_secret", "private_key", "signing_key",
-    "license_key", "license_secret", "license_salt",
-    "mql5_api_token",
-    "telegram_bot_token", "telegram_webhook_secret",
-    "supabase_key", "supabase_service_key",
-    "master_key", "secrets_master_key",
-    "mt5_password",
-    "card_number", "pan", "cvv", "cvc",
-    "authorization",
-    "x-api-key",
-    "cookie",
-})
+_SENSITIVE_KEYS = frozenset(
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "pass",
+        "secret",
+        "jwt_secret",
+        "jwt_secret_key",
+        "api_key",
+        "apikey",
+        "api_token",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "client_secret",
+        "private_key",
+        "signing_key",
+        "license_key",
+        "license_secret",
+        "license_salt",
+        "mql5_api_token",
+        "telegram_bot_token",
+        "telegram_webhook_secret",
+        "supabase_key",
+        "supabase_service_key",
+        "master_key",
+        "secrets_master_key",
+        "mt5_password",
+        "card_number",
+        "pan",
+        "cvv",
+        "cvc",
+        "authorization",
+        "x-api-key",
+        "cookie",
+    }
+)
 
 
 def redact_string(text: str) -> str:
@@ -115,8 +137,10 @@ def redact_dict(data: Dict[str, Any], depth: int = 0) -> Dict[str, Any]:
             result[k] = redact_string(v)
         elif isinstance(v, (list, tuple)):
             result[k] = [
-                redact_dict(i, depth + 1) if isinstance(i, dict)
-                else redact_string(i) if isinstance(i, str)
+                redact_dict(i, depth + 1)
+                if isinstance(i, dict)
+                else redact_string(i)
+                if isinstance(i, str)
                 else i
                 for i in v
             ]
@@ -136,15 +160,30 @@ class RedactionFilter(logging.Filter):
                 record.args = redact_dict(record.args)
             elif isinstance(record.args, tuple):
                 record.args = tuple(
-                    redact_string(a) if isinstance(a, str) else a
-                    for a in record.args
+                    redact_string(a) if isinstance(a, str) else a for a in record.args
                 )
         _SKIP = {
-            "msg", "args", "exc_info", "exc_text", "stack_info",
-            "name", "levelname", "levelno", "pathname", "filename",
-            "module", "funcName", "lineno", "created", "msecs",
-            "relativeCreated", "thread", "threadName", "processName",
-            "process", "message",
+            "msg",
+            "args",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "name",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "funcName",
+            "lineno",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
         }
         for attr in list(vars(record).keys()):
             if attr in _SKIP:
@@ -168,6 +207,8 @@ def install_redaction_filter(logger_name: Optional[str] = None) -> None:
             handler.addFilter(f)
 
 
-def structlog_redact_processor(logger: Any, method: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
+def structlog_redact_processor(
+    logger: Any, method: str, event_dict: Dict[str, Any]
+) -> Dict[str, Any]:
     """P11-LR-3: structlog processor. Add to processor chain at startup."""
     return redact_dict(event_dict)

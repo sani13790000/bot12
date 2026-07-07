@@ -2,9 +2,11 @@
 Helper imported by main.py to register security AI routers.
 Kept separate to avoid inflating main.py size.
 """
+
 from __future__ import annotations
 
 import logging
+
 from fastapi import FastAPI
 
 log = logging.getLogger(__name__)
@@ -19,6 +21,7 @@ def register_security_ai_routes(app: FastAPI, prefix: str = "/api/v1/security-ai
     """
     try:
         from backend.api.routes import security_ai, security_ai_extended
+
         app.include_router(security_ai.router, prefix=prefix, tags=["Security AI"])
         app.include_router(security_ai_extended.router, prefix=prefix, tags=["Security AI"])
         log.info("Security AI routes registered at %s", prefix)

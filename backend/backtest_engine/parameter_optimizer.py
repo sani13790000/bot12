@@ -9,20 +9,21 @@ Phase-6 fix:
 - Extended OptimizationConfig with WalkForward fields
 - Added best_is_result / best_oos_result / best_fitness to OptimizationResult
 """
+
 from __future__ import annotations
+
 import asyncio
 import itertools
 import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
-import math
-import statistics
 
 
 @dataclass
 class ParameterGrid:
     """Defines the search space for optimization."""
+
     name: str
     min_value: float
     max_value: float
@@ -46,6 +47,7 @@ class ParameterGrid:
 @dataclass
 class ParameterRange:
     """Alias-style class: discrete list of values (used by walk_forward_advanced)."""
+
     name: str
     values_list: List[Any]
 
@@ -62,19 +64,19 @@ class ParameterRange:
 class OptimizationConfig:
     # Core fields (original)
     parameter_grids: List[ParameterGrid] = field(default_factory=list)
-    metric: str = "sharpe_ratio"            # objective metric to maximize
-    method: str = "GRID"                    # GRID / RANDOM / WALK_FORWARD
+    metric: str = "sharpe_ratio"  # objective metric to maximize
+    method: str = "GRID"  # GRID / RANDOM / WALK_FORWARD
     max_iterations: int = 200
-    train_ratio: float = 0.70               # 70% train / 30% out-of-sample
+    train_ratio: float = 0.70  # 70% train / 30% out-of-sample
     random_seed: int = 42
-    min_trades: int = 30                    # discard runs with fewer trades
-    penalty_overfitting: float = 0.5        # penalize train>>test gap
-    n_jobs: int = 4                         # parallel workers
+    min_trades: int = 30  # discard runs with fewer trades
+    penalty_overfitting: float = 0.5  # penalize train>>test gap
+    n_jobs: int = 4  # parallel workers
 
     # Walk-forward extra fields (Phase-6)
-    symbols: List[str] = field(default_factory=lambda: ['XAUUSD'])
+    symbols: List[str] = field(default_factory=lambda: ["XAUUSD"])
     parameter_ranges: List[ParameterRange] = field(default_factory=list)
-    optimization_metric: str = "SHARPE"     # SHARPE / PROFIT_FACTOR / WIN_RATE
+    optimization_metric: str = "SHARPE"  # SHARPE / PROFIT_FACTOR / WIN_RATE
     initial_balance: float = 10_000.0
     is_start: Optional[datetime] = None
     is_end: Optional[datetime] = None
@@ -99,13 +101,13 @@ class IterationResult:
         return {
             "params": self.params,
             "train_metric": round(self.train_metric, 4),
-            "test_metric":  round(self.test_metric, 4),
+            "test_metric": round(self.test_metric, 4),
             "train_trades": self.train_trades,
-            "test_trades":  self.test_trades,
-            "net_pnl":      round(self.net_pnl, 2),
+            "test_trades": self.test_trades,
+            "net_pnl": round(self.net_pnl, 2),
             "max_drawdown": round(self.max_drawdown, 4),
-            "profit_factor":round(self.profit_factor, 4),
-            "win_rate":     round(self.win_rate, 4),
+            "profit_factor": round(self.profit_factor, 4),
+            "win_rate": round(self.win_rate, 4),
             "combined_score": round(self.combined_score, 4),
         }
 
@@ -120,31 +122,34 @@ class OptimizationResult:
     all_iterations: List[IterationResult]
     total_iterations: int
     is_robust: bool
-    robustness_score: float           # 0-100
+    robustness_score: float  # 0-100
     overfit_warning: bool
     recommendation: str
     start_time: datetime = field(default_factory=datetime.utcnow)
-    end_time: datetime   = field(default_factory=datetime.utcnow)
+    end_time: datetime = field(default_factory=datetime.utcnow)
 
     # Phase-6: walk_forward_advanced compatibility
     best_fitness: float = 0.0
-    best_is_result: Any = None   # MultiSymbolBacktestResult | None
+    best_is_result: Any = None  # MultiSymbolBacktestResult | None
     best_oos_result: Any = None  # MultiSymbolBacktestResult | None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "best_params":          self.best_params,
-            "best_train_metric":    round(self.best_train_metric, 4),
-            "best_test_metric":     round(self.best_test_metric, 4),
-            "best_combined_score":  round(self.best_combined_score, 4),
-            "total_iterations":     self.total_iterations,
-            "is_robust":            self.is_robust,
-            "robustness_score":     round(self.robustness_score, 2),
-            "overfit_warning":      self.overfit_warning,
-            "recommendation":       self.recommendation,
-            "top_10": [r.to_dict() for r in sorted(
-                self.all_iterations, key=lambda x: x.combined_score, reverse=True
-            )[:10]],
+            "best_params": self.best_params,
+            "best_train_metric": round(self.best_train_metric, 4),
+            "best_test_metric": round(self.best_test_metric, 4),
+            "best_combined_score": round(self.best_combined_score, 4),
+            "total_iterations": self.total_iterations,
+            "is_robust": self.is_robust,
+            "robustness_score": round(self.robustness_score, 2),
+            "overfit_warning": self.overfit_warning,
+            "recommendation": self.recommendation,
+            "top_10": [
+                r.to_dict()
+                for r in sorted(self.all_iterations, key=lambda x: x.combined_score, reverse=True)[
+                    :10
+                ]
+            ],
             "duration_seconds": round((self.end_time - self.start_time).total_seconds(), 2),
         }
 
@@ -193,8 +198,8 @@ class ParameterOptimizer:
 
         # Robustness analysis
         robustness = self._compute_robustness(valid)
-        is_robust  = robustness >= 60.0
-        overfit    = (best.train_metric - best.test_metric) > 0.5
+        is_robust = robustness >= 60.0
+        overfit = (best.train_metric - best.test_metric) > 0.5
 
         if overfit and not is_robust:
             recommendation = "OVERFITTED — do not deploy"
@@ -276,10 +281,7 @@ class ParameterOptimizer:
 
         names = [p[0] for p in all_params]
         value_lists = [p[1] for p in all_params]
-        return [
-            dict(zip(names, combo))
-            for combo in itertools.product(*value_lists)
-        ]
+        return [dict(zip(names, combo)) for combo in itertools.product(*value_lists)]
 
     def _calc_fitness(self, result: Any, metric: str) -> float:
         """Calculate fitness score from a MultiSymbolBacktestResult or similar."""
@@ -287,12 +289,12 @@ class ParameterOptimizer:
             return 0.0
         metric_upper = metric.upper()
         if metric_upper == "SHARPE":
-            return getattr(result, 'sharpe_ratio', 0.0)
+            return getattr(result, "sharpe_ratio", 0.0)
         if metric_upper == "PROFIT_FACTOR":
-            return getattr(result, 'profit_factor', 0.0)
+            return getattr(result, "profit_factor", 0.0)
         if metric_upper == "WIN_RATE":
-            return getattr(result, 'win_rate', 0.0) / 100.0
-        return getattr(result, 'net_profit_pct', 0.0)
+            return getattr(result, "win_rate", 0.0) / 100.0
+        return getattr(result, "net_profit_pct", 0.0)
 
     @staticmethod
     def _compute_robustness(results: List[IterationResult]) -> float:
@@ -300,18 +302,30 @@ class ParameterOptimizer:
         if not results:
             return 0.0
         passing = sum(
-            1 for r in results
-            if r.test_metric > 0 and
-               (r.train_metric == 0 or abs(r.train_metric - r.test_metric) / max(abs(r.train_metric), 1e-9) < 0.5)
+            1
+            for r in results
+            if r.test_metric > 0
+            and (
+                r.train_metric == 0
+                or abs(r.train_metric - r.test_metric) / max(abs(r.train_metric), 1e-9) < 0.5
+            )
         )
         return (passing / len(results)) * 100
 
     def _empty_result(self, config: OptimizationConfig, start: datetime) -> OptimizationResult:
         return OptimizationResult(
-            config=config, best_params={}, best_train_metric=0,
-            best_test_metric=0, best_combined_score=0, all_iterations=[],
-            total_iterations=0, is_robust=False, robustness_score=0,
-            overfit_warning=True, recommendation="INSUFFICIENT DATA",
-            start_time=start, end_time=datetime.utcnow(),
+            config=config,
+            best_params={},
+            best_train_metric=0,
+            best_test_metric=0,
+            best_combined_score=0,
+            all_iterations=[],
+            total_iterations=0,
+            is_robust=False,
+            robustness_score=0,
+            overfit_warning=True,
+            recommendation="INSUFFICIENT DATA",
+            start_time=start,
+            end_time=datetime.utcnow(),
             best_fitness=0.0,
         )

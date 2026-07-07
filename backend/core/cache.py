@@ -7,6 +7,7 @@ P7-CACHE-2: Redis serialisation via msgpack with fallback to json
 P7-CACHE-3: key namespacing to prevent collisions across modules
 P7-CACHE-4: async-safe in-process cache (no threading issues)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,9 +35,9 @@ class LRUCache:
 
     def __init__(self, max_size: int = 1024, default_ttl: float = 300.0) -> None:
         self._store: OrderedDict[str, tuple[Any, float]] = OrderedDict()
-        self._max   = max_size
-        self._ttl   = default_ttl
-        self._lock  = asyncio.Lock()
+        self._max = max_size
+        self._ttl = default_ttl
+        self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[Any]:
         async with self._lock:
@@ -46,14 +47,14 @@ class LRUCache:
             if expiry and time.monotonic() > expiry:
                 del self._store[key]
                 return None
-            self._store.move_to_end(key)   # mark as recently used
+            self._store.move_to_end(key)  # mark as recently used
             return value
 
     async def set(
         self,
-        key:   str,
+        key: str,
         value: Any,
-        ttl:   Optional[float] = None,
+        ttl: Optional[float] = None,
     ) -> None:
         async with self._lock:
             effective_ttl = ttl if ttl is not None else self._ttl
@@ -102,6 +103,7 @@ class RedisCache:
     def _serialise(self, value: Any) -> bytes:
         try:
             import msgpack
+
             return msgpack.packb(value, use_bin_type=True)
         except Exception:
             return json.dumps(value).encode()
@@ -109,6 +111,7 @@ class RedisCache:
     def _deserialise(self, data: bytes) -> Any:
         try:
             import msgpack
+
             return msgpack.unpackb(data, raw=False)
         except Exception:
             return json.loads(data)
@@ -123,9 +126,9 @@ class RedisCache:
 
     async def set(
         self,
-        key:   str,
+        key: str,
         value: Any,
-        ttl:   Optional[int] = None,
+        ttl: Optional[int] = None,
     ) -> None:
         try:
             data = self._serialise(value)
@@ -159,14 +162,14 @@ class TwoLevelCache:
 
     def __init__(
         self,
-        namespace:  str = "galaxy",
-        l1_size:    int = 512,
-        l1_ttl:     float = 60.0,
-        redis:      Optional[Any] = None,
+        namespace: str = "galaxy",
+        l1_size: int = 512,
+        l1_ttl: float = 60.0,
+        redis: Optional[Any] = None,
     ) -> None:
-        self._ns    = namespace
-        self._l1    = LRUCache(max_size=l1_size, default_ttl=l1_ttl)
-        self._l2    = RedisCache(redis) if redis else None
+        self._ns = namespace
+        self._l1 = LRUCache(max_size=l1_size, default_ttl=l1_ttl)
+        self._l2 = RedisCache(redis) if redis else None
 
     def _key(self, key: str) -> str:
         return f"{self._ns}:{key}"
@@ -187,10 +190,10 @@ class TwoLevelCache:
 
     async def set(
         self,
-        key:     str,
-        value:   Any,
-        l1_ttl:  Optional[float] = None,
-        l2_ttl:  Optional[int]   = None,
+        key: str,
+        value: Any,
+        l1_ttl: Optional[float] = None,
+        l2_ttl: Optional[int] = None,
     ) -> None:
         ns_key = self._key(key)
         await self._l1.set(ns_key, value, ttl=l1_ttl)

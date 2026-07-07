@@ -1,86 +1,130 @@
 """
 Phase 30 -- Compliance, Legal & User-Facing Disclosures
 """
+
 from __future__ import annotations
-import copy, hashlib, hmac, json, os, time, uuid
+
+import copy
+import hashlib
+import hmac
+import json
+import os
+import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from threading import RLock
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
+
 class DocumentType(str, Enum):
-    TOS           = "tos"
-    PRIVACY       = "privacy"
-    RISK          = "risk_disclaimer"
-    LICENSE       = "license_terms"
-    REFUND        = "refund_policy"
-    RETENTION     = "retention_policy"
-    CANCELLATION  = "cancellation_policy"
-    DPA           = "data_processing_agreement"
-    COOKIE        = "cookie_policy"
-    AML           = "aml_kyc_policy"
+    TOS = "tos"
+    PRIVACY = "privacy"
+    RISK = "risk_disclaimer"
+    LICENSE = "license_terms"
+    REFUND = "refund_policy"
+    RETENTION = "retention_policy"
+    CANCELLATION = "cancellation_policy"
+    DPA = "data_processing_agreement"
+    COOKIE = "cookie_policy"
+    AML = "aml_kyc_policy"
+
 
 class DocumentStatus(str, Enum):
-    DRAFT      = "draft"
-    ACTIVE     = "active"
+    DRAFT = "draft"
+    ACTIVE = "active"
     SUPERSEDED = "superseded"
-    ARCHIVED   = "archived"
+    ARCHIVED = "archived"
+
 
 class ConsentStatus(str, Enum):
-    PENDING    = "pending"
-    ACCEPTED   = "accepted"
-    DECLINED   = "declined"
-    EXPIRED    = "expired"
-    WITHDRAWN  = "withdrawn"
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+    WITHDRAWN = "withdrawn"
+
 
 class JurisdictionCode(str, Enum):
     GLOBAL = "GLOBAL"
-    EU     = "EU"
-    UK     = "UK"
-    US     = "US"
-    UAE    = "UAE"
-    AU     = "AU"
+    EU = "EU"
+    UK = "UK"
+    US = "US"
+    UAE = "UAE"
+    AU = "AU"
+
 
 class AuditAction(str, Enum):
-    DOC_PUBLISHED    = "doc.published"
-    DOC_SUPERSEDED   = "doc.superseded"
-    DOC_ARCHIVED     = "doc.archived"
+    DOC_PUBLISHED = "doc.published"
+    DOC_SUPERSEDED = "doc.superseded"
+    DOC_ARCHIVED = "doc.archived"
     CONSENT_RECORDED = "consent.recorded"
-    CONSENT_WITHDRAWN= "consent.withdrawn"
-    CONSENT_EXPIRED  = "consent.expired"
-    DISCLOSURE_GATE  = "disclosure.gate_checked"
+    CONSENT_WITHDRAWN = "consent.withdrawn"
+    CONSENT_EXPIRED = "consent.expired"
+    DISCLOSURE_GATE = "disclosure.gate_checked"
     DISCLOSURE_BLOCK = "disclosure.blocked"
-    RETENTION_SET    = "retention.policy_set"
-    REFUND_ISSUED    = "refund.issued"
-    REFUND_DENIED    = "refund.denied"
+    RETENTION_SET = "retention.policy_set"
+    REFUND_ISSUED = "refund.issued"
+    REFUND_DENIED = "refund.denied"
     CANCEL_REQUESTED = "cancellation.requested"
     CANCEL_CONFIRMED = "cancellation.confirmed"
-    SAAS_CHECK       = "saas.readiness_check"
-    COMPROMISE_RESP  = "compliance.compromise_response"
+    SAAS_CHECK = "saas.readiness_check"
+    COMPROMISE_RESP = "compliance.compromise_response"
+
 
 SAAS_REQUIRED_DOCS: Set[DocumentType] = {
-    DocumentType.TOS, DocumentType.PRIVACY, DocumentType.RISK,
-    DocumentType.LICENSE, DocumentType.REFUND, DocumentType.RETENTION,
-    DocumentType.CANCELLATION, DocumentType.COOKIE,
+    DocumentType.TOS,
+    DocumentType.PRIVACY,
+    DocumentType.RISK,
+    DocumentType.LICENSE,
+    DocumentType.REFUND,
+    DocumentType.RETENTION,
+    DocumentType.CANCELLATION,
+    DocumentType.COOKIE,
 }
 ACCEPTANCE_REQUIRED: Set[DocumentType] = {
-    DocumentType.TOS, DocumentType.PRIVACY,
-    DocumentType.RISK, DocumentType.LICENSE,
+    DocumentType.TOS,
+    DocumentType.PRIVACY,
+    DocumentType.RISK,
+    DocumentType.LICENSE,
 }
 REQUIRES_REASON: Set[AuditAction] = {
-    AuditAction.DOC_SUPERSEDED, AuditAction.DOC_ARCHIVED,
-    AuditAction.CONSENT_WITHDRAWN, AuditAction.REFUND_DENIED,
+    AuditAction.DOC_SUPERSEDED,
+    AuditAction.DOC_ARCHIVED,
+    AuditAction.CONSENT_WITHDRAWN,
+    AuditAction.REFUND_DENIED,
 }
 GENESIS_CONST = "GENESIS:COMPLIANCE:CHAIN:V30"
 
-class ComplianceError(Exception): pass
-class MissingReasonError(ComplianceError): pass
-class DocumentNotFoundError(ComplianceError): pass
-class ConsentRequiredError(ComplianceError): pass
-class ConsentDeclinedError(ComplianceError): pass
-class RefundDeniedError(ComplianceError): pass
-class CancellationError(ComplianceError): pass
+
+class ComplianceError(Exception):
+    pass
+
+
+class MissingReasonError(ComplianceError):
+    pass
+
+
+class DocumentNotFoundError(ComplianceError):
+    pass
+
+
+class ConsentRequiredError(ComplianceError):
+    pass
+
+
+class ConsentDeclinedError(ComplianceError):
+    pass
+
+
+class RefundDeniedError(ComplianceError):
+    pass
+
+
+class CancellationError(ComplianceError):
+    pass
+
 
 @dataclass
 class DocumentVersion:
@@ -98,8 +142,10 @@ class DocumentVersion:
     superseded_by: Optional[str] = None
     min_version_required: Optional[str] = None
     language: str = "en"
+
     def __repr__(self):
         return f"DocumentVersion(type={self.doc_type.value}, v={self.version}, status={self.status.value})"
+
 
 @dataclass
 class ConsentRecord:
@@ -116,12 +162,14 @@ class ConsentRecord:
     expires_at: Optional[float] = None
     withdrawn_at: Optional[float] = None
     reason: Optional[str] = None
+
     def is_valid(self) -> bool:
         if self.status != ConsentStatus.ACCEPTED:
             return False
         if self.expires_at and time.time() > self.expires_at:
             return False
         return True
+
 
 @dataclass
 class RetentionRule:
@@ -131,6 +179,7 @@ class RetentionRule:
     jurisdiction: JurisdictionCode
     auto_delete: bool = True
     description: str = ""
+
 
 @dataclass
 class RefundRequest:
@@ -147,6 +196,7 @@ class RefundRequest:
     resolved_by: Optional[str] = None
     denial_reason: Optional[str] = None
 
+
 @dataclass
 class CancellationRequest:
     request_id: str
@@ -160,6 +210,7 @@ class CancellationRequest:
     confirmed_at: Optional[float] = None
     data_deletion: bool = False
 
+
 @dataclass
 class _AuditEntry:
     entry_id: str
@@ -171,6 +222,7 @@ class _AuditEntry:
     ts: float
     seq: int
     chain_hash: str = ""
+
 
 class ComplianceAuditChain:
     def __init__(self, secret: Optional[str] = None) -> None:
@@ -186,8 +238,14 @@ class ComplianceAuditChain:
     def _hmac(self, data: str) -> str:
         return hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()
 
-    def record(self, action: AuditAction, actor: str, tenant_id: str = "system",
-               reason: Optional[str] = None, **detail) -> _AuditEntry:
+    def record(
+        self,
+        action: AuditAction,
+        actor: str,
+        tenant_id: str = "system",
+        reason: Optional[str] = None,
+        **detail,
+    ) -> _AuditEntry:
         if action in REQUIRES_REASON:
             if not reason or not reason.strip():
                 raise MissingReasonError(f"reason required for action {action.value}")
@@ -196,14 +254,32 @@ class ComplianceAuditChain:
             self._seq += 1
             seq = self._seq
             entry_id = str(uuid.uuid4())
-            canonical = json.dumps({"entry_id": entry_id, "action": action.value,
-                "actor": actor, "tenant_id": tenant_id, "reason": reason,
-                "detail": detail, "ts": ts_now, "seq": seq}, sort_keys=True)
+            canonical = json.dumps(
+                {
+                    "entry_id": entry_id,
+                    "action": action.value,
+                    "actor": actor,
+                    "tenant_id": tenant_id,
+                    "reason": reason,
+                    "detail": detail,
+                    "ts": ts_now,
+                    "seq": seq,
+                },
+                sort_keys=True,
+            )
             chain_hash = self._hmac(self._prev_hash + ":" + canonical)
             self._prev_hash = chain_hash
-            entry = _AuditEntry(entry_id=entry_id, action=action, actor=actor,
-                tenant_id=tenant_id, detail=detail, reason=reason,
-                ts=ts_now, seq=seq, chain_hash=chain_hash)
+            entry = _AuditEntry(
+                entry_id=entry_id,
+                action=action,
+                actor=actor,
+                tenant_id=tenant_id,
+                detail=detail,
+                reason=reason,
+                ts=ts_now,
+                seq=seq,
+                chain_hash=chain_hash,
+            )
             self._entries.append(entry)
         return entry
 
@@ -214,9 +290,19 @@ class ComplianceAuditChain:
             return True
         prev = self._genesis()
         for e in entries:
-            canonical = json.dumps({"entry_id": e.entry_id, "action": e.action.value,
-                "actor": e.actor, "tenant_id": e.tenant_id, "reason": e.reason,
-                "detail": e.detail, "ts": e.ts, "seq": e.seq}, sort_keys=True)
+            canonical = json.dumps(
+                {
+                    "entry_id": e.entry_id,
+                    "action": e.action.value,
+                    "actor": e.actor,
+                    "tenant_id": e.tenant_id,
+                    "reason": e.reason,
+                    "detail": e.detail,
+                    "ts": e.ts,
+                    "seq": e.seq,
+                },
+                sort_keys=True,
+            )
             expected = self._hmac(prev + ":" + canonical)
             if not hmac.compare_digest(expected, e.chain_hash):
                 return False
@@ -229,17 +315,28 @@ class ComplianceAuditChain:
         broken = []
         prev = self._genesis()
         for e in entries:
-            canonical = json.dumps({"entry_id": e.entry_id, "action": e.action.value,
-                "actor": e.actor, "tenant_id": e.tenant_id, "reason": e.reason,
-                "detail": e.detail, "ts": e.ts, "seq": e.seq}, sort_keys=True)
+            canonical = json.dumps(
+                {
+                    "entry_id": e.entry_id,
+                    "action": e.action.value,
+                    "actor": e.actor,
+                    "tenant_id": e.tenant_id,
+                    "reason": e.reason,
+                    "detail": e.detail,
+                    "ts": e.ts,
+                    "seq": e.seq,
+                },
+                sort_keys=True,
+            )
             expected = self._hmac(prev + ":" + canonical)
             if not hmac.compare_digest(expected, e.chain_hash):
                 broken.append(e.seq)
             prev = e.chain_hash
         return broken
 
-    def query(self, action: Optional[AuditAction] = None,
-              tenant_id: Optional[str] = None, limit: int = 50) -> List[_AuditEntry]:
+    def query(
+        self, action: Optional[AuditAction] = None, tenant_id: Optional[str] = None, limit: int = 50
+    ) -> List[_AuditEntry]:
         with self._lock:
             entries = list(self._entries)
         results = []
@@ -278,13 +375,18 @@ class DocumentStore:
             raise DocumentNotFoundError(doc_id)
         return d
 
-    def active_for_type(self, doc_type: DocumentType,
-                        jurisdiction: JurisdictionCode = JurisdictionCode.GLOBAL) -> Optional[DocumentVersion]:
+    def active_for_type(
+        self, doc_type: DocumentType, jurisdiction: JurisdictionCode = JurisdictionCode.GLOBAL
+    ) -> Optional[DocumentVersion]:
         with self._lock:
             docs = list(self._docs.values())
-        candidates = [d for d in docs if d.doc_type == doc_type
-                      and d.status == DocumentStatus.ACTIVE
-                      and d.jurisdiction in (jurisdiction, JurisdictionCode.GLOBAL)]
+        candidates = [
+            d
+            for d in docs
+            if d.doc_type == doc_type
+            and d.status == DocumentStatus.ACTIVE
+            and d.jurisdiction in (jurisdiction, JurisdictionCode.GLOBAL)
+        ]
         if not candidates:
             return None
         return max(candidates, key=lambda d: d.effective_date)
@@ -335,19 +437,25 @@ class ConsentStore:
         with self._lock:
             return self._records.get(consent_id)
 
-    def latest_for(self, user_id: str, doc_type: DocumentType,
-                   tenant_id: Optional[str] = None) -> Optional[ConsentRecord]:
+    def latest_for(
+        self, user_id: str, doc_type: DocumentType, tenant_id: Optional[str] = None
+    ) -> Optional[ConsentRecord]:
         with self._lock:
             records = list(self._records.values())
-        candidates = [r for r in records if r.user_id == user_id
-                      and r.doc_type == doc_type
-                      and (tenant_id is None or r.tenant_id == tenant_id)]
+        candidates = [
+            r
+            for r in records
+            if r.user_id == user_id
+            and r.doc_type == doc_type
+            and (tenant_id is None or r.tenant_id == tenant_id)
+        ]
         if not candidates:
             return None
         return max(candidates, key=lambda r: r.accepted_at)
 
-    def user_has_accepted(self, user_id: str, doc_type: DocumentType,
-                          tenant_id: Optional[str] = None) -> bool:
+    def user_has_accepted(
+        self, user_id: str, doc_type: DocumentType, tenant_id: Optional[str] = None
+    ) -> bool:
         r = self.latest_for(user_id, doc_type, tenant_id)
         return r is not None and r.is_valid()
 
@@ -362,9 +470,13 @@ class ConsentStore:
             r.withdrawn_at = time.time()
             r.reason = reason
 
-    def pending_for_user(self, user_id: str, tenant_id: str,
-                         required_types: Set[DocumentType],
-                         doc_store: DocumentStore) -> List[DocumentType]:
+    def pending_for_user(
+        self,
+        user_id: str,
+        tenant_id: str,
+        required_types: Set[DocumentType],
+        doc_store: DocumentStore,
+    ) -> List[DocumentType]:
         missing = []
         for doc_type in required_types:
             active = doc_store.active_for_type(doc_type)
@@ -380,8 +492,13 @@ class ConsentStore:
 
 
 class DisclosureEngine:
-    def __init__(self, doc_store: DocumentStore, consent_store: ConsentStore,
-                 audit: ComplianceAuditChain, grace_days: int = 7) -> None:
+    def __init__(
+        self,
+        doc_store: DocumentStore,
+        consent_store: ConsentStore,
+        audit: ComplianceAuditChain,
+        grace_days: int = 7,
+    ) -> None:
         self._docs = doc_store
         self._consents = consent_store
         self._audit = audit
@@ -391,21 +508,35 @@ class DisclosureEngine:
     def add_hook(self, fn: Callable) -> None:
         self._hooks.append(fn)
 
-    def check_access(self, user_id: str, tenant_id: str, user_created_at: float,
-                     required: Set[DocumentType] = ACCEPTANCE_REQUIRED) -> Tuple[bool, List[DocumentType]]:
+    def check_access(
+        self,
+        user_id: str,
+        tenant_id: str,
+        user_created_at: float,
+        required: Set[DocumentType] = ACCEPTANCE_REQUIRED,
+    ) -> Tuple[bool, List[DocumentType]]:
         missing = self._consents.pending_for_user(user_id, tenant_id, required, self._docs)
         if not missing:
-            self._audit.record(AuditAction.DISCLOSURE_GATE, actor=user_id,
-                               tenant_id=tenant_id, result="allowed")
+            self._audit.record(
+                AuditAction.DISCLOSURE_GATE, actor=user_id, tenant_id=tenant_id, result="allowed"
+            )
             return True, []
         in_grace = (time.time() - user_created_at) < self._grace_seconds
         if in_grace:
-            self._audit.record(AuditAction.DISCLOSURE_GATE, actor=user_id,
-                               tenant_id=tenant_id, result="grace_period",
-                               missing=[t.value for t in missing])
+            self._audit.record(
+                AuditAction.DISCLOSURE_GATE,
+                actor=user_id,
+                tenant_id=tenant_id,
+                result="grace_period",
+                missing=[t.value for t in missing],
+            )
             return True, missing
-        self._audit.record(AuditAction.DISCLOSURE_BLOCK, actor=user_id,
-                           tenant_id=tenant_id, missing=[t.value for t in missing])
+        self._audit.record(
+            AuditAction.DISCLOSURE_BLOCK,
+            actor=user_id,
+            tenant_id=tenant_id,
+            missing=[t.value for t in missing],
+        )
         for hook in self._hooks:
             try:
                 hook(user_id, tenant_id, missing)
@@ -413,54 +544,137 @@ class DisclosureEngine:
                 pass
         raise ConsentRequiredError(f"User {user_id} must accept: {[t.value for t in missing]}")
 
-    def record_consent(self, user_id: str, tenant_id: str, doc_type: DocumentType,
-                       ip_address: str, user_agent: str,
-                       ttl_days: Optional[int] = None) -> ConsentRecord:
+    def record_consent(
+        self,
+        user_id: str,
+        tenant_id: str,
+        doc_type: DocumentType,
+        ip_address: str,
+        user_agent: str,
+        ttl_days: Optional[int] = None,
+    ) -> ConsentRecord:
         active = self._docs.active_for_type(doc_type)
         if active is None:
             raise DocumentNotFoundError(f"No active document for type {doc_type.value}")
         now = time.time()
         consent = ConsentRecord(
-            consent_id=str(uuid.uuid4()), user_id=user_id, tenant_id=tenant_id,
-            doc_id=active.doc_id, doc_type=doc_type, doc_version=active.version,
-            status=ConsentStatus.ACCEPTED, ip_address=ip_address, user_agent=user_agent,
-            accepted_at=now, expires_at=now + ttl_days * 86400 if ttl_days else None)
+            consent_id=str(uuid.uuid4()),
+            user_id=user_id,
+            tenant_id=tenant_id,
+            doc_id=active.doc_id,
+            doc_type=doc_type,
+            doc_version=active.version,
+            status=ConsentStatus.ACCEPTED,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            accepted_at=now,
+            expires_at=now + ttl_days * 86400 if ttl_days else None,
+        )
         self._consents.record(consent)
-        self._audit.record(AuditAction.CONSENT_RECORDED, actor=user_id,
-                           tenant_id=tenant_id, doc_type=doc_type.value,
-                           doc_version=active.version, ip_address=ip_address)
+        self._audit.record(
+            AuditAction.CONSENT_RECORDED,
+            actor=user_id,
+            tenant_id=tenant_id,
+            doc_type=doc_type.value,
+            doc_version=active.version,
+            ip_address=ip_address,
+        )
         return consent
 
 
 DEFAULT_RETENTION_RULES: Dict[str, RetentionRule] = {
-    "user_pii": RetentionRule("user_pii", 730, "GDPR Art.5", JurisdictionCode.EU, True,
-        "Personal identifiable information retained for 2 years post-account closure"),
-    "trading_logs": RetentionRule("trading_logs", 2555, "MiFID II", JurisdictionCode.EU, False,
-        "Trade logs retained for 7 years per MiFID II"),
-    "audit_logs": RetentionRule("audit_logs", 2555, "SOC2/ISO27001", JurisdictionCode.GLOBAL, False,
-        "Security audit logs retained for 7 years"),
-    "financial_records": RetentionRule("financial_records", 2555, "Companies Act", JurisdictionCode.UK, False,
-        "Financial records retained for 7 years"),
-    "support_tickets": RetentionRule("support_tickets", 1095, "Operational", JurisdictionCode.GLOBAL, True,
-        "Support tickets retained for 3 years"),
-    "marketing_consent": RetentionRule("marketing_consent", 1825, "GDPR Art.7", JurisdictionCode.EU, True,
-        "Marketing consent records retained for 5 years"),
-    "backup_data": RetentionRule("backup_data", 90, "Operational", JurisdictionCode.GLOBAL, True,
-        "Backup snapshots retained for 90 days"),
-    "session_data": RetentionRule("session_data", 30, "Security", JurisdictionCode.GLOBAL, True,
-        "Session tokens and refresh records for 30 days"),
-    "kyc_documents": RetentionRule("kyc_documents", 1825, "AML Directive", JurisdictionCode.EU, False,
-        "KYC/AML documents retained 5 years post-relationship"),
-    "payment_records": RetentionRule("payment_records", 2555, "PCI-DSS", JurisdictionCode.GLOBAL, False,
-        "Payment transaction records for 7 years"),
+    "user_pii": RetentionRule(
+        "user_pii",
+        730,
+        "GDPR Art.5",
+        JurisdictionCode.EU,
+        True,
+        "Personal identifiable information retained for 2 years post-account closure",
+    ),
+    "trading_logs": RetentionRule(
+        "trading_logs",
+        2555,
+        "MiFID II",
+        JurisdictionCode.EU,
+        False,
+        "Trade logs retained for 7 years per MiFID II",
+    ),
+    "audit_logs": RetentionRule(
+        "audit_logs",
+        2555,
+        "SOC2/ISO27001",
+        JurisdictionCode.GLOBAL,
+        False,
+        "Security audit logs retained for 7 years",
+    ),
+    "financial_records": RetentionRule(
+        "financial_records",
+        2555,
+        "Companies Act",
+        JurisdictionCode.UK,
+        False,
+        "Financial records retained for 7 years",
+    ),
+    "support_tickets": RetentionRule(
+        "support_tickets",
+        1095,
+        "Operational",
+        JurisdictionCode.GLOBAL,
+        True,
+        "Support tickets retained for 3 years",
+    ),
+    "marketing_consent": RetentionRule(
+        "marketing_consent",
+        1825,
+        "GDPR Art.7",
+        JurisdictionCode.EU,
+        True,
+        "Marketing consent records retained for 5 years",
+    ),
+    "backup_data": RetentionRule(
+        "backup_data",
+        90,
+        "Operational",
+        JurisdictionCode.GLOBAL,
+        True,
+        "Backup snapshots retained for 90 days",
+    ),
+    "session_data": RetentionRule(
+        "session_data",
+        30,
+        "Security",
+        JurisdictionCode.GLOBAL,
+        True,
+        "Session tokens and refresh records for 30 days",
+    ),
+    "kyc_documents": RetentionRule(
+        "kyc_documents",
+        1825,
+        "AML Directive",
+        JurisdictionCode.EU,
+        False,
+        "KYC/AML documents retained 5 years post-relationship",
+    ),
+    "payment_records": RetentionRule(
+        "payment_records",
+        2555,
+        "PCI-DSS",
+        JurisdictionCode.GLOBAL,
+        False,
+        "Payment transaction records for 7 years",
+    ),
 }
 
 
 class RetentionPolicyEngine:
-    def __init__(self, rules: Optional[Dict[str, RetentionRule]] = None,
-                 audit: Optional[ComplianceAuditChain] = None) -> None:
+    def __init__(
+        self,
+        rules: Optional[Dict[str, RetentionRule]] = None,
+        audit: Optional[ComplianceAuditChain] = None,
+    ) -> None:
         self._rules: Dict[str, RetentionRule] = (
-            copy.deepcopy(DEFAULT_RETENTION_RULES) if rules is None else copy.deepcopy(rules))
+            copy.deepcopy(DEFAULT_RETENTION_RULES) if rules is None else copy.deepcopy(rules)
+        )
         self._audit = audit
         self._lock = RLock()
 
@@ -472,9 +686,13 @@ class RetentionPolicyEngine:
         with self._lock:
             self._rules[rule.category] = rule
         if self._audit is not None:
-            self._audit.record(AuditAction.RETENTION_SET, actor=actor,
-                               tenant_id=tenant_id, category=rule.category,
-                               retain_days=rule.retain_days)
+            self._audit.record(
+                AuditAction.RETENTION_SET,
+                actor=actor,
+                tenant_id=tenant_id,
+                category=rule.category,
+                retain_days=rule.retain_days,
+            )
 
     def is_expired(self, category: str, created_at: float) -> bool:
         rule = self.get(category)
@@ -502,20 +720,37 @@ class RefundPolicyConfig:
 
 
 class RefundPolicyEngine:
-    def __init__(self, config: Optional[RefundPolicyConfig] = None,
-                 audit: Optional[ComplianceAuditChain] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[RefundPolicyConfig] = None,
+        audit: Optional[ComplianceAuditChain] = None,
+    ) -> None:
         self._config = config or RefundPolicyConfig()
         self._requests: Dict[str, RefundRequest] = {}
         self._audit = audit
         self._lock = RLock()
 
-    def request_refund(self, user_id: str, tenant_id: str, amount_cents: int,
-                       currency: str, reason: str, purchase_at: float) -> RefundRequest:
+    def request_refund(
+        self,
+        user_id: str,
+        tenant_id: str,
+        amount_cents: int,
+        currency: str,
+        reason: str,
+        purchase_at: float,
+    ) -> RefundRequest:
         if self._config.require_reason and (not reason or not reason.strip()):
             raise MissingReasonError("reason required for refund request")
-        req = RefundRequest(request_id=str(uuid.uuid4()), user_id=user_id,
-            tenant_id=tenant_id, amount_cents=amount_cents, currency=currency,
-            reason=reason, requested_at=time.time(), purchase_at=purchase_at)
+        req = RefundRequest(
+            request_id=str(uuid.uuid4()),
+            user_id=user_id,
+            tenant_id=tenant_id,
+            amount_cents=amount_cents,
+            currency=currency,
+            reason=reason,
+            requested_at=time.time(),
+            purchase_at=purchase_at,
+        )
         with self._lock:
             self._requests[req.request_id] = req
         return req
@@ -533,9 +768,13 @@ class RefundPolicyEngine:
             req.resolved_at = now
             req.resolved_by = actor
             if self._audit is not None:
-                self._audit.record(AuditAction.REFUND_DENIED, actor=actor,
-                    tenant_id=req.tenant_id, request_id=request_id,
-                    reason=req.denial_reason)
+                self._audit.record(
+                    AuditAction.REFUND_DENIED,
+                    actor=actor,
+                    tenant_id=req.tenant_id,
+                    request_id=request_id,
+                    reason=req.denial_reason,
+                )
             raise RefundDeniedError(req.denial_reason)
         if req.amount_cents > self._config.max_amount_cents:
             req.status = "denied"
@@ -543,17 +782,25 @@ class RefundPolicyEngine:
             req.resolved_at = now
             req.resolved_by = actor
             if self._audit is not None:
-                self._audit.record(AuditAction.REFUND_DENIED, actor=actor,
-                    tenant_id=req.tenant_id, request_id=request_id,
-                    reason=req.denial_reason)
+                self._audit.record(
+                    AuditAction.REFUND_DENIED,
+                    actor=actor,
+                    tenant_id=req.tenant_id,
+                    request_id=request_id,
+                    reason=req.denial_reason,
+                )
             raise RefundDeniedError(req.denial_reason)
         req.status = "approved"
         req.resolved_at = now
         req.resolved_by = actor
         if self._audit is not None:
-            self._audit.record(AuditAction.REFUND_ISSUED, actor=actor,
-                tenant_id=req.tenant_id, request_id=request_id,
-                amount_cents=req.amount_cents)
+            self._audit.record(
+                AuditAction.REFUND_ISSUED,
+                actor=actor,
+                tenant_id=req.tenant_id,
+                request_id=request_id,
+                amount_cents=req.amount_cents,
+            )
         return req
 
     def get(self, request_id: str) -> Optional[RefundRequest]:
@@ -575,32 +822,52 @@ class CancellationPolicyConfig:
 
 
 class CancellationPolicyEngine:
-    def __init__(self, config: Optional[CancellationPolicyConfig] = None,
-                 audit: Optional[ComplianceAuditChain] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[CancellationPolicyConfig] = None,
+        audit: Optional[ComplianceAuditChain] = None,
+    ) -> None:
         self._config = config or CancellationPolicyConfig()
         self._requests: Dict[str, CancellationRequest] = {}
         self._audit = audit
         self._lock = RLock()
 
-    def request_cancellation(self, user_id: str, tenant_id: str, reason: str,
-                              immediate: bool = False,
-                              data_deletion: bool = False) -> CancellationRequest:
+    def request_cancellation(
+        self,
+        user_id: str,
+        tenant_id: str,
+        reason: str,
+        immediate: bool = False,
+        data_deletion: bool = False,
+    ) -> CancellationRequest:
         if not reason or not reason.strip():
             raise MissingReasonError("reason required for cancellation")
         if immediate and not self._config.immediate_allowed:
             raise CancellationError(
-                f"Immediate cancellation not allowed; notice period is {self._config.notice_days} days")
+                f"Immediate cancellation not allowed; notice period is {self._config.notice_days} days"
+            )
         now = time.time()
         notice_days = 0 if immediate else self._config.notice_days
-        req = CancellationRequest(request_id=str(uuid.uuid4()), user_id=user_id,
-            tenant_id=tenant_id, reason=reason, requested_at=now,
-            effective_at=now + notice_days * 86400, notice_days=notice_days,
-            data_deletion=data_deletion)
+        req = CancellationRequest(
+            request_id=str(uuid.uuid4()),
+            user_id=user_id,
+            tenant_id=tenant_id,
+            reason=reason,
+            requested_at=now,
+            effective_at=now + notice_days * 86400,
+            notice_days=notice_days,
+            data_deletion=data_deletion,
+        )
         with self._lock:
             self._requests[req.request_id] = req
         if self._audit is not None:
-            self._audit.record(AuditAction.CANCEL_REQUESTED, actor=user_id,
-                tenant_id=tenant_id, request_id=req.request_id, notice_days=notice_days)
+            self._audit.record(
+                AuditAction.CANCEL_REQUESTED,
+                actor=user_id,
+                tenant_id=tenant_id,
+                request_id=req.request_id,
+                notice_days=notice_days,
+            )
         return req
 
     def confirm_cancellation(self, request_id: str, actor: str) -> CancellationRequest:
@@ -613,8 +880,12 @@ class CancellationPolicyEngine:
         req.status = "confirmed"
         req.confirmed_at = time.time()
         if self._audit is not None:
-            self._audit.record(AuditAction.CANCEL_CONFIRMED, actor=actor,
-                tenant_id=req.tenant_id, request_id=request_id)
+            self._audit.record(
+                AuditAction.CANCEL_CONFIRMED,
+                actor=actor,
+                tenant_id=req.tenant_id,
+                request_id=request_id,
+            )
         return req
 
     def abort_cancellation(self, request_id: str) -> CancellationRequest:
@@ -641,22 +912,37 @@ class SaaSReadinessReport:
     gaps: List[str]
     recommendations: List[str]
     checked_at: float = field(default_factory=time.time)
+
     def to_dict(self) -> dict:
-        return {"passed": self.passed, "score": self.score,
-                "missing_docs": [d.value for d in self.missing_docs],
-                "outdated_docs": [d.value for d in self.outdated_docs],
-                "gaps": self.gaps, "recommendations": self.recommendations,
-                "checked_at": self.checked_at}
+        return {
+            "passed": self.passed,
+            "score": self.score,
+            "missing_docs": [d.value for d in self.missing_docs],
+            "outdated_docs": [d.value for d in self.outdated_docs],
+            "gaps": self.gaps,
+            "recommendations": self.recommendations,
+            "checked_at": self.checked_at,
+        }
 
 
 class SaaSReadinessChecker:
     REQUIRED_RETENTION_CATEGORIES = {
-        "user_pii", "trading_logs", "audit_logs", "financial_records", "payment_records",
+        "user_pii",
+        "trading_logs",
+        "audit_logs",
+        "financial_records",
+        "payment_records",
     }
 
-    def __init__(self, doc_store: DocumentStore, consent_store: ConsentStore,
-                 retention: RetentionPolicyEngine, refund: RefundPolicyEngine,
-                 cancellation: CancellationPolicyEngine, audit: ComplianceAuditChain) -> None:
+    def __init__(
+        self,
+        doc_store: DocumentStore,
+        consent_store: ConsentStore,
+        retention: RetentionPolicyEngine,
+        refund: RefundPolicyEngine,
+        cancellation: CancellationPolicyEngine,
+        audit: ComplianceAuditChain,
+    ) -> None:
         self._docs = doc_store
         self._consents = consent_store
         self._retention = retention
@@ -698,16 +984,29 @@ class SaaSReadinessChecker:
             recommendations.append("No audit entries yet -- publish first doc to initiate chain")
         score = max(0, score)
         passed = score >= 80 and len(gaps) == 0
-        report = SaaSReadinessReport(passed=passed, score=score, missing_docs=missing_docs,
-            outdated_docs=outdated_docs, gaps=gaps, recommendations=recommendations)
-        self._audit.record(AuditAction.SAAS_CHECK, actor=actor, tenant_id="system",
-                           passed=passed, score=score, gaps=len(gaps))
+        report = SaaSReadinessReport(
+            passed=passed,
+            score=score,
+            missing_docs=missing_docs,
+            outdated_docs=outdated_docs,
+            gaps=gaps,
+            recommendations=recommendations,
+        )
+        self._audit.record(
+            AuditAction.SAAS_CHECK,
+            actor=actor,
+            tenant_id="system",
+            passed=passed,
+            score=score,
+            gaps=len(gaps),
+        )
         return report
 
 
 class ComplianceAdmin:
-    def __init__(self, doc_store: DocumentStore, consent_store: ConsentStore,
-                 audit: ComplianceAuditChain) -> None:
+    def __init__(
+        self, doc_store: DocumentStore, consent_store: ConsentStore, audit: ComplianceAuditChain
+    ) -> None:
         self._docs = doc_store
         self._consents = consent_store
         self._audit = audit
@@ -716,35 +1015,64 @@ class ComplianceAdmin:
     def _content_hash(content: str) -> str:
         return hashlib.sha256(content.encode()).hexdigest()
 
-    def publish_document(self, doc_type: DocumentType, version: str, title: str,
-                         content: str, effective_date: float, actor: str,
-                         jurisdiction: JurisdictionCode = JurisdictionCode.GLOBAL,
-                         language: str = "en",
-                         supersede_reason: Optional[str] = None) -> DocumentVersion:
+    def publish_document(
+        self,
+        doc_type: DocumentType,
+        version: str,
+        title: str,
+        content: str,
+        effective_date: float,
+        actor: str,
+        jurisdiction: JurisdictionCode = JurisdictionCode.GLOBAL,
+        language: str = "en",
+        supersede_reason: Optional[str] = None,
+    ) -> DocumentVersion:
         doc_id = str(uuid.uuid4())
-        doc = DocumentVersion(doc_id=doc_id, doc_type=doc_type, version=version,
-            title=title, content=content, content_hash=self._content_hash(content),
-            status=DocumentStatus.ACTIVE, effective_date=effective_date,
-            jurisdiction=jurisdiction, created_by=actor, language=language)
+        doc = DocumentVersion(
+            doc_id=doc_id,
+            doc_type=doc_type,
+            version=version,
+            title=title,
+            content=content,
+            content_hash=self._content_hash(content),
+            status=DocumentStatus.ACTIVE,
+            effective_date=effective_date,
+            jurisdiction=jurisdiction,
+            created_by=actor,
+            language=language,
+        )
         for old in self._docs.list_active():
             if old.doc_type == doc_type and old.doc_id != doc_id:
                 reason = supersede_reason or f"Superseded by version {version}"
                 self._docs.supersede(old.doc_id, doc_id, actor, reason)
-                self._audit.record(AuditAction.DOC_SUPERSEDED, actor=actor,
-                    tenant_id="system", old_doc_id=old.doc_id, new_doc_id=doc_id,
-                    reason=reason)
+                self._audit.record(
+                    AuditAction.DOC_SUPERSEDED,
+                    actor=actor,
+                    tenant_id="system",
+                    old_doc_id=old.doc_id,
+                    new_doc_id=doc_id,
+                    reason=reason,
+                )
         self._docs.add(doc)
-        self._audit.record(AuditAction.DOC_PUBLISHED, actor=actor, tenant_id="system",
-                           doc_id=doc_id, doc_type=doc_type.value, version=version)
+        self._audit.record(
+            AuditAction.DOC_PUBLISHED,
+            actor=actor,
+            tenant_id="system",
+            doc_id=doc_id,
+            doc_type=doc_type.value,
+            version=version,
+        )
         return doc
 
     def archive_document(self, doc_id: str, actor: str, reason: str) -> None:
         self._docs.archive(doc_id, actor, reason)
-        self._audit.record(AuditAction.DOC_ARCHIVED, actor=actor, tenant_id="system",
-                           doc_id=doc_id, reason=reason)
+        self._audit.record(
+            AuditAction.DOC_ARCHIVED, actor=actor, tenant_id="system", doc_id=doc_id, reason=reason
+        )
 
-    def bulk_consent_check(self, user_ids: List[str], tenant_id: str,
-                            required: Set[DocumentType] = ACCEPTANCE_REQUIRED) -> Dict[str, List[DocumentType]]:
+    def bulk_consent_check(
+        self, user_ids: List[str], tenant_id: str, required: Set[DocumentType] = ACCEPTANCE_REQUIRED
+    ) -> Dict[str, List[DocumentType]]:
         result = {}
         for uid in user_ids:
             missing = self._consents.pending_for_user(uid, tenant_id, required, self._docs)
@@ -758,19 +1086,25 @@ class ComplianceAdmin:
         action_counts: Dict[str, int] = {}
         for e in entries:
             action_counts[e.action.value] = action_counts.get(e.action.value, 0) + 1
-        return {"total_entries": len(entries), "action_counts": action_counts,
-                "chain_valid": self._audit.verify_chain(),
-                "last_hash": self._audit.last_hash[:16] + "...",
-                "docs_active": len(self._docs.list_active()),
-                "consents_total": self._consents.count()}
+        return {
+            "total_entries": len(entries),
+            "action_counts": action_counts,
+            "chain_valid": self._audit.verify_chain(),
+            "last_hash": self._audit.last_hash[:16] + "...",
+            "docs_active": len(self._docs.list_active()),
+            "consents_total": self._consents.count(),
+        }
 
 
 class LegalDocumentFactory:
-    def __init__(self, company_name: str = "ACME Trading Technologies Ltd",
-                 product_name: str = "Bot12 Trading Platform",
-                 support_email: str = "legal@bot12.io",
-                 jurisdiction: str = "England and Wales",
-                 effective_date: str = "1 January 2026") -> None:
+    def __init__(
+        self,
+        company_name: str = "ACME Trading Technologies Ltd",
+        product_name: str = "Bot12 Trading Platform",
+        support_email: str = "legal@bot12.io",
+        jurisdiction: str = "England and Wales",
+        effective_date: str = "1 January 2026",
+    ) -> None:
         self.company = company_name
         self.product = product_name
         self.email = support_email
@@ -779,11 +1113,16 @@ class LegalDocumentFactory:
 
     def generate(self, doc_type: DocumentType) -> Tuple[str, str]:
         generators = {
-            DocumentType.TOS: self._tos, DocumentType.PRIVACY: self._privacy,
-            DocumentType.RISK: self._risk, DocumentType.LICENSE: self._license,
-            DocumentType.REFUND: self._refund, DocumentType.RETENTION: self._retention,
-            DocumentType.CANCELLATION: self._cancellation, DocumentType.DPA: self._dpa,
-            DocumentType.COOKIE: self._cookie, DocumentType.AML: self._aml,
+            DocumentType.TOS: self._tos,
+            DocumentType.PRIVACY: self._privacy,
+            DocumentType.RISK: self._risk,
+            DocumentType.LICENSE: self._license,
+            DocumentType.REFUND: self._refund,
+            DocumentType.RETENTION: self._retention,
+            DocumentType.CANCELLATION: self._cancellation,
+            DocumentType.DPA: self._dpa,
+            DocumentType.COOKIE: self._cookie,
+            DocumentType.AML: self._aml,
         }
         return generators[doc_type]()
 
@@ -857,17 +1196,35 @@ def build_compliance_system(
     disclosure = DisclosureEngine(doc_store, consent_store, audit)
     admin = ComplianceAdmin(doc_store, consent_store, audit)
     saas_checker = SaaSReadinessChecker(
-        doc_store, consent_store, retention, refund, cancellation, audit)
+        doc_store, consent_store, retention, refund, cancellation, audit
+    )
     factory = LegalDocumentFactory(
-        company_name=company_name, product_name=product_name,
-        support_email=support_email, jurisdiction=jurisdiction,
-        effective_date=effective_date)
+        company_name=company_name,
+        product_name=product_name,
+        support_email=support_email,
+        jurisdiction=jurisdiction,
+        effective_date=effective_date,
+    )
     now = time.time()
     for doc_type in DocumentType:
         title, content = factory.generate(doc_type)
-        admin.publish_document(doc_type=doc_type, version="1.0.0", title=title,
-            content=content, effective_date=now, actor="system")
-    return {"audit": audit, "doc_store": doc_store, "consent_store": consent_store,
-            "retention": retention, "refund": refund, "cancellation": cancellation,
-            "disclosure": disclosure, "admin": admin, "saas_checker": saas_checker,
-            "factory": factory}
+        admin.publish_document(
+            doc_type=doc_type,
+            version="1.0.0",
+            title=title,
+            content=content,
+            effective_date=now,
+            actor="system",
+        )
+    return {
+        "audit": audit,
+        "doc_store": doc_store,
+        "consent_store": consent_store,
+        "retention": retention,
+        "refund": refund,
+        "cancellation": cancellation,
+        "disclosure": disclosure,
+        "admin": admin,
+        "saas_checker": saas_checker,
+        "factory": factory,
+    }

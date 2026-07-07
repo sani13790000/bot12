@@ -11,10 +11,11 @@ backend/core/timezone_utils.py — Phase 5: Timezone & Market Session Consistenc
   4. Clock injection برای testability
   5. هیچ datetime.utcnow() یا datetime.now() بدون tz مجاز نیست
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone, date
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -27,25 +28,26 @@ UTC = timezone.utc
 
 # Forex broker standard timezone (most MT5 brokers: EET = UTC+2/+3 DST)
 _BROKER_ZONES = {
-    "EET":           "Europe/Helsinki",   # UTC+2 / UTC+3 DST  ← most MT5 brokers
-    "UTC":           "UTC",
-    "EST":           "America/New_York",
-    "GMT":           "Europe/London",
-    "AEST":          "Australia/Sydney",
-    "JST":           "Asia/Tokyo",
+    "EET": "Europe/Helsinki",  # UTC+2 / UTC+3 DST  ← most MT5 brokers
+    "UTC": "UTC",
+    "EST": "America/New_York",
+    "GMT": "Europe/London",
+    "AEST": "Australia/Sydney",
+    "JST": "Asia/Tokyo",
 }
 
 # Market session zones (for DST-aware open/close)
 _SESSION_ZONES = {
-    "london":        ZoneInfo("Europe/London"),     # BST/GMT (+0/+1)
-    "new_york":      ZoneInfo("America/New_York"),  # EST/EDT (-5/-4)
-    "tokyo":         ZoneInfo("Asia/Tokyo"),        # JST +9 (no DST)
-    "sydney":        ZoneInfo("Australia/Sydney"),  # AEST/AEDT (+10/+11)
+    "london": ZoneInfo("Europe/London"),  # BST/GMT (+0/+1)
+    "new_york": ZoneInfo("America/New_York"),  # EST/EDT (-5/-4)
+    "tokyo": ZoneInfo("Asia/Tokyo"),  # JST +9 (no DST)
+    "sydney": ZoneInfo("Australia/Sydney"),  # AEST/AEDT (+10/+11)
 }
 
 # ────────────────────────────────────────────────────────────────
 # Core helpers
 # ────────────────────────────────────────────────────────────────
+
 
 def utcnow() -> datetime:
     """
@@ -100,8 +102,7 @@ def broker_time_to_utc(
         tz = ZoneInfo(zone_name)
     except (ZoneInfoNotFoundError, KeyError) as exc:
         raise ValueError(
-            f"Unknown broker timezone: {broker_tz!r}. "
-            f"Valid values: {list(_BROKER_ZONES)}"
+            f"Unknown broker timezone: {broker_tz!r}. Valid values: {list(_BROKER_ZONES)}"
         ) from exc
 
     if broker_dt.tzinfo is None:
@@ -141,9 +142,7 @@ def next_midnight_utc(from_dt: Optional[datetime] = None) -> datetime:
     """
     now = from_dt if from_dt is not None else utcnow()
     now = ensure_utc(now)
-    return now.replace(
-        hour=0, minute=0, second=0, microsecond=0
-    ) + timedelta(days=1)
+    return now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
 
 def next_monday_midnight_utc(from_dt: Optional[datetime] = None) -> datetime:
@@ -151,9 +150,7 @@ def next_monday_midnight_utc(from_dt: Optional[datetime] = None) -> datetime:
     now = from_dt if from_dt is not None else utcnow()
     now = ensure_utc(now)
     days_ahead = (7 - now.weekday()) % 7 or 7
-    return (now + timedelta(days=days_ahead)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    return (now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def next_month_start_utc(from_dt: Optional[datetime] = None) -> datetime:
@@ -169,9 +166,10 @@ def next_month_start_utc(from_dt: Optional[datetime] = None) -> datetime:
 # DST-aware session open/close helpers
 # ────────────────────────────────────────────────────────────────
 
+
 def session_open_utc(
     session: str,
-    ref_dt:  Optional[datetime] = None,
+    ref_dt: Optional[datetime] = None,
     local_hour: int = 8,
     local_minute: int = 0,
 ) -> datetime:
@@ -190,8 +188,12 @@ def session_open_utc(
         raise ValueError(f"Unknown session: {session!r}. Valid: {list(_SESSION_ZONES)}")
 
     local_dt = datetime(
-        ref.year, ref.month, ref.day,
-        local_hour, local_minute, 0,
+        ref.year,
+        ref.month,
+        ref.day,
+        local_hour,
+        local_minute,
+        0,
         tzinfo=tz,
     )
     return local_dt.astimezone(UTC)
@@ -284,6 +286,7 @@ def now() -> datetime:
 # ────────────────────────────────────────────────────────────────
 # Formatting helpers
 # ────────────────────────────────────────────────────────────────
+
 
 def to_iso(dt: datetime) -> str:
     """UTC-aware datetime to ISO 8601 string with Z suffix."""

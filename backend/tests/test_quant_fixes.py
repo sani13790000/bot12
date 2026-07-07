@@ -13,32 +13,44 @@ FIX #8: Test coverage >= 90% for all 8 surgical fixes.
   FIX #7  Dead code removal checks
   FIX #8  Portfolio correlation calculations
 """
+
 from __future__ import annotations
+
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-import pytest
-
-from backend.risk.volatility_filter import (
-    VolatilityFilter, VolatilityFilterConfig, VolatilityLevel,
-    NewsEvent, SymbolThresholds, FailMode,
+from backend.risk.portfolio_risk import (
+    FailMode as PFFailMode,
 )
 from backend.risk.portfolio_risk import (
-    PortfolioRiskManager, OpenTradeRisk, TradeDirection, RiskLevel,
-    FailMode as PFFailMode, _get_pip_value,
+    OpenTradeRisk,
+    PortfolioRiskManager,
+    RiskLevel,
+    TradeDirection,
+    _get_pip_value,
 )
-from backend.risk.risk_orchestrator import RiskOrchestrator, RiskDecision
+from backend.risk.risk_orchestrator import RiskOrchestrator
+from backend.risk.volatility_filter import (
+    FailMode,
+    NewsEvent,
+    SymbolThresholds,
+    VolatilityFilter,
+    VolatilityFilterConfig,
+    VolatilityLevel,
+)
 
 _ATR_HISTORY_NORMAL = [1.0] * 20
-_ATR_HISTORY_SPIKE  = [1.0] * 19 + [10.0]
+_ATR_HISTORY_SPIKE = [1.0] * 19 + [10.0]
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
+
 def _future(minutes: int) -> datetime:
     return _now_utc() + timedelta(minutes=minutes)
+
 
 def _past(minutes: int) -> datetime:
     return _now_utc() - timedelta(minutes=minutes)
@@ -47,6 +59,7 @@ def _past(minutes: int) -> datetime:
 # ===========================================================================
 # FIX #1 -- NEWS EVENT BLOCKING
 # ===========================================================================
+
 
 class TestNewsEventBlocking:
     def _filter(self, events: List[NewsEvent], enable=True) -> VolatilityFilter:
@@ -123,6 +136,7 @@ class TestNewsEventBlocking:
 # FIX #2 -- ATR SPIKE ROBUSTNESS
 # ===========================================================================
 
+
 class TestATRSpikeRobustness:
     def test_median_ignores_spike(self):
         cfg = VolatilityFilterConfig(atr_estimator="median")
@@ -160,6 +174,7 @@ class TestATRSpikeRobustness:
 # ===========================================================================
 # FIX #3 -- SYMBOL-SPECIFIC THRESHOLDS
 # ===========================================================================
+
 
 class TestSymbolThresholds:
     def test_btcusd_tighter_threshold(self):
@@ -200,6 +215,7 @@ class TestSymbolThresholds:
 # FIX #4 -- GOLD & CRYPTO PIP VALUES
 # ===========================================================================
 
+
 class TestPipValues:
     def test_gold_pip_value_is_1(self):
         val, src = _get_pip_value("XAUUSD")
@@ -229,8 +245,11 @@ class TestPipValues:
 
     def test_gold_risk_calculation_correct(self):
         trade = OpenTradeRisk(
-            symbol="XAUUSD", direction=TradeDirection.BUY,
-            lot_size=0.1, entry_price=1900.0, stop_loss=1890.0,
+            symbol="XAUUSD",
+            direction=TradeDirection.BUY,
+            lot_size=0.1,
+            entry_price=1900.0,
+            stop_loss=1890.0,
             account_balance=10000.0,
         )
         # 10 price * 0.1 lot * 1.0 pip_val = $1.0
@@ -238,8 +257,11 @@ class TestPipValues:
 
     def test_eurusd_risk_calculation(self):
         trade = OpenTradeRisk(
-            symbol="EURUSD", direction=TradeDirection.BUY,
-            lot_size=1.0, entry_price=1.1000, stop_loss=1.0900,
+            symbol="EURUSD",
+            direction=TradeDirection.BUY,
+            lot_size=1.0,
+            entry_price=1.1000,
+            stop_loss=1.0900,
             account_balance=10000.0,
         )
         # price_dist=0.01 * 1.0 lot * 10.0 pip_val = $0.10
@@ -247,8 +269,11 @@ class TestPipValues:
 
     def test_btc_risk_calculation(self):
         trade = OpenTradeRisk(
-            symbol="BTCUSD", direction=TradeDirection.BUY,
-            lot_size=0.01, entry_price=40000.0, stop_loss=39500.0,
+            symbol="BTCUSD",
+            direction=TradeDirection.BUY,
+            lot_size=0.01,
+            entry_price=40000.0,
+            stop_loss=39500.0,
             account_balance=10000.0,
         )
         # 500 * 0.01 * 1.0 = $5.0
@@ -259,6 +284,7 @@ class TestPipValues:
 # FIX #5 -- EXPOSURE WITH REAL RISK
 # ===========================================================================
 
+
 class TestExposureWithRealRisk:
     def test_orchestrator_uses_actual_risk(self):
         captured_risk = []
@@ -267,28 +293,39 @@ class TestExposureWithRealRisk:
             def check(self, new_symbol, new_direction, new_risk_percent, open_positions):
                 captured_risk.append(new_risk_percent)
                 from dataclasses import dataclass
+
                 @dataclass
                 class ER:
                     can_trade: bool = True
                     reason: str = ""
+
                 return ER()
 
         class MockLotSizer:
             async def calculate(self, **kwargs):
                 from dataclasses import dataclass
+
                 @dataclass
                 class LR:
                     lot_size: float = 0.1
                     risk_percent: float = 2.5
                     pip_value_used: float = 10.0
                     source: str = "table"
+
                 return LR()
 
         orch = RiskOrchestrator(exposure_control=MockExposure(), lot_sizer=MockLotSizer())
-        asyncio.run(orch.check(
-            symbol="EURUSD", direction="BUY", entry_price=1.1, stop_loss=1.09,
-            account_balance=10000.0, user_id="u1", signal_id="s1",
-        ))
+        asyncio.run(
+            orch.check(
+                symbol="EURUSD",
+                direction="BUY",
+                entry_price=1.1,
+                stop_loss=1.09,
+                account_balance=10000.0,
+                user_id="u1",
+                signal_id="s1",
+            )
+        )
         assert len(captured_risk) == 1
         assert captured_risk[0] == 2.5
 
@@ -296,28 +333,42 @@ class TestExposureWithRealRisk:
         class MockExposure:
             def check(self, new_symbol, new_direction, new_risk_percent, open_positions):
                 from dataclasses import dataclass
+
                 @dataclass
                 class ER:
                     can_trade: bool
                     reason: str
-                return ER(can_trade=(new_risk_percent <= 4.0), reason="EXCEEDED" if new_risk_percent > 4.0 else "")
+
+                return ER(
+                    can_trade=(new_risk_percent <= 4.0),
+                    reason="EXCEEDED" if new_risk_percent > 4.0 else "",
+                )
 
         class MockLotSizer:
             async def calculate(self, **kwargs):
                 from dataclasses import dataclass
+
                 @dataclass
                 class LR:
                     lot_size: float = 2.0
                     risk_percent: float = 4.5
                     pip_value_used: float = 10.0
                     source: str = "table"
+
                 return LR()
 
         orch = RiskOrchestrator(exposure_control=MockExposure(), lot_sizer=MockLotSizer())
-        result = asyncio.run(orch.check(
-            symbol="EURUSD", direction="BUY", entry_price=1.1, stop_loss=1.07,
-            account_balance=10000.0, user_id="u1", signal_id="s1",
-        ))
+        result = asyncio.run(
+            orch.check(
+                symbol="EURUSD",
+                direction="BUY",
+                entry_price=1.1,
+                stop_loss=1.07,
+                account_balance=10000.0,
+                user_id="u1",
+                signal_id="s1",
+            )
+        )
         assert result.approved is False
         assert "EXPOSURE" in result.gates_failed
 
@@ -325,6 +376,7 @@ class TestExposureWithRealRisk:
 # ===========================================================================
 # FIX #6 -- FAIL-CLOSED BEHAVIOR
 # ===========================================================================
+
 
 class TestFailClosed:
     def test_volatility_exception_blocks_fail_closed(self):
@@ -350,35 +402,58 @@ class TestFailClosed:
 
     def test_portfolio_exception_handled(self):
         class BrokenCorr:
-            def add_price(self, *a): pass
-            def get_correlation(self, *a): raise RuntimeError("corr failure")
+            def add_price(self, *a):
+                pass
+
+            def get_correlation(self, *a):
+                raise RuntimeError("corr failure")
 
         pm = PortfolioRiskManager(fail_mode=PFFailMode.FAIL_CLOSED, corr_engine=BrokenCorr())
-        trade    = OpenTradeRisk("EURUSD", TradeDirection.BUY, 1.0, 1.1, 1.09, 10000.0)
+        trade = OpenTradeRisk("EURUSD", TradeDirection.BUY, 1.0, 1.1, 1.09, 10000.0)
         existing = OpenTradeRisk("GBPUSD", TradeDirection.BUY, 1.0, 1.3, 1.29, 10000.0)
         result = pm.check(trade, [existing])
         assert result.risk_level in list(RiskLevel)
 
     def test_orchestrator_fail_closed_correlation(self):
         class BrokenCorrelation:
-            def check(self, *a, **k): raise RuntimeError("corr crash")
+            def check(self, *a, **k):
+                raise RuntimeError("corr crash")
 
-        orch = RiskOrchestrator(correlation_filter=BrokenCorrelation(), fail_mode_correlation="FAIL_CLOSED")
-        result = asyncio.run(orch.check(
-            symbol="EURUSD", direction="BUY", entry_price=1.1, stop_loss=1.09,
-            account_balance=10000.0, user_id="u1", signal_id="s1",
-        ))
+        orch = RiskOrchestrator(
+            correlation_filter=BrokenCorrelation(), fail_mode_correlation="FAIL_CLOSED"
+        )
+        result = asyncio.run(
+            orch.check(
+                symbol="EURUSD",
+                direction="BUY",
+                entry_price=1.1,
+                stop_loss=1.09,
+                account_balance=10000.0,
+                user_id="u1",
+                signal_id="s1",
+            )
+        )
         assert result.approved is False
 
     def test_orchestrator_fail_open_correlation(self):
         class BrokenCorrelation:
-            def check(self, *a, **k): raise RuntimeError("corr crash")
+            def check(self, *a, **k):
+                raise RuntimeError("corr crash")
 
-        orch = RiskOrchestrator(correlation_filter=BrokenCorrelation(), fail_mode_correlation="FAIL_OPEN")
-        result = asyncio.run(orch.check(
-            symbol="EURUSD", direction="BUY", entry_price=1.1, stop_loss=1.09,
-            account_balance=10000.0, user_id="u1", signal_id="s1",
-        ))
+        orch = RiskOrchestrator(
+            correlation_filter=BrokenCorrelation(), fail_mode_correlation="FAIL_OPEN"
+        )
+        result = asyncio.run(
+            orch.check(
+                symbol="EURUSD",
+                direction="BUY",
+                entry_price=1.1,
+                stop_loss=1.09,
+                account_balance=10000.0,
+                user_id="u1",
+                signal_id="s1",
+            )
+        )
         assert result.approved is True
 
 
@@ -386,47 +461,51 @@ class TestFailClosed:
 # FIX #8 -- PORTFOLIO CORRELATION CALCULATIONS
 # ===========================================================================
 
+
 class TestPortfolioCorrelation:
     def _trade(self, symbol, entry, sl, lot=0.1):
         return OpenTradeRisk(symbol, TradeDirection.BUY, lot, entry, sl, 10000.0)
 
     def test_correlated_pairs_increase_risk(self):
-        pm        = PortfolioRiskManager()
+        pm = PortfolioRiskManager()
         new_trade = self._trade("EURUSD", 1.10, 1.09, 1.0)
-        existing  = self._trade("GBPUSD", 1.30, 1.29, 1.0)
-        snapshot  = pm.check(new_trade, [existing])
+        existing = self._trade("GBPUSD", 1.30, 1.29, 1.0)
+        snapshot = pm.check(new_trade, [existing])
         assert snapshot.correlated_risk > new_trade.risk_percent
 
     def test_uncorrelated_pairs_normal_risk(self):
-        pm        = PortfolioRiskManager()
+        pm = PortfolioRiskManager()
         new_trade = self._trade("EURUSD", 1.10, 1.09)
-        existing  = self._trade("BTCUSD", 40000.0, 39500.0)
-        snapshot  = pm.check(new_trade, [existing])
+        existing = self._trade("BTCUSD", 40000.0, 39500.0)
+        snapshot = pm.check(new_trade, [existing])
         assert abs(snapshot.correlated_risk - new_trade.risk_percent) < 0.01
 
     def test_rolling_corr_overrides_static(self):
         class MockRolling:
-            def add_price(self, *a): pass
-            def get_correlation(self, a, b): return 0.99
+            def add_price(self, *a):
+                pass
 
-        pm        = PortfolioRiskManager(corr_engine=MockRolling())
+            def get_correlation(self, a, b):
+                return 0.99
+
+        pm = PortfolioRiskManager(corr_engine=MockRolling())
         new_trade = self._trade("EURUSD", 1.10, 1.09, 1.0)
-        existing  = self._trade("GBPUSD", 1.30, 1.29, 1.0)
-        snapshot  = pm.check(new_trade, [existing])
+        existing = self._trade("GBPUSD", 1.30, 1.29, 1.0)
+        snapshot = pm.check(new_trade, [existing])
         assert snapshot.correlation_source == "rolling"
         assert snapshot.correlated_risk > new_trade.risk_percent * 1.5
 
     def test_empty_portfolio_safe(self):
-        pm        = PortfolioRiskManager()
+        pm = PortfolioRiskManager()
         new_trade = self._trade("EURUSD", 1.10, 1.09)
-        snap      = pm.check(new_trade, [])
+        snap = pm.check(new_trade, [])
         assert snap.can_add_new is True
         assert snap.open_trades == 0
 
     def test_max_risk_check(self):
-        pm        = PortfolioRiskManager()
+        pm = PortfolioRiskManager()
         new_trade = OpenTradeRisk("GBPUSD", TradeDirection.BUY, 5.0, 1.30, 1.29, 10000.0)
-        snap      = pm.check(new_trade, [])
+        snap = pm.check(new_trade, [])
         assert snap.risk_level in list(RiskLevel)
 
 
@@ -434,15 +513,18 @@ class TestPortfolioCorrelation:
 # FIX #7 -- DEAD CODE REMOVAL
 # ===========================================================================
 
+
 class TestDeadCodeRemoval:
     def test_volatility_filter_no_lock(self):
         import asyncio as _asyncio
+
         vf = VolatilityFilter()
         for attr in vars(vf).values():
             assert not isinstance(attr, _asyncio.Lock)
 
     def test_portfolio_manager_no_lock(self):
         import asyncio as _asyncio
+
         pm = PortfolioRiskManager()
         for attr in vars(pm).values():
             assert not isinstance(attr, _asyncio.Lock)

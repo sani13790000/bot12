@@ -1,12 +1,14 @@
 """
 تست‌های RiskOrchestrator
 """
+
 from __future__ import annotations
+
 import asyncio
-import pytest
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict
+
+import pytest
 
 
 # ─── Stub RiskAssessment ────────────────────────────────────────────────────────────────
@@ -27,7 +29,6 @@ class RiskAssessment:
 
 # ─── Minimal RiskOrchestrator stub ──────────────────────────────────────────────────
 class RiskOrchestrator:
-
     def __init__(self):
         self._sizing_lock = asyncio.Lock()
         self._max_daily_loss_pct = 0.05
@@ -43,14 +44,20 @@ class RiskOrchestrator:
             dd_pct = (balance - equity) / balance if balance > 0 else 0.0
             if dd_pct >= self._max_equity_drawdown_pct:
                 return RiskAssessment(
-                    approved=False, lot_size=0.0, risk_usd=0.0,
-                    risk_pct=0.0, reason="Equity drawdown limit",
+                    approved=False,
+                    lot_size=0.0,
+                    risk_usd=0.0,
+                    risk_pct=0.0,
+                    reason="Equity drawdown limit",
                     equity_gate=False,
                 )
         except Exception as exc:
             return RiskAssessment(
-                approved=False, lot_size=0.0, risk_usd=0.0,
-                risk_pct=0.0, reason=f"Gate1 error: {exc}",
+                approved=False,
+                lot_size=0.0,
+                risk_usd=0.0,
+                risk_pct=0.0,
+                reason=f"Gate1 error: {exc}",
                 equity_gate=False,
             )
 
@@ -59,8 +66,11 @@ class RiskOrchestrator:
             daily_loss = market_data.get("daily_loss_pct", 0.0)
             if daily_loss >= self._max_daily_loss_pct:
                 return RiskAssessment(
-                    approved=False, lot_size=0.0, risk_usd=0.0,
-                    risk_pct=0.0, reason="Daily loss limit",
+                    approved=False,
+                    lot_size=0.0,
+                    risk_usd=0.0,
+                    risk_pct=0.0,
+                    reason="Daily loss limit",
                     daily_gate=False,
                 )
         except Exception:
@@ -76,15 +86,18 @@ class RiskOrchestrator:
             lot = max(self._min_lot, min(self._max_lot, round(lot, 2)))
 
         return RiskAssessment(
-            approved=True, lot_size=lot, risk_usd=risk_usd,
-            risk_pct=risk_pct, reason="All gates passed",
+            approved=True,
+            lot_size=lot,
+            risk_usd=risk_usd,
+            risk_pct=risk_pct,
+            reason="All gates passed",
         )
 
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestRiskOrchestratorGates:
 
+class TestRiskOrchestratorGates:
     @pytest.mark.asyncio
     async def test_approved_normal_conditions(self):
         orch = RiskOrchestrator()
@@ -153,20 +166,20 @@ class TestRiskOrchestratorGates:
 
 
 class TestRiskAssessment:
-
     def test_approved_fields(self):
-        r = RiskAssessment(
-            approved=True, lot_size=0.1, risk_usd=100.0,
-            risk_pct=0.01, reason="ok"
-        )
+        r = RiskAssessment(approved=True, lot_size=0.1, risk_usd=100.0, risk_pct=0.01, reason="ok")
         assert r.approved is True
         assert r.equity_gate is True
         assert r.daily_gate is True
 
     def test_denied_fields(self):
         r = RiskAssessment(
-            approved=False, lot_size=0.0, risk_usd=0.0,
-            risk_pct=0.0, reason="dd limit", equity_gate=False
+            approved=False,
+            lot_size=0.0,
+            risk_usd=0.0,
+            risk_pct=0.0,
+            reason="dd limit",
+            equity_gate=False,
         )
         assert r.approved is False
         assert r.equity_gate is False

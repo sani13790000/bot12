@@ -1,1 +1,163 @@
-IiIiCkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0K4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCkFQSSBSb3V0ZXM6IE11bHRpLUFnZW50IFN5c3RlbQoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKZnJvbSB0eXBpbmcgaW1wb3J0IEFueSwgRGljdCwgTGlzdCwgT3B0aW9uYWwKCmZyb20gZmFzdGFwaSBpbXBvcnQgQVBJUm91dGVyLCBEZXBlbmRzLCBIVFRQRXhjZXB0aW9uLCBzdGF0dXMKZnJvbSBweWRhbnRpYyBpbXBvcnQgQmFzZU1vZGVsLCBGaWVsZAoKZnJvbSBiYWNrZW5kLmFnZW50cy5hZ2VudF9zZXJ2aWNlIGltcG9ydCBBZ2VudFNlcnZpY2UsIGdldF9hZ2VudF9zZXJ2aWNlCmZyb20gYmFja2VuZC5jb3JlLmxvZ2dlciBpbXBvcnQgZ2V0X2xvZ2dlcgoKcm91dGVyID0gQVBJUm91dGVyKHRhZ3M9WyJNdWx0aS1BZ2VudCJdKQpsb2dnZXIgPSBnZXRfbG9nZ2VyKCJhcGkuYWdlbnRzIikKCgojIOKUgOKUgCBTY2hlbWFzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAoKY2xhc3MgRXZhbHVhdGVSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgc3RyICAgPSBGaWVsZCguLi4sIGV4YW1wbGU9IlhBVVVTRCIpCiAgICBkaXJlY3Rpb246IHN0ciAgPSBGaWVsZCguLi4sIGV4YW1wbGU9IkJVWSIpCgogICAgIyBNYXJrZXQgU3RydWN0dXJlCiAgICBib3NfZGV0ZWN0ZWQ6ICAgIGJvb2wgID0gRmFsc2UKICAgIGJvc19zdHJlbmd0aDogICAgZmxvYXQgPSAwLjAKICAgIGNob2NoX2RldGVjdGVkOiAgYm9vbCAgPSBGYWxzZQogICAgY2hvY2hfc3RyZW5ndGg6ICBmbG9hdCA9IDAuMAogICAgaHRmX2FsaWdubWVudDogICBib29sICA9IEZhbHNlCiAgICBodGZfc2NvcmU6ICAgICAgIGZsb2F0ID0gMC41CiAgICBzdHJ1Y3R1cmVfY291bnQ6IGludCAgID0gMAoKICAgICMgTGlxdWlkaXR5CiAgICBsaXF1aWRpdHlfc3dlZXA6ICAgIGJvb2wgID0gRmFsc2UKICAgIHN3ZWVwX3F1YWxpdHk6ICAgICAgZmxvYXQgPSAwLjAKICAgIGludGVybmFsX2xpcXVpZGl0eTogZmxvYXQgPSAwLjAKICAgIGV4dGVybmFsX2xpcXVpZGl0eTogZmxvYXQgPSAwLjAKICAgIGluX2Rpc2NvdW50X3pvbmU6ICAgYm9vbCAgPSBGYWxzZQogICAgaW5fcHJlbWl1bV96b25lOiAgICBib29sICA9IEZhbHNlCgogICAgIyBTTUMKICAgIG9yZGVyX2Jsb2NrX3ByZXNlbnQ6IGJvb2wgID0gRmFsc2UKICAgIG9yZGVyX2Jsb2NrX3F1YWxpdHk6IGZsb2F0ID0gMC4wCiAgICBvcmRlcl9ibG9ja190ZXN0ZWQ6ICBib29sICA9IEZhbHNlCiAgICBicmVha2VyX2Jsb2NrOiAgICAgICBib29sICA9IEZhbHNlCiAgICBmdmdfcHJlc2VudDogICAgICAgICBib29sICA9IEZhbHNlCiAgICBmdmdfcXVhbGl0eTogICAgICAgICBmbG9hdCA9IDAuMAogICAgaWZ2Z19wcmVzZW50OiAgICAgICAgYm9vbCAgPSBGYWxzZQogICAgaW5fa2lsbF96b25lOiAgICAgICAgYm9vbCAgPSBGYWxzZQogICAgc2Vzc2lvbl9xdWFsaXR5OiAgICAgZmxvYXQgPSAwLjUKCiAgICAjIEFJCiAgICBhaV9wcmVkaWN0aW9uOiAgRGljdFtzdHIsIEFueV0gPSBGaWVsZChkZWZhdWx0X2ZhY3Rvcnk9ZGljdCkKICAgIGRlY2lzaW9uX3Njb3JlOiBmbG9hdCA9IDUwLjAKCiAgICAjIFJpc2sKICAgIHBvcnRmb2xpb19yaXNrX3BlcmNlbnQ6IGZsb2F0ID0gMC4wCiAgICBzcHJlYWRfcmF0aW86ICAgICAgICAgICBmbG9hdCA9IDEuMAogICAgYXRyX25vcm1hbGl6ZWQ6ICAgICAgICAgZmxvYXQgPSAxLjAKICAgIGRhaWx5X3RyYWRlc19jb3VudDogICAgIGludCAgID0gMAogICAgbWF4X2RhaWx5X3RyYWRlczogICAgICAgaW50ICAgPSA1CiAgICBkYWlseV9sb3NzX3BlcmNlbnQ6ICAgICBmbG9hdCA9IDAuMAogICAgbWF4X2RhaWx5X2xvc3NfcGVyY2VudDogZmxvYXQgPSAzLjAKICAgIGNvbnNlY3V0aXZlX2xvc3NlczogICAgIGludCAgID0gMAoKICAgICMgTmV3cwogICAgbmV3c19maWx0ZXJfZW5hYmxlZDogYm9vbCA9IFRydWUKICAgIHVwY29taW5nX25ld3M6ICAgICAgIExpc3RbRGljdFtzdHIsIEFueV1dID0gRmllbGQoZGVmYXVsdF9mYWN0b3J5PWxpc3QpCgogICAgIyBFeGVjdXRpb24KICAgIHRyYWRpbmdfbW9kZTogICAgICAgICAgIHN0ciAgID0gIkZVTExfQVVUTyIKICAgIHNlc3Npb246ICAgICAgICAgICAgICAgIHN0ciAgID0gIkxPTkRPTiIKICAgIGV4cGVjdGVkX3NsaXBwYWdlX3BpcHM6IGZsb2F0ID0gMC4wCiAgICBtYXJrZXRfZGVwdGhfc2NvcmU6ICAgICBmbG9hdCA9IDAuNwoKCmNsYXNzIFVwZGF0ZVdlaWdodHNSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICB3ZWlnaHRzOiBEaWN0W3N0ciwgZmxvYXRdID0gRmllbGQoCiAgICAgICAgLi4uLAogICAgICAgIGV4YW1wbGU9ewogICAgICAgICAgICAiTWFya2V0IFN0cnVjdHVyZSI6IDAuMjAsCiAgICAgICAgICAgICJMaXF1aWRpdHkiOiAgICAgICAgMC4xNSwKICAgICAgICAgICAgIlNNQyI6ICAgICAgICAgICAgICAwLjIwLAogICAgICAgICAgICAiQUkgUHJlZGljdGlvbiI6ICAgIDAuMjAsCiAgICAgICAgICAgICJSaXNrIjogICAgICAgICAgICAgMC4xNSwKICAgICAgICAgICAgIk5ld3MiOiAgICAgICAgICAgICAwLjEwLAogICAgICAgICAgICAiRXhlY3V0aW9uIjogICAgICAgIDAuMTAsCiAgICAgICAgfQogICAgKQoKCmNsYXNzIFNldFRocmVzaG9sZFJlcXVlc3QoQmFzZU1vZGVsKToKICAgIHRocmVzaG9sZDogZmxvYXQgPSBGaWVsZCguLi4sIGdlPTAuMCwgbGU9MTAwLjAsIGV4YW1wbGU9NjUuMCkKCgpjbGFzcyBBZ2VudENvbnRyb2xSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBhZ2VudF9uYW1lOiBzdHIgID0gRmllbGQoLi4uLCBleGFtcGxlPSJOZXdzIikKICAgIGVuYWJsZWQ6ICAgIGJvb2wgPSBUcnVlCgoKIyDilIDilIAgRW5kcG9pbnRzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAoKQHJvdXRlci5wb3N0KCIvZXZhbHVhdGUiKQphc3luYyBkZWYgZXZhbHVhdGUoCiAgICByZXE6ICAgICBFdmFsdWF0ZVJlcXVlc3QsCiAgICBzZXJ2aWNlOiBBZ2VudFNlcnZpY2UgPSBEZXBlbmRzKGdldF9hZ2VudF9zZXJ2aWNlKSwKKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBjb250ZXh0ID0gcmVxLm1vZGVsX2R1bXAoKQogICAgICAgIHJlc3VsdCAgPSBhd2FpdCBzZXJ2aWNlLmV2YWx1YXRlKGNvbnRleHQpCiAgICAgICAgcmV0dXJuIHsic3VjY2VzcyI6IFRydWUsICJkYXRhIjogcmVzdWx0LnRvX2RpY3QoKX0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci5lcnJvcihmIkV2YWx1YXRlIGVycm9yOiB7ZXhjfSIpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1zdGF0dXMuSFRUUF81MDBfSU5URVJOQUxfU0VSVkVSX0VSUk9SLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZGV0YWlsPXN0cihleGMpKQoKCkByb3V0ZXIuZ2V0KCIvd2VpZ2h0cyIpCmFzeW5jIGRlZiBnZXRfd2VpZ2h0cyhzZXJ2aWNlOiBBZ2VudFNlcnZpY2UgPSBEZXBlbmRzKGdldF9hZ2VudF9zZXJ2aWNlKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICByZXR1cm4geyJzdWNjZXNzIjogVHJ1ZSwgImRhdGEiOiBzZXJ2aWNlLmdldF9hZ2VudF93ZWlnaHRzKCl9CgoKQHJvdXRlci5wdXQoIi93ZWlnaHRzIikKYXN5bmMgZGVmIHVwZGF0ZV93ZWlnaHRzKAogICAgcmVxOiAgICAgVXBkYXRlV2VpZ2h0c1JlcXVlc3QsCiAgICBzZXJ2aWNlOiBBZ2VudFNlcnZpY2UgPSBEZXBlbmRzKGdldF9hZ2VudF9zZXJ2aWNlKSwKKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHNlcnZpY2UudXBkYXRlX3dlaWdodHMocmVxLndlaWdodHMpCiAgICByZXR1cm4geyJzdWNjZXNzIjogVHJ1ZSwgImRhdGEiOiBzZXJ2aWNlLmdldF9hZ2VudF93ZWlnaHRzKCl9CgoKQHJvdXRlci5wdXQoIi90aHJlc2hvbGQiKQphc3luYyBkZWYgc2V0X3RocmVzaG9sZCgKICAgIHJlcTogICAgIFNldFRocmVzaG9sZFJlcXVlc3QsCiAgICBzZXJ2aWNlOiBBZ2VudFNlcnZpY2UgPSBEZXBlbmRzKGdldF9hZ2VudF9zZXJ2aWNlKSwKKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHNlcnZpY2Uuc2V0X3RocmVzaG9sZChyZXEudGhyZXNob2xkKQogICAgcmV0dXJuIHsic3VjY2VzcyI6IFRydWUsICJ0aHJlc2hvbGQiOiByZXEudGhyZXNob2xkfQoKCkByb3V0ZXIucHV0KCIvY29udHJvbCIpCmFzeW5jIGRlZiBjb250cm9sX2FnZW50KAogICAgcmVxOiAgICAgQWdlbnRDb250cm9sUmVxdWVzdCwKICAgIHNlcnZpY2U6IEFnZW50U2VydmljZSA9IERlcGVuZHMoZ2V0X2FnZW50X3NlcnZpY2UpLAopIC0+IERpY3Rbc3RyLCBBbnldOgogICAgaWYgcmVxLmVuYWJsZWQ6CiAgICAgICAgc2VydmljZS5lbmFibGVfYWdlbnQocmVxLmFnZW50X25hbWUpCiAgICBlbHNlOgogICAgICAgIHNlcnZpY2UuZGlzYWJsZV9hZ2VudChyZXEuYWdlbnRfbmFtZSkKICAgIHJldHVybiB7InN1Y2Nlc3MiOiBUcnVlLCAiYWdlbnQiOiByZXEuYWdlbnRfbmFtZSwgImVuYWJsZWQiOiByZXEuZW5hYmxlZH0KCgpAcm91dGVyLmdldCgiL2xpc3QiKQphc3luYyBkZWYgbGlzdF9hZ2VudHMoc2VydmljZTogQWdlbnRTZXJ2aWNlID0gRGVwZW5kcyhnZXRfYWdlbnRfc2VydmljZSkpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgd2VpZ2h0cyA9IHNlcnZpY2UuZ2V0X2FnZW50X3dlaWdodHMoKQogICAgcmV0dXJuIHsKICAgICAgICAic3VjY2VzcyI6IFRydWUsCiAgICAgICAgImRhdGEiOiBbCiAgICAgICAgICAgIHsibmFtZSI6IG5hbWUsICJ3ZWlnaHQiOiB3ZWlnaHR9CiAgICAgICAgICAgIGZvciBuYW1lLCB3ZWlnaHQgaW4gd2VpZ2h0cy5pdGVtcygpCiAgICAgICAgXSwKICAgIH0K
+"""
+Galaxy Vast AI Trading Platform
+════════════════════════════════
+API Routes: Multi-Agent System
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from backend.agents.agent_service import AgentService, get_agent_service
+from backend.core.logger import get_logger
+
+router = APIRouter(tags=["Multi-Agent"])
+logger = get_logger("api.agents")
+
+
+# ── Schemas ────────────────────────────────────────────────────
+
+
+class EvaluateRequest(BaseModel):
+    symbol: str = Field(..., example="XAUUSD")
+    direction: str = Field(..., example="BUY")
+
+    # Market Structure
+    bos_detected: bool = False
+    bos_strength: float = 0.0
+    choch_detected: bool = False
+    choch_strength: float = 0.0
+    htf_alignment: bool = False
+    htf_score: float = 0.5
+    structure_count: int = 0
+
+    # Liquidity
+    liquidity_sweep: bool = False
+    sweep_quality: float = 0.0
+    internal_liquidity: float = 0.0
+    external_liquidity: float = 0.0
+    in_discount_zone: bool = False
+    in_premium_zone: bool = False
+
+    # SMC
+    order_block_present: bool = False
+    order_block_quality: float = 0.0
+    order_block_tested: bool = False
+    breaker_block: bool = False
+    fvg_present: bool = False
+    fvg_quality: float = 0.0
+    ifvg_present: bool = False
+    in_kill_zone: bool = False
+    session_quality: float = 0.5
+
+    # AI
+    ai_prediction: Dict[str, Any] = Field(default_factory=dict)
+    decision_score: float = 50.0
+
+    # Risk
+    portfolio_risk_percent: float = 0.0
+    spread_ratio: float = 1.0
+    atr_normalized: float = 1.0
+    daily_trades_count: int = 0
+    max_daily_trades: int = 5
+    daily_loss_percent: float = 0.0
+    max_daily_loss_percent: float = 3.0
+    consecutive_losses: int = 0
+
+    # News
+    news_filter_enabled: bool = True
+    upcoming_news: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Execution
+    trading_mode: str = "FULL_AUTO"
+    session: str = "LONDON"
+    expected_slippage_pips: float = 0.0
+    market_depth_score: float = 0.7
+
+
+class UpdateWeightsRequest(BaseModel):
+    weights: Dict[str, float] = Field(
+        ...,
+        example={
+            "Market Structure": 0.20,
+            "Liquidity": 0.15,
+            "SMC": 0.20,
+            "AI Prediction": 0.20,
+            "Risk": 0.15,
+            "News": 0.10,
+            "Execution": 0.10,
+        },
+    )
+
+
+class SetThresholdRequest(BaseModel):
+    threshold: float = Field(..., ge=0.0, le=100.0, example=65.0)
+
+
+class AgentControlRequest(BaseModel):
+    agent_name: str = Field(..., example="News")
+    enabled: bool = True
+
+
+# ── Endpoints ──────────────────────────────────────────────────
+
+
+@router.post("/evaluate")
+async def evaluate(
+    req: EvaluateRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> Dict[str, Any]:
+    try:
+        context = req.model_dump()
+        result = await service.evaluate(context)
+        return {"success": True, "data": result.to_dict()}
+    except Exception as exc:
+        logger.error(f"Evaluate error: {exc}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.get("/weights")
+async def get_weights(service: AgentService = Depends(get_agent_service)) -> Dict[str, Any]:
+    return {"success": True, "data": service.get_agent_weights()}
+
+
+@router.put("/weights")
+async def update_weights(
+    req: UpdateWeightsRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> Dict[str, Any]:
+    service.update_weights(req.weights)
+    return {"success": True, "data": service.get_agent_weights()}
+
+
+@router.put("/threshold")
+async def set_threshold(
+    req: SetThresholdRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> Dict[str, Any]:
+    service.set_threshold(req.threshold)
+    return {"success": True, "threshold": req.threshold}
+
+
+@router.put("/control")
+async def control_agent(
+    req: AgentControlRequest,
+    service: AgentService = Depends(get_agent_service),
+) -> Dict[str, Any]:
+    if req.enabled:
+        service.enable_agent(req.agent_name)
+    else:
+        service.disable_agent(req.agent_name)
+    return {"success": True, "agent": req.agent_name, "enabled": req.enabled}
+
+
+@router.get("/list")
+async def list_agents(service: AgentService = Depends(get_agent_service)) -> Dict[str, Any]:
+    weights = service.get_agent_weights()
+    return {
+        "success": True,
+        "data": [{"name": name, "weight": weight} for name, weight in weights.items()],
+    }

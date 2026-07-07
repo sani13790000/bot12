@@ -2,11 +2,10 @@
 Phase 26  -  API Versioning & Backward Compatibility
 Test Suite: 196 tests
 """
-import json
+
 import sys
 import threading
 import time
-import types
 import uuid
 
 import pytest
@@ -14,14 +13,35 @@ import pytest
 sys.path.insert(0, "/home/definable/phase26")
 
 from backend.core.api_versioning import (
-    APIVersion, VersionStatus, CompatibilityLevel, DeprecationSeverity,
-    MigrationStrategy, VersionError, UnknownVersionError, SunsetVersionError,
-    VersionMismatchError, BreakingChangeError, MissingReasonError,
-    VersionPolicy, DEFAULT_VERSION_POLICIES, CURRENT_VERSION, SUPPORTED_VERSIONS,
-    VERSIONED_ENDPOINTS, VERSIONED_SCHEMAS, FieldDescriptor, VersionedSchema,
-    MigrationRule, ResponseMigrator, DeprecationNotice, VersionNegotiator,
-    VersionAuditEntry, VersionAuditChain, VersionedRequest, VersionedResponse,
-    VersionRouter, BreakingChangeDetector, VersionRegistryAdmin,
+    CURRENT_VERSION,
+    DEFAULT_VERSION_POLICIES,
+    SUPPORTED_VERSIONS,
+    VERSIONED_ENDPOINTS,
+    VERSIONED_SCHEMAS,
+    APIVersion,
+    BreakingChangeDetector,
+    BreakingChangeError,
+    CompatibilityLevel,
+    DeprecationNotice,
+    DeprecationSeverity,
+    FieldDescriptor,
+    MigrationRule,
+    MigrationStrategy,
+    MissingReasonError,
+    ResponseMigrator,
+    SunsetVersionError,
+    UnknownVersionError,
+    VersionAuditChain,
+    VersionedRequest,
+    VersionedResponse,
+    VersionedSchema,
+    VersionError,
+    VersionMismatchError,
+    VersionNegotiator,
+    VersionPolicy,
+    VersionRegistryAdmin,
+    VersionRouter,
+    VersionStatus,
 )
 
 
@@ -158,7 +178,9 @@ class TestVersionPolicy:
         assert not DEFAULT_VERSION_POLICIES[APIVersion.V2].is_experimental()
 
     def test_T031_custom_policy_active(self):
-        p = VersionPolicy(version=APIVersion.V1, status=VersionStatus.EXPERIMENTAL, released_at="2026-01-01")
+        p = VersionPolicy(
+            version=APIVersion.V1, status=VersionStatus.EXPERIMENTAL, released_at="2026-01-01"
+        )
         assert p.is_experimental()
 
     def test_T032_released_at_set(self):
@@ -193,15 +215,21 @@ class TestFieldDescriptorAndSchema:
         assert "audit_token" in names and "feature_flags" in names
 
     def test_T038_auth_response_v1_fields(self):
-        names = [f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V1)]
+        names = [
+            f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V1)
+        ]
         assert "access_token" in names and "refresh_token" not in names
 
     def test_T039_auth_response_v2_adds_refresh(self):
-        names = [f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V2)]
+        names = [
+            f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V2)
+        ]
         assert "refresh_token" in names
 
     def test_T040_auth_response_v3_adds_tenant_roles(self):
-        names = [f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V3)]
+        names = [
+            f.name for f in VERSIONED_SCHEMAS["auth_response"].fields_for_version(APIVersion.V3)
+        ]
         assert "tenant_id" in names and "roles" in names
 
     def test_T041_schema_validate_missing_required(self):
@@ -209,8 +237,15 @@ class TestFieldDescriptorAndSchema:
         assert any("symbol" in e for e in errors)
 
     def test_T042_schema_validate_ok(self):
-        data = {"id": "1", "symbol": "EURUSD", "direction": "BUY",
-                "entry_price": 1.1, "sl": 1.09, "tp": 1.12, "timestamp": 123}
+        data = {
+            "id": "1",
+            "symbol": "EURUSD",
+            "direction": "BUY",
+            "entry_price": 1.1,
+            "sl": 1.09,
+            "tp": 1.12,
+            "timestamp": 123,
+        }
         assert VERSIONED_SCHEMAS["signal"].validate(data, APIVersion.V1) == []
 
     def test_T043_required_fields_v1_signal(self):
@@ -221,7 +256,9 @@ class TestFieldDescriptorAndSchema:
         assert "tenant_id" in VERSIONED_SCHEMAS["signal"].required_fields_for_version(APIVersion.V2)
 
     def test_T045_billing_checkout_v2_adds_idempotency(self):
-        names = [f.name for f in VERSIONED_SCHEMAS["billing_checkout"].fields_for_version(APIVersion.V2)]
+        names = [
+            f.name for f in VERSIONED_SCHEMAS["billing_checkout"].fields_for_version(APIVersion.V2)
+        ]
         assert "idempotency_key" in names
 
     def test_T046_risk_status_v2_adds_kill_switch(self):
@@ -245,15 +282,29 @@ class TestResponseMigrator:
         assert self.migrator.migrate(data, APIVersion.V3, APIVersion.V3) == data
 
     def test_T050_v3_to_v2_removes_audit_token(self):
-        data = {"access_token": "tok", "user_id": "u1", "expires_in": 3600,
-                "audit_token": "at", "feature_flags": {}, "roles": [], "incident_id": None}
+        data = {
+            "access_token": "tok",
+            "user_id": "u1",
+            "expires_in": 3600,
+            "audit_token": "at",
+            "feature_flags": {},
+            "roles": [],
+            "incident_id": None,
+        }
         result = self.migrator.migrate(data, APIVersion.V3, APIVersion.V2)
         assert "audit_token" not in result and "feature_flags" not in result
 
     def test_T051_v3_to_v1_removes_v2_v3_fields(self):
-        data = {"access_token": "tok", "user_id": "u1", "expires_in": 3600,
-                "refresh_token": "rt", "tenant_id": "t1", "audit_token": "at",
-                "feature_flags": {}, "roles": []}
+        data = {
+            "access_token": "tok",
+            "user_id": "u1",
+            "expires_in": 3600,
+            "refresh_token": "rt",
+            "tenant_id": "t1",
+            "audit_token": "at",
+            "feature_flags": {},
+            "roles": [],
+        }
         result = self.migrator.migrate(data, APIVersion.V3, APIVersion.V1)
         assert "refresh_token" not in result and "audit_token" not in result
 
@@ -273,39 +324,59 @@ class TestResponseMigrator:
 
     def test_T055_custom_rule_field_rename(self):
         rule = MigrationRule(
-            source_version=APIVersion.V2, target_version=APIVersion.V3,
-            strategy=MigrationStrategy.FIELD_RENAME, field_map={"old_field": "new_field"},
+            source_version=APIVersion.V2,
+            target_version=APIVersion.V3,
+            strategy=MigrationStrategy.FIELD_RENAME,
+            field_map={"old_field": "new_field"},
         )
         m = ResponseMigrator()
-        m._rules = [r for r in m._rules
-                    if not (r.source_version == APIVersion.V2 and r.target_version == APIVersion.V3)]
+        m._rules = [
+            r
+            for r in m._rules
+            if not (r.source_version == APIVersion.V2 and r.target_version == APIVersion.V3)
+        ]
         m.register(rule)
         result = m.migrate({"old_field": "value", "other": "x"}, APIVersion.V2, APIVersion.V3)
         assert "new_field" in result and "old_field" not in result
 
     def test_T056_custom_rule_transform(self):
         rule = MigrationRule(
-            source_version=APIVersion.V2, target_version=APIVersion.V3,
+            source_version=APIVersion.V2,
+            target_version=APIVersion.V3,
             strategy=MigrationStrategy.TRANSFORM,
             transform_fn=lambda d: {**d, "transformed": True},
         )
         m = ResponseMigrator()
-        m._rules = [r for r in m._rules
-                    if not (r.source_version == APIVersion.V2 and r.target_version == APIVersion.V3)]
+        m._rules = [
+            r
+            for r in m._rules
+            if not (r.source_version == APIVersion.V2 and r.target_version == APIVersion.V3)
+        ]
         m.register(rule)
         assert m.migrate({"x": 1}, APIVersion.V2, APIVersion.V3)["transformed"] is True
 
     def test_T057_v2_to_v1_removes_refresh_token(self):
-        data = {"access_token": "t", "user_id": "u", "expires_in": 3600,
-                "refresh_token": "rt", "plan_tier": "PRO"}
+        data = {
+            "access_token": "t",
+            "user_id": "u",
+            "expires_in": 3600,
+            "refresh_token": "rt",
+            "plan_tier": "PRO",
+        }
         assert "refresh_token" not in self.migrator.migrate(data, APIVersion.V2, APIVersion.V1)
 
     def test_T058_passthrough_rule(self):
-        rule = MigrationRule(source_version=APIVersion.V1, target_version=APIVersion.V2,
-                             strategy=MigrationStrategy.PASSTHROUGH)
+        rule = MigrationRule(
+            source_version=APIVersion.V1,
+            target_version=APIVersion.V2,
+            strategy=MigrationStrategy.PASSTHROUGH,
+        )
         m = ResponseMigrator()
-        m._rules = [r for r in m._rules
-                    if not (r.source_version == APIVersion.V1 and r.target_version == APIVersion.V2)]
+        m._rules = [
+            r
+            for r in m._rules
+            if not (r.source_version == APIVersion.V1 and r.target_version == APIVersion.V2)
+        ]
         m.register(rule)
         assert m.migrate({"x": 1}, APIVersion.V1, APIVersion.V2)["x"] == 1
 
@@ -315,14 +386,18 @@ class TestResponseMigrator:
 
     def test_T060_thread_safe_concurrent_migrations(self):
         errors = []
+
         def work():
             try:
                 self.migrator.migrate({"x": 1}, APIVersion.V1, APIVersion.V3)
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=work) for _ in range(50)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert errors == []
 
     def test_T061_migrate_adds_feature_flags_default(self):
@@ -334,11 +409,15 @@ class TestResponseMigrator:
         assert result.get("roles") == []
 
     def test_T063_v3_to_v2_removes_audit_chain(self):
-        result = self.migrator.migrate({"x": 1, "audit_chain": "c", "roles": []}, APIVersion.V3, APIVersion.V2)
+        result = self.migrator.migrate(
+            {"x": 1, "audit_chain": "c", "roles": []}, APIVersion.V3, APIVersion.V2
+        )
         assert "audit_chain" not in result
 
     def test_T064_migrate_preserves_non_schema_fields(self):
-        result = self.migrator.migrate({"access_token": "tok", "custom_field": "val"}, APIVersion.V3, APIVersion.V3)
+        result = self.migrator.migrate(
+            {"access_token": "tok", "custom_field": "val"}, APIVersion.V3, APIVersion.V3
+        )
         assert result["custom_field"] == "val"
 
 
@@ -406,17 +485,26 @@ class TestVersionNegotiator:
 
     def test_T078_deprecate_requires_reason(self):
         with pytest.raises(MissingReasonError):
-            self.neg.deprecate_version(APIVersion.V2, reason="", deprecated_at="2026-01-01",
-                                       sunset_at=None, actor="admin")
+            self.neg.deprecate_version(
+                APIVersion.V2, reason="", deprecated_at="2026-01-01", sunset_at=None, actor="admin"
+            )
 
     def test_T079_sunset_requires_reason(self):
         with pytest.raises(MissingReasonError):
-            self.neg.sunset_version(APIVersion.V2, reason="   ", sunset_at="2027-01-01", actor="admin")
+            self.neg.sunset_version(
+                APIVersion.V2, reason="   ", sunset_at="2027-01-01", actor="admin"
+            )
 
     def test_T080_deprecate_version_updates_policy(self):
         neg = VersionNegotiator()
-        neg.deprecate_version(APIVersion.V2, reason="Moving to V3", deprecated_at="2026-06-01",
-                               sunset_at="2027-06-01", actor="admin", successor=APIVersion.V3)
+        neg.deprecate_version(
+            APIVersion.V2,
+            reason="Moving to V3",
+            deprecated_at="2026-06-01",
+            sunset_at="2027-06-01",
+            actor="admin",
+            successor=APIVersion.V3,
+        )
         p = neg.get_policy(APIVersion.V2)
         assert p.is_deprecated() and p.successor == APIVersion.V3
 
@@ -500,18 +588,24 @@ class TestVersionAuditChain:
     def test_T095_thread_safe_concurrent(self):
         c = VersionAuditChain(secret=b"s")
         errors = []
+
         def work():
             try:
                 c.record("x", "v3", "/", tenant_id=str(uuid.uuid4()))
             except Exception as e:
                 errors.append(e)
+
         ts = [threading.Thread(target=work) for _ in range(50)]
-        for t in ts: t.start()
-        for t in ts: t.join()
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
         assert errors == [] and len(c) == 50
 
     def test_T096_str_secret_accepted(self):
-        assert len(VersionAuditChain(secret="string-secret").record("x", "v3", "/").chain_hash) == 64
+        assert (
+            len(VersionAuditChain(secret="string-secret").record("x", "v3", "/").chain_hash) == 64
+        )
 
 
 class TestVersionRouter:
@@ -545,14 +639,19 @@ class TestVersionRouter:
         assert resp.status_code == 400 and resp.body["code"] == "VERSION_MISMATCH"
 
     def test_T103_route_mismatch_includes_supported(self):
-        assert "supported_versions" in self.router.route(VersionedRequest("/api/signals", "v99")).body
+        assert (
+            "supported_versions" in self.router.route(VersionedRequest("/api/signals", "v99")).body
+        )
 
     def test_T104_route_adds_api_version_header(self):
         resp = self.router.route(VersionedRequest("/api/signals", "v3"))
         assert resp.headers["X-API-Version"] == "v3"
 
     def test_T105_route_adds_canonical_version_header(self):
-        assert "X-API-Canonical-Version" in self.router.route(VersionedRequest("/api/signals", "v2")).headers
+        assert (
+            "X-API-Canonical-Version"
+            in self.router.route(VersionedRequest("/api/signals", "v2")).headers
+        )
 
     def test_T106_route_audits_call(self):
         self.router.route(VersionedRequest("/api/signals", "v3", client_id="tc"))
@@ -572,16 +671,29 @@ class TestVersionRouter:
 
     def test_T109_register_handler_called(self):
         called = []
-        def h(req): called.append(req); return {"custom": True}
+
+        def h(req):
+            called.append(req)
+            return {"custom": True}
+
         self.router.register_handler("/api/custom", h)
         resp = self.router.route(VersionedRequest("/api/custom", "v3"))
         assert resp.status_code == 200 and len(called) == 1
 
     def test_T110_route_v3_to_v1_removes_v3_fields(self):
         def h(req):
-            return {"access_token": "tok", "user_id": "u", "expires_in": 3600,
-                    "tenant_id": "t", "roles": [], "audit_token": "at",
-                    "feature_flags": {}, "incident_id": None, "refresh_token": "rt"}
+            return {
+                "access_token": "tok",
+                "user_id": "u",
+                "expires_in": 3600,
+                "tenant_id": "t",
+                "roles": [],
+                "audit_token": "at",
+                "feature_flags": {},
+                "incident_id": None,
+                "refresh_token": "rt",
+            }
+
         r = VersionRouter(canonical_version=APIVersion.V3)
         r.register_handler("/api/auth/login", h)
         resp = r.route(VersionedRequest("/api/auth/login", "v1"))
@@ -589,12 +701,18 @@ class TestVersionRouter:
 
     def test_T111_concurrent_routing(self):
         errors = []
+
         def work(v):
-            try: self.router.route(VersionedRequest("/api/signals", v))
-            except Exception as e: errors.append(e)
-        ts = [threading.Thread(target=work, args=(["v1","v2","v3"][i%3],)) for i in range(60)]
-        for t in ts: t.start()
-        for t in ts: t.join()
+            try:
+                self.router.route(VersionedRequest("/api/signals", v))
+            except Exception as e:
+                errors.append(e)
+
+        ts = [threading.Thread(target=work, args=(["v1", "v2", "v3"][i % 3],)) for i in range(60)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
         assert errors == []
 
     def test_T112_is_ok_property(self):
@@ -609,18 +727,31 @@ class TestBreakingChangeDetector:
 
     def test_T114_breaking_when_required_removed(self):
         old = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1)])
-        new = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1, removed_in=APIVersion.V2)])
+        new = VersionedSchema(
+            "t",
+            [FieldDescriptor("x", required=True, added_in=APIVersion.V1, removed_in=APIVersion.V2)],
+        )
         issues = BreakingChangeDetector.compare(old, new, APIVersion.V1, APIVersion.V2)
         assert len(issues) > 0 and "BREAKING" in issues[0]
 
     def test_T115_no_breaking_for_optional_removal(self):
         old = VersionedSchema("t", [FieldDescriptor("x", required=False, added_in=APIVersion.V1)])
-        new = VersionedSchema("t", [FieldDescriptor("x", required=False, added_in=APIVersion.V1, removed_in=APIVersion.V2)])
+        new = VersionedSchema(
+            "t",
+            [
+                FieldDescriptor(
+                    "x", required=False, added_in=APIVersion.V1, removed_in=APIVersion.V2
+                )
+            ],
+        )
         assert BreakingChangeDetector.compare(old, new, APIVersion.V1, APIVersion.V2) == []
 
     def test_T116_assert_compatible_raises_on_breaking(self):
         old = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1)])
-        new = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1, removed_in=APIVersion.V2)])
+        new = VersionedSchema(
+            "t",
+            [FieldDescriptor("x", required=True, added_in=APIVersion.V1, removed_in=APIVersion.V2)],
+        )
         with pytest.raises(BreakingChangeError):
             BreakingChangeDetector.assert_compatible(old, new, APIVersion.V1, APIVersion.V2)
 
@@ -630,15 +761,27 @@ class TestBreakingChangeDetector:
 
     def test_T118_adding_fields_not_breaking(self):
         old = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1)])
-        new = VersionedSchema("t", [FieldDescriptor("x", required=True, added_in=APIVersion.V1),
-                                    FieldDescriptor("y", required=False, added_in=APIVersion.V2)])
+        new = VersionedSchema(
+            "t",
+            [
+                FieldDescriptor("x", required=True, added_in=APIVersion.V1),
+                FieldDescriptor("y", required=False, added_in=APIVersion.V2),
+            ],
+        )
         assert BreakingChangeDetector.compare(old, new, APIVersion.V1, APIVersion.V2) == []
 
     def test_T119_multiple_breaking_changes(self):
-        old = VersionedSchema("t", [FieldDescriptor("a", True, APIVersion.V1),
-                                    FieldDescriptor("b", True, APIVersion.V1)])
-        new = VersionedSchema("t", [FieldDescriptor("a", True, APIVersion.V1, removed_in=APIVersion.V2),
-                                    FieldDescriptor("b", True, APIVersion.V1, removed_in=APIVersion.V2)])
+        old = VersionedSchema(
+            "t",
+            [FieldDescriptor("a", True, APIVersion.V1), FieldDescriptor("b", True, APIVersion.V1)],
+        )
+        new = VersionedSchema(
+            "t",
+            [
+                FieldDescriptor("a", True, APIVersion.V1, removed_in=APIVersion.V2),
+                FieldDescriptor("b", True, APIVersion.V1, removed_in=APIVersion.V2),
+            ],
+        )
         assert len(BreakingChangeDetector.compare(old, new, APIVersion.V1, APIVersion.V2)) == 2
 
     def test_T120_renamed_field_descriptor(self):
@@ -647,12 +790,22 @@ class TestBreakingChangeDetector:
 
 
 class TestDeprecationNotice:
-    def _notice(self, severity=DeprecationSeverity.WARNING, sunset_at="2027-01-01",
-                successor=APIVersion.V3, guide=None):
+    def _notice(
+        self,
+        severity=DeprecationSeverity.WARNING,
+        sunset_at="2027-01-01",
+        successor=APIVersion.V3,
+        guide=None,
+    ):
         return DeprecationNotice(
-            version=APIVersion.V1, endpoint="/api/signals", message="Use V3",
-            severity=severity, deprecated_at="2026-01-01", sunset_at=sunset_at,
-            successor_version=successor, successor_endpoint="/api/signals",
+            version=APIVersion.V1,
+            endpoint="/api/signals",
+            message="Use V3",
+            severity=severity,
+            deprecated_at="2026-01-01",
+            sunset_at=sunset_at,
+            successor_version=successor,
+            successor_endpoint="/api/signals",
             migration_guide_url=guide,
         )
 
@@ -694,8 +847,9 @@ class TestVersionRegistryAdmin:
 
     def test_T131_force_sunset_requires_reason(self):
         with pytest.raises(MissingReasonError):
-            VersionRegistryAdmin().force_sunset(APIVersion.V1, reason="",
-                                                sunset_at="2020-01-01", actor="admin")
+            VersionRegistryAdmin().force_sunset(
+                APIVersion.V1, reason="", sunset_at="2020-01-01", actor="admin"
+            )
 
     def test_T132_force_sunset_updates_policy(self):
         neg = VersionNegotiator()
@@ -719,7 +873,8 @@ class TestVersionRegistryAdmin:
     def test_T136_schemas_has_all_versions(self):
         schemas = VersionRegistryAdmin().schemas()
         assert "signal" in schemas
-        for v in ["v1", "v2", "v3"]: assert v in schemas["signal"]
+        for v in ["v1", "v2", "v3"]:
+            assert v in schemas["signal"]
 
     def test_T137_schemas_fields_nonempty_for_v3(self):
         assert len(VersionRegistryAdmin().schemas()["signal"]["v3"]["fields"]) > 0
@@ -742,9 +897,12 @@ class TestSQLMigration:
     @pytest.fixture(autouse=True)
     def load_sql(self):
         import os
+
         p = "/home/definable/phase26/supabase/migrations/20260628_035_phase26_api_versioning.sql"
-        if not os.path.exists(p): pytest.skip("SQL file not found")
-        with open(p) as f: self.sql = f.read()
+        if not os.path.exists(p):
+            pytest.skip("SQL file not found")
+        with open(p) as f:
+            self.sql = f.read()
 
     def test_T141_sql_has_begin_commit(self):
         assert "BEGIN" in self.sql.upper() and "COMMIT" in self.sql.upper()
@@ -812,7 +970,10 @@ class TestIntegrationFlows:
         neg = VersionNegotiator()
         neg._policies[APIVersion.V1].status = VersionStatus.SUNSET
         neg._policies[APIVersion.V1].sunset_at = "2020-01-01"
-        assert VersionRouter(negotiator=neg).route(VersionedRequest("/api/signals", "v1")).status_code == 410
+        assert (
+            VersionRouter(negotiator=neg).route(VersionedRequest("/api/signals", "v1")).status_code
+            == 410
+        )
 
     def test_T160_unknown_version_gets_400_with_guidance(self):
         resp = VersionRouter().route(VersionedRequest("/api/signals", "v0"))
@@ -822,25 +983,37 @@ class TestIntegrationFlows:
         audit = VersionAuditChain(secret=b"audit-secret")
         router = VersionRouter(audit=audit)
         for i in range(100):
-            router.route(VersionedRequest("/api/signals", ["v1","v2","v3"][i%3]))
+            router.route(VersionedRequest("/api/signals", ["v1", "v2", "v3"][i % 3]))
         assert audit.verify_chain()
 
     def test_T162_deprecate_v2_and_route(self):
         neg = VersionNegotiator()
-        neg.deprecate_version(APIVersion.V2, reason="Moving to V3", deprecated_at="2026-06-01",
-                               sunset_at="2027-06-01", actor="admin", successor=APIVersion.V3)
+        neg.deprecate_version(
+            APIVersion.V2,
+            reason="Moving to V3",
+            deprecated_at="2026-06-01",
+            sunset_at="2027-06-01",
+            actor="admin",
+            successor=APIVersion.V3,
+        )
         resp = VersionRouter(negotiator=neg).route(VersionedRequest("/api/signals", "v2"))
         assert resp.is_deprecated and "Deprecation" in resp.headers
 
     def test_T163_concurrent_multi_version_routing(self):
         router = VersionRouter()
         errors = []
+
         def work(v):
-            try: router.route(VersionedRequest("/api/signals", v))
-            except Exception as e: errors.append(e)
-        ts = [threading.Thread(target=work, args=(["v1","v2","v3"][i%3],)) for i in range(90)]
-        for t in ts: t.start()
-        for t in ts: t.join()
+            try:
+                router.route(VersionedRequest("/api/signals", v))
+            except Exception as e:
+                errors.append(e)
+
+        ts = [threading.Thread(target=work, args=(["v1", "v2", "v3"][i % 3],)) for i in range(90)]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join()
         assert errors == []
 
     def test_T164_schema_backward_compat_v1_to_v2(self):
@@ -859,7 +1032,11 @@ class TestIntegrationFlows:
         assert VERSIONED_ENDPOINTS["/api/tenant/settings"] == {APIVersion.V3}
 
     def test_T167_endpoint_all_versions(self):
-        assert VERSIONED_ENDPOINTS["/api/auth/login"] == {APIVersion.V1, APIVersion.V2, APIVersion.V3}
+        assert VERSIONED_ENDPOINTS["/api/auth/login"] == {
+            APIVersion.V1,
+            APIVersion.V2,
+            APIVersion.V3,
+        }
 
     def test_T168_deprecation_policy_all_three_versions(self):
         assert len(DEFAULT_VERSION_POLICIES) == 3
@@ -869,9 +1046,16 @@ class TestIntegrationFlows:
             VersionNegotiator().negotiate("v1", "/api/feature-flags")
 
     def test_T170_migration_v3_to_v1_removes_feature_flags(self):
-        data = {"access_token": "tok", "user_id": "u", "expires_in": 3600,
-                "refresh_token": "rt", "tenant_id": "t", "audit_token": "at",
-                "feature_flags": {"f": True}, "roles": []}
+        data = {
+            "access_token": "tok",
+            "user_id": "u",
+            "expires_in": 3600,
+            "refresh_token": "rt",
+            "tenant_id": "t",
+            "audit_token": "at",
+            "feature_flags": {"f": True},
+            "roles": [],
+        }
         assert "feature_flags" not in ResponseMigrator().migrate(data, APIVersion.V3, APIVersion.V1)
 
     def test_T171_breaking_change_detector_on_standard_schemas(self):
@@ -882,8 +1066,12 @@ class TestIntegrationFlows:
     def test_T172_admin_force_sunset_blocks_routing(self):
         neg = VersionNegotiator()
         VersionRegistryAdmin(negotiator=neg).force_sunset(
-            APIVersion.V1, reason="Emergency", sunset_at="2020-01-01", actor="admin")
-        assert VersionRouter(negotiator=neg).route(VersionedRequest("/api/signals", "v1")).status_code == 410
+            APIVersion.V1, reason="Emergency", sunset_at="2020-01-01", actor="admin"
+        )
+        assert (
+            VersionRouter(negotiator=neg).route(VersionedRequest("/api/signals", "v1")).status_code
+            == 410
+        )
 
 
 class TestEdgeCasesAndCoverage:
@@ -902,11 +1090,14 @@ class TestEdgeCasesAndCoverage:
         assert not VersionedResponse(400, APIVersion.V3, {}, {}).is_ok
 
     def test_T177_versioned_response_is_deprecated_false(self):
-        assert not VersionedResponse(200, APIVersion.V3, {}, {}, deprecation_notice=None).is_deprecated
+        assert not VersionedResponse(
+            200, APIVersion.V3, {}, {}, deprecation_notice=None
+        ).is_deprecated
 
     def test_T178_versioned_response_is_deprecated_true(self):
-        n = DeprecationNotice(APIVersion.V1, "/", "x", DeprecationSeverity.INFO,
-                             "2026-01-01", None, None, None)
+        n = DeprecationNotice(
+            APIVersion.V1, "/", "x", DeprecationSeverity.INFO, "2026-01-01", None, None, None
+        )
         assert VersionedResponse(200, APIVersion.V1, {}, {}, deprecation_notice=n).is_deprecated
 
     def test_T179_audit_chain_len(self):
@@ -924,28 +1115,43 @@ class TestEdgeCasesAndCoverage:
         assert before <= ts <= time.time()
 
     def test_T182_migration_rule_field_remove(self):
-        rule = MigrationRule(source_version=APIVersion.V3, target_version=APIVersion.V2,
-                             strategy=MigrationStrategy.FIELD_REMOVE, remove_fields=["x", "y"])
+        rule = MigrationRule(
+            source_version=APIVersion.V3,
+            target_version=APIVersion.V2,
+            strategy=MigrationStrategy.FIELD_REMOVE,
+            remove_fields=["x", "y"],
+        )
         m = ResponseMigrator()
-        m._rules = [r for r in m._rules
-                    if not (r.source_version == APIVersion.V3 and r.target_version == APIVersion.V2)]
+        m._rules = [
+            r
+            for r in m._rules
+            if not (r.source_version == APIVersion.V3 and r.target_version == APIVersion.V2)
+        ]
         m.register(rule)
         result = m.migrate({"x": 1, "y": 2, "z": 3}, APIVersion.V3, APIVersion.V2)
         assert "x" not in result and "y" not in result and result["z"] == 3
 
     def test_T183_unknown_version_error_message(self):
-        try: APIVersion.from_string("v-invalid")
-        except UnknownVersionError as e: assert "v-invalid" in str(e)
+        try:
+            APIVersion.from_string("v-invalid")
+        except UnknownVersionError as e:
+            assert "v-invalid" in str(e)
 
     def test_T184_versioned_schema_compatibility_field(self):
         assert VERSIONED_SCHEMAS["signal"].compatibility == CompatibilityLevel.PARTIAL
 
     def test_T185_field_descriptor_default(self):
-        assert FieldDescriptor("flags", required=False, default={}, added_in=APIVersion.V3).default == {}
+        assert (
+            FieldDescriptor("flags", required=False, default={}, added_in=APIVersion.V3).default
+            == {}
+        )
 
     def test_T186_negotiator_custom_policies(self):
-        policies = {APIVersion.V3: VersionPolicy(version=APIVersion.V3,
-                                                  status=VersionStatus.ACTIVE, released_at="2026-01-01")}
+        policies = {
+            APIVersion.V3: VersionPolicy(
+                version=APIVersion.V3, status=VersionStatus.ACTIVE, released_at="2026-01-01"
+            )
+        }
         v, n = VersionNegotiator(policies=policies).negotiate("v3")
         assert v == APIVersion.V3 and n is None
 
@@ -960,7 +1166,10 @@ class TestEdgeCasesAndCoverage:
             assert APIVersion.V3 in versions or APIVersion.V2 in versions
 
     def test_T189_deprecation_severity_warning_for_v1(self):
-        assert DEFAULT_VERSION_POLICIES[APIVersion.V1].deprecation_severity == DeprecationSeverity.WARNING
+        assert (
+            DEFAULT_VERSION_POLICIES[APIVersion.V1].deprecation_severity
+            == DeprecationSeverity.WARNING
+        )
 
     def test_T190_migration_strategy_enum_count(self):
         assert len(list(MigrationStrategy)) == 5
@@ -978,7 +1187,9 @@ class TestEdgeCasesAndCoverage:
         assert len(VERSIONED_ENDPOINTS) >= 10
 
     def test_T195_audit_chain_genesis_deterministic(self):
-        assert VersionAuditChain(secret=b"same")._genesis == VersionAuditChain(secret=b"same")._genesis
+        assert (
+            VersionAuditChain(secret=b"same")._genesis == VersionAuditChain(secret=b"same")._genesis
+        )
 
     def test_T196_audit_chain_genesis_differs_for_diff_secret(self):
         assert VersionAuditChain(secret=b"A")._genesis != VersionAuditChain(secret=b"B")._genesis

@@ -14,6 +14,7 @@ Commands
 /positions   – list open positions
 /close <ticket> – close a specific position
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,6 +54,7 @@ async def cmd_status(message: types.Message) -> None:
         # Kill-switch
         try:
             from backend.risk.kill_switch import kill_switch
+
             ks_state = "🐂 ACTIVE" if kill_switch.is_active() else "🔴 INACTIVE"
             lines.append(f"🛑️ Kill-Switch: `{ks_state}`")
         except Exception:
@@ -61,6 +63,7 @@ async def cmd_status(message: types.Message) -> None:
         # Open positions
         try:
             from backend.execution.order_state_machine import order_state_machine
+
             active = order_state_machine.active_tickets()
             lines.append(f"📈 Open Positions: `{len(active)}`")
         except Exception:
@@ -69,6 +72,7 @@ async def cmd_status(message: types.Message) -> None:
         # Scheduler
         try:
             from backend.services.scheduler import scheduler
+
             task_count = len(scheduler._tasks)  # noqa: SLF001
             lines.append(f"⏰ Scheduler Tasks: `{task_count}`")
         except Exception:
@@ -77,6 +81,7 @@ async def cmd_status(message: types.Message) -> None:
         # License
         try:
             from backend.license.engine import license_engine
+
             valid = license_engine.is_valid()
             lines.append(f"🔑 License: `{'Valid ✅' if valid else 'INVALID ❌'}`")
         except Exception:
@@ -97,6 +102,7 @@ async def cmd_pause(message: types.Message) -> None:
     """Pause automated trading by activating the kill-switch."""
     try:
         from backend.risk.kill_switch import kill_switch
+
         kill_switch.activate(reason="Telegram /pause")
         await message.answer(
             "⏸️ معاملات خودکار *متوقف* شد.\nبرای ادامه `/resume` بزنید.",
@@ -112,6 +118,7 @@ async def cmd_resume(message: types.Message) -> None:
     """Resume automated trading by deactivating the kill-switch."""
     try:
         from backend.risk.kill_switch import kill_switch
+
         kill_switch.deactivate()
         await message.answer(
             "▶️ معاملات خودکار *از سر گرفته شد*.",
@@ -138,6 +145,7 @@ async def cmd_kill(message: types.Message) -> None:
             return
 
         from backend.risk.kill_switch import kill_switch
+
         kill_switch.activate(reason="Telegram /kill CONFIRM")
         await message.answer(
             "😨 *KILL-SWITCH فعال شد*\nتمام معاملات جدید متوقف شدند.",
@@ -156,6 +164,7 @@ async def cmd_positions(message: types.Message) -> None:
     """List all active trade positions."""
     try:
         from backend.execution.order_state_machine import order_state_machine
+
         tickets = order_state_machine.active_tickets()
 
         if not tickets:
@@ -192,6 +201,7 @@ async def cmd_close(message: types.Message) -> None:
 
         ticket = int(args[0])
         from backend.execution.execution_service import execution_service
+
         result = await execution_service.close(ticket)
 
         if result.success:

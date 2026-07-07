@@ -4,11 +4,12 @@ Galaxy Vast AI Trading Platform
 Agent 1: Market Structure Agent
 مسئولیت: تحلیل BOS، CHOCH، روند کلی بازار
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 
 class MarketStructureAgent(BaseAgent):
@@ -24,10 +25,10 @@ class MarketStructureAgent(BaseAgent):
         super().__init__(name="Market Structure", weight=weight, enabled=enabled)
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 0.0
+        score = 0.0
         confidence = 50.0
-        reasons    = []
-        direction  = "NEUTRAL"
+        reasons = []
+        direction = "NEUTRAL"
 
         # BOS تشخیص
         bos = context.get("bos_detected", False)
@@ -47,7 +48,7 @@ class MarketStructureAgent(BaseAgent):
 
         # هم‌راستایی HTF
         htf_aligned = context.get("htf_alignment", False)
-        htf_score   = float(context.get("htf_score", 0.5))
+        htf_score = float(context.get("htf_score", 0.5))
         if htf_aligned:
             score += 20.0 * htf_score
             confidence += 15.0
@@ -69,7 +70,7 @@ class MarketStructureAgent(BaseAgent):
             confidence = 30.0
             reasons.append("No structural break detected")
 
-        score      = min(score, 100.0)
+        score = min(score, 100.0)
         confidence = min(confidence, 100.0)
 
         return AgentVote(
@@ -79,7 +80,8 @@ class MarketStructureAgent(BaseAgent):
             status=AgentStatus.OK,
             reason=" | ".join(reasons) if reasons else "No structure",
             metadata={
-                "bos": bos, "choch": choch,
+                "bos": bos,
+                "choch": choch,
                 "bos_strength": bos_strength,
                 "htf_aligned": htf_aligned,
             },

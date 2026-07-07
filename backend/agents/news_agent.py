@@ -5,10 +5,11 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 try:
     import httpx
+
     _HTTPX_AVAILABLE = True
 except ImportError:
     _HTTPX_AVAILABLE = False
@@ -71,19 +72,19 @@ async def _fetch_news_events(timeout: float = 5.0) -> List[Dict]:
                     ).replace(tzinfo=timezone.utc)
                 except Exception:
                     try:
-                        event_dt = datetime.fromisoformat(
-                            date_str.replace("Z", "+00:00")
-                        )
+                        event_dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                     except Exception:
                         continue
 
                 delta_min = (event_dt - now).total_seconds() / 60.0
-                results.append({
-                    "name": str(ev.get("title", ev.get("name", "Unknown"))).upper(),
-                    "impact": impact,
-                    "minutes_to_event":    max(0.0, delta_min) if delta_min > 0 else 999.0,
-                    "minutes_since_event": max(0.0, -delta_min) if delta_min < 0 else 999.0,
-                })
+                results.append(
+                    {
+                        "name": str(ev.get("title", ev.get("name", "Unknown"))).upper(),
+                        "impact": impact,
+                        "minutes_to_event": max(0.0, delta_min) if delta_min > 0 else 999.0,
+                        "minutes_since_event": max(0.0, -delta_min) if delta_min < 0 else 999.0,
+                    }
+                )
 
     except Exception:
         return []
@@ -105,22 +106,23 @@ class NewsAgent(BaseAgent):
         super().__init__(name="News", weight=weight, enabled=enabled)
         self.block_on_high_impact = block_on_high_impact
         self.minutes_before = minutes_before
-        self.minutes_after  = minutes_after
+        self.minutes_after = minutes_after
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
         if not context.get("news_filter_enabled", True):
             return AgentVote(
-                score=80.0, confidence=60.0,
+                score=80.0,
+                confidence=60.0,
                 direction=context.get("direction", "NEUTRAL"),
                 status=AgentStatus.OK,
                 reason="News filter disabled",
                 metadata={"filter_active": False},
             )
 
-        score      = 90.0
+        score = 90.0
         confidence = 70.0
         reasons: List[str] = []
-        blocked    = False
+        blocked = False
 
         upcoming_news: List[Dict] = context.get("upcoming_news", [])
         fetched_from_api = False
@@ -135,9 +137,9 @@ class NewsAgent(BaseAgent):
             fetched_from_api = True
 
         for event in upcoming_news:
-            impact        = str(event.get("impact", "LOW")).upper()
-            event_name    = str(event.get("name", ""))
-            minutes_to    = float(event.get("minutes_to_event", 999))
+            impact = str(event.get("impact", "LOW")).upper()
+            event_name = str(event.get("name", ""))
+            minutes_to = float(event.get("minutes_to_event", 999))
             minutes_since = float(event.get("minutes_since_event", 999))
 
             if impact == "HIGH" or event_name.upper() in self.HIGH_IMPACT_EVENTS:
@@ -146,7 +148,7 @@ class NewsAgent(BaseAgent):
                     reasons.append(f"High impact event in {minutes_to:.0f}min: {event_name}")
                     if self.block_on_high_impact and minutes_to <= 15:
                         blocked = True
-                        score   = 0.0
+                        score = 0.0
                         reasons.append(f"BLOCKED: {event_name} < 15min away")
                 elif minutes_since <= self.minutes_after:
                     score -= 25.0
@@ -160,9 +162,9 @@ class NewsAgent(BaseAgent):
             score = 90.0
             reasons.append("No significant news nearby")
 
-        score      = max(0.0, min(100.0, score))
+        score = max(0.0, min(100.0, score))
         confidence = max(0.0, min(100.0, confidence))
-        status     = AgentStatus.ERROR if blocked else AgentStatus.OK
+        status = AgentStatus.ERROR if blocked else AgentStatus.OK
 
         return AgentVote(
             score=score,

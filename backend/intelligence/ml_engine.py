@@ -6,16 +6,19 @@ Fixes:
   - LOG-FIX-1: ConceptDriftDetector._history bounded deque(maxlen=1000)
   - LOG-FIX-2: _get_feature_importance except AttributeError + log
 """
+
 from __future__ import annotations
-from collections import deque
+
 import asyncio
+import logging
+from collections import deque
 from enum import Enum
 from typing import Dict, List, Optional
-import logging
 
 try:
     from sklearn.preprocessing import StandardScaler
     from xgboost import XGBClassifier
+
     _ML_AVAILABLE = True
 except ImportError:
     _ML_AVAILABLE = False
@@ -32,8 +35,13 @@ class DriftStatus(Enum):
 
 
 class MLPrediction:
-    def __init__(self, direction: str, confidence: float,
-                 risk: float = 0.5, importance: Optional[Dict[str, float]] = None):
+    def __init__(
+        self,
+        direction: str,
+        confidence: float,
+        risk: float = 0.5,
+        importance: Optional[Dict[str, float]] = None,
+    ):
         self.direction = direction
         self.confidence = confidence
         self.risk = risk
@@ -101,6 +109,7 @@ class MLEngine:
             return None
         try:
             import numpy as np
+
             X = np.array([[features.get(k, 0.0) for k in sorted(features.keys())]])
             if self._scaler:
                 X = self._scaler.transform(X)
@@ -133,6 +142,7 @@ class MLEngine:
         async with self._lock:
             try:
                 import numpy as np
+
                 X = np.array(X_data)
                 y = np.array(y_data)
                 if self._scaler:

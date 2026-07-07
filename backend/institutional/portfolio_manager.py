@@ -1,10 +1,11 @@
 """Portfolio Manager — multi-symbol allocation with risk-parity and Kelly sizing."""
 
 from __future__ import annotations
+
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 
 class AllocationMethod(str, Enum):
@@ -20,17 +21,17 @@ class PortfolioConfig:
     symbols: List[str]
     initial_capital: float = 100_000.0
     method: AllocationMethod = AllocationMethod.RISK_PARITY
-    max_position_pct: float = 25.0   # max % per symbol
-    min_position_pct: float = 2.0    # min % per symbol
-    max_corr_threshold: float = 0.80 # reject if correlation > this
-    risk_free_rate: float = 0.05     # annual
-    rebalance_every_n_bars: int = 96 # 96 M15 bars = 1 day
+    max_position_pct: float = 25.0  # max % per symbol
+    min_position_pct: float = 2.0  # min % per symbol
+    max_corr_threshold: float = 0.80  # reject if correlation > this
+    risk_free_rate: float = 0.05  # annual
+    rebalance_every_n_bars: int = 96  # 96 M15 bars = 1 day
 
 
 @dataclass
 class SymbolAllocation:
     symbol: str
-    weight: float          # 0-1
+    weight: float  # 0-1
     capital_usd: float
     max_lot_size: float
     current_exposure_usd: float = 0.0
@@ -189,6 +190,6 @@ class PortfolioManager:
         """Simple HHI-based diversification score (1 = fully diversified)."""
         if not allocations:
             return 0.0
-        hhi = sum(a.weight ** 2 for a in allocations)
+        hhi = sum(a.weight**2 for a in allocations)
         n = len(allocations)
         return (1 / hhi) / n if hhi > 0 else 1.0

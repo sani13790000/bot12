@@ -6,6 +6,7 @@ Additions:
   - None-guard before redis.ping() (BUG-R5-3 fix retained)
   - All checks return (name, ok, msg) tuples
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +21,7 @@ CheckResult = Tuple[str, bool, str]
 async def _check_redis() -> CheckResult:
     try:
         from backend.database.redis_client import get_redis
+
         r = await asyncio.wait_for(get_redis(), timeout=3.0)
         if r is None:  # BUG-R5-3 fix: None guard
             return ("redis", False, "could not connect")
@@ -34,6 +36,7 @@ async def _check_redis() -> CheckResult:
 async def _check_supabase() -> CheckResult:
     try:
         from backend.database.connection import get_db_client
+
         client = await asyncio.wait_for(get_db_client(), timeout=5.0)
         if client is None:
             return ("supabase", False, "client is None")
@@ -46,10 +49,12 @@ async def _check_supabase() -> CheckResult:
 
 async def _check_mt5_gateway() -> CheckResult:
     try:
-        from backend.core.config import get_settings
         import aiohttp
+
+        from backend.core.config import get_settings
+
         s = get_settings()
-        url = getattr(s, 'MT5_GATEWAY_URL', 'http://localhost:8080')
+        url = getattr(s, "MT5_GATEWAY_URL", "http://localhost:8080")
         async with aiohttp.ClientSession() as session:
             async with session.get(f"{url}/ping", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status < 400:
@@ -63,16 +68,17 @@ async def _check_secrets() -> CheckResult:
     """Phase C: Validate critical secrets are set in production."""
     try:
         from backend.core.config import get_settings, is_production
+
         if not is_production():
             return ("secrets", True, "skipped (not production)")
         s = get_settings()
         missing = []
-        if not getattr(s, 'SECRETS_MASTER_KEY', ''):
-            missing.append('SECRETS_MASTER_KEY')
-        if not getattr(s, 'FIELD_ENCRYPTION_KEY', ''):
-            missing.append('FIELD_ENCRYPTION_KEY')
-        if not getattr(s, 'LICENSE_SECRET', ''):
-            missing.append('LICENSE_SECRET')
+        if not getattr(s, "SECRETS_MASTER_KEY", ""):
+            missing.append("SECRETS_MASTER_KEY")
+        if not getattr(s, "FIELD_ENCRYPTION_KEY", ""):
+            missing.append("FIELD_ENCRYPTION_KEY")
+        if not getattr(s, "LICENSE_SECRET", ""):
+            missing.append("LICENSE_SECRET")
         if missing:
             return ("secrets", False, f"missing: {', '.join(missing)}")
         return ("secrets", True, "all critical secrets set")
@@ -84,9 +90,10 @@ async def _check_jwt_secret() -> CheckResult:
     """Phase C: Warn if JWT_SECRET_KEY is weak/default."""
     try:
         from backend.core.config import get_settings
+
         s = get_settings()
-        key = getattr(s, 'JWT_SECRET_KEY', '')
-        weak = {'changeme', 'secret', 'password', 'test', 'dev', 'replace-me'}
+        key = getattr(s, "JWT_SECRET_KEY", "")
+        weak = {"changeme", "secret", "password", "test", "dev", "replace-me"}
         if key.lower() in weak:
             return ("jwt_secret", False, "weak/default value - set a strong secret")
         if len(key) < 32:

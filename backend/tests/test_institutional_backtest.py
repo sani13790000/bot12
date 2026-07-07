@@ -10,20 +10,20 @@ Tests:
   - ReportGenerator
   - API routes (FastAPI TestClient)
 """
+
 import asyncio
-import math
-import statistics
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
-import pytest
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+
 def make_candles(symbol="XAUUSD", n=200, base_price=2000.0, tf=None):
     from backend.backtest_engine.multi_symbol_engine import Candle, Timeframe
+
     tf = tf or Timeframe.H1
     candles = []
     import random
+
     rng = random.Random(42)
     price = base_price
     t = datetime(2023, 1, 1)
@@ -33,17 +33,29 @@ def make_candles(symbol="XAUUSD", n=200, base_price=2000.0, tf=None):
         c = price + move
         h = max(o, c) + abs(rng.gauss(0, base_price * 0.001))
         lw = min(o, c) - abs(rng.gauss(0, base_price * 0.001))
-        candles.append(Candle(time=t, open=round(o,5), high=round(h,5),
-                              low=round(lw,5), close=round(c,5),
-                              volume=1000, spread=0.5, symbol=symbol, timeframe=tf))
+        candles.append(
+            Candle(
+                time=t,
+                open=round(o, 5),
+                high=round(h, 5),
+                low=round(lw, 5),
+                close=round(c, 5),
+                volume=1000,
+                spread=0.5,
+                symbol=symbol,
+                timeframe=tf,
+            )
+        )
         price = c
         t += timedelta(hours=1)
     return candles
 
 
 def simple_signal_generator(symbol, tf, candles):
-    from backend.backtest_engine.multi_symbol_engine import BacktestSignal, Timeframe
     import random
+
+    from backend.backtest_engine.multi_symbol_engine import BacktestSignal
+
     if len(candles) < 10:
         return []
     last = candles[-1]
@@ -53,29 +65,37 @@ def simple_signal_generator(symbol, tf, candles):
         atr = abs(last.high - last.low)
         sl = last.close - atr * 1.5 if direction == "BUY" else last.close + atr * 1.5
         tp = last.close + atr * 3.0 if direction == "BUY" else last.close - atr * 3.0
-        return [BacktestSignal(
-            symbol=symbol, direction=direction,
-            entry_price=last.close, stop_loss=sl, take_profit=tp,
-            confidence=82.0, timeframe=tf, timestamp=last.time,
-        )]
+        return [
+            BacktestSignal(
+                symbol=symbol,
+                direction=direction,
+                entry_price=last.close,
+                stop_loss=sl,
+                take_profit=tp,
+                confidence=82.0,
+                timeframe=tf,
+                timestamp=last.time,
+            )
+        ]
     return []
 
 
 # ─── MultiSymbolBacktestEngine ────────────────────────────────────────────────
 
-class TestMultiSymbolEngine:
 
+class TestMultiSymbolEngine:
     def test_engine_instantiation(self):
         from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
+
         engine = MultiSymbolBacktestEngine()
         assert engine is not None
 
     def test_synthetic_candles_generated(self):
         from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine, Timeframe
+
         engine = MultiSymbolBacktestEngine()
         candles = engine._generate_synthetic_candles(
-            "XAUUSD", Timeframe.H1,
-            datetime(2023, 1, 1), datetime(2023, 2, 1)
+            "XAUUSD", Timeframe.H1, datetime(2023, 1, 1), datetime(2023, 2, 1)
         )
         assert len(candles) > 0
         assert candles[0].symbol == "XAUUSD"
@@ -83,8 +103,11 @@ class TestMultiSymbolEngine:
 
     def test_single_symbol_backtest(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, MultiSymbolConfig, Timeframe
+            MultiSymbolBacktestEngine,
+            MultiSymbolConfig,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
         config = MultiSymbolConfig(
             symbols=["XAUUSD"],
@@ -103,8 +126,11 @@ class TestMultiSymbolEngine:
 
     def test_multi_symbol_backtest(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, MultiSymbolConfig, Timeframe
+            MultiSymbolBacktestEngine,
+            MultiSymbolConfig,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
         config = MultiSymbolConfig(
             symbols=["XAUUSD", "EURUSD"],
@@ -123,8 +149,11 @@ class TestMultiSymbolEngine:
 
     def test_equity_curve_built(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, MultiSymbolConfig, Timeframe
+            MultiSymbolBacktestEngine,
+            MultiSymbolConfig,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
         config = MultiSymbolConfig(
             symbols=["XAUUSD"],
@@ -142,8 +171,11 @@ class TestMultiSymbolEngine:
 
     def test_to_dict_structure(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, MultiSymbolConfig, Timeframe
+            MultiSymbolBacktestEngine,
+            MultiSymbolConfig,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
         config = MultiSymbolConfig(
             symbols=["EURUSD"],
@@ -164,22 +196,49 @@ class TestMultiSymbolEngine:
 
     def test_correlation_blocking(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, BacktestSignal, Timeframe
+            BacktestSignal,
+            MultiSymbolBacktestEngine,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
-        sig1 = BacktestSignal("EURUSD","BUY",1.09,1.08,1.11,confidence=80,timeframe=Timeframe.H1,timestamp=datetime.utcnow())
+        sig1 = BacktestSignal(
+            "EURUSD",
+            "BUY",
+            1.09,
+            1.08,
+            1.11,
+            confidence=80,
+            timeframe=Timeframe.H1,
+            timestamp=datetime.utcnow(),
+        )
         open_trades = []
         # First signal: no open trades → not correlated
         assert not engine._is_correlated(sig1, open_trades, 0.80)
 
         from backend.backtest_engine.multi_symbol_engine import BacktestTrade
-        t = BacktestTrade(signal=BacktestSignal("GBPUSD","BUY",1.27,1.26,1.29,confidence=80,timeframe=Timeframe.H1,timestamp=datetime.utcnow()), entry_time=datetime.utcnow(), entry_price=1.27)
+
+        t = BacktestTrade(
+            signal=BacktestSignal(
+                "GBPUSD",
+                "BUY",
+                1.27,
+                1.26,
+                1.29,
+                confidence=80,
+                timeframe=Timeframe.H1,
+                timestamp=datetime.utcnow(),
+            ),
+            entry_time=datetime.utcnow(),
+            entry_price=1.27,
+        )
         open_trades.append(t)
         # EURUSD + GBPUSD BUY → corr=0.85 → blocked
         assert engine._is_correlated(sig1, open_trades, 0.80)
 
     def test_pip_value_helper(self):
-        from backend.backtest_engine.multi_symbol_engine import _pip_value, _pip_size
+        from backend.backtest_engine.multi_symbol_engine import _pip_size, _pip_value
+
         assert _pip_value("XAUUSD") == 1.0
         assert _pip_value("EURUSD") == 10.0
         assert _pip_size("USDJPY") == 0.01
@@ -187,12 +246,14 @@ class TestMultiSymbolEngine:
 
     def test_lot_computation_capped(self):
         from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
+
         engine = MultiSymbolBacktestEngine()
         lot = engine._compute_lot(10_000, 1.0, 2000.0, 1990.0, "XAUUSD")
         assert 0.01 <= lot <= 100.0
 
     def test_sharpe_positive(self):
         from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
+
         engine = MultiSymbolBacktestEngine()
         returns = [0.01, 0.02, -0.005, 0.015, 0.008, -0.003, 0.012]
         sharpe = engine._sharpe(returns)
@@ -200,6 +261,7 @@ class TestMultiSymbolEngine:
 
     def test_sortino_ignores_gains(self):
         from backend.backtest_engine.multi_symbol_engine import MultiSymbolBacktestEngine
+
         engine = MultiSymbolBacktestEngine()
         returns = [0.02, 0.03, 0.01, 0.04]  # all positive
         sortino = engine._sortino(returns)
@@ -208,21 +270,26 @@ class TestMultiSymbolEngine:
 
 # ─── ParameterOptimizer ───────────────────────────────────────────────────────
 
-class TestParameterOptimizer:
 
+class TestParameterOptimizer:
     def _make_evaluator(self):
         """Evaluator that returns higher metric for higher confidence."""
+
         def evaluator(params, is_train):
             conf = params.get("min_confidence", 70)
             metric = (conf - 60) / 30  # normalize 60-90 → 0-1
             noise = 0.05 if is_train else -0.05
             return (metric + noise, 50, 500.0, 0.10, 1.5)
+
         return evaluator
 
     def test_optimizer_basic_run(self):
         from backend.backtest_engine.parameter_optimizer import (
-            ParameterOptimizer, OptimizationConfig, ParameterGrid
+            OptimizationConfig,
+            ParameterGrid,
+            ParameterOptimizer,
         )
+
         opt = ParameterOptimizer()
         config = OptimizationConfig(
             parameter_grids=[ParameterGrid("min_confidence", 65, 85, 10)],
@@ -239,8 +306,11 @@ class TestParameterOptimizer:
 
     def test_optimizer_best_params_selected(self):
         from backend.backtest_engine.parameter_optimizer import (
-            ParameterOptimizer, OptimizationConfig, ParameterGrid
+            OptimizationConfig,
+            ParameterGrid,
+            ParameterOptimizer,
         )
+
         opt = ParameterOptimizer()
         config = OptimizationConfig(
             parameter_grids=[ParameterGrid("min_confidence", 60, 90, 10)],
@@ -256,8 +326,11 @@ class TestParameterOptimizer:
 
     def test_optimizer_robustness_computed(self):
         from backend.backtest_engine.parameter_optimizer import (
-            ParameterOptimizer, OptimizationConfig, ParameterGrid
+            OptimizationConfig,
+            ParameterGrid,
+            ParameterOptimizer,
         )
+
         opt = ParameterOptimizer()
         config = OptimizationConfig(
             parameter_grids=[ParameterGrid("min_confidence", 65, 75, 5)],
@@ -272,8 +345,11 @@ class TestParameterOptimizer:
 
     def test_optimizer_to_dict(self):
         from backend.backtest_engine.parameter_optimizer import (
-            ParameterOptimizer, OptimizationConfig, ParameterGrid
+            OptimizationConfig,
+            ParameterGrid,
+            ParameterOptimizer,
         )
+
         opt = ParameterOptimizer()
         config = OptimizationConfig(
             parameter_grids=[ParameterGrid("min_confidence", 70, 80, 10)],
@@ -290,12 +366,14 @@ class TestParameterOptimizer:
 
     def test_parameter_grid_values_int(self):
         from backend.backtest_engine.parameter_optimizer import ParameterGrid
+
         grid = ParameterGrid("n", 1, 5, 1, "int")
         vals = grid.values()
         assert vals == [1, 2, 3, 4, 5]
 
     def test_parameter_grid_values_float(self):
         from backend.backtest_engine.parameter_optimizer import ParameterGrid
+
         grid = ParameterGrid("x", 0.5, 2.0, 0.5)
         vals = grid.values()
         assert len(vals) == 4
@@ -303,17 +381,21 @@ class TestParameterOptimizer:
 
 # ─── Monte Carlo ──────────────────────────────────────────────────────────────
 
-class TestMonteCarloInline:
 
+class TestMonteCarloInline:
     def _simulate(self, pnls, initial=10000, n=500):
         import random
+
         rng = random.Random(42)
         results_fin, results_dd = [], []
         for _ in range(n):
             sample = rng.choices(pnls, k=len(pnls))
-            eq = initial; peak = eq; max_dd = 0.0
+            eq = initial
+            peak = eq
+            max_dd = 0.0
             for p in sample:
-                eq += p; peak = max(peak, eq)
+                eq += p
+                peak = max(peak, eq)
                 dd = (peak - eq) / peak if peak > 0 else 0
                 max_dd = max(max_dd, dd)
             results_fin.append(eq)
@@ -348,8 +430,8 @@ class TestMonteCarloInline:
 
 # ─── Walk-Forward Inline ──────────────────────────────────────────────────────
 
-class TestWalkForwardInline:
 
+class TestWalkForwardInline:
     def test_consistent_strategy_is_robust(self):
         window_results = [
             {"passed": True, "train_sharpe": 1.5, "test_sharpe": 1.2},
@@ -364,8 +446,10 @@ class TestWalkForwardInline:
 
     def test_inconsistent_strategy_not_robust(self):
         window_results = [
-            {"passed": False}, {"passed": False},
-            {"passed": True},  {"passed": False},
+            {"passed": False},
+            {"passed": False},
+            {"passed": True},
+            {"passed": False},
             {"passed": False},
         ]
         pass_rate = sum(1 for w in window_results if w["passed"]) / len(window_results)
@@ -373,18 +457,27 @@ class TestWalkForwardInline:
 
     def test_recommendation_logic(self):
         for consistency, expected in [(75, "ROBUST"), (55, "ACCEPTABLE"), (30, "OVERFITTED")]:
-            rec = "ROBUST" if consistency >= 70 else "ACCEPTABLE" if consistency >= 50 else "OVERFITTED"
+            rec = (
+                "ROBUST"
+                if consistency >= 70
+                else "ACCEPTABLE"
+                if consistency >= 50
+                else "OVERFITTED"
+            )
             assert rec == expected
 
 
 # ─── ReportGenerator ─────────────────────────────────────────────────────────
 
-class TestReportGenerator:
 
+class TestReportGenerator:
     def _make_result(self):
         from backend.backtest_engine.multi_symbol_engine import (
-            MultiSymbolBacktestEngine, MultiSymbolConfig, Timeframe
+            MultiSymbolBacktestEngine,
+            MultiSymbolConfig,
+            Timeframe,
         )
+
         engine = MultiSymbolBacktestEngine()
         config = MultiSymbolConfig(
             symbols=["XAUUSD"],
@@ -399,6 +492,7 @@ class TestReportGenerator:
 
     def test_html_report_generated(self):
         from backend.backtest_engine.report_generator import BacktestReportGenerator
+
         result = self._make_result()
         html = BacktestReportGenerator().generate_html(result)
         assert "Galaxy Vast" in html
@@ -408,6 +502,7 @@ class TestReportGenerator:
 
     def test_json_report_generated(self):
         from backend.backtest_engine.report_generator import BacktestReportGenerator
+
         result = self._make_result()
         report = BacktestReportGenerator().generate_json(result)
         assert "brand" in report
@@ -417,6 +512,7 @@ class TestReportGenerator:
 
     def test_html_contains_metrics(self):
         from backend.backtest_engine.report_generator import BacktestReportGenerator
+
         result = self._make_result()
         html = BacktestReportGenerator().generate_html(result)
         assert "Win Rate" in html
@@ -427,6 +523,7 @@ class TestReportGenerator:
 
     def test_json_with_monte_carlo(self):
         from backend.backtest_engine.report_generator import BacktestReportGenerator
+
         result = self._make_result()
         mc = {"probability_profit": 0.82, "var_95": -0.08, "simulations": 1000}
         report = BacktestReportGenerator().generate_json(result, mc_result=mc)

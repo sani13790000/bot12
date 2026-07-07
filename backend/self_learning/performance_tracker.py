@@ -8,16 +8,16 @@ Galaxy Vast AI Trading Platform
 from __future__ import annotations
 
 import json
-import pickle
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import asyncpg
-import numpy as np
 
 from ..core.logger import get_logger
+
+if TYPE_CHECKING:
+    from .training_pipeline import TrainingResult
 
 logger = get_logger("self_learning.performance_tracker")
 
@@ -26,60 +26,62 @@ logger = get_logger("self_learning.performance_tracker")
 # Data Models
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ModelPerformanceRecord:
     """رکورد عملکرد یک مدل در زمان ثبت."""
-    record_id:     str      = ""
-    model_id:      str      = ""
-    symbol:        str      = ""
-    version:       str      = ""
+
+    record_id: str = ""
+    model_id: str = ""
+    symbol: str = ""
+    version: str = ""
     registered_at: datetime = field(default_factory=datetime.utcnow)
 
     # متریک‌های آموزش
-    train_auc:     float = 0.0
-    val_auc:       float = 0.0
-    test_auc:      float = 0.0
-    cv_auc_mean:   float = 0.0
-    cv_auc_std:    float = 0.0
-    accuracy:      float = 0.0
-    precision:     float = 0.0
-    recall:        float = 0.0
-    f1_score:      float = 0.0
+    train_auc: float = 0.0
+    val_auc: float = 0.0
+    test_auc: float = 0.0
+    cv_auc_mean: float = 0.0
+    cv_auc_std: float = 0.0
+    accuracy: float = 0.0
+    precision: float = 0.0
+    recall: float = 0.0
+    f1_score: float = 0.0
 
     # اطلاعات dataset
-    total_samples: int   = 0
-    win_rate:      float = 0.0
+    total_samples: int = 0
+    win_rate: float = 0.0
 
     # وضعیت
-    is_promoted:   bool  = False
-    is_active:     bool  = False
-    model_path:    str   = ""
-    scaler_path:   str   = ""
-    feature_names: List[str]       = field(default_factory=list)
+    is_promoted: bool = False
+    is_active: bool = False
+    model_path: str = ""
+    scaler_path: str = ""
+    feature_names: List[str] = field(default_factory=list)
     feature_importance: Dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "record_id":     self.record_id,
-            "model_id":      self.model_id,
-            "symbol":        self.symbol,
-            "version":       self.version,
+            "record_id": self.record_id,
+            "model_id": self.model_id,
+            "symbol": self.symbol,
+            "version": self.version,
             "registered_at": self.registered_at.isoformat(),
-            "train_auc":     self.train_auc,
-            "val_auc":       self.val_auc,
-            "test_auc":      self.test_auc,
-            "cv_auc_mean":   self.cv_auc_mean,
-            "cv_auc_std":    self.cv_auc_std,
-            "accuracy":      self.accuracy,
-            "precision":     self.precision,
-            "recall":        self.recall,
-            "f1_score":      self.f1_score,
+            "train_auc": self.train_auc,
+            "val_auc": self.val_auc,
+            "test_auc": self.test_auc,
+            "cv_auc_mean": self.cv_auc_mean,
+            "cv_auc_std": self.cv_auc_std,
+            "accuracy": self.accuracy,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1_score": self.f1_score,
             "total_samples": self.total_samples,
-            "win_rate":      self.win_rate,
-            "is_promoted":   self.is_promoted,
-            "is_active":     self.is_active,
-            "model_path":    self.model_path,
-            "scaler_path":   self.scaler_path,
+            "win_rate": self.win_rate,
+            "is_promoted": self.is_promoted,
+            "is_active": self.is_active,
+            "model_path": self.model_path,
+            "scaler_path": self.scaler_path,
             "feature_names": self.feature_names,
             "feature_importance": self.feature_importance,
         }
@@ -88,6 +90,7 @@ class ModelPerformanceRecord:
 # ─────────────────────────────────────────────────────────────────────────────
 # Performance Tracker
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class PerformanceTracker:
     """
@@ -149,7 +152,7 @@ class PerformanceTracker:
 
     async def record_model(
         self,
-        result:   "TrainingResult",   # type: ignore[name-defined]
+        result: "TrainingResult",  # type: ignore[name-defined]
         promoted: bool = False,
     ) -> str:
         """ثبت نتیجه آموزش یک مدل در registry."""
@@ -184,13 +187,25 @@ class PerformanceTracker:
                     is_active   = EXCLUDED.is_active,
                     metadata    = EXCLUDED.metadata
                 """,
-                record_id, result.model_id, result.symbol, result.version,
-                result.train_auc, result.val_auc, result.test_auc,
-                result.cv_auc_mean, result.cv_auc_std,
-                result.accuracy, result.precision, result.recall, result.f1_score,
-                result.total_samples, result.win_rate,
-                promoted, promoted,
-                result.model_path, result.scaler_path,
+                record_id,
+                result.model_id,
+                result.symbol,
+                result.version,
+                result.train_auc,
+                result.val_auc,
+                result.test_auc,
+                result.cv_auc_mean,
+                result.cv_auc_std,
+                result.accuracy,
+                result.precision,
+                result.recall,
+                result.f1_score,
+                result.total_samples,
+                result.win_rate,
+                promoted,
+                promoted,
+                result.model_path,
+                result.scaler_path,
                 json.dumps(result.feature_names),
                 json.dumps(result.feature_importance),
                 json.dumps(result.to_dict()),
@@ -232,13 +247,13 @@ class PerformanceTracker:
         if len(rows) < 2:
             return None
 
-        prev_row = rows[1]   # مدل قبلی
+        prev_row = rows[1]  # مدل قبلی
         return self._row_to_training_result(prev_row)
 
     async def get_model_history(
         self,
         symbol: str,
-        limit:  int = 20,
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """تاریخچه همه مدل‌های ثبت‌شده برای یک نماد."""
         async with self._pool.acquire() as conn:
@@ -252,7 +267,8 @@ class PerformanceTracker:
                 ORDER  BY registered_at DESC
                 LIMIT  $2
                 """,
-                symbol, limit,
+                symbol,
+                limit,
             )
         return [dict(r) for r in rows]
 
@@ -269,16 +285,16 @@ class PerformanceTracker:
             trend = "IMPROVING" if aucs[0] > aucs[-1] else "DEGRADING"
             auc_delta = round(float(aucs[0]) - float(aucs[-1]), 4)
         else:
-            trend    = "STABLE"
+            trend = "STABLE"
             auc_delta = 0.0
 
         return {
-            "symbol":    symbol,
-            "history":   history,
-            "trend":     trend,
+            "symbol": symbol,
+            "history": history,
+            "trend": trend,
             "auc_delta": auc_delta,
-            "best_auc":  max(float(a) for a in aucs) if aucs else 0.0,
-            "latest_auc":float(aucs[0]) if aucs else 0.0,
+            "best_auc": max(float(a) for a in aucs) if aucs else 0.0,
+            "latest_auc": float(aucs[0]) if aucs else 0.0,
         }
 
     async def get_all_symbols_summary(self) -> List[Dict[str, Any]]:
@@ -300,38 +316,41 @@ class PerformanceTracker:
     @staticmethod
     def _row_to_record(row: Any) -> ModelPerformanceRecord:
         return ModelPerformanceRecord(
-            record_id          = str(row["record_id"]),
-            model_id           = row["model_id"],
-            symbol             = row["symbol"],
-            version            = row["version"],
-            registered_at      = row["registered_at"],
-            train_auc          = float(row["train_auc"]),
-            val_auc            = float(row["val_auc"]),
-            test_auc           = float(row["test_auc"]),
-            cv_auc_mean        = float(row["cv_auc_mean"]),
-            cv_auc_std         = float(row["cv_auc_std"]),
-            accuracy           = float(row["accuracy"]),
-            precision          = float(row["precision_score"]),
-            recall             = float(row["recall_score"]),
-            f1_score           = float(row["f1_score"]),
-            total_samples      = row["total_samples"],
-            win_rate           = float(row["win_rate"]),
-            is_promoted        = row["is_promoted"],
-            is_active          = row["is_active"],
-            model_path         = row["model_path"],
-            scaler_path        = row["scaler_path"],
-            feature_names      = json.loads(row["feature_names"])      if row["feature_names"] else [],
-            feature_importance = json.loads(row["feature_importance"]) if row["feature_importance"] else {},
+            record_id=str(row["record_id"]),
+            model_id=row["model_id"],
+            symbol=row["symbol"],
+            version=row["version"],
+            registered_at=row["registered_at"],
+            train_auc=float(row["train_auc"]),
+            val_auc=float(row["val_auc"]),
+            test_auc=float(row["test_auc"]),
+            cv_auc_mean=float(row["cv_auc_mean"]),
+            cv_auc_std=float(row["cv_auc_std"]),
+            accuracy=float(row["accuracy"]),
+            precision=float(row["precision_score"]),
+            recall=float(row["recall_score"]),
+            f1_score=float(row["f1_score"]),
+            total_samples=row["total_samples"],
+            win_rate=float(row["win_rate"]),
+            is_promoted=row["is_promoted"],
+            is_active=row["is_active"],
+            model_path=row["model_path"],
+            scaler_path=row["scaler_path"],
+            feature_names=json.loads(row["feature_names"]) if row["feature_names"] else [],
+            feature_importance=json.loads(row["feature_importance"])
+            if row["feature_importance"]
+            else {},
         )
 
     @staticmethod
-    def _row_to_training_result(row: Any) -> "TrainingResult":   # type: ignore
+    def _row_to_training_result(row: Any) -> "TrainingResult":  # type: ignore
         from .training_pipeline import TrainingResult
+
         r = TrainingResult()
-        r.model_id    = row["model_id"]
-        r.symbol      = row["symbol"]
-        r.version     = row["version"]
-        r.test_auc    = float(row["test_auc"])
-        r.model_path  = row["model_path"]
+        r.model_id = row["model_id"]
+        r.symbol = row["symbol"]
+        r.version = row["version"]
+        r.test_auc = float(row["test_auc"])
+        r.model_path = row["model_path"]
         r.scaler_path = row["scaler_path"]
         return r

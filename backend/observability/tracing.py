@@ -1,4 +1,5 @@
 """Request tracing for Galaxy Vast. Phase L fixes L-13/L-17/L-18."""
+
 from __future__ import annotations
 
 import time
@@ -89,11 +90,7 @@ class Tracer:
         return [s.to_dict() for s in self._active.values()]
 
     def get_slow_spans(self, threshold_ms: float = 500.0) -> List[Dict[str, Any]]:
-        return [
-            s.to_dict()
-            for s in reversed(list(self._spans))
-            if s.duration_ms >= threshold_ms
-        ]
+        return [s.to_dict() for s in reversed(list(self._spans)) if s.duration_ms >= threshold_ms]
 
     def summary(self) -> Dict[str, Any]:
         spans = list(self._spans)

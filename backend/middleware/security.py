@@ -7,13 +7,13 @@ P11-SEC-2: Request size limits
 P11-SEC-3: Suspicious pattern detection
 P11-SEC-4: Audit logging for all mutating requests
 """
+
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Callable, DefaultDict, Dict, Optional
+from typing import Callable, DefaultDict
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -25,9 +25,9 @@ logger = logging.getLogger(__name__)
 # Constants
 # --------------------------------------------------------------------------- #
 
-_MAX_BODY_BYTES  = 10 * 1024 * 1024   # 10 MB
-_RATE_LIMIT_RPM  = 120                 # requests per minute per IP
-_RATE_WINDOW     = 60.0                # seconds
+_MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+_RATE_LIMIT_RPM = 120  # requests per minute per IP
+_RATE_WINDOW = 60.0  # seconds
 _SUSPICIOUS_HDRS = frozenset(["x-forwarded-for", "x-real-ip"])
 
 
@@ -35,17 +35,18 @@ _SUSPICIOUS_HDRS = frozenset(["x-forwarded-for", "x-real-ip"])
 # Rate limiter (in-process, no Redis dependency)
 # --------------------------------------------------------------------------- #
 
+
 class _RateLimiter:
     """Simple sliding-window rate limiter."""
 
     def __init__(self, max_rpm: int = _RATE_LIMIT_RPM, window: float = _RATE_WINDOW) -> None:
-        self._max    = max_rpm
+        self._max = max_rpm
         self._window = window
         self._counts: DefaultDict[str, list] = defaultdict(list)
 
     def is_allowed(self, key: str) -> bool:
-        now   = time.monotonic()
-        hits  = self._counts[key]
+        now = time.monotonic()
+        hits = self._counts[key]
         # remove old hits outside window
         cutoff = now - self._window
         hits[:] = [t for t in hits if t > cutoff]
@@ -56,9 +57,9 @@ class _RateLimiter:
 
     def cleanup(self) -> None:
         """Purge stale keys."""
-        now    = time.monotonic()
+        now = time.monotonic()
         cutoff = now - self._window
-        stale  = [k for k, v in self._counts.items() if not any(t > cutoff for t in v)]
+        stale = [k for k, v in self._counts.items() if not any(t > cutoff for t in v)]
         for k in stale:
             del self._counts[k]
 
@@ -70,6 +71,7 @@ _rate_limiter = _RateLimiter()
 # Middleware
 # --------------------------------------------------------------------------- #
 
+
 class SecurityMiddleware(BaseHTTPMiddleware):
     """
     FastAPI/Starlette middleware that enforces:
@@ -79,11 +81,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        client_ip = (request.client.host if request.client else "0.0.0.0")
+        client_ip = request.client.host if request.client else "0.0.0.0"
 
         # 1. Rate limit
         if not _rate_limiter.is_allowed(client_ip):
-            logger.warning("[Security] rate limit exceeded: ip=%s path=%s", client_ip, request.url.path)
+            logger.warning(
+                "[Security] rate limit exceeded: ip=%s path=%s", client_ip, request.url.path
+            )
             return JSONResponse(
                 {"error": "RATE_LIMIT_EXCEEDED", "retry_after": int(_RATE_WINDOW)},
                 status_code=429,
@@ -94,7 +98,8 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if content_length and int(content_length) > _MAX_BODY_BYTES:
             logger.warning(
                 "[Security] body too large: %s bytes from ip=%s",
-                content_length, client_ip,
+                content_length,
+                client_ip,
             )
             return JSONResponse({"error": "REQUEST_ENTITY_TOO_LARGE"}, status_code=413)
 

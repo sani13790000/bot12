@@ -13,20 +13,22 @@ Topics:
   7. Max trades per day cap
   8. Fail-closed defaults
 """
+
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone, timedelta
 
 try:
+    from backend.risk.correlation_guard import CorrelationGuard
+    from backend.risk.equity_curve_guard import EquityCurveGuard
     from backend.risk.news_filter import NewsFilter
     from backend.risk.session_filter import SessionFilter
-    from backend.risk.correlation_guard import CorrelationGuard
-    from backend.risk.volatility_guard import VolatilityGuard
-    from backend.risk.equity_curve_guard import EquityCurveGuard
     from backend.risk.trade_cap import TradeCap
+    from backend.risk.volatility_guard import VolatilityGuard
+
     HAS_RISK_MODULES = True
 except ImportError:
     HAS_RISK_MODULES = False

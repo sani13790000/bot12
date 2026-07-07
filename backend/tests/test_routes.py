@@ -1,8 +1,8 @@
 """API route smoke tests — verify all 22 routers respond."""
+
 from __future__ import annotations
 
 import os
-import pytest
 
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-key-" + "x" * 20)
@@ -15,6 +15,7 @@ os.environ.setdefault("LICENSE_SALT", "test-salt-value-ok")
 os.environ.setdefault("ENVIRONMENT", "development")
 
 from fastapi.testclient import TestClient
+
 from backend.api.main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -97,6 +98,7 @@ class TestRateLimitHeaders:
 class TestWebSocketRoutes:
     def test_ws_health_no_auth_required(self):
         from fastapi.testclient import TestClient
+
         with TestClient(app) as c:
             with c.websocket_connect("/ws/health") as ws:
                 data = ws.receive_json()
@@ -105,9 +107,10 @@ class TestWebSocketRoutes:
     def test_ws_prices_requires_token(self):
         """WS /prices without token should be rejected."""
         from fastapi.testclient import TestClient
+
         try:
             with TestClient(app) as c:
-                with c.websocket_connect("/ws/prices?token=invalid_token") as ws:
+                with c.websocket_connect("/ws/prices?token=invalid_token"):
                     # Should receive close or error
                     pass
         except Exception:

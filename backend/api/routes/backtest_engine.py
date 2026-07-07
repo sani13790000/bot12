@@ -1,1 +1,248 @@
-IiIiCkJhY2t0ZXN0IGVuZ2luZSBBUEkuCkJVRy1BRjcgRklYOiByZW1vdmVkIHByZWZpeD0iL2JhY2t0ZXN0LWVuZ2luZSIgLS0gZG91YmxlIHByZWZpeCB3YXMgY2F1c2luZyAvYmFja3Rlc3QtZW5naW5lL2JhY2t0ZXN0LWVuZ2luZS8qCk5vdzogcHJlZml4IHByb3ZpZGVkIGJ5IG1haW4ucHkgYXMgIi9iYWNrdGVzdC1lbmdpbmUiCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmltcG9ydCBhc3luY2lvCmltcG9ydCBoYXNobGliCmltcG9ydCBqc29uCmltcG9ydCBsb2dnaW5nCmltcG9ydCBvcwppbXBvcnQgdGltZQppbXBvcnQgdXVpZApmcm9tIGNvbmN1cnJlbnQuZnV0dXJlcyBpbXBvcnQgUHJvY2Vzc1Bvb2xFeGVjdXRvcgpmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRlCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERpY3QsIE9wdGlvbmFsCmZyb20gZmFzdGFwaSBpbXBvcnQgQVBJUm91dGVyLCBEZXBlbmRzLCBIVFRQRXhjZXB0aW9uLCBzdGF0dXMKZnJvbSBiYWNrZW5kLmNvcmUuY2FjaGUgaW1wb3J0IGNhY2hlCmZyb20gYmFja2VuZC5jb3JlLmNvbmZpZyBpbXBvcnQgc2V0dGluZ3MKZnJvbSBiYWNrZW5kLmNvcmUuZGVwcyBpbXBvcnQgZ2V0X2N1cnJlbnRfdXNlcgpmcm9tIGJhY2tlbmQuYmFja3Rlc3RfZW5naW5lIGltcG9ydCAoTW9udGVDYXJsb1NpbXVsYXRvciwgTXVsdGlTeW1ib2xCYWNrdGVzdEVuZ2luZSwgV2Fsa0ZvcndhcmRBbmFseXplcikKZnJvbSBiYWNrZW5kLmJhY2t0ZXN0X2VuZ2luZS5kYXRhX3Byb3ZpZGVyIGltcG9ydCBEYXRhUHJvdmlkZXIKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQoKcm91dGVyID0gQVBJUm91dGVyKHRhZ3M9WyJCYWNrdGVzdCBFbmdpbmUiXSkKCl9DUFVfV09SS0VSUyA9IG1pbihtYXgoMiwgb3MuY3B1X2NvdW50KCkgb3IgMiksIGdldGF0dHIoc2V0dGluZ3MsICJCQUNLVEVTVF9NQVhfV09SS0VSUyIsIDQpKQpfSk9CX1RJTUVPVVRfU0VDT05EUyA9IDMwMApfTUFYX0pPQlNfU1RPUkVEID0gNTAwCl9leGVjdXRvcjogT3B0aW9uYWxbUHJvY2Vzc1Bvb2xFeGVjdXRvcl0gPSBOb25lCl9leGVjdXRvcl9sb2NrID0gYXN5bmNpby5Mb2NrKCkKX2pvYnNfbG9jayA9IGFzeW5jaW8uTG9jaygpCl9qb2JzOiBEaWN0W3N0ciwgRGljdFtzdHIsIEFueV1dID0ge30KCgphc3luYyBkZWYgX2dldF9leGVjdXRvcigpIC0+IFByb2Nlc3NQb29sRXhlY3V0b3I6CiAgICBnbG9iYWwgX2V4ZWN1dG9yCiAgICBpZiBfZXhlY3V0b3IgaXMgTm9uZSBvciBfZXhlY3V0b3IuX3NodXRkb3duOgogICAgICAgIGFzeW5jIHdpdGggX2V4ZWN1dG9yX2xvY2s6CiAgICAgICAgICAgIGlmIF9leGVjdXRvciBpcyBOb25lIG9yIF9leGVjdXRvci5fc2h1dGRvd246CiAgICAgICAgICAgICAgICBfZXhlY3V0b3IgPSBQcm9jZXNzUG9vbEV4ZWN1dG9yKG1heF93b3JrZXJzPV9DUFVfV09SS0VSUywgaW5pdGlhbGl6ZXI9X3dvcmtlcl9pbml0KQogICAgcmV0dXJuIF9leGVjdXRvcgoKCmRlZiBfd29ya2VyX2luaXQoKSAtPiBOb25lOgogICAgdHJ5OiBvcy5uaWNlKDEwKQogICAgZXhjZXB0IChBdHRyaWJ1dGVFcnJvciwgT1NFcnJvcik6IHBhc3MKCgpkZWYgX3J1bl9iYWNrdGVzdF93b3JrZXIocGFyYW1zOiBEaWN0W3N0ciwgQW55XSkgLT4gRGljdFtzdHIsIEFueV06CiAgICBwcm92aWRlciA9IERhdGFQcm92aWRlcigpCiAgICBjYW5kbGVzID0gcHJvdmlkZXIuZ2V0X2NhbmRsZXNfc3luYyhzeW1ib2w9cGFyYW1zWyJzeW1ib2wiXSwgdGltZWZyYW1lPXBhcmFtc1sidGltZWZyYW1lIl0sIHN0YXJ0X2RhdGU9cGFyYW1zLmdldCgic3RhcnRfZGF0ZSIpLCBlbmRfZGF0ZT1wYXJhbXMuZ2V0KCJlbmRfZGF0ZSIpLCBsaW1pdD1wYXJhbXMuZ2V0KCJsaW1pdCIsIDUwMDApKQogICAgZW5naW5lID0gTXVsdGlTeW1ib2xCYWNrdGVzdEVuZ2luZShzeW1ib2w9cGFyYW1zWyJzeW1ib2wiXSwgdGltZWZyYW1lPXBhcmFtc1sidGltZWZyYW1lIl0sIGluaXRpYWxfYmFsYW5jZT1wYXJhbXMuZ2V0KCJpbml0aWFsX2JhbGFuY2UiLCAxMF8wMDAuMCksIHJpc2tfcGN0PXBhcmFtcy5nZXQoInJpc2tfcGN0IiwgMS4wKSkKICAgIHJldHVybiBlbmdpbmUucnVuKGNhbmRsZXM9Y2FuZGxlcywgc3RyYXRlZ3k9cGFyYW1zLmdldCgic3RyYXRlZ3kiLCAic21jIiksIHBhcmFtZXRlcnM9cGFyYW1zLmdldCgicGFyYW1ldGVycyIsIHt9KSkKCgpkZWYgX3J1bl93Zm9fd29ya2VyKHBhcmFtczogRGljdFtzdHIsIEFueV0pIC0+IERpY3Rbc3RyLCBBbnldOgogICAgcHJvdmlkZXIgPSBEYXRhUHJvdmlkZXIoKQogICAgY2FuZGxlcyA9IHByb3ZpZGVyLmdldF9jYW5kbGVzX3N5bmMoc3ltYm9sPXBhcmFtc1sic3ltYm9sIl0sIHRpbWVmcmFtZT1wYXJhbXNbInRpbWVmcmFtZSJdLCBzdGFydF9kYXRlPXBhcmFtcy5nZXQoInN0YXJ0X2RhdGUiKSwgZW5kX2RhdGU9cGFyYW1zLmdldCgiZW5kX2RhdGUiKSwgbGltaXQ9cGFyYW1zLmdldCgibGltaXQiLCA1MDAwKSkKICAgIGFuYWx5emVyID0gV2Fsa0ZvcndhcmRBbmFseXplcihzeW1ib2w9cGFyYW1zWyJzeW1ib2wiXSwgdGltZWZyYW1lPXBhcmFtc1sidGltZWZyYW1lIl0sIHRyYWluX3BjdD1wYXJhbXMuZ2V0KCJ0cmFpbl9wY3QiLCAwLjcpLCBuX3NwbGl0cz1wYXJhbXMuZ2V0KCJuX3NwbGl0cyIsIDUpKQogICAgcmV0dXJuIGFuYWx5emVyLnJ1bihjYW5kbGVzPWNhbmRsZXMsIHN0cmF0ZWd5PXBhcmFtcy5nZXQoInN0cmF0ZWd5IiwgInNtYyIpLCBwYXJhbV9ncmlkPXBhcmFtcy5nZXQoInBhcmFtX2dyaWQiLCB7fSkpCgoKZGVmIF9ydW5fbWNfd29ya2VyKHBhcmFtczogRGljdFtzdHIsIEFueV0pIC0+IERpY3Rbc3RyLCBBbnldOgogICAgcmV0dXJuIE1vbnRlQ2FybG9TaW11bGF0b3Iobl9pdGVyYXRpb25zPXBhcmFtcy5nZXQoIm5faXRlcmF0aW9ucyIsIDEwMDApLCBjb25maWRlbmNlX2xldmVsPXBhcmFtcy5nZXQoImNvbmZpZGVuY2VfbGV2ZWwiLCAwLjk1KSkucnVuKHRyYWRlcz1wYXJhbXMuZ2V0KCJ0cmFkZXMiLCBbXSkpCgoKZGVmIF9jYWNoZV9rZXkocHJlZml4OiBzdHIsIHBhcmFtczogRGljdFtzdHIsIEFueV0pIC0+IHN0cjoKICAgIHBheWxvYWQgPSBqc29uLmR1bXBzKHBhcmFtcywgc29ydF9rZXlzPVRydWUsIGRlZmF1bHQ9c3RyKQogICAgcmV0dXJuIGYiYmFja3Rlc3Q6e3ByZWZpeH06e2hhc2hsaWIuc2hhMjU2KHBheWxvYWQuZW5jb2RlKCkpLmhleGRpZ2VzdCgpWzozMl19IgoKCmFzeW5jIGRlZiBfcnVuX2pvYihqb2JfaWQ6IHN0ciwga2luZDogc3RyLCB3b3JrZXJfZm46IEFueSwgcGFyYW1zOiBEaWN0W3N0ciwgQW55XSkgLT4gTm9uZToKICAgIGxvb3AgPSBhc3luY2lvLmdldF9ydW5uaW5nX2xvb3AoKQogICAgZXhlY3V0b3IgPSBhd2FpdCBfZ2V0X2V4ZWN1dG9yKCkKICAgIHN0YXJ0ID0gdGltZS5tb25vdG9uaWMoKQogICAgdHJ5OgogICAgICAgIHJlc3VsdCA9IGF3YWl0IGFzeW5jaW8ud2FpdF9mb3IobG9vcC5ydW5faW5fZXhlY3V0b3IoZXhlY3V0b3IsIHdvcmtlcl9mbiwgcGFyYW1zKSwgdGltZW91dD1fSk9CX1RJTUVPVVRfU0VDT05EUykKICAgICAgICByZXN1bHRbImpvYl9pZCJdID0gam9iX2lkCiAgICAgICAgcmVzdWx0WyJraW5kIl0gPSBraW5kCiAgICAgICAgcmVzdWx0WyJlbGFwc2VkX3NlY29uZHMiXSA9IHJvdW5kKHRpbWUubW9ub3RvbmljKCkgLSBzdGFydCwgMykKICAgICAgICBhd2FpdCBfc2V0X2pvYihqb2JfaWQsICJjb21wbGV0ZWQiLCByZXN1bHQpCiAgICAgICAgYXdhaXQgY2FjaGUuc2V0KF9jYWNoZV9rZXkoa2luZCwgcGFyYW1zKSwgcmVzdWx0LCB0dGw9MzYwMCkKICAgIGV4Y2VwdCBhc3luY2lvLlRpbWVvdXRFcnJvcjoKICAgICAgICBhd2FpdCBfc2V0X2pvYihqb2JfaWQsICJmYWlsZWQiLCB7ImVycm9yIjogZiJKb2IgZXhjZWVkZWQge19KT0JfVElNRU9VVF9TRUNPTkRTfXMgdGltZW91dCJ9KQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmV4Y2VwdGlvbigiYmFja3Rlc3Qgam9iIGZhaWxlZCIpCiAgICAgICAgYXdhaXQgX3NldF9qb2Ioam9iX2lkLCAiZmFpbGVkIiwgeyJlcnJvciI6IHN0cihleGMpfSkKCgphc3luYyBkZWYgX3NldF9qb2Ioam9iX2lkOiBzdHIsIHN0YXR1czogc3RyLCBwYXlsb2FkOiBEaWN0W3N0ciwgQW55XSkgLT4gTm9uZToKICAgIGFzeW5jIHdpdGggX2pvYnNfbG9jazoKICAgICAgICBfam9ic1tqb2JfaWRdID0geyJpZCI6IGpvYl9pZCwgInN0YXR1cyI6IHN0YXR1cywgInJlc3VsdCI6IHBheWxvYWQgaWYgc3RhdHVzID09ICJjb21wbGV0ZWQiIGVsc2UgTm9uZSwgImVycm9yIjogcGF5bG9hZC5nZXQoImVycm9yIikgaWYgc3RhdHVzID09ICJmYWlsZWQiIGVsc2UgTm9uZSwgInVwZGF0ZWRfYXQiOiB0aW1lLnRpbWUoKX0KICAgICAgICB3aGlsZSBsZW4oX2pvYnMpID4gX01BWF9KT0JTX1NUT1JFRDoKICAgICAgICAgICAgX2pvYnMucG9wKG5leHQoaXRlcihfam9icykpLCBOb25lKQogICAgdHJ5OiBhd2FpdCBjYWNoZS5zZXQoZiJqb2I6e2pvYl9pZH0iLCBfam9ic1tqb2JfaWRdLCB0dGw9MzYwMCkKICAgIGV4Y2VwdCBFeGNlcHRpb246IHBhc3MKCgphc3luYyBkZWYgX2dldF9qb2Ioam9iX2lkOiBzdHIpIC0+IE9wdGlvbmFsW0RpY3Rbc3RyLCBBbnldXToKICAgIGlmIGpvYl9pZCBpbiBfam9iczogcmV0dXJuIF9qb2JzW2pvYl9pZF0KICAgIHJldHVybiBhd2FpdCBjYWNoZS5nZXQoZiJqb2I6e2pvYl9pZH0iKQoKCkByb3V0ZXIucG9zdCgiL3J1biIpCmFzeW5jIGRlZiBydW5fYmFja3Rlc3Qoc3ltYm9sOiBzdHIsIHRpbWVmcmFtZTogc3RyID0gIkgxIiwgc3RhcnRfZGF0ZTogT3B0aW9uYWxbZGF0ZV0gPSBOb25lLCBlbmRfZGF0ZTogT3B0aW9uYWxbZGF0ZV0gPSBOb25lLCBzdHJhdGVneTogc3RyID0gInNtYyIsIGluaXRpYWxfYmFsYW5jZTogZmxvYXQgPSAxMF8wMDAuMCwgcmlza19wY3Q6IGZsb2F0ID0gMS4wLCBfOiBzdHIgPSBEZXBlbmRzKGdldF9jdXJyZW50X3VzZXIpKSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHBhcmFtcyA9IHsic3ltYm9sIjogc3ltYm9sLnVwcGVyKCksICJ0aW1lZnJhbWUiOiB0aW1lZnJhbWUudXBwZXIoKSwgInN0cmF0ZWd5Ijogc3RyYXRlZ3ksICJpbml0aWFsX2JhbGFuY2UiOiBpbml0aWFsX2JhbGFuY2UsICJyaXNrX3BjdCI6IHJpc2tfcGN0fQogICAgY2FjaGVkID0gYXdhaXQgY2FjaGUuZ2V0KF9jYWNoZV9rZXkoImJhY2t0ZXN0IiwgcGFyYW1zKSkKICAgIGlmIGNhY2hlZDogcmV0dXJuIHsiam9iX2lkIjogY2FjaGVkLmdldCgiam9iX2lkIiksICJjYWNoZWQiOiBUcnVlLCAicmVzdWx0IjogY2FjaGVkfQogICAgam9iX2lkID0gc3RyKHV1aWQudXVpZDQoKSkKICAgIGF3YWl0IF9zZXRfam9iKGpvYl9pZCwgInJ1bm5pbmciLCB7fSkKICAgIGFzeW5jaW8uY3JlYXRlX3Rhc2soX3J1bl9qb2Ioam9iX2lkLCAiYmFja3Rlc3QiLCBfcnVuX2JhY2t0ZXN0X3dvcmtlciwgcGFyYW1zKSwgbmFtZT1mImJhY2t0ZXN0LXtqb2JfaWR9IikKICAgIHJldHVybiB7ImpvYl9pZCI6IGpvYl9pZCwgInN0YXR1cyI6ICJydW5uaW5nIn0KCgpAcm91dGVyLnBvc3QoIi93Zm8iKQphc3luYyBkZWYgcnVuX3dmbyhjc3ltYm9sOiBzdHIsIHRpbWVmcmFtZTogc3RyID0gIkgxIiwgc3RyYXRlZ3k6IHN0ciA9ICJzbWMiLCB0cmFpbl9wY3Q6IGZsb2F0ID0gMC43LCBuX3NwbGl0czogaW50ID0gNSwgXzogc3RyID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICBwYXJhbXMgPSB7InN5bWJvbCI6IGNzeW1ib2wudXBwZXIoKSwgInRpbWVmcmFtZSI6IHRpbWVmcmFtZS51cHBlcigpLCAic3RyYXRlZ3kiOiBzdHJhdGVneSwgInRyYWluX3BjdCI6IHRyYWluX3BjdCwgIm5fc3BsaXRzIjogbl9zcGxpdHN9CiAgICBjYWNoZWQgPSBhd2FpdCBjYWNoZS5nZXQoX2NhY2hlX2tleSgid2ZvIiwgcGFyYW1zKSkKICAgIGlmIGNhY2hlZDogcmV0dXJuIHsiam9iX2lkIjogY2FjaGVkLmdldCgiam9iX2lkIiksICJjYWNoZWQiOiBUcnVlLCAicmVzdWx0IjogY2FjaGVkfQogICAgam9iX2lkID0gc3RyKHV1aWQudXVpZDQoKSkKICAgIGF3YWl0IF9zZXRfam9iKGpvYl9pZCwgInJ1bm5pbmciLCB7fSkKICAgIGFzeW5jaW8uY3JlYXRlX3Rhc2soX3J1bl9qb2Ioam9iX2lkLCAid2ZvIiwgX3J1bl93Zm9fd29ya2VyLCBwYXJhbXMpLCBuYW1lPWYid2ZvLXtqb2JfaWR9IikKICAgIHJldHVybiB7ImpvYl9pZCI6IGpvYl9pZCwgInN0YXR1cyI6ICJydW5uaW5nIn0KCgpAcm91dGVyLnBvc3QoIi9tb250ZS1jYXJsbyIpCmFzeW5jIGRlZiBydW5fbW9udGVfY2FybG8odHJhZGVzOiBsaXN0W0RpY3Rbc3RyLCBBbnldXSwgbl9pdGVyYXRpb25zOiBpbnQgPSAxMDAwLCBjb25maWRlbmNlX2xldmVsOiBmbG9hdCA9IDAuOTUsIF86IHN0ciA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgaWYgbl9pdGVyYXRpb25zID4gNTBfMDAwOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPXN0YXR1cy5IVFRQXZQ4MDtCQURfUkVRVUVTVCwgZGV0YWlsPSJuX2l0ZXJhdGlvbnMgbXVzdCBiZSA8PSA1MDAwMCIpCiAgICBwYXJhbXMgPSB7InRyYWRlcyI6IHRyYWRlcywgIm5faXRlcmF0aW9ucyI6IG5faXRlcmF0aW9ucywgImNvbmZpZGVuY2VfbGV2ZWwiOiBjb25maWRlbmNlX2xldmVsfQogICAgY2FjaGVkID0gYXdhaXQgY2FjaGUuZ2V0KF9jYWNoZV9rZXkoIm1jIiwgcGFyYW1zKSkKICAgIGlmIGNhY2hlZDogcmV0dXJuIHsiam9iX2lkIjogY2FjaGVkLmdldCgiam9iX2lkIiksICJjYWNoZWQiOiBUcnVlLCAicmVzdWx0IjogY2FjaGVkfQogICAgam9iX2lkID0gc3RyKHV1aWQudXVpZDQoKSkKICAgIGF3YWl0IF9zZXRfam9iKGpvYl9pZCwgInJ1bm5pbmciLCB7fSkKICAgIGFzeW5jaW8uY3JlYXRlX3Rhc2soX3J1bl9qb2Ioam9iX2lkLCAibW9udGVfY2FybG8iLCBfcnVuX21jX3dvcmtlciwgcGFyYW1zKSwgbmFtZT1mIm1jLXtqb2JfaWR9IikKICAgIHJldHVybiB7ImpvYl9pZCI6IGpvYl9pZCwgInN0YXR1cyI6ICJydW5uaW5nIn0KCgpAcm91dGVyLmdldCgiL2pvYnMve2pvYl9pZH0iKQphc3luYyBkZWYgZ2V0X2pvYihqb2JfaWQ6IHN0ciwgXzogc3RyID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICBqb2IgPSBhd2FpdCBfZ2V0X2pvYihqb2JfaWQpCiAgICBpZiBub3Qgam9iOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTQwNCwgZGV0YWlsPSJKb2Igbm90IGZvdW5kIikKICAgIHJldHVybiBqb2IKCgpAcm91dGVyLmdldCgiL2pvYnMiKQphc3luYyBkZWYgbGlzdF9qb2JzKGxpbWl0OiBpbnQgPSA1MCwgXzogc3RyID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSkgLT4gRGljdFtzdHIsIEFueV06CiAgICBqb2JzID0gc29ydGVkKF9qb2JzLnZhbHVlcygpLCBrZXk9bGFtYmRhIGo6IGouZ2V0KCJ1cGRhdGVkX2F0IiwgMCksIHJldmVyc2U9VHJ1ZSlbOmxpbWl0XQogICAgcmV0dXJuIHsiam9icyI6IGpvYnMsICJjb3VudCI6IGxlbihqb2JzKX0K
+"""
+Backtest engine API.
+BUG-AF7 FIX: removed prefix="/backtest-engine" -- double prefix was causing /backtest-engine/backtest-engine/*
+Now: prefix provided by main.py as "/backtest-engine"
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import logging
+import os
+import time
+import uuid
+from concurrent.futures import ProcessPoolExecutor
+from datetime import date
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from backend.backtest_engine import (
+    MonteCarloSimulator,
+    MultiSymbolBacktestEngine,
+    WalkForwardAnalyzer,
+)
+from backend.backtest_engine.data_provider import DataProvider
+from backend.core.cache import cache
+from backend.core.config import settings
+from backend.core.deps import get_current_user
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["Backtest Engine"])
+
+_CPU_WORKERS = min(max(2, os.cpu_count() or 2), getattr(settings, "BACKTEST_MAX_WORKERS", 4))
+_JOB_TIMEOUT_SECONDS = 300
+_MAX_JOBS_STORED = 500
+_executor: Optional[ProcessPoolExecutor] = None
+_executor_lock = asyncio.Lock()
+_jobs_lock = asyncio.Lock()
+_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+async def _get_executor() -> ProcessPoolExecutor:
+    global _executor
+    if _executor is None or _executor._shutdown:
+        async with _executor_lock:
+            if _executor is None or _executor._shutdown:
+                _executor = ProcessPoolExecutor(max_workers=_CPU_WORKERS, initializer=_worker_init)
+    return _executor
+
+
+def _worker_init() -> None:
+    try:
+        os.nice(10)
+    except (AttributeError, OSError):
+        pass
+
+
+def _run_backtest_worker(params: Dict[str, Any]) -> Dict[str, Any]:
+    provider = DataProvider()
+    candles = provider.get_candles_sync(
+        symbol=params["symbol"],
+        timeframe=params["timeframe"],
+        start_date=params.get("start_date"),
+        end_date=params.get("end_date"),
+        limit=params.get("limit", 5000),
+    )
+    engine = MultiSymbolBacktestEngine(
+        symbol=params["symbol"],
+        timeframe=params["timeframe"],
+        initial_balance=params.get("initial_balance", 10_000.0),
+        risk_pct=params.get("risk_pct", 1.0),
+    )
+    return engine.run(
+        candles=candles,
+        strategy=params.get("strategy", "smc"),
+        parameters=params.get("parameters", {}),
+    )
+
+
+def _run_wfo_worker(params: Dict[str, Any]) -> Dict[str, Any]:
+    provider = DataProvider()
+    candles = provider.get_candles_sync(
+        symbol=params["symbol"],
+        timeframe=params["timeframe"],
+        start_date=params.get("start_date"),
+        end_date=params.get("end_date"),
+        limit=params.get("limit", 5000),
+    )
+    analyzer = WalkForwardAnalyzer(
+        symbol=params["symbol"],
+        timeframe=params["timeframe"],
+        train_pct=params.get("train_pct", 0.7),
+        n_splits=params.get("n_splits", 5),
+    )
+    return analyzer.run(
+        candles=candles,
+        strategy=params.get("strategy", "smc"),
+        param_grid=params.get("param_grid", {}),
+    )
+
+
+def _run_mc_worker(params: Dict[str, Any]) -> Dict[str, Any]:
+    return MonteCarloSimulator(
+        n_iterations=params.get("n_iterations", 1000),
+        confidence_level=params.get("confidence_level", 0.95),
+    ).run(trades=params.get("trades", []))
+
+
+def _cache_key(prefix: str, params: Dict[str, Any]) -> str:
+    payload = json.dumps(params, sort_keys=True, default=str)
+    return f"backtest:{prefix}:{hashlib.sha256(payload.encode()).hexdigest()[:32]}"
+
+
+async def _run_job(job_id: str, kind: str, worker_fn: Any, params: Dict[str, Any]) -> None:
+    loop = asyncio.get_running_loop()
+    executor = await _get_executor()
+    start = time.monotonic()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(executor, worker_fn, params), timeout=_JOB_TIMEOUT_SECONDS
+        )
+        result["job_id"] = job_id
+        result["kind"] = kind
+        result["elapsed_seconds"] = round(time.monotonic() - start, 3)
+        await _set_job(job_id, "completed", result)
+        await cache.set(_cache_key(kind, params), result, ttl=3600)
+    except asyncio.TimeoutError:
+        await _set_job(job_id, "failed", {"error": f"Job exceeded {_JOB_TIMEOUT_SECONDS}s timeout"})
+    except Exception as exc:
+        logger.exception("backtest job failed")
+        await _set_job(job_id, "failed", {"error": str(exc)})
+
+
+async def _set_job(job_id: str, status: str, payload: Dict[str, Any]) -> None:
+    async with _jobs_lock:
+        _jobs[job_id] = {
+            "id": job_id,
+            "status": status,
+            "result": payload if status == "completed" else None,
+            "error": payload.get("error") if status == "failed" else None,
+            "updated_at": time.time(),
+        }
+        while len(_jobs) > _MAX_JOBS_STORED:
+            _jobs.pop(next(iter(_jobs)), None)
+    try:
+        await cache.set(f"job:{job_id}", _jobs[job_id], ttl=3600)
+    except Exception:
+        pass
+
+
+async def _get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    if job_id in _jobs:
+        return _jobs[job_id]
+    return await cache.get(f"job:{job_id}")
+
+
+@router.post("/run")
+async def run_backtest(
+    symbol: str,
+    timeframe: str = "H1",
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    strategy: str = "smc",
+    initial_balance: float = 10_000.0,
+    risk_pct: float = 1.0,
+    _: str = Depends(get_current_user),
+) -> Dict[str, Any]:
+    params = {
+        "symbol": symbol.upper(),
+        "timeframe": timeframe.upper(),
+        "strategy": strategy,
+        "initial_balance": initial_balance,
+        "risk_pct": risk_pct,
+    }
+    cached = await cache.get(_cache_key("backtest", params))
+    if cached:
+        return {"job_id": cached.get("job_id"), "cached": True, "result": cached}
+    job_id = str(uuid.uuid4())
+    await _set_job(job_id, "running", {})
+    asyncio.create_task(
+        _run_job(job_id, "backtest", _run_backtest_worker, params), name=f"backtest-{job_id}"
+    )
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.post("/wfo")
+async def run_wfo(
+    csymbol: str,
+    timeframe: str = "H1",
+    strategy: str = "smc",
+    train_pct: float = 0.7,
+    n_splits: int = 5,
+    _: str = Depends(get_current_user),
+) -> Dict[str, Any]:
+    params = {
+        "symbol": csymbol.upper(),
+        "timeframe": timeframe.upper(),
+        "strategy": strategy,
+        "train_pct": train_pct,
+        "n_splits": n_splits,
+    }
+    cached = await cache.get(_cache_key("wfo", params))
+    if cached:
+        return {"job_id": cached.get("job_id"), "cached": True, "result": cached}
+    job_id = str(uuid.uuid4())
+    await _set_job(job_id, "running", {})
+    asyncio.create_task(_run_job(job_id, "wfo", _run_wfo_worker, params), name=f"wfo-{job_id}")
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.post("/monte-carlo")
+async def run_monte_carlo(
+    trades: list[Dict[str, Any]],
+    n_iterations: int = 1000,
+    confidence_level: float = 0.95,
+    _: str = Depends(get_current_user),
+) -> Dict[str, Any]:
+    if n_iterations > 50_000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="n_iterations must be <= 50000"
+        )
+    params = {"trades": trades, "n_iterations": n_iterations, "confidence_level": confidence_level}
+    cached = await cache.get(_cache_key("mc", params))
+    if cached:
+        return {"job_id": cached.get("job_id"), "cached": True, "result": cached}
+    job_id = str(uuid.uuid4())
+    await _set_job(job_id, "running", {})
+    asyncio.create_task(
+        _run_job(job_id, "monte_carlo", _run_mc_worker, params), name=f"mc-{job_id}"
+    )
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str, _: str = Depends(get_current_user)) -> Dict[str, Any]:
+    job = await _get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.get("/jobs")
+async def list_jobs(limit: int = 50, _: str = Depends(get_current_user)) -> Dict[str, Any]:
+    jobs = sorted(_jobs.values(), key=lambda j: j.get("updated_at", 0), reverse=True)[:limit]
+    return {"jobs": jobs, "count": len(jobs)}

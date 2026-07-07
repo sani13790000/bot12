@@ -44,17 +44,18 @@ class WalkForwardConfig:
 
     پنجره‌های زمانی را و نحوه تقسیم داده‌ها تعریف می‌کند.
     """
+
     symbol: str = "XAUUSD"
     total_start: Optional[datetime] = None
     total_end: Optional[datetime] = None
 
     # ─── اندازه پنجره‌ها ───
-    training_days: int = 90     # دوره آموزش: ۳ ماه
-    validation_days: int = 30   # دوره اعتبارسنجی: ۱ ماه
-    testing_days: int = 30      # دوره تست: ۱ ماه
+    training_days: int = 90  # دوره آموزش: ۳ ماه
+    validation_days: int = 30  # دوره اعتبارسنجی: ۱ ماه
+    testing_days: int = 30  # دوره تست: ۱ ماه
 
     # ─── rolling window ───
-    step_days: int = 30         # هر بار چقدر جلو برود
+    step_days: int = 30  # هر بار چقدر جلو برود
 
     # ─── تنظیمات بک‌تست ───
     initial_balance: float = 10000.0
@@ -69,6 +70,7 @@ class WindowResult:
 
     شامل عملکرد در سه مرحله Training، Validation و Testing.
     """
+
     window_index: int
     training_start: datetime
     training_end: datetime
@@ -117,6 +119,7 @@ class WalkForwardResult:
 
     خلاصه عملکرد در تمام پنجره‌های زمانی.
     """
+
     config: WalkForwardConfig
     windows: List[WindowResult]
 
@@ -133,8 +136,8 @@ class WalkForwardResult:
     avg_return: float = 0.0
 
     # ─── ثبات استراتژی ───
-    consistency_score: float = 0.0   # ۰ تا ۱۰۰ — هر چه بالاتر بهتر
-    is_robust: bool = False          # آیا استراتژی robust است؟
+    consistency_score: float = 0.0  # ۰ تا ۱۰۰ — هر چه بالاتر بهتر
+    is_robust: bool = False  # آیا استراتژی robust است؟
     robustness_notes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -146,7 +149,9 @@ class WalkForwardResult:
                 "failed_windows": self.failed_windows,
                 "pass_rate": round(
                     (self.passed_windows / self.total_windows * 100)
-                    if self.total_windows > 0 else 0, 1
+                    if self.total_windows > 0
+                    else 0,
+                    1,
                 ),
             },
             "performance": {
@@ -207,10 +212,7 @@ class WalkForwardAnalyzer:
         start = config.total_start or candles[0].timestamp
         end = config.total_end or candles[-1].timestamp
 
-        logger.info(
-            f"Walk-Forward شروع شد | {config.symbol} | "
-            f"از: {start.date()} تا: {end.date()}"
-        )
+        logger.info(f"Walk-Forward شروع شد | {config.symbol} | از: {start.date()} تا: {end.date()}")
 
         # ─── ساخت پنجره‌ها ───
         windows_config = self._build_windows(start, end, config)
@@ -230,9 +232,7 @@ class WalkForwardAnalyzer:
                 f"{win_cfg['training_end'].date()}"
             )
 
-            win_result = await self._run_window(
-                idx, win_cfg, candles, config, signal_generator
-            )
+            win_result = await self._run_window(idx, win_cfg, candles, config, signal_generator)
             window_results.append(win_result)
             await asyncio.sleep(0)
 
@@ -262,7 +262,7 @@ class WalkForwardAnalyzer:
         """
         windows = []
         window_start = start
-        total_days = (config.training_days + config.validation_days + config.testing_days)
+        (config.training_days + config.validation_days + config.testing_days)
 
         while True:
             train_start = window_start
@@ -275,14 +275,16 @@ class WalkForwardAnalyzer:
             if test_end > end:
                 break
 
-            windows.append({
-                "training_start": train_start,
-                "training_end": train_end,
-                "validation_start": val_start,
-                "validation_end": val_end,
-                "testing_start": test_start,
-                "testing_end": test_end,
-            })
+            windows.append(
+                {
+                    "training_start": train_start,
+                    "training_end": train_end,
+                    "validation_start": val_start,
+                    "validation_end": val_end,
+                    "testing_start": test_start,
+                    "testing_end": test_end,
+                }
+            )
 
             window_start += timedelta(days=config.step_days)
 
@@ -375,9 +377,7 @@ class WalkForwardAnalyzer:
             logger.warning(f"خطا در Testing پنجره {idx}: {e}")
 
         # ─── قضاوت پنجره ───
-        window.passed, window.pass_reason, window.fail_reason = (
-            self._evaluate_window(window)
-        )
+        window.passed, window.pass_reason, window.fail_reason = self._evaluate_window(window)
 
         return window
 
@@ -439,9 +439,13 @@ class WalkForwardAnalyzer:
         test_metrics = [w.testing_metrics for w in windows if w.testing_metrics]
         if test_metrics:
             result.avg_win_rate = sum(m.win_rate for m in test_metrics) / len(test_metrics)
-            result.avg_profit_factor = sum(m.profit_factor for m in test_metrics) / len(test_metrics)
+            result.avg_profit_factor = sum(m.profit_factor for m in test_metrics) / len(
+                test_metrics
+            )
             result.avg_sharpe_ratio = sum(m.sharpe_ratio for m in test_metrics) / len(test_metrics)
-            result.avg_max_drawdown = sum(m.max_drawdown_percent for m in test_metrics) / len(test_metrics)
+            result.avg_max_drawdown = sum(m.max_drawdown_percent for m in test_metrics) / len(
+                test_metrics
+            )
             result.avg_return = sum(m.return_percent for m in test_metrics) / len(test_metrics)
 
         # ─── Consistency Score (0-100) ───

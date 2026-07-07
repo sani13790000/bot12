@@ -6,10 +6,10 @@ Endpointهای ثبت و مدیریت گزارش‌های معاملاتی از 
 نویسنده: MT5 Trading Team
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 from ...core.logger import get_logger
 from ...services.trade_service import trade_service
@@ -23,8 +23,10 @@ router = APIRouter()
 # مدل‌های Pydantic
 # =====================================================
 
+
 class TradeReportRequest(BaseModel):
     """درخواست گزارش معامله"""
+
     symbol: str = Field(..., description="نماد")
     direction: str = Field(..., description="جهت: buy یا sell")
     entry_price: float = Field(..., description="قیمت ورود")
@@ -42,6 +44,7 @@ class TradeReportRequest(BaseModel):
 
 class CloseTradeRequest(BaseModel):
     """درخواست بستن معامله"""
+
     exit_price: float = Field(..., description="قیمت خروج")
     close_reason: str = Field(default="manual", description="دلیل بستن")
     profit_money: Optional[float] = Field(default=None, description="سود/ضرر")
@@ -50,6 +53,7 @@ class CloseTradeRequest(BaseModel):
 # =====================================================
 # Endpoints
 # =====================================================
+
 
 @router.get("/")
 async def list_trades(
@@ -60,7 +64,7 @@ async def list_trades(
     to_date: Optional[str] = Query(None),
     limit: int = Query(default=50, le=100),
     offset: int = Query(default=0),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     لیست معاملات
@@ -80,13 +84,10 @@ async def list_trades(
         from_date=from_date,
         to_date=to_date,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
-    return {
-        "success": True,
-        "data": result
-    }
+    return {"success": True, "data": result}
 
 
 @router.get("/open")
@@ -96,49 +97,32 @@ async def get_open_positions(user: dict = Depends(get_current_user)):
     """
     result = await trade_service.get_open_positions(user_id=user.get("id"))
 
-    return {
-        "success": True,
-        "data": result
-    }
+    return {"success": True, "data": result}
 
 
 @router.get("/{trade_id}")
-async def get_trade(
-    trade_id: str,
-    user: dict = Depends(get_current_user)
-):
+async def get_trade(trade_id: str, user: dict = Depends(get_current_user)):
     """
     جزئیات یک معامله
     """
-    trade = await trade_service.get_trade(
-        trade_id=trade_id,
-        user_id=user.get("id")
-    )
+    trade = await trade_service.get_trade(trade_id=trade_id, user_id=user.get("id"))
 
     if not trade:
         raise HTTPException(status_code=404, detail="معامله یافت نشد")
 
-    return {
-        "success": True,
-        "data": trade
-    }
+    return {"success": True, "data": trade}
 
 
 @router.post("/report")
 async def report_trade(
-    request: Request,
-    data: TradeReportRequest,
-    user: dict = Depends(get_current_user)
+    request: Request, data: TradeReportRequest, user: dict = Depends(get_current_user)
 ):
     """
     ثبت گزارش معامله
 
     برای ثبت معامله از MT5 EA یا گزارش دستی.
     """
-    logger.info(
-        f"گزارش معامله: {data.symbol} {data.direction} "
-        f"توسط {user.get('id')}"
-    )
+    logger.info(f"گزارش معامله: {data.symbol} {data.direction} توسط {user.get('id')}")
 
     ip_address = request.client.host if request.client else None
 
@@ -157,22 +141,15 @@ async def report_trade(
         profit_pips=data.profit_pips,
         signal_id=data.signal_id,
         notes=data.notes,
-        ip_address=ip_address
+        ip_address=ip_address,
     )
 
-    return {
-        "success": True,
-        "message": "معامله ثبت شد",
-        "data": result
-    }
+    return {"success": True, "message": "معامله ثبت شد", "data": result}
 
 
 @router.post("/{trade_id}/close")
 async def close_trade(
-    trade_id: str,
-    request: Request,
-    data: CloseTradeRequest,
-    user: dict = Depends(get_current_user)
+    trade_id: str, request: Request, data: CloseTradeRequest, user: dict = Depends(get_current_user)
 ):
     """
     بستن یک معامله
@@ -187,80 +164,52 @@ async def close_trade(
         exit_price=data.exit_price,
         close_reason=data.close_reason,
         profit_money=data.profit_money,
-        ip_address=ip_address
+        ip_address=ip_address,
     )
 
     if not result:
         raise HTTPException(status_code=404, detail="معامله یافت نشد یا بسته شده")
 
-    return {
-        "success": True,
-        "message": "معامله بسته شد",
-        "data": result
-    }
+    return {"success": True, "message": "معامله بسته شد", "data": result}
 
 
 @router.post("/close-all")
 async def close_all_trades(
-    request: Request,
-    direction: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user)
+    request: Request, direction: Optional[str] = Query(None), user: dict = Depends(get_current_user)
 ):
     """
     بستن همه معاملات
     """
-    logger.info(f"درخواست بستن همه معاملات")
+    logger.info("درخواست بستن همه معاملات")
 
     ip_address = request.client.host if request.client else None
 
     result = await trade_service.close_all_trades(
-        user_id=user.get("id"),
-        direction=direction,
-        ip_address=ip_address
+        user_id=user.get("id"), direction=direction, ip_address=ip_address
     )
 
-    return {
-        "success": True,
-        "data": result
-    }
+    return {"success": True, "data": result}
 
 
 @router.get("/stats/summary")
 async def get_trade_stats(
-    days: int = Query(default=30, le=90),
-    user: dict = Depends(get_current_user)
+    days: int = Query(default=30, le=90), user: dict = Depends(get_current_user)
 ):
     """
     آمار معاملات
     """
-    stats = await trade_service.get_trade_stats(
-        user_id=user.get("id"),
-        days=days
-    )
+    stats = await trade_service.get_trade_stats(user_id=user.get("id"), days=days)
 
-    return {
-        "success": True,
-        "data": stats
-    }
+    return {"success": True, "data": stats}
 
 
 @router.get("/stats/daily")
 async def get_daily_breakdown(
-    days: int = Query(default=7, le=30),
-    user: dict = Depends(get_current_user)
+    days: int = Query(default=7, le=30), user: dict = Depends(get_current_user)
 ):
     """
     تفکیک روزانه
     """
-    breakdown = await trade_service.get_daily_breakdown(
-        user_id=user.get("id"),
-        days=days
-    )
+    breakdown = await trade_service.get_daily_breakdown(user_id=user.get("id"), days=days)
 
-    return {
-        "success": True,
-        "data": {
-            "daily_breakdown": breakdown,
-            "period_days": days
-        }
-    }
+    return {"success": True, "data": {"daily_breakdown": breakdown, "period_days": days}}

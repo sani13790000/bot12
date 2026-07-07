@@ -3,6 +3,7 @@
 BUG-N5 FIX: _format_position() uses .get() with safe fallbacks
 so /positions command never crashes with KeyError in DEMO mode.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,8 +15,9 @@ from typing import Any, Dict, List, Optional
 log = logging.getLogger(__name__)
 
 try:
-    from telegram import Bot, Update
+    from telegram import Bot, Update  # noqa: F401
     from telegram.ext import Application, CommandHandler, ContextTypes
+
     TELEGRAM_AVAILABLE = True
 except ImportError:
     TELEGRAM_AVAILABLE = False
@@ -47,8 +49,7 @@ def _format_position(pos: Dict[str, Any]) -> str:
     return (
         f"{emoji} *{symbol}* | {pos_type} | Vol: {volume}\n"
         f"   Open: `{open_price}` → Now: `{current_price}`\n"
-        f"   P&L: `{profit:.2f}` | Ticket: `{ticket}`"
-        + (f"\n   📝 {comment}" if comment else "")
+        f"   P&L: `{profit:.2f}` | Ticket: `{ticket}`" + (f"\n   📝 {comment}" if comment else "")
     )
 
 
@@ -73,11 +74,7 @@ class TelegramBot:
             return
         self._running = True
         try:
-            self._app = (
-                Application.builder()
-                .token(self._token)
-                .build()
-            )
+            self._app = Application.builder().token(self._token).build()
             self._register_handlers()
             await self._app.initialize()
             await self._app.start()
@@ -139,13 +136,13 @@ class TelegramBot:
         if not self._app:
             return
         cmds = [
-            ("start",     self._cmd_start),
-            ("status",    self._cmd_status),
+            ("start", self._cmd_start),
+            ("status", self._cmd_status),
             ("positions", self._cmd_positions),
-            ("kill",      self._cmd_kill),
-            ("resume",    self._cmd_resume),
-            ("stats",     self._cmd_stats),
-            ("help",      self._cmd_help),
+            ("kill", self._cmd_kill),
+            ("resume", self._cmd_resume),
+            ("stats", self._cmd_stats),
+            ("help", self._cmd_help),
         ]
         for name, handler in cmds:
             self._app.add_handler(CommandHandler(name, handler))
@@ -170,6 +167,7 @@ class TelegramBot:
     async def _cmd_status(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             from backend.risk.kill_switch import kill_switch
+
             ks = "🔴 ACTIVE" if kill_switch.is_active else "🟢 OK"
         except Exception:
             ks = "unknown"
@@ -182,6 +180,7 @@ class TelegramBot:
         """Show open positions — BUG-N5 FIX: uses _format_position() with safe .get()"""
         try:
             from backend.execution.mt5_connector import mt5_connector
+
             positions: List[Dict[str, Any]] = await mt5_connector.get_positions()
         except Exception as e:
             await update.message.reply_text(f"❌ Error fetching positions: {e}")
@@ -202,6 +201,7 @@ class TelegramBot:
     async def _cmd_kill(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             from backend.risk.kill_switch import kill_switch
+
             await kill_switch.activate(reason="Telegram /kill command")
             await update.message.reply_text("🔴 *Kill switch ACTIVATED*", parse_mode="Markdown")
         except Exception as e:
@@ -210,14 +210,18 @@ class TelegramBot:
     async def _cmd_resume(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             from backend.risk.kill_switch import kill_switch
+
             await kill_switch.reset()
-            await update.message.reply_text("🟢 *Kill switch RESET — trading resumed*", parse_mode="Markdown")
+            await update.message.reply_text(
+                "🟢 *Kill switch RESET — trading resumed*", parse_mode="Markdown"
+            )
         except Exception as e:
             await update.message.reply_text(f"❌ Error: {e}")
 
     async def _cmd_stats(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             from backend.analytics.metrics_engine import metrics_engine
+
             perf = await metrics_engine.get_performance_metrics()
             win_rate = perf.get("win_rate", 0)
             total = perf.get("total_trades", 0)

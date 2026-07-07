@@ -10,14 +10,16 @@ Security:
 - Callback data validated (no arbitrary callback injection)
 - Admin chat_id sourced from env, never from user input
 """
+
 from __future__ import annotations
 
+import os
 import time
 from collections import defaultdict, deque
-from typing import Any, Awaitable, Callable, Dict, MutableMapping
+from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
-from aiogram.types import CallbackQuery, Message, TelegramObject, Update
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from backend.core.logger import get_logger
 
@@ -27,9 +29,9 @@ logger = get_logger(__name__)
 # Rate-limit constants
 # ---------------------------------------------------------------------------
 _RATE_WINDOW_SECONDS: int = 60
-_RATE_MAX_MESSAGES: int = 30          # messages per minute per user
-_RATE_MAX_CALLBACKS: int = 20         # callbacks per minute per user
-_MAX_TRACKED_USERS: int = 50_000      # cap memory; evict oldest
+_RATE_MAX_MESSAGES: int = 30  # messages per minute per user
+_RATE_MAX_CALLBACKS: int = 20  # callbacks per minute per user
+_MAX_TRACKED_USERS: int = 50_000  # cap memory; evict oldest
 
 
 def _sanitise(text: str | None, max_len: int = 200) -> str:
@@ -142,8 +144,6 @@ class RateLimitMiddleware(BaseMiddleware):
 # ---------------------------------------------------------------------------
 # 3. Auth Middleware
 # ---------------------------------------------------------------------------
-import os
-from backend.core.config import settings
 
 
 def _get_admin_ids() -> set[int]:

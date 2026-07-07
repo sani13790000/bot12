@@ -6,12 +6,13 @@ Security:
 - No eval/exec, no dynamic imports from callback data.
 - No privilege escalation via callback injection.
 """
+
 from __future__ import annotations
 
 import re
 from typing import Any
 
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.types import CallbackQuery
 
 from backend.core.logger import get_logger
@@ -32,9 +33,20 @@ _ALLOWED_ACTIONS = {
     "risk",
 }
 _ALLOWED_SYMBOLS = {
-    "XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-    "AUDUSD", "NZDUSD", "USDCAD", "BTCUSD", "ETHUSD",
-    "US30", "NAS100", "SPX500", "DISMISS",
+    "XAUUSD",
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "AUDUSD",
+    "NZDUSD",
+    "USDCAD",
+    "BTCUSD",
+    "ETHUSD",
+    "US30",
+    "NAS100",
+    "SPX500",
+    "DISMISS",
 }
 
 
@@ -71,9 +83,7 @@ async def handle_callback(callback: CallbackQuery, is_admin: bool, **kwargs: Any
             callback.from_user.id if callback.from_user else "?",
             (callback.data or "")[:50],
         )
-        await callback.answer(
-            "Invalid action. Please use the menu.", show_alert=True
-        )
+        await callback.answer("Invalid action. Please use the menu.", show_alert=True)
         return
 
     action, value = parsed
@@ -81,7 +91,6 @@ async def handle_callback(callback: CallbackQuery, is_admin: bool, **kwargs: Any
     if action == "signal":
         await callback.answer(f"Fetching signal for {value}...")
         # Import here to avoid circular imports
-        from backend.telegram.routers.signal import cmd_signal
         # Re-use signal logic by sending a synthetic message is complex;
         # instead, edit the message with signal data directly.
         await _send_signal_inline(callback, value)
@@ -101,12 +110,15 @@ async def handle_callback(callback: CallbackQuery, is_admin: bool, **kwargs: Any
 
     elif action == "risk":
         await callback.answer()
-        await callback.message.answer("\U0001f6e1\ufe0f Use /risk for risk status.") if callback.message else None
+        await callback.message.answer(
+            "\U0001f6e1\ufe0f Use /risk for risk status."
+        ) if callback.message else None
 
 
 async def _send_signal_inline(callback: CallbackQuery, symbol: str) -> None:
     """Fetch signal and edit the inline message."""
     import httpx
+
     from backend.core.config import settings
     from backend.telegram.keyboards import signal_action_keyboard
 
@@ -122,7 +134,13 @@ async def _send_signal_inline(callback: CallbackQuery, symbol: str) -> None:
             d = resp.json()
             direction = d.get("direction", "N/A")
             score = d.get("score", 0)
-            emoji = "\U0001f7e2" if direction == "BUY" else "\U0001f534" if direction == "SELL" else "\u26aa"
+            emoji = (
+                "\U0001f7e2"
+                if direction == "BUY"
+                else "\U0001f534"
+                if direction == "SELL"
+                else "\u26aa"
+            )
             text = (
                 f"{emoji} *{symbol} {direction}*\n"
                 f"Score: `{score:.1f}/100`\n"
@@ -138,6 +156,7 @@ async def _send_signal_inline(callback: CallbackQuery, symbol: str) -> None:
 async def _send_analysis_inline(callback: CallbackQuery, symbol: str) -> None:
     """Fetch analysis and reply."""
     import httpx
+
     from backend.core.config import settings
 
     api_base = getattr(settings, "API_BASE_URL", "http://api:8000")
@@ -150,8 +169,8 @@ async def _send_analysis_inline(callback: CallbackQuery, symbol: str) -> None:
         if resp.status_code == 200 and callback.message:
             d = resp.json()
             await callback.message.reply(
-                f"\U0001f4ca *{symbol}* | Trend: `{d.get('trend','N/A')}` | "
-                f"Score: `{d.get('confluence_score',0):.1f}`"
+                f"\U0001f4ca *{symbol}* | Trend: `{d.get('trend', 'N/A')}` | "
+                f"Score: `{d.get('confluence_score', 0):.1f}`"
             )
     except Exception as exc:  # noqa: BLE001
         logger.error("Inline analysis error: %s", exc)

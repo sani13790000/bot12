@@ -1,1 +1,127 @@
-IiIiQW5hbHlzaXMgcm91dGVzIOKAlCBTTUMgKyBQcmljZSBBY3Rpb24uCkJVRy1BRjIgRklYOiByZW1vdmVkIHByZWZpeD0iL2FuYWx5c2lzIiAtLSBkb3VibGUgcHJlZml4IHdhcyBjYXVzaW5nIC9hbmFseXNpcy9hbmFseXNpcy8qCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0LCBMaXN0LCBPcHRpb25hbAoKZnJvbSBmYXN0YXBpIGltcG9ydCBBUElSb3V0ZXIsIEhUVFBFeGNlcHRpb24KZnJvbSBweWRhbnRpYyBpbXBvcnQgQmFzZU1vZGVsLCB2YWxpZGF0b3IKCmxvZyAgICA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIodGFncz1bImFuYWx5c2lzIl0pCgoKY2xhc3MgQ2FuZGxlRGF0YShCYXNlTW9kZWwpOgogICAgb3BlbjogICBmbG9hdAogICAgaGlnaDogICBmbG9hdAogICAgbG93OiAgICBmbG9hdAogICAgY2xvc2U6ICBmbG9hdAogICAgdm9sdW1lOiBmbG9hdCAgICAgICAgID0gMC4wCiAgICB0aW1lOiAgIE9wdGlvbmFsW2ludF0gPSBOb25lCgoKY2xhc3MgU01DQW5hbHlzaXNSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgIHN0cgogICAgY2FuZGxlczogICBMaXN0W0NhbmRsZURhdGFdCiAgICB0aW1lZnJhbWU6IHN0ciA9ICJIMSIKCiAgICBAdmFsaWRhdG9yKCJjYW5kbGVzIikKICAgIGRlZiB2YWxpZGF0ZV9jYW5kbGVfY291bnQoY2xzLCB2KToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5jb25maWcgaW1wb3J0IGdldF9zZXR0aW5ncwogICAgICAgIG1heF9jID0gZ2V0X3NldHRpbmdzKCkuU01DX01BWF9DQU5ETEVTCG11c3Qgbm90IHVzZSBsb2NhbCB2YXJpYWJsZXMgc3RhcnRpbmcgd2l0aCB1bmRlcnNjb3JlCiAgICAgICAgaWYgbGVuKHYpID4gbWF4X2M6IHJhaXNlIFZhbHVlRXJyb3IoZiJUb28gbWFueSBjYW5kbGVzOiB7bGVuKHYpfSA+IHttYXhfY30iKQogICAgICAgIGlmIGxlbih2KSA8IDI6IHJhaXNlIFZhbHVlRXJyb3IoIkF0IGxlYXN0IDIgY2FuZGxlcyByZXF1aXJlZC4iKQogICAgICAgIHJldHVybiB2CgoKY2xhc3MgUEFBbmFseXNpc1JlcXVlc3QoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogICAgc3RyCiAgICBjYW5kbGVzOiAgIExpc3RbQ2FuZGxlRGF0YV0KICAgIHRpbWVmcmFtZTogc3RyID0gIkgxIgoKICAgIEB2YWxpZGF0b3IoImNhbmRsZXMiKQogICAgZGVmIHZhbGlkYXRlX2NhbmRsZV9jb3VudChjbHMsIHYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLmNvbmZpZyBpbXBvcnQgZ2V0X3NldHRpbmdzCiAgICAgICAgbWF4X2MgPSBnZXRfc2V0dGluZ3MoKS5TTUNfTUFYX0NBTkRMRVMKICAgICAgICBpZiBsZW4odikgPiBtYXhfYzogcmFpc2UgVmFsdWVFcnJvcihmIlRvbyBtYW55IGNhbmRsZXM6IHtsZW4odil9ID4ge21heF9jfSIpCiAgICAgICAgaWYgbGVuKHYpIDwgMjogcmFpc2UgVmFsdWVFcnJvcigiQXQgbGVhc3QgMiBjYW5kbGVzIHJlcXVpcmVkLiIpCiAgICAgICAgcmV0dXJuIHYKCgpAcm91dGVyLnBvc3QoIi9zbWMiKQphc3luYyBkZWYgYW5hbHl6ZV9zbWMocmVxdWVzdDogU01DQW5hbHlzaXNSZXF1ZXN0KSAtPiBEaWN0W3N0ciwgQW55XToKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuYW5hbHlzaXMuc21jX2VuZ2luZSBpbXBvcnQgU01DRW5naW5lCiAgICAgICAgZW5naW5lID0gU01DRW5naW5lKCkKICAgICAgICBjYW5kbGVzID0gW3sib3BlbiI6IGMub3BlbiwgImhpZ2giOiBjLmhpZ2gsICJsb3ciOiBjLmxvdywgImNsb3NlIjogYy5jbG9zZSwgInZvbHVtZSI6IGMudm9sdW1lfSBmb3IgYyBpbiByZXF1ZXN0LmNhbmRsZXNdCiAgICAgICAgcmVzdWx0ID0gZW5naW5lLmFuYWx5c2UoY2FuZGxlcykKICAgICAgICByZXR1cm4geyJzeW1ib2wiOiByZXF1ZXN0LnN5bWJvbCwgInRpbWVmcmFtZSI6IHJlcXVlc3QudGltZWZyYW1lLCAiY2FuZGxlX2NvdW50IjogbGVuKGNhbmRsZXMpLCAiYW5hbHlzaXMiOiByZXN1bHR9CiAgICBleGNlcHQgVmFsdWVFcnJvcjogcmFpc2UKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTogbG9nLmVycm9yKCJTTUMgYW5hbHlzaXMgZXJyb3I6ICVzIiwgZSk7IHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGUpKQoKCkByb3V0ZXIucG9zdCgiL3ByaWNlLWFjdGlvbiIpCmFzeW5jIGRlZiBhbmFseXplX3ByaWNlX2FjdGlvbihyZXF1ZXN0OiBQQUFuYWx5c2lzUmVxdWVzdCkgLT4gRGljdFtzdHIsIEFueV06CiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLmFuYWx5c2lzLnByaWNlX2FjdGlvbl9lbmdpbmUgaW1wb3J0IFByaWNlQWN0aW9uRW5naW5lCiAgICAgICAgZW5naW5lID0gUHJpY2VBY3Rpb25FbmdpbmUoKQogICAgICAgIGNhbmRsZXMgPSBbeyJvcGVuIjogYy5vcGVuLCAiaGlnaCI6IGMuaGlnaCwgImxvdyI6IGMubG93LCAiY2xvc2UiOiBjLmNsb3NlLCAidm9sdW1lIjogYy52b2x1bWV9IGZvciBjIGluIHJlcXVlc3QuY2FuZGxlc10KICAgICAgICByZXN1bHQgPSBlbmdpbmUuYW5hbHl6ZShjYW5kbGVzKQogICAgICAgIHNyX2xldmVscyA9IFt7InByaWNlIjogbHZsLnByaWNlLCAidHlwZSI6IHN0cihsdmwubGV2ZWxfdHlwZSksICJzdHJlbmd0aCI6IGdldGF0dHIobHZsLCAic3RyZW5ndGgiLCAwLjApfSBmb3IgbHZsIGluIGdldGF0dHIocmVzdWx0LCAic3VwcG9ydF9yZXNpc3RhbmNlIiwgW10pXQogICAgICAgIHBhdHRlcm5zID0gW3sibmFtZSI6IGdldGF0dHIocCwgIm5hbWUiLCBzdHIocCkpLCAiZGlyZWN0aW9uIjogZ2V0YXR0cihwLCAiZGlyZWN0aW9uIiwgTm9uZSksICJjb25maWRlbmNlIjogZ2V0YXR0cihwLCAiY29uZmlkZW5jZSIsIDAuMCl9IGZvciBwIGluIGdldGF0dHIocmVzdWx0LCAicGF0dGVybnMiLCBbXSldCiAgICAgICAgcmV0dXJuIHsic3ltYm9sIjogcmVxdWVzdC5zeW1ib2wsICJ0aW1lZnJhbWUiOiByZXF1ZXN0LnRpbWVmcmFtZSwgImNhbmRsZV9jb3VudCI6IGxlbihjYW5kbGVzKSwgInRyZW5kIjogc3RyKGdldGF0dHIocmVzdWx0LCAidHJlbmQiLCAiIikpLCAicGF0dGVybnMiOiBwYXR0ZXJucywgInBhdHRlcm5zX2NvdW50IjogbGVuKHBhdHRlcm5zKSwgInNyX2xldmVscyI6IHNyX2xldmVscywgInNyX2NvdW50IjogbGVuKHNyX2xldmVscyksICJtb21lbnR1bSI6IGdldGF0dHIocmVzdWx0LCAibW9tZW50dW0iLCBOb25lKSwgInZvbGF0aWxpdHkiOiBnZXRhdHRyKHJlc3VsdCwgInZvbGF0aWxpdHkiLCBOb25lKX0KICAgIGV4Y2VwdCBWYWx1ZUVycm9yOiByYWlzZQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOiBsb2cuZXJyb3IoIlBBIGFuYWx5c2lzIGVycm9yOiAlcyIsIGUpOyByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihlKSkK
+"""Analysis routes — SMC + Price Action.
+BUG-AF2 FIX: removed prefix="/analysis" -- double prefix was causing /analysis/analysis/*
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, validator
+
+log = logging.getLogger(__name__)
+router = APIRouter(tags=["analysis"])
+
+
+class CandleData(BaseModel):
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float = 0.0
+    time: Optional[int] = None
+
+
+class SMCAnalysisRequest(BaseModel):
+    symbol: str
+    candles: List[CandleData]
+    timeframe: str = "H1"
+
+    @validator("candles")
+    def validate_candle_count(cls, v):
+        from backend.core.config import get_settings
+
+        max_c = get_settings().SMC_MAX_CANDLES
+        if len(v) > max_c:
+            raise ValueError(f"Too many candles: {len(v)} > {max_c}")
+        if len(v) < 2:
+            raise ValueError("At least 2 candles required.")
+        return v
+
+
+class PAAnalysisRequest(BaseModel):
+    symbol: str
+    candles: List[CandleData]
+    timeframe: str = "H1"
+
+    @validator("candles")
+    def validate_candle_count(cls, v):
+        from backend.core.config import get_settings
+
+        max_c = get_settings().SMC_MAX_CANDLES
+        if len(v) > max_c:
+            raise ValueError(f"Too many candles: {len(v)} > {max_c}")
+        if len(v) < 2:
+            raise ValueError("At least 2 candles required.")
+        return v
+
+
+@router.post("/smc")
+async def analyze_smc(request: SMCAnalysisRequest) -> Dict[str, Any]:
+    try:
+        from backend.analysis.smc_engine import SMCEngine
+
+        engine = SMCEngine()
+        candles = [
+            {"open": c.open, "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
+            for c in request.candles
+        ]
+        result = engine.analyse(candles)
+        return {
+            "symbol": request.symbol,
+            "timeframe": request.timeframe,
+            "candle_count": len(candles),
+            "analysis": result,
+        }
+    except ValueError:
+        raise
+    except Exception as e:
+        log.error("SMC analysis error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/price-action")
+async def analyze_price_action(request: PAAnalysisRequest) -> Dict[str, Any]:
+    try:
+        from backend.analysis.price_action_engine import PriceActionEngine
+
+        engine = PriceActionEngine()
+        candles = [
+            {"open": c.open, "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
+            for c in request.candles
+        ]
+        result = engine.analyze(candles)
+        sr_levels = [
+            {
+                "price": lvl.price,
+                "type": str(lvl.level_type),
+                "strength": getattr(lvl, "strength", 0.0),
+            }
+            for lvl in getattr(result, "support_resistance", [])
+        ]
+        patterns = [
+            {
+                "name": getattr(p, "name", str(p)),
+                "direction": getattr(p, "direction", None),
+                "confidence": getattr(p, "confidence", 0.0),
+            }
+            for p in getattr(result, "patterns", [])
+        ]
+        return {
+            "symbol": request.symbol,
+            "timeframe": request.timeframe,
+            "candle_count": len(candles),
+            "trend": str(getattr(result, "trend", "")),
+            "patterns": patterns,
+            "patterns_count": len(patterns),
+            "sr_levels": sr_levels,
+            "sr_count": len(sr_levels),
+            "momentum": getattr(result, "momentum", None),
+            "volatility": getattr(result, "volatility", None),
+        }
+    except ValueError:
+        raise
+    except Exception as e:
+        log.error("PA analysis error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))

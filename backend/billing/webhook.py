@@ -1,35 +1,36 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Set
 
-from .provider import (
-    PaymentProvider, ProviderName,
-    WebhookEvent, WebhookEventType,
-)
 from .engine import BillingEngine
+from .provider import (
+    PaymentProvider,
+    WebhookEvent,
+    WebhookEventType,
+)
 
-
-MAX_PAYLOAD_BYTES   = 1 * 1024 * 1024
+MAX_PAYLOAD_BYTES = 1 * 1024 * 1024
 TIMESTAMP_TOLERANCE = 300
-NONCE_STORE_MAX     = 100_000
+NONCE_STORE_MAX = 100_000
 
 
 class WebhookError(Exception):
     pass
 
+
 class InvalidSignatureError(WebhookError):
     pass
+
 
 class ReplayAttackError(WebhookError):
     pass
 
+
 class PayloadTooLargeError(WebhookError):
     pass
+
 
 class StaleTimestampError(WebhookError):
     pass
@@ -37,31 +38,31 @@ class StaleTimestampError(WebhookError):
 
 @dataclass
 class WebhookProcessResult:
-    accepted:   bool
-    event_id:   str
+    accepted: bool
+    event_id: str
     event_type: str
-    duplicate:  bool = False
-    error:      str  = ""
+    duplicate: bool = False
+    error: str = ""
 
 
 class WebhookProcessor:
     def __init__(
         self,
-        engine:         BillingEngine,
-        provider:       PaymentProvider,
+        engine: BillingEngine,
+        provider: PaymentProvider,
         webhook_secret: str,
     ) -> None:
-        self._engine   = engine
+        self._engine = engine
         self._provider = provider
-        self._secret   = webhook_secret
+        self._secret = webhook_secret
         self._seen_ids: Set[str] = set()
         self._audit: list = []
 
     def process(
         self,
-        payload:   bytes,
+        payload: bytes,
         signature: str,
-        event_id:  str            = "",
+        event_id: str = "",
         timestamp: Optional[float] = None,
     ) -> WebhookProcessResult:
         # P10-WH-4: size cap
@@ -89,8 +90,10 @@ class WebhookProcessor:
         if event_id and event_id in self._seen_ids:
             self._audit_event("DUPLICATE_SKIPPED", event_id)
             return WebhookProcessResult(
-                accepted=True, event_id=event_id,
-                event_type="duplicate", duplicate=True,
+                accepted=True,
+                event_id=event_id,
+                event_type="duplicate",
+                duplicate=True,
             )
 
         event: WebhookEvent = self._provider.parse_webhook(payload)
@@ -103,12 +106,15 @@ class WebhookProcessor:
         self._dispatch(event)
 
         self._audit_event(
-            "PROCESSED", event_id,
+            "PROCESSED",
+            event_id,
             detail=f"type={event.event_type} invoice={event.invoice_id}",
         )
 
         return WebhookProcessResult(
-            accepted=True, event_id=event_id, event_type=event.event_type.value,
+            accepted=True,
+            event_id=event_id,
+            event_type=event.event_type.value,
         )
 
     def _dispatch(self, event: WebhookEvent) -> bool:
@@ -126,22 +132,25 @@ class WebhookProcessor:
                 )
             return True
         except KeyError:
-            self._audit_event(
-                "DISPATCH_KEY_ERROR", event.invoice_id, error="invoice_not_found"
-            )
+            self._audit_event("DISPATCH_KEY_ERROR", event.invoice_id, error="invoice_not_found")
             return False
 
     def _audit_event(
-        self, action: str, event_id: str,
-        error: str = "", detail: str = "",
+        self,
+        action: str,
+        event_id: str,
+        error: str = "",
+        detail: str = "",
     ) -> None:
-        self._audit.append({
-            "action":   action,
-            "event_id": event_id,
-            "error":    error,
-            "detail":   detail,
-            "ts":       time.time(),
-        })
+        self._audit.append(
+            {
+                "action": action,
+                "event_id": event_id,
+                "error": error,
+                "detail": detail,
+                "ts": time.time(),
+            }
+        )
 
     def audit_log(self) -> list:
         return list(self._audit)

@@ -19,7 +19,7 @@ Galaxy Vast AI Trading Platform
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
@@ -32,6 +32,7 @@ logger = get_logger("research.replay.engine")
 
 class ReplayStatus(Enum):
     """وضعیت موتور Replay"""
+
     IDLE = "IDLE"
     RUNNING = "RUNNING"
     PAUSED = "PAUSED"
@@ -41,23 +42,25 @@ class ReplayStatus(Enum):
 
 class ReplaySpeed(Enum):
     """سرعت پخش Replay"""
-    SLOW = 0.25      # ۴ برابر کندتر
-    NORMAL = 1.0     # سرعت عادی
-    FAST = 4.0       # ۴ برابر سریع‌تر
-    VERY_FAST = 16.0 # ۱۶ برابر سریع‌تر
-    INSTANT = 0.0    # بدون تأخیر
+
+    SLOW = 0.25  # ۴ برابر کندتر
+    NORMAL = 1.0  # سرعت عادی
+    FAST = 4.0  # ۴ برابر سریع‌تر
+    VERY_FAST = 16.0  # ۱۶ برابر سریع‌تر
+    INSTANT = 0.0  # بدون تأخیر
 
 
 @dataclass
 class ReplayConfig:
     """تنظیمات موتور Replay"""
+
     symbol: str = "XAUUSD"
     start_date: Optional[datetime] = None
-    days_back: int = 2              # چند روز به عقب برگردیم
+    days_back: int = 2  # چند روز به عقب برگردیم
     speed: ReplaySpeed = ReplaySpeed.NORMAL
-    candle_delay_ms: int = 500      # تأخیر بین کندل‌ها (میلی‌ثانیه)
-    run_analysis: bool = True       # اجرای تحلیل روی هر کندل
-    show_predictions: bool = True   # نمایش پیش‌بینی قبل از نتیجه واقعی
+    candle_delay_ms: int = 500  # تأخیر بین کندل‌ها (میلی‌ثانیه)
+    run_analysis: bool = True  # اجرای تحلیل روی هر کندل
+    show_predictions: bool = True  # نمایش پیش‌بینی قبل از نتیجه واقعی
 
 
 @dataclass
@@ -67,6 +70,7 @@ class ReplayFrame:
 
     اطلاعات هر کندل به همراه تحلیل سیستم و نتیجه واقعی.
     """
+
     frame_index: int
     candle: CandleData
     candles_so_far: int
@@ -75,7 +79,7 @@ class ReplayFrame:
     system_prediction: Optional[Dict[str, Any]] = None
 
     # نتیجه واقعی (از کندل بعدی به بعد مشخص می‌شود)
-    actual_outcome: Optional[str] = None   # "TP_HIT" / "SL_HIT" / "PENDING"
+    actual_outcome: Optional[str] = None  # "TP_HIT" / "SL_HIT" / "PENDING"
 
     # مقایسه
     prediction_correct: Optional[bool] = None
@@ -95,6 +99,7 @@ class ReplayFrame:
 @dataclass
 class ReplayState:
     """وضعیت فعلی موتور Replay"""
+
     status: ReplayStatus = ReplayStatus.IDLE
     current_index: int = 0
     total_candles: int = 0
@@ -199,9 +204,7 @@ class ReplayEngine:
         self._candles = [c for c in candles if c.timestamp >= start]
 
         if len(self._candles) < 10:
-            raise ValueError(
-                f"داده کافی برای Replay وجود ندارد: {len(self._candles)} کندل"
-            )
+            raise ValueError(f"داده کافی برای Replay وجود ندارد: {len(self._candles)} کندل")
 
         # ─── مقداردهی state ───
         self._state = ReplayState(
@@ -242,9 +245,7 @@ class ReplayEngine:
 
         self._state.status = ReplayStatus.RUNNING
         logger.info(
-            f"Replay شروع شد | "
-            f"از index: {self._state.current_index} | "
-            f"سرعت: {speed_factor}x"
+            f"Replay شروع شد | از index: {self._state.current_index} | سرعت: {speed_factor}x"
         )
 
         start_idx = self._state.current_index
@@ -261,7 +262,7 @@ class ReplayEngine:
                 await self._pause_event.wait()
 
                 candle = self._candles[i]
-                historical = self._candles[max(0, i - 100):i]
+                historical = self._candles[max(0, i - 100) : i]
 
                 # ─── تولید پیش‌بینی ───
                 prediction = None
@@ -318,10 +319,7 @@ class ReplayEngine:
 
             else:
                 self._state.status = ReplayStatus.FINISHED
-                logger.info(
-                    f"Replay کامل شد | "
-                    f"دقت پیش‌بینی: {self._state.accuracy:.1f}%"
-                )
+                logger.info(f"Replay کامل شد | دقت پیش‌بینی: {self._state.accuracy:.1f}%")
 
         except Exception as e:
             self._state.status = ReplayStatus.ERROR

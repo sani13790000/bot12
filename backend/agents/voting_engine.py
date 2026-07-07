@@ -10,6 +10,7 @@ MS-5: Per-agent error isolation (gather return_exceptions=True).
 Note: results lists are bounded (one entry per agent, max ~8).
 Phase L: record_vote hook — fire-and-forget to AgentPerformanceTracker.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,14 +19,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .base_agent import (
-    AgentResult,
-    AgentStatus,
-    AgentVote,
     BaseAgent,
     VoteResult,
     VoteSignal,
 )
-
 
 _LOG = logging.getLogger(__name__)
 _RISK_AGENT_NAME = "risk_agent"
@@ -34,22 +31,23 @@ _DEFAULT_TIMEOUT = 10.0
 
 @dataclass
 class VotingConfig:
-    timeout_s:           float = _DEFAULT_TIMEOUT
-    min_agents:              int   = 3
-    quorum_pct:          float = 0.6
-    confidence_floor:    float = 55.0
-    sequential_fallback: bool  = True
+    timeout_s: float = _DEFAULT_TIMEOUT
+    min_agents: int = 3
+    quorum_pct: float = 0.6
+    confidence_floor: float = 55.0
+    sequential_fallback: bool = True
 
 
 @dataclass
 class FinalVote:
     """Aggregated vote result from all agents."""
-    signal:       VoteSignal
-    confidence:   float
-    reason:       str
-    votes:        List[VoteResult] = field(default_factory=list)
-    blocked:      bool = False
-    block_reason: str  = ""
+
+    signal: VoteSignal
+    confidence: float
+    reason: str
+    votes: List[VoteResult] = field(default_factory=list)
+    blocked: bool = False
+    block_reason: str = ""
 
     @property
     def approved(self) -> bool:
@@ -57,13 +55,13 @@ class FinalVote:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "signal":       self.signal.value,
-            "confidence":   round(self.confidence, 4),
-            "reason":       self.reason,
-            "approved":     self.approved,
-            "blocked":      self.blocked,
+            "signal": self.signal.value,
+            "confidence": round(self.confidence, 4),
+            "reason": self.reason,
+            "approved": self.approved,
+            "blocked": self.blocked,
             "block_reason": self.block_reason,
-            "votes":        [v.__dict__ if hasattr(v, '__dict__') else str(v) for v in self.votes],
+            "votes": [v.__dict__ if hasattr(v, "__dict__") else str(v) for v in self.votes],
         }
 
 
@@ -96,7 +94,7 @@ class VotingEngine:
 
     async def vote(
         self,
-        agents:  List[BaseAgent],
+        agents: List[BaseAgent],
         context: Dict[str, Any],
     ) -> FinalVote:
         """Run a full voting cycle and return the aggregated decision."""
@@ -145,7 +143,7 @@ class VotingEngine:
 
     async def _gather_votes(
         self,
-        agents:  List[BaseAgent],
+        agents: List[BaseAgent],
         context: Dict[str, Any],
     ) -> List[VoteResult]:
         """Gather votes from all agents with error isolation (MS-5)."""
@@ -167,15 +165,14 @@ class VotingEngine:
 
     def _process_raw(
         self,
-        raw:    List[Any],
+        raw: List[Any],
         agents: List[BaseAgent],
     ) -> List[VoteResult]:
         """Convert gather() results into VoteResult list (MS-5)."""
         results: List[VoteResult] = []
         for i, item in enumerate(raw):
             if isinstance(item, BaseException):
-                name = getattr(agents[i], "agent_id",
-                               getattr(agents[i], "name", f"Agent[{i}]"))
+                name = getattr(agents[i], "agent_id", getattr(agents[i], "name", f"Agent[{i}]"))
                 self._log.error("MS-5 gather fallback for %s: %s", name, item)
                 results.append(
                     VoteResult(
@@ -203,14 +200,16 @@ class VotingEngine:
             except Exception as exc:
                 name = getattr(agent, "agent_id", getattr(agent, "name", str(agent)))
                 self._log.error("Sequential fallback error for %s: %s", name, exc)
-                results.append(VoteResult(
-                    agent_id=name,
-                    signal=VoteSignal.ABSTAIN,
-                    confidence=0.0,
-                    weight=getattr(agent, "weight", 1.0),
-                    reason=f"sequential error: {exc}",
-                    error=str(exc),
-                ))
+                results.append(
+                    VoteResult(
+                        agent_id=name,
+                        signal=VoteSignal.ABSTAIN,
+                        confidence=0.0,
+                        weight=getattr(agent, "weight", 1.0),
+                        reason=f"sequential error: {exc}",
+                        error=str(exc),
+                    )
+                )
         return results
 
     def _check_risk_veto(self, votes: List[VoteResult]) -> Optional[str]:
@@ -259,21 +258,21 @@ class VotingEngine:
             return FinalVote(
                 signal=VoteSignal.BUY,
                 confidence=avg_conf,
-                reason=f"BUY quorum {buy_w/total_w:.0%}",
+                reason=f"BUY quorum {buy_w / total_w:.0%}",
                 votes=votes,
             )
         if sell_w / total_w >= self._cfg.quorum_pct:
             return FinalVote(
                 signal=VoteSignal.SELL,
                 confidence=avg_conf,
-                reason=f"SELL quorum {sell_w/total_w:.0%}",
+                reason=f"SELL quorum {sell_w / total_w:.0%}",
                 votes=votes,
             )
 
         return FinalVote(
             signal=VoteSignal.ABSTAIN,
             confidence=avg_conf,
-            reason=f"no quorum (buy={buy_w/total_w:.0%} sell={sell_w/total_w:.0%})",
+            reason=f"no quorum (buy={buy_w / total_w:.0%} sell={sell_w / total_w:.0%})",
             votes=votes,
         )
 
@@ -285,12 +284,13 @@ class VotingEngine:
         """Fire-and-forget: persist each vote to AgentPerformanceTracker."""
         try:
             from backend.analytics.agent_performance_tracker import agent_tracker
+
             for v in votes:
                 await agent_tracker.record_vote(
                     agent_id=v.agent_id,
                     signal=v.signal.value if hasattr(v.signal, "value") else str(v.signal),
                     confidence=v.confidence,
-                    correct=None,   # updated later when trade closes
+                    correct=None,  # updated later when trade closes
                     symbol=symbol,
                 )
         except Exception as e:

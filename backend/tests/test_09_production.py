@@ -1,1 +1,384 @@
-IiIiCmJhY2tlbmQvdGVzdHMvdGVzdF8wOV9wcm9kdWN0aW9uLnB5CkdhbGF4eSBWYXN0IEFJIFR6YWRpbmcgUGxhdGZvcm0g4oCUIFByb2R1Y3Rpb24gSGFyZGVuaW5nIFRlc3RzCgpmYXogSToKICAtIFNlY3VyaXR5IGhlYWRlcnMgbWlkZGxld2FyZQogIC0gQ09SUyBzdHJpY3QgbW9kZQogIC0gUmVxdWVzdCBzaXplIGxpbWl0ZXIKICAtIFJlcXVlc3QgSUQgbWlkZGxld2FyZQogIC0gQWRtaW4gSVAgYWxsb3dsaXN0CiAgLSBTbG93IHJlcXVlc3QgbG9nZ2VyCiAgLSBTdGFydHVwIHZhbGlkYXRvcgogIC0gTW9uaXRvcmluZyBpbml0CiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgb3MKaW1wb3J0IHN5cwppbXBvcnQgdGltZQppbXBvcnQgYXN5bmNpbwppbXBvcnQgbG9nZ2luZwppbXBvcnQgdW5pdHRlc3QKZnJvbSB1bml0dGVzdC5tb2NrIGltcG9ydCBNYWdpY01vY2ssIHBhdGNoLCBBc3luY01vY2sKZnJvbSB0eXBpbmcgaW1wb3J0IE9wdGlvbmFsCgoKY2xhc3MgTW9ja1N0YXRlOgogICAgcGFzcwoKCmNsYXNzIE1vY2tDbGllbnQ6CiAgICBkZWYgX19pbml0X18oc2VsZiwgaG9zdDogc3RyID0gIjEyNy4wLjAuMSIpOgogICAgICAgIHNlbGYuaG9zdCA9IGhvc3QKCgpjbGFzcyBNb2NrUmVxdWVzdDoKICAgIGRlZiBfX2luaXRfXygKICAgICAgICBzZWxmLAogICAgICAgIG1ldGhvZDogc3RyID0gIkdFVCIsCiAgICAgICAgcGF0aDogc3RyID0gIi9hcGkvdGVzdCIsCiAgICAgICAgaGVhZGVyczogT3B0aW9uYWxbZGljdF0gPSBOb25lLAogICAgICAgIGNsaWVudF9pcDogc3RyID0gIjEyNy4wLjAuMSIsCiAgICApOgogICAgICAgIHNlbGYubWV0aG9kID0gbWV0aG9kCiAgICAgICAgc2VsZi51cmwgPSBNYWdpY01vY2soKQogICAgICAgIHNlbGYudXJsLnBhdGggPSBwYXRoCiAgICAgICAgc2VsZi5oZWFkZXJzID0gaGVhZGVycyBvciB7fQogICAgICAgIHNlbGYuY2xpZW50ID0gTW9ja0NsaWVudChjbGllbnRfaXApCiAgICAgICAgc2VsZi5zdGF0ZSA9IE1vY2tTdGF0ZSgpCgoKY2xhc3MgTW9ja1Jlc3BvbnNlOgogICAgZGVmIF9faW5pdF9fKHNlbGYsIHN0YXR1c19jb2RlOiBpbnQgPSAyMDApOgogICAgICAgIHNlbGYuc3RhdHVzX2NvZGUgPSBzdGF0dXNfY29kZQogICAgICAgIHNlbGYuaGVhZGVyczogZGljdFtzdHIsIHN0cl0gPSB7fQoKCmNsYXNzIFRlc3RTZWN1cml0eUhlYWRlcnModW5pdHRlc3QuVGVzdENhc2UpOgoKICAgIGRlZiBfcnVuX21pZGRsZXdhcmUoc2VsZiwgbWlkZGxld2FyZSwgcmVxdWVzdCwgcmVzcG9uc2UpOgogICAgICAgIGFzeW5jIGRlZiBfcnVuKCk6CiAgICAgICAgICAgIGFzeW5jIGRlZiBjYWxsX25leHQocmVxKToKICAgICAgICAgICAgICAgIHJldHVybiByZXNwb25zZQogICAgICAgICAgICByZXR1cm4gYXdhaXQgbWlkZGxld2FyZS5kaXNwYXRjaChyZXF1ZXN0LCBjYWxsX25leHQpCiAgICAgICAgcmV0dXJuIGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoX3J1bigpKQoKICAgIGRlZiB0ZXN0X3hfY29udGVudF90eXBlX29wdGlvbnMoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUKICAgICAgICBtdyA9IFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcXVlc3QgPSBNb2NrUmVxdWVzdCgpCiAgICAgICAgcmVzcCA9IE1vY2tSZXNwb25zZSgpCiAgICAgICAgcmVzdWx0ID0gc2VsZi5fcnVuX21pZGRsZXdhcmUobXcsIHJlcXVlc3QsIHJlc3ApCiAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChyZXN1bHQuaGVhZGVycy5nZXQoIlgtQ29udGVudC1UeXBlLU9wdGlvbnMiKSwgIm5vc25pZmYiKQoKICAgIGRlZiB0ZXN0X3hfZnJhbWVfb3B0aW9ucyhzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBpbXBvcnQgU2VjdXJpdHlIZWFkZXJzTWlkZGxld2FyZQogICAgICAgIG13ID0gU2VjdXJpdHlIZWFkZXJzTWlkZGxld2FyZShhcHA9TWFnaWNNb2NrKCkpCiAgICAgICAgcmVxdWVzdCA9IE1vY2tSZXF1ZXN0KCkKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxdWVzdCwgcmVzcCkKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKHJlc3VsdC5oZWFkZXJzLmdldCgiWC1GcmFtZS1PcHRpb25zIiksICJERU5ZIikKCiAgICBkZWYgdGVzdF94X3hzc19wcm90ZWN0aW9uKHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGltcG9ydCBTZWN1cml0eUhlYWRlcnNNaWRkbGV3YXJlCiAgICAgICAgbXcgPSBTZWN1cml0eUhlYWRlcnNNaWRkbGV3YXJlKGFwcD1NYWdpY01vY2soKSkKICAgICAgICByZXF1ZXN0ID0gTW9ja1JlcXVlc3QoKQogICAgICAgIHJlc3AgPSBNb2NrUmVzcG9uc2UoKQogICAgICAgIHJlc3VsdCA9IHNlbGYuX3J1bl9taWRkbGV3YXJlKG13LCByZXF1ZXN0LCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LmhlYWRlcnMuZ2V0KCJYLVhTUy1Qcm90ZWN0aW9uIiksICIxOyBtb2RlPWJsb2NrIikKCiAgICBkZWYgdGVzdF9yZWZlcnJlcl9wb2xpY3koc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUKICAgICAgICBtdyA9IFNlY3VyaXR5SGVhZGVyc01pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcXVlc3QgPSBNb2NrUmVxdWVzdCgpCiAgICAgICAgcmVzcCA9IE1vY2tSZXNwb25zZSgpCiAgICAgICAgcmVzdWx0ID0gc2VsZi5fcnVuX21pZGRsZXdhcmUobXcsIHJlcXVlc3QsIHJlc3ApCiAgICAgICAgc2VsZi5hc3NlcnRJbigKICAgICAgICAgICAgIlJlZmVycmVyLVBvbGljeSIsIHJlc3VsdC5oZWFkZXJzCiAgICAgICAgKQoKCmNsYXNzIFRlc3RSZXF1ZXN0SURNaWRkbGV3YXJlKHVuaXR0ZXN0LlRlc3RDYXNlKToKCiAgICBkZWYgX3J1bl9taWRkbGV3YXJlKHNlbGYsIG1pZGRsZXdhcmUsIHJlcXVlc3QsIHJlc3BvbnNlKToKICAgICAgICBhc3luYyBkZWYgX3J1bigpOgogICAgICAgICAgICBhc3luYyBkZWYgY2FsbF9uZXh0KHJlcSk6CiAgICAgICAgICAgICAgICByZXR1cm4gcmVzcG9uc2UKICAgICAgICAgICAgcmV0dXJuIGF3YWl0IG1pZGRsZXdhcmUuZGlzcGF0Y2gocmVxdWVzdCwgY2FsbF9uZXh0KQogICAgICAgIHJldHVybiBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKF9ydW4oKSkKCiAgICBkZWYgdGVzdF9yZXF1ZXN0X2lkX2FkZGVkX3RvX3Jlc3BvbnNlKHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGltcG9ydCBSZXF1ZXN0SURNaWRkbGV3YXJlCiAgICAgICAgbXcgPSBSZXF1ZXN0SURNaWRkbGV3YXJlKGFwcD1NYWdpY01vY2soKSkKICAgICAgICByZXEgPSBNb2NrUmVxdWVzdCgpCiAgICAgICAgcmVzcCA9IE1vY2tSZXNwb25zZSgpCiAgICAgICAgcmVzdWx0ID0gc2VsZi5fcnVuX21pZGRsZXdhcmUobXcsIHJlcSwgcmVzcCkKICAgICAgICBzZWxmLmFzc2VydEluKCJYLVJlcXVlc3QtSUQiLCByZXN1bHQuaGVhZGVycykKICAgICAgICBzZWxmLmFzc2VydFRydWUobGVuKHJlc3VsdC5oZWFkZXJzWyJYLVJlcXVlc3QtSUQiXSkgPiAwKQoKICAgIGRlZiB0ZXN0X2V4aXN0aW5nX3JlcXVlc3RfaWRfcHJlc2VydmVkKHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGltcG9ydCBSZXF1ZXN0SURNaWRkbGV3YXJlCiAgICAgICAgbXcgPSBSZXF1ZXN0SURNaWRkbGV3YXJlKGFwcD1NYWdpY01vY2soKSkKICAgICAgICByZXEgPSBNb2NrUmVxdWVzdChoZWFkZXJzPXsiWC1SZXF1ZXN0LUlEIjogImN1c3RvbS1pZC0xMjMifSkKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxLCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LmhlYWRlcnNbIlgtUmVxdWVzdC1JRCJdLCAiY3VzdG9tLWlkLTEyMyIpCgoKY2xhc3MgVGVzdFJlcXVlc3RTaXplTGltaXRlcih1bml0dGVzdC5UZXN0Q2FzZSk6CgogICAgZGVmIF9ydW5fbWlkZGxld2FyZShzZWxmLCBtaWRkbGV3YXJlLCByZXF1ZXN0LCByZXNwb25zZSk6CiAgICAgICAgYXN5bmMgZGVmIF9ydW4oKToKICAgICAgICAgICAgYXN5bmMgZGVmIGNhbGxfbmV4dChyZXEpOgogICAgICAgICAgICAgICAgcmV0dXJuIHJlc3BvbnNlCiAgICAgICAgICAgIHJldHVybiBhd2FpdCBtaWRkbGV3YXJlLmRpc3BhdGNoKHJlcXVlc3QsIGNhbGxfbmV4dCkKICAgICAgICByZXR1cm4gYXN5bmNpby5nZXRfZXZlbnRfbG9vcCgpLnJ1bl91bnRpbF9jb21wbGV0ZShfcnVuKCkpCgogICAgZGVmIHRlc3Rfc21hbGxfcmVxdWVzdF9wYXNzZXMoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUKICAgICAgICBtdyA9IFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcSA9IE1vY2tSZXF1ZXN0KGhlYWRlcnM9eyJjb250ZW50LWxlbmd0aCI6ICIxMDI0In0pCiAgICAgICAgcmVzcCA9IE1vY2tSZXNwb25zZSgpCiAgICAgICAgcmVzdWx0ID0gc2VsZi5fcnVuX21pZGRsZXdhcmUobXcsIHJlcSwgcmVzcCkKICAgICAgICBzZWxmLmFzc2VydEVxdWFsKHJlc3VsdC5zdGF0dXNfY29kZSwgMjAwKQoKICAgIGRlZiB0ZXN0X2xhcmdlX3JlcXVlc3RfYmxvY2tlZChzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBpbXBvcnQgKAogICAgICAgICAgICBSZXF1ZXN0U2l6ZUxpbWl0ZXJNaWRkbGV3YXJlLAogICAgICAgICAgICBNQVhfUkVRVUVTVF9CT0RZX0JZVEVTLAogICAgICAgICkKICAgICAgICBtdyA9IFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIGJpZyA9IHN0cihNQVhfUkVRVUVTVF9CT0RZX0JZVEVTICsgMSkKICAgICAgICByZXEgPSBNb2NrUmVxdWVzdChoZWFkZXJzPXsiY29udGVudC1sZW5ndGgiOiBiaWd9KQogICAgICAgIHJlc3AgPSBNb2NrUmVzcG9uc2UoKQogICAgICAgIHJlc3VsdCA9IHNlbGYuX3J1bl9taWRkbGV3YXJlKG13LCByZXEsIHJlc3ApCiAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChyZXN1bHQuc3RhdHVzX2NvZGUsIDQxMykKCiAgICBkZWYgdGVzdF9ub19jb250ZW50X2xlbmd0aF9wYXNzZXMoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUKICAgICAgICBtdyA9IFJlcXVlc3RTaXplTGltaXRlck1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcSA9IE1vY2tSZXF1ZXN0KCkKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxLCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LnN0YXR1c19jb2RlLCAyMDApCgoKY2xhc3MgVGVzdEFkbWluSVBBbGxvd2xpc3QodW5pdHRlc3QuVGVzdENhc2UpOgoKICAgIGRlZiBfcnVuX21pZGRsZXdhcmUoc2VsZiwgbWlkZGxld2FyZSwgcmVxdWVzdCwgcmVzcG9uc2UpOgogICAgICAgIGFzeW5jIGRlZiBfcnVuKCk6CiAgICAgICAgICAgIGFzeW5jIGRlZiBjYWxsX25leHQocmVxKToKICAgICAgICAgICAgICAgIHJldHVybiByZXNwb25zZQogICAgICAgICAgICByZXR1cm4gYXdhaXQgbWlkZGxld2FyZS5kaXNwYXRjaChyZXF1ZXN0LCBjYWxsX25leHQpCiAgICAgICAgcmV0dXJuIGFzeW5jaW8uZ2V0X2V2ZW50X2xvb3AoKS5ydW5fdW50aWxfY29tcGxldGUoX3J1bigpKQoKICAgIGRlZiB0ZXN0X25vbl9hZG1pbl9wYXRoX2Fsd2F5c19wYXNzZXMoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IEFkbWluSVBBbGxvd2xpc3RNaWRkbGV3YXJlCiAgICAgICAgaW1wb3J0IGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBhcyBwaAogICAgICAgIHBoLkFETUlOX0lQX0FMTE9XTElTVCA9IHsiMTkyLjE2OC4xLjEifQogICAgICAgIG13ID0gQWRtaW5JUEFsbG93bGlzdE1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcSA9IE1vY2tSZXF1ZXN0KHBhdGg9Ii9hcGkvdHJhZGVzIiwgY2xpZW50X2lwPSIxLjIuMy40IikKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxLCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LnN0YXR1c19jb2RlLCAyMDApCiAgICAgICAgcGguQURNSU5fSVBfQUxMT1dMSVNUID0gc2V0KCkKCiAgICBkZWYgdGVzdF9hZG1pbl9wYXRoX2Jsb2NrZWRfZm9yX3Vua25vd25faXAoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IEFkbWluSVBBbGxvd2xpc3RNaWRkbGV3YXJlCiAgICAgICAgaW1wb3J0IGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBhcyBwaAogICAgICAgIHBoLkFETUlOX0lQX0FMTE9XTElTVCA9IHsiMTkyLjE2OC4xLjEifQogICAgICAgIG13ID0gQWRtaW5JUEFsbG93bGlzdE1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcSA9IE1vY2tSZXF1ZXN0KHBhdGg9Ii9hcGkvYWRtaW4vdXNlcnMiLCBjbGllbnRfaXA9IjEuMi4zLjQiKQogICAgICAgIHJlc3AgPSBNb2NrUmVzcG9uc2UoKQogICAgICAgIHJlc3VsdCA9IHNlbGYuX3J1bl9taWRkbGV3YXJlKG13LCByZXEsIHJlc3ApCiAgICAgICAgc2VsZi5hc3NlcnRFcXVhbChyZXN1bHQuc3RhdHVzX2NvZGUsIDQwMykKICAgICAgICBwaC5BRE1JTl9JUF9BTExPV0xJU1QgPSBzZXQoKQoKICAgIGRlZiB0ZXN0X2FkbWluX3BhdGhfYWxsb3dlZF9mb3Jfd2hpdGVsaXN0ZWRfaXAoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IEFkbWluSVBBbGxvd2xpc3RNaWRkbGV3YXJlCiAgICAgICAgaW1wb3J0IGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBhcyBwaAogICAgICAgIHBoLkFETUlOX0lQX0FMTE9XTElTVCA9IHsiMTkyLjE2OC4xLjEifQogICAgICAgIG13ID0gQWRtaW5JUEFsbG93bGlzdE1pZGRsZXdhcmUoYXBwPU1hZ2ljTW9jaygpKQogICAgICAgIHJlcSA9IE1vY2tSZXF1ZXN0KHBhdGg9Ii9hcGkvYWRtaW4vdXNlcnMiLCBjbGllbnRfaXA9IjE5Mi4xNjguMS4xIikKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxLCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LnN0YXR1c19jb2RlLCAyMDApCiAgICAgICAgcGguQURNSU5fSVBfQUxMT1dMSVNUID0gc2V0KCkKCiAgICBkZWYgdGVzdF9lbXB0eV9hbGxvd2xpc3RfZGlzYWJsZXNfbWlkZGxld2FyZShzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5wcm9kdWN0aW9uX2hhcmRlbmluZyBpbXBvcnQgQWRtaW5JUEFsbG93bGlzdE1pZGRsZXdhcmUKICAgICAgICBpbXBvcnQgYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGFzIHBoCiAgICAgICAgcGguQURNSU5fSVBfQUxMT1dMSVNUID0gc2V0KCkKICAgICAgICBtdyA9IEFkbWluSVBBbGxvd2xpc3RNaWRkbGV3YXJlKGFwcD1NYWdpY01vY2soKSkKICAgICAgICByZXEgPSBNb2NrUmVxdWVzdChwYXRoPSIvYXBpL2FkbWluL3VzZXJzIiwgY2xpZW50X2lwPSIxLjIuMy40IikKICAgICAgICByZXNwID0gTW9ja1Jlc3BvbnNlKCkKICAgICAgICByZXN1bHQgPSBzZWxmLl9ydW5fbWlkZGxld2FyZShtdywgcmVxLCByZXNwKQogICAgICAgIHNlbGYuYXNzZXJ0RXF1YWwocmVzdWx0LnN0YXR1c19jb2RlLCAyMDApCgoKY2xhc3MgVGVzdFN0YXJ0dXBWYWxpZGF0b3IodW5pdHRlc3QuVGVzdENhc2UpOgoKICAgIGRlZiB0ZXN0X21pc3NpbmdfcmVxdWlyZWRfdmFyX3JldHVybnNfZmFsc2Uoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUuc3RhcnR1cF92YWxpZGF0b3IgaW1wb3J0IHZhbGlkYXRlX2Vudmlyb25tZW50CiAgICAgICAgc2F2ZSA9IHt9CiAgICAgICAgZm9yIGsgaW4gWyJKV1RfU0VDUkVUIiwgIkxJQ0VOU0VfU0VDUkVUIiwgIlNVUEFCQVNFX1VSTCIsCiAgICAgICAgICAgICAgICAgICJTVVBBQkFTRV9TRVJWSUNFX1JPTEVfS0VZIiwgIlRFTEVHUkFNX0JPVF9UT0tFTiIsCiAgICAgICAgICAgICAgICAgICJURUxFR1JBTV9DSEFUX0lEIiwgIk1UNV9HQVRFV0FZX1VSTCIsICJBUFBfRU5WIl06CiAgICAgICAgICAgIHNhdmVba10gPSBvcy5lbnZpcm9uLnBvcChrLCBOb25lKQogICAgICAgIHRyeToKICAgICAgICAgICAgcmVzdWx0ID0gdmFsaWRhdGVfZW52aXJvbm1lbnQoc3RyaWN0PUZhbHNlKQogICAgICAgICAgICBzZWxmLmFzc2VydEZhbHNlKHJlc3VsdCkKICAgICAgICBmaW5hbGx5OgogICAgICAgICAgICBmb3IgaywgdiBpbiBzYXZlLml0ZW1zKCk6CiAgICAgICAgICAgICAgICBpZiB2IGlzIG5vdCBOb25lOgogICAgICAgICAgICAgICAgICAgIG9zLmVudmlyb25ba10gPSB2CgogICAgZGVmIHRlc3RfYWxsX3ZhcnNfc2V0X3JldHVybnNfdHJ1ZShzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5zdGFydHVwX3ZhbGlkYXRvciBpbXBvcnQgdmFsaWRhdGVfZW52aXJvbm1lbnQKICAgICAgICBlbnYgPSB7CiAgICAgICAgICAgICJKV1RfU0VDUkVUIjogImEiICogMzIsCiAgICAgICAgICAgICJMSUNFTlNFX1NFQ1JFVCI6ICJiIiAqIDMyLAogICAgICAgICAgICAiU1VQQUJBU0VfVVJMIjogImh0dHBzOi8veHh4LnN1cGFiYXNlLmNvIiwKICAgICAgICAgICAgIlNVUEFCQVNFX1NFUlZJQ0VfUk9MRV9LRVkiOiAiYyIgKiA0MCwKICAgICAgICAgICAgIlRFTEVHUkFNX0JPVF9UT0tFTiI6ICIxMjM0NTY3ODkwOkFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaYWJjZGVmZyIsCiAgICAgICAgICAgICJURUxFR1JBTV9DSEFUX0lEIjogIi0xMDAxMjM0NTYiLAogICAgICAgICAgICAiTVQ1X0dBVEVXQVlfVVJMIjogImh0dHA6Ly8xOTIuMTY4LjEuMTAwOjgwODAiLAogICAgICAgICAgICAiQVBQX0VOViI6ICJkZXZlbG9wbWVudCIsCiAgICAgICAgfQogICAgICAgIHdpdGggcGF0Y2guZGljdChvcy5lbnZpcm9uLCBlbnYsIGNsZWFyPUZhbHNlKToKICAgICAgICAgICAgcmVzdWx0ID0gdmFsaWRhdGVfZW52aXJvbm1lbnQoc3RyaWN0PUZhbHNlKQogICAgICAgIHNlbGYuYXNzZXJ0VHJ1ZShyZXN1bHQpCgogICAgZGVmIHRlc3RfaW5zZWN1cmVfand0X3NlY3JldF9ibG9ja2VkKHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLnN0YXJ0dXBfdmFsaWRhdG9yIGltcG9ydCBFbnZWYXIKICAgICAgICB2YXIgPSBFbnZWYXIoCiAgICAgICAgICAgICJKV1RfU0VDUkVUIiwgcmVxdWlyZWQ9VHJ1ZSwgbWluX2xlbmd0aD0zMiwKICAgICAgICAgICAgZm9yYmlkZGVuX3ZhbHVlcz0oImNoYW5nZS1tZS1pbi1wcm9kdWN0aW9uIiwpLAogICAgICAgICkKICAgICAgICB3aXRoIHBhdGNoLmRpY3Qob3MuZW52aXJvbiwgeyJKV1RfU0VDUkVUIjogImNoYW5nZS1tZS1pbi1wcm9kdWN0aW9uIn0pOgogICAgICAgICAgICBlcnJvciA9IHZhci52YWxpZGF0ZSgpCiAgICAgICAgc2VsZi5hc3NlcnRJc05vdE5vbmUoZXJyb3IpCiAgICAgICAgc2VsZi5hc3NlcnRJbigiSU5TRUNVUkUiLCBlcnJvcikKCiAgICBkZWYgdGVzdF9zaG9ydF9zZWNyZXRfYmxvY2tlZChzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5zdGFydHVwX3ZhbGlkYXRvciBpbXBvcnQgRW52VmFyCiAgICAgICAgdmFyID0gRW52VmFyKCJKV1RfU0VDUkVUIiwgcmVxdWlyZWQ9VHJ1ZSwgbWluX2xlbmd0aD0zMikKICAgICAgICB3aXRoIHBhdGNoLmRpY3Qob3MuZW52aXJvbiwgeyJKV1RfU0VDUkVUIjogInNob3J0In0pOgogICAgICAgICAgICBlcnJvciA9IHZhci52YWxpZGF0ZSgpCiAgICAgICAgc2VsZi5hc3NlcnRJc05vdE5vbmUoZXJyb3IpCiAgICAgICAgc2VsZi5hc3NlcnRJbigiVE9PIFNIT1JUIiwgZXJyb3IpCgoKY2xhc3MgVGVzdE1vbml0b3JpbmcodW5pdHRlc3QuVGVzdENhc2UpOgoKICAgIGRlZiB0ZXN0X3VwdGltZV9pbmNyZWFzZXMoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLm9ic2VydmFiaWxpdHkubW9uaXRvcmluZyBpbXBvcnQgZ2V0X3VwdGltZV9zZWNvbmRzCiAgICAgICAgdDEgPSBnZXRfdXB0aW1lX3NlY29uZHMoKQogICAgICAgIHRpbWUuc2xlZXAoMC4wMSkKICAgICAgICB0MiA9IGdldF91cHRpbWVfc2Vjb25kcygpCiAgICAgICAgc2VsZi5hc3NlcnRHcmVhdGVyKHQyLCB0MSkKCiAgICBkZWYgdGVzdF91cHRpbWVfaHVtYW5fZm9ybWF0KHNlbGYpOgogICAgICAgIGZyb20gYmFja2VuZC5vYnNlcnZhYmlsaXR5Lm1vbml0b3JpbmcgaW1wb3J0IGdldF91cHRpbWVfaHVtYW4KICAgICAgICByZXN1bHQgPSBnZXRfdXB0aW1lX2h1bWFuKCkKICAgICAgICBzZWxmLmFzc2VydElzSW5zdGFuY2UocmVzdWx0LCBzdHIpCiAgICAgICAgc2VsZi5hc3NlcnRUcnVlKGxlbihyZXN1bHQpID4gMCkKCiAgICBkZWYgdGVzdF9kcmF3ZG93bl9hbGVydF9maXJlcyhzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQub2JzZXJ2YWJpbGl0eS5tb25pdG9yaW5nIGltcG9ydCAoCiAgICAgICAgICAgIGNoZWNrX2RyYXdkb3duX2FsZXJ0LAogICAgICAgICAgICBhZGRfYWxlcnRfaG9vaywKICAgICAgICAgICAgX2FsZXJ0X3N0YXRlLAogICAgICAgICkKICAgICAgICBmaXJlZCA9IFtdCiAgICAgICAgZGVmIGhvb2soYWxlcnRfdHlwZSwgbWVzc2FnZSwgdmFsdWUpOgogICAgICAgICAgICBmaXJlZC5hcHBlbmQoKGFsZXJ0X3R5cGUsIHZhbHVlKSkKICAgICAgICBhZGRfYWxlcnRfaG9vayhob29rKQogICAgICAgIF9hbGVydF9zdGF0ZS5sYXN0X2RyYXdkb3duX2FsZXJ0ID0gMC4wCiAgICAgICAgY2hlY2tfZHJhd2Rvd25fYWxlcnQoMTAuMCkKICAgICAgICBzZWxmLmFzc2VydFRydWUoYW55KHQgPT0gIkRSQVdET1dOIiBmb3IgdCwgXyBpbiBmaXJlZCkpCgogICAgZGVmIHRlc3Rfc2V0dXBfbG9nZ2luZ19ub19lcnJvcihzZWxmKToKICAgICAgICBmcm9tIGJhY2tlbmQub2JzZXJ2YWJpbGl0eS5tb25pdG9yaW5nIGltcG9ydCBzZXR1cF9sb2dnaW5nCiAgICAgICAgdHJ5OgogICAgICAgICAgICBzZXR1cF9sb2dnaW5nKCJXQVJOSU5HIikKICAgICAgICAgICAgc2V0dXBfbG9nZ2luZygiREVCVUciKQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgICAgICAgICAgc2VsZi5mYWlsKGYic2V0dXBfbG9nZ2luZyByYWlzZWQ6IHtlfSIpCgogICAgZGVmIHRlc3RfaW5pdF9tb25pdG9yaW5nX25vX3NlbnRyeV9kc24oc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLm9ic2VydmFiaWxpdHkubW9uaXRvcmluZyBpbXBvcnQgaW5pdF9tb25pdG9yaW5nCiAgICAgICAgd2l0aCBwYXRjaC5kaWN0KG9zLmVudmlyb24sIHsiU0VOVFJZX0RTTiI6ICIifSwgY2xlYXI9RmFsc2UpOgogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICBpbml0X21vbml0b3JpbmcoIldBUk5JTkciKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgICAgICAgICBzZWxmLmZhaWwoZiJpbml0X21vbml0b3JpbmcgcmFpc2VkOiB7ZX0iKQoKCmNsYXNzIFRlc3RTbG93UmVxdWVzdExvZ2dlcih1bml0dGVzdC5UZXN0Q2FzZSk6CgogICAgZGVmIHRlc3RfcmVzcG9uc2VfdGltZV9oZWFkZXJfYWRkZWQoc2VsZik6CiAgICAgICAgZnJvbSBiYWNrZW5kLmNvcmUucHJvZHVjdGlvbl9oYXJkZW5pbmcgaW1wb3J0IFNsb3dSZXF1ZXN0TWlkZGxld2FyZQogICAgICAgIG13ID0gU2xvd1JlcXVlc3RNaWRkbGV3YXJlKGFwcD1NYWdpY01vY2soKSkKICAgICAgICByZXEgPSBNb2NrUmVxdWVzdCgpCiAgICAgICAgcmVzcCA9IE1vY2tSZXNwb25zZSgpCiAgICAgICAgYXN5bmMgZGVmIF9ydW4oKToKICAgICAgICAgICAgYXN5bmMgZGVmIGNhbGxfbmV4dChyKToKICAgICAgICAgICAgICAgIHJldHVybiByZXNwCiAgICAgICAgICAgIHJldHVybiBhd2FpdCBtdy5kaXNwYXRjaChyZXEsIGNhbGxfbmV4dCkKICAgICAgICByZXN1bHQgPSBhc3luY2lvLmdldF9ldmVudF9sb29wKCkucnVuX3VudGlsX2NvbXBsZXRlKF9ydW4oKSkKICAgICAgICBzZWxmLmFzc2VydEluKCJYLVJlc3BvbnNlLVRpbWUtTXMiLCByZXN1bHQuaGVhZGVycykKICAgICAgICBtcyA9IGludChyZXN1bHQuaGVhZGVyc1siWC1SZXNwb25zZS1UaW1lLU1zIl0pCiAgICAgICAgc2VsZi5hc3NlcnRHcmVhdGVyRXF1YWwobXMsIDApCgoKY2xhc3MgVGVzdENPUlNDb25maWd1cmF0aW9uKHVuaXR0ZXN0LlRlc3RDYXNlKToKCiAgICBkZWYgdGVzdF93aWxkY2FyZF9ub3RfaW5fZGVmYXVsdChzZWxmKToKICAgICAgICBpbXBvcnQgYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGFzIHBoCiAgICAgICAgc2VsZi5hc3NlcnROb3RJbigiKiIsIHBoLkFMTE9XRURfT1JJR0lOUykKCiAgICBkZWYgdGVzdF9hbGxvd2VkX29yaWdpbnNfaXNfbGlzdChzZWxmKToKICAgICAgICBpbXBvcnQgYmFja2VuZC5jb3JlLnByb2R1Y3Rpb25faGFyZGVuaW5nIGFzIHBoCiAgICAgICAgc2VsZi5hc3NlcnRJc0luc3RhbmNlKHBoLkFMTE9XRURfT1JJR0lOUywgbGlzdCkKCgppZiBfX25hbWVfXyA9PSAiX19tYWluX18iOgogICAgdW5pdHRlc3QubWFpbih2ZXJib3NpdHk9MikK
+"""
+backend/tests/test_09_production.py
+Galaxy Vast AI Tzading Platform — Production Hardening Tests
+
+faz I:
+  - Security headers middleware
+  - CORS strict mode
+  - Request size limiter
+  - Request ID middleware
+  - Admin IP allowlist
+  - Slow request logger
+  - Startup validator
+  - Monitoring init
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import time
+import unittest
+from typing import Optional
+from unittest.mock import MagicMock, patch
+
+
+class MockState:
+    pass
+
+
+class MockClient:
+    def __init__(self, host: str = "127.0.0.1"):
+        self.host = host
+
+
+class MockRequest:
+    def __init__(
+        self,
+        method: str = "GET",
+        path: str = "/api/test",
+        headers: Optional[dict] = None,
+        client_ip: str = "127.0.0.1",
+    ):
+        self.method = method
+        self.url = MagicMock()
+        self.url.path = path
+        self.headers = headers or {}
+        self.client = MockClient(client_ip)
+        self.state = MockState()
+
+
+class MockResponse:
+    def __init__(self, status_code: int = 200):
+        self.status_code = status_code
+        self.headers: dict[str, str] = {}
+
+
+class TestSecurityHeaders(unittest.TestCase):
+    def _run_middleware(self, middleware, request, response):
+        async def _run():
+            async def call_next(req):
+                return response
+
+            return await middleware.dispatch(request, call_next)
+
+        return asyncio.get_event_loop().run_until_complete(_run())
+
+    def test_x_content_type_options(self):
+        from backend.core.production_hardening import SecurityHeadersMiddleware
+
+        mw = SecurityHeadersMiddleware(app=MagicMock())
+        request = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, request, resp)
+        self.assertEqual(result.headers.get("X-Content-Type-Options"), "nosniff")
+
+    def test_x_frame_options(self):
+        from backend.core.production_hardening import SecurityHeadersMiddleware
+
+        mw = SecurityHeadersMiddleware(app=MagicMock())
+        request = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, request, resp)
+        self.assertEqual(result.headers.get("X-Frame-Options"), "DENY")
+
+    def test_x_xss_protection(self):
+        from backend.core.production_hardening import SecurityHeadersMiddleware
+
+        mw = SecurityHeadersMiddleware(app=MagicMock())
+        request = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, request, resp)
+        self.assertEqual(result.headers.get("X-XSS-Protection"), "1; mode=block")
+
+    def test_referrer_policy(self):
+        from backend.core.production_hardening import SecurityHeadersMiddleware
+
+        mw = SecurityHeadersMiddleware(app=MagicMock())
+        request = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, request, resp)
+        self.assertIn("Referrer-Policy", result.headers)
+
+
+class TestRequestIDMiddleware(unittest.TestCase):
+    def _run_middleware(self, middleware, request, response):
+        async def _run():
+            async def call_next(req):
+                return response
+
+            return await middleware.dispatch(request, call_next)
+
+        return asyncio.get_event_loop().run_until_complete(_run())
+
+    def test_request_id_added_to_response(self):
+        from backend.core.production_hardening import RequestIDMiddleware
+
+        mw = RequestIDMiddleware(app=MagicMock())
+        req = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertIn("X-Request-ID", result.headers)
+        self.assertTrue(len(result.headers["X-Request-ID"]) > 0)
+
+    def test_existing_request_id_preserved(self):
+        from backend.core.production_hardening import RequestIDMiddleware
+
+        mw = RequestIDMiddleware(app=MagicMock())
+        req = MockRequest(headers={"X-Request-ID": "custom-id-123"})
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.headers["X-Request-ID"], "custom-id-123")
+
+
+class TestRequestSizeLimiter(unittest.TestCase):
+    def _run_middleware(self, middleware, request, response):
+        async def _run():
+            async def call_next(req):
+                return response
+
+            return await middleware.dispatch(request, call_next)
+
+        return asyncio.get_event_loop().run_until_complete(_run())
+
+    def test_small_request_passes(self):
+        from backend.core.production_hardening import RequestSizeLimiterMiddleware
+
+        mw = RequestSizeLimiterMiddleware(app=MagicMock())
+        req = MockRequest(headers={"content-length": "1024"})
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 200)
+
+    def test_large_request_blocked(self):
+        from backend.core.production_hardening import (
+            MAX_REQUEST_BODY_BYTES,
+            RequestSizeLimiterMiddleware,
+        )
+
+        mw = RequestSizeLimiterMiddleware(app=MagicMock())
+        big = str(MAX_REQUEST_BODY_BYTES + 1)
+        req = MockRequest(headers={"content-length": big})
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 413)
+
+    def test_no_content_length_passes(self):
+        from backend.core.production_hardening import RequestSizeLimiterMiddleware
+
+        mw = RequestSizeLimiterMiddleware(app=MagicMock())
+        req = MockRequest()
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 200)
+
+
+class TestAdminIPAllowlist(unittest.TestCase):
+    def _run_middleware(self, middleware, request, response):
+        async def _run():
+            async def call_next(req):
+                return response
+
+            return await middleware.dispatch(request, call_next)
+
+        return asyncio.get_event_loop().run_until_complete(_run())
+
+    def test_non_admin_path_always_passes(self):
+        import backend.core.production_hardening as ph
+        from backend.core.production_hardening import AdminIPAllowlistMiddleware
+
+        ph.ADMIN_IP_ALLOWLIST = {"192.168.1.1"}
+        mw = AdminIPAllowlistMiddleware(app=MagicMock())
+        req = MockRequest(path="/api/trades", client_ip="1.2.3.4")
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 200)
+        ph.ADMIN_IP_ALLOWLIST = set()
+
+    def test_admin_path_blocked_for_unknown_ip(self):
+        import backend.core.production_hardening as ph
+        from backend.core.production_hardening import AdminIPAllowlistMiddleware
+
+        ph.ADMIN_IP_ALLOWLIST = {"192.168.1.1"}
+        mw = AdminIPAllowlistMiddleware(app=MagicMock())
+        req = MockRequest(path="/api/admin/users", client_ip="1.2.3.4")
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 403)
+        ph.ADMIN_IP_ALLOWLIST = set()
+
+    def test_admin_path_allowed_for_whitelisted_ip(self):
+        import backend.core.production_hardening as ph
+        from backend.core.production_hardening import AdminIPAllowlistMiddleware
+
+        ph.ADMIN_IP_ALLOWLIST = {"192.168.1.1"}
+        mw = AdminIPAllowlistMiddleware(app=MagicMock())
+        req = MockRequest(path="/api/admin/users", client_ip="192.168.1.1")
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 200)
+        ph.ADMIN_IP_ALLOWLIST = set()
+
+    def test_empty_allowlist_disables_middleware(self):
+        import backend.core.production_hardening as ph
+        from backend.core.production_hardening import AdminIPAllowlistMiddleware
+
+        ph.ADMIN_IP_ALLOWLIST = set()
+        mw = AdminIPAllowlistMiddleware(app=MagicMock())
+        req = MockRequest(path="/api/admin/users", client_ip="1.2.3.4")
+        resp = MockResponse()
+        result = self._run_middleware(mw, req, resp)
+        self.assertEqual(result.status_code, 200)
+
+
+class TestStartupValidator(unittest.TestCase):
+    def test_missing_required_var_returns_false(self):
+        from backend.core.startup_validator import validate_environment
+
+        save = {}
+        for k in [
+            "JWT_SECRET",
+            "LICENSE_SECRET",
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "TELEGRAM_BOT_TOKEN",
+            "TELEGRAM_CHAT_ID",
+            "MT5_GATEWAY_URL",
+            "APP_ENV",
+        ]:
+            save[k] = os.environ.pop(k, None)
+        try:
+            result = validate_environment(strict=False)
+            self.assertFalse(result)
+        finally:
+            for k, v in save.items():
+                if v is not None:
+                    os.environ[k] = v
+
+    def test_all_vars_set_returns_true(self):
+        from backend.core.startup_validator import validate_environment
+
+        env = {
+            "JWT_SECRET": "a" * 32,
+            "LICENSE_SECRET": "b" * 32,
+            "SUPABASE_URL": "https://xxx.supabase.co",
+            "SUPABASE_SERVICE_ROLE_KEY": "c" * 40,
+            "TELEGRAM_BOT_TOKEN": "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefg",
+            "TELEGRAM_CHAT_ID": "-100123456",
+            "MT5_GATEWAY_URL": "http://192.168.1.100:8080",
+            "APP_ENV": "development",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            result = validate_environment(strict=False)
+        self.assertTrue(result)
+
+    def test_insecure_jwt_secret_blocked(self):
+        from backend.core.startup_validator import EnvVar
+
+        var = EnvVar(
+            "JWT_SECRET",
+            required=True,
+            min_length=32,
+            forbidden_values=("change-me-in-production",),
+        )
+        with patch.dict(os.environ, {"JWT_SECRET": "change-me-in-production"}):
+            error = var.validate()
+        self.assertIsNotNone(error)
+        self.assertIn("INSECURE", error)
+
+    def test_short_secret_blocked(self):
+        from backend.core.startup_validator import EnvVar
+
+        var = EnvVar("JWT_SECRET", required=True, min_length=32)
+        with patch.dict(os.environ, {"JWT_SECRET": "short"}):
+            error = var.validate()
+        self.assertIsNotNone(error)
+        self.assertIn("TOO SHORT", error)
+
+
+class TestMonitoring(unittest.TestCase):
+    def test_uptime_increases(self):
+        from backend.observability.monitoring import get_uptime_seconds
+
+        t1 = get_uptime_seconds()
+        time.sleep(0.01)
+        t2 = get_uptime_seconds()
+        self.assertGreater(t2, t1)
+
+    def test_uptime_human_format(self):
+        from backend.observability.monitoring import get_uptime_human
+
+        result = get_uptime_human()
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+    def test_drawdown_alert_fires(self):
+        from backend.observability.monitoring import (
+            _alert_state,
+            add_alert_hook,
+            check_drawdown_alert,
+        )
+
+        fired = []
+
+        def hook(alert_type, message, value):
+            fired.append((alert_type, value))
+
+        add_alert_hook(hook)
+        _alert_state.last_drawdown_alert = 0.0
+        check_drawdown_alert(10.0)
+        self.assertTrue(any(t == "DRAWDOWN" for t, _ in fired))
+
+    def test_setup_logging_no_error(self):
+        from backend.observability.monitoring import setup_logging
+
+        try:
+            setup_logging("WARNING")
+            setup_logging("DEBUG")
+        except Exception as e:
+            self.fail(f"setup_logging raised: {e}")
+
+    def test_init_monitoring_no_sentry_dsn(self):
+        from backend.observability.monitoring import init_monitoring
+
+        with patch.dict(os.environ, {"SENTRY_DSN": ""}, clear=False):
+            try:
+                init_monitoring("WARNING")
+            except Exception as e:
+                self.fail(f"init_monitoring raised: {e}")
+
+
+class TestSlowRequestLogger(unittest.TestCase):
+    def test_response_time_header_added(self):
+        from backend.core.production_hardening import SlowRequestMiddleware
+
+        mw = SlowRequestMiddleware(app=MagicMock())
+        req = MockRequest()
+        resp = MockResponse()
+
+        async def _run():
+            async def call_next(r):
+                return resp
+
+            return await mw.dispatch(req, call_next)
+
+        result = asyncio.get_event_loop().run_until_complete(_run())
+        self.assertIn("X-Response-Time-Ms", result.headers)
+        ms = int(result.headers["X-Response-Time-Ms"])
+        self.assertGreaterEqual(ms, 0)
+
+
+class TestCORSConfiguration(unittest.TestCase):
+    def test_wildcard_not_in_default(self):
+        import backend.core.production_hardening as ph
+
+        self.assertNotIn("*", ph.ALLOWED_ORIGINS)
+
+    def test_allowed_origins_is_list(self):
+        import backend.core.production_hardening as ph
+
+        self.assertIsInstance(ph.ALLOWED_ORIGINS, list)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

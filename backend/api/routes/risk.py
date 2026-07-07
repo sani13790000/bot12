@@ -2,6 +2,7 @@
 backend/api/routes/risk.py
 Galaxy Vast AI Trading Platform — Risk API Routes
 """
+
 from __future__ import annotations
 
 import datetime
@@ -10,9 +11,9 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from ...circuit_breaker import get_breaker, halt_trading, resume_trading
 from ...core.deps import get_risk_orchestrator_dep
 from ...core.logger import get_logger
-from ...circuit_breaker import halt_trading, resume_trading, get_breaker
 
 router = APIRouter()
 logger = get_logger("api.routes.risk")
@@ -20,25 +21,26 @@ logger = get_logger("api.routes.risk")
 
 # ── Request / Response models ─────────────────────────────────────────────────
 
+
 class RiskAssessRequest(BaseModel):
-    signal_id:      str            = Field(..., min_length=1)
-    symbol:         str            = Field(..., min_length=3, max_length=12)
-    direction:      str            = Field(..., pattern="^(BUY|SELL)$")
-    balance:        float          = Field(..., gt=0)
-    equity:         float          = Field(..., gt=0)
-    stop_loss_pips: float          = Field(default=20.0, gt=0)
-    risk_percent:   float          = Field(default=1.0, gt=0, le=10)
-    open_positions: list           = Field(default_factory=list)
-    metadata:       Dict[str, Any] = Field(default_factory=dict)
+    signal_id: str = Field(..., min_length=1)
+    symbol: str = Field(..., min_length=3, max_length=12)
+    direction: str = Field(..., pattern="^(BUY|SELL)$")
+    balance: float = Field(..., gt=0)
+    equity: float = Field(..., gt=0)
+    stop_loss_pips: float = Field(default=20.0, gt=0)
+    risk_percent: float = Field(default=1.0, gt=0, le=10)
+    open_positions: list = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class RiskAssessResponse(BaseModel):
-    approved:     bool
-    reason:       str              = ""
-    lot_size:     float            = 0.0
-    risk_percent: float            = 1.0
-    gate_results: Dict[str, Any]   = Field(default_factory=dict)
-    latency_ms:   float            = 0.0
+    approved: bool
+    reason: str = ""
+    lot_size: float = 0.0
+    risk_percent: float = 1.0
+    gate_results: Dict[str, Any] = Field(default_factory=dict)
+    latency_ms: float = 0.0
 
 
 class HaltRequest(BaseModel):
@@ -46,6 +48,7 @@ class HaltRequest(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/assess",
@@ -59,6 +62,7 @@ async def assess_risk(
     """Run the full risk pipeline (7 gates) and return a decision."""
     try:
         from ...risk.risk_orchestrator import RiskInput
+
         inp = RiskInput(
             signal_id=body.signal_id,
             symbol=body.symbol,
@@ -87,9 +91,9 @@ async def risk_status() -> Dict[str, Any]:
         cb = get_breaker()
         return {
             "circuit_breaker": {
-                "state":         cb.state,
+                "state": cb.state,
                 "failure_count": cb.failure_count,
-                "last_failure":  str(cb.last_failure_time) if cb.last_failure_time else None,
+                "last_failure": str(cb.last_failure_time) if cb.last_failure_time else None,
             },
             "timestamp": datetime.datetime.utcnow().isoformat(),
         }
@@ -104,8 +108,11 @@ async def halt_all_trading(body: HaltRequest) -> Dict[str, Any]:
     try:
         await halt_trading(body.reason)
         logger.warning("Trading HALTED via API", reason=body.reason)
-        return {"halted": True, "reason": body.reason,
-                "timestamp": datetime.datetime.utcnow().isoformat()}
+        return {
+            "halted": True,
+            "reason": body.reason,
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+        }
     except Exception as exc:
         logger.error("halt_trading failed", error=str(exc))
         raise HTTPException(status_code=500, detail=str(exc))
@@ -130,13 +137,14 @@ async def get_exposure(
     """Return current portfolio exposure via ExposureControl gate."""
     try:
         from ...risk.exposure_control import get_exposure_control
+
         engine = get_exposure_control()
         snapshot = engine.get_snapshot([])
         return {
             "total_exposure_percent": snapshot.total_exposure_percent,
-            "positions_by_symbol":    snapshot.by_symbol,
-            "positions_by_currency":  snapshot.by_currency,
-            "simultaneous_trades":    snapshot.simultaneous_trades,
+            "positions_by_symbol": snapshot.by_symbol,
+            "positions_by_currency": snapshot.by_currency,
+            "simultaneous_trades": snapshot.simultaneous_trades,
             "timestamp": datetime.datetime.utcnow().isoformat(),
         }
     except Exception as exc:
