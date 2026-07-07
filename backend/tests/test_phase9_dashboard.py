@@ -1,15 +1,28 @@
 """Phase 9 Dashboard Productization — 88/88 PASS"""
+
 from __future__ import annotations
-import asyncio, json, time, uuid
+
+import json
+import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
+
 import pytest
 
 # ── minimal stubs for dashboard domain ───────────────────────────────────────
 
-class AuthError(Exception): pass
-class OwnershipError(Exception): pass
-class ServiceUnavailableError(Exception): pass
+
+class AuthError(Exception):
+    pass
+
+
+class OwnershipError(Exception):
+    pass
+
+
+class ServiceUnavailableError(Exception):
+    pass
+
 
 @dataclass
 class DashboardStats:
@@ -21,6 +34,7 @@ class DashboardStats:
     open_positions: int = 0
     equity_usd: float = 0.0
 
+
 @dataclass
 class BotStatus:
     user_id: str
@@ -29,18 +43,21 @@ class BotStatus:
     margin_level: float = 100.0
     last_heartbeat: float = field(default_factory=time.time)
 
+
 @dataclass
 class LicenseStatus:
     user_id: str
     status: str = "active"
-    expires_at: float = field(default_factory=lambda: time.time()+86400*30)
+    expires_at: float = field(default_factory=lambda: time.time() + 86400 * 30)
     plan_id: str = "basic"
     days_left: int = 30
+
 
 @dataclass
 class EquityPoint:
     ts: float
     equity: float
+
 
 @dataclass
 class AdminStats:
@@ -51,7 +68,9 @@ class AdminStats:
     open_positions: int = 0
     pending_payments: int = 0
 
+
 # ── DashboardService ─────────────────────────────────────────────────────────
+
 
 class DashboardService:
     def __init__(self):
@@ -80,7 +99,9 @@ class DashboardService:
     def add_equity(self, user_id: str, point: EquityPoint):
         self._equity.setdefault(user_id, []).append(point)
 
+
 # ── AdminService ──────────────────────────────────────────────────────────────
+
 
 class AdminService:
     def __init__(self):
@@ -93,15 +114,20 @@ class AdminService:
         self._users[uid] = {"user_id": uid, "role": role, "blocked": blocked}
 
     def block_user(self, actor: str, target: str):
-        if target not in self._users: raise KeyError(target)
-        if target == actor: raise ValueError("cannot block self")
+        if target not in self._users:
+            raise KeyError(target)
+        if target == actor:
+            raise ValueError("cannot block self")
         self._users[target]["blocked"] = True
         self._audit.append({"actor": actor, "action": "block", "target": target, "ts": time.time()})
 
     def unblock_user(self, actor: str, target: str):
-        if target not in self._users: raise KeyError(target)
+        if target not in self._users:
+            raise KeyError(target)
         self._users[target]["blocked"] = False
-        self._audit.append({"actor": actor, "action": "unblock", "target": target, "ts": time.time()})
+        self._audit.append(
+            {"actor": actor, "action": "unblock", "target": target, "ts": time.time()}
+        )
 
     def set_role(self, actor_role: str, target: str, new_role: str):
         if new_role == "super_admin" and actor_role != "super_admin":
@@ -121,24 +147,32 @@ class AdminService:
         return True
 
     def reset_kill_switch(self, actor_role: str, token: str) -> bool:
-        if actor_role != "super_admin": return False
-        if token != "KILL_TOKEN": return False
+        if actor_role != "super_admin":
+            return False
+        if token != "KILL_TOKEN":
+            return False
         self._kill_active = False
         return True
 
     def audit_log(self) -> List[Dict]:
         return list(self._audit)
 
+
 # ── error masking helper ──────────────────────────────────────────────────────
 
+
 def mask_error(detail: str, max_len: int = 120) -> str:
-    if len(detail) > max_len or any(k in detail.lower() for k in ("traceback","file ","line ","error:")):
+    if len(detail) > max_len or any(
+        k in detail.lower() for k in ("traceback", "file ", "line ", "error:")
+    ):
         return "خطای سرور — با پشتیبانی تماس بگیرید"
     return detail
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST CLASSES
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDashboardStats:
     def setup_method(self):
@@ -175,12 +209,13 @@ class TestDashboardStats:
 
     def test_T07_multiple_users_isolated(self):
         for i in range(5):
-            self.svc.set_stats(DashboardStats(user_id=f"u{i}", total_trades=i*10))
+            self.svc.set_stats(DashboardStats(user_id=f"u{i}", total_trades=i * 10))
         assert self.svc.get_stats("u3").total_trades == 30
 
     def test_T08_open_positions_tracked(self):
         self.svc.set_stats(DashboardStats(user_id="u1", open_positions=3))
         assert self.svc.get_stats("u1").open_positions == 3
+
 
 class TestBotStatus:
     def setup_method(self):
@@ -211,6 +246,7 @@ class TestBotStatus:
         self.svc.set_bot(BotStatus(user_id="u2", is_running=False))
         assert self.svc.get_bot_status("u1").is_running != self.svc.get_bot_status("u2").is_running
 
+
 class TestEquityCurve:
     def setup_method(self):
         self.svc = DashboardService()
@@ -225,7 +261,7 @@ class TestEquityCurve:
 
     def test_T17_curve_ordering(self):
         for i in range(5):
-            self.svc.add_equity("u1", EquityPoint(ts=float(i), equity=10000+i*100))
+            self.svc.add_equity("u1", EquityPoint(ts=float(i), equity=10000 + i * 100))
         curve = self.svc.get_equity_curve("u1")
         assert curve[0].ts < curve[-1].ts
 
@@ -244,6 +280,7 @@ class TestEquityCurve:
     def test_T20_equity_values_numeric(self):
         self.svc.add_equity("u1", EquityPoint(ts=1.0, equity=9999.99))
         assert self.svc.get_equity_curve("u1")[0].equity == 9999.99
+
 
 class TestLicenseStatus:
     def test_T21_active_status(self):
@@ -269,6 +306,7 @@ class TestLicenseStatus:
     def test_T26_revoked_status(self):
         lic = LicenseStatus(user_id="u1", status="revoked")
         assert lic.status == "revoked"
+
 
 class TestAdminUsers:
     def setup_method(self):
@@ -313,6 +351,7 @@ class TestAdminUsers:
         with pytest.raises(KeyError):
             self.svc.block_user("admin1", "nonexistent")
 
+
 class TestAdminLicenses:
     def setup_method(self):
         self.svc = AdminService()
@@ -340,6 +379,7 @@ class TestAdminLicenses:
 
     def test_T40_license_user_mapping(self):
         assert self.svc._licenses["lic1"]["user_id"] == "u1"
+
 
 class TestKillSwitch:
     def setup_method(self):
@@ -374,6 +414,7 @@ class TestKillSwitch:
         self.svc.activate_kill_switch("KILL_TOKEN")
         assert self.svc._kill_active is True
 
+
 class TestErrorMasking:
     def test_T47_short_error_passthrough(self):
         err = "مشکل در اتصال"
@@ -396,6 +437,7 @@ class TestErrorMasking:
         masked = mask_error("x" * 200)
         assert any(c in masked for c in "ابتپثجچحخدذرزژسشصضطظعغفقکگلمنوهی")
 
+
 class TestAdminStats:
     def test_T52_admin_stats_fields(self):
         s = AdminStats(total_users=10, active_licenses=8, total_revenue=1000.0, active_bots=5)
@@ -414,6 +456,7 @@ class TestAdminStats:
     def test_T55_zero_defaults(self):
         s = AdminStats()
         assert s.total_users == 0
+
 
 class TestAuditLog:
     def setup_method(self):
@@ -443,6 +486,7 @@ class TestAuditLog:
         self.svc.block_user("admin", "user1")
         assert self.svc.audit_log()[0]["target"] == "user1"
 
+
 class TestDataIsolation:
     def setup_method(self):
         self.svc = DashboardService()
@@ -469,6 +513,7 @@ class TestDataIsolation:
         masked = mask_error(err)
         assert "psycopg2" not in masked or "خطای سرور" in masked
 
+
 class TestIntegration:
     def setup_method(self):
         self.dash = DashboardService()
@@ -479,10 +524,12 @@ class TestIntegration:
         self.admin._licenses["lic1"] = {"status": "active", "user_id": "u1"}
 
     def test_T65_full_customer_flow(self):
-        self.dash.set_stats(DashboardStats(user_id="u1", total_trades=10, win_rate=0.6, today_profit=50.0))
+        self.dash.set_stats(
+            DashboardStats(user_id="u1", total_trades=10, win_rate=0.6, today_profit=50.0)
+        )
         self.dash.set_bot(BotStatus(user_id="u1", is_running=True, margin_level=300.0))
         for i in range(20):
-            self.dash.add_equity("u1", EquityPoint(ts=float(i), equity=10000+i*50))
+            self.dash.add_equity("u1", EquityPoint(ts=float(i), equity=10000 + i * 50))
         stats = self.dash.get_stats("u1")
         bot = self.dash.get_bot_status("u1")
         curve = self.dash.get_equity_curve("u1")
@@ -504,10 +551,15 @@ class TestIntegration:
 
     def test_T68_concurrent_stats_updates(self):
         import threading
-        def update(i): self.dash.set_stats(DashboardStats(user_id=f"u{i}", total_trades=i))
+
+        def update(i):
+            self.dash.set_stats(DashboardStats(user_id=f"u{i}", total_trades=i))
+
         threads = [threading.Thread(target=update, args=(i,)) for i in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert self.dash.get_stats("u10").total_trades == 10
 
     def test_T69_error_masking_in_pipeline(self):
@@ -545,15 +597,22 @@ class TestIntegration:
         assert lic.days_left < 7
 
     def test_T74_admin_stats_aggregation(self):
-        stats = AdminStats(total_users=100, active_licenses=85, total_revenue=15000.0, active_bots=40, open_positions=23, pending_payments=5)
+        stats = AdminStats(
+            total_users=100,
+            active_licenses=85,
+            total_revenue=15000.0,
+            active_bots=40,
+            open_positions=23,
+            pending_payments=5,
+        )
         assert stats.total_users > stats.active_bots
         assert stats.total_revenue > 0
 
     def test_T75_no_cross_user_equity(self):
         for i in range(10):
-            self.dash.add_equity("userA", EquityPoint(ts=float(i), equity=1000.0+i))
+            self.dash.add_equity("userA", EquityPoint(ts=float(i), equity=1000.0 + i))
         for i in range(5):
-            self.dash.add_equity("userB", EquityPoint(ts=float(i), equity=2000.0+i))
+            self.dash.add_equity("userB", EquityPoint(ts=float(i), equity=2000.0 + i))
         assert len(self.dash.get_equity_curve("userA")) == 10
         assert len(self.dash.get_equity_curve("userB")) == 5
 
@@ -565,6 +624,7 @@ class TestIntegration:
     def test_T77_service_unavailable_masked(self):
         def bad_service():
             raise RuntimeError("Traceback File db.py line 42 psycopg2 error")
+
         try:
             bad_service()
         except Exception as e:
@@ -576,14 +636,14 @@ class TestIntegration:
         assert s.total_users >= s.active_licenses - 10
 
     def test_T79_license_status_enum(self):
-        valid = {"active","suspended","revoked","expired","pending","inactive"}
+        valid = {"active", "suspended", "revoked", "expired", "pending", "inactive"}
         for s in valid:
             lic = LicenseStatus(user_id="u1", status=s)
             assert lic.status == s
 
     def test_T80_equity_curve_high_volume(self):
         for i in range(365):
-            self.dash.add_equity("u1", EquityPoint(ts=float(i*86400), equity=10000+i*10))
+            self.dash.add_equity("u1", EquityPoint(ts=float(i * 86400), equity=10000 + i * 10))
         assert len(self.dash.get_equity_curve("u1")) == 365
 
     def test_T81_admin_list_users(self):
@@ -596,17 +656,22 @@ class TestIntegration:
 
     def test_T83_dashboard_stats_serializable(self):
         s = DashboardStats(user_id="u1", total_trades=5, win_rate=0.6, today_profit=100.0)
-        d = {"user_id":s.user_id,"total_trades":s.total_trades,"win_rate":s.win_rate,"today_profit":s.today_profit}
+        d = {
+            "user_id": s.user_id,
+            "total_trades": s.total_trades,
+            "win_rate": s.win_rate,
+            "today_profit": s.today_profit,
+        }
         assert json.dumps(d)
 
     def test_T84_bot_status_serializable(self):
         b = BotStatus(user_id="u1", is_running=True, session="لندن", margin_level=300.0)
-        d = {"user_id":b.user_id,"is_running":b.is_running,"session":b.session}
+        d = {"user_id": b.user_id, "is_running": b.is_running, "session": b.session}
         assert json.dumps(d, ensure_ascii=False)
 
     def test_T85_license_expiry_serializable(self):
         l = LicenseStatus(user_id="u1", status="active", days_left=30)
-        d = {"user_id":l.user_id,"status":l.status,"days_left":l.days_left}
+        d = {"user_id": l.user_id, "status": l.status, "days_left": l.days_left}
         assert json.dumps(d)
 
     def test_T86_kill_switch_state_persists(self):

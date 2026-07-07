@@ -22,13 +22,12 @@
 """
 
 import asyncio
-import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Set
-from dataclasses import dataclass
 
-from .session_service import SessionService, SessionInfo, SessionType, KillZoneType
 from ..core.logger import get_logger
+from .session_service import KillZoneType, SessionService
 
 logger = get_logger("session_alert_service")
 
@@ -36,6 +35,7 @@ logger = get_logger("session_alert_service")
 @dataclass
 class SessionAlertState:
     """وضعیت فعلی هشدارهای سشن برای جلوگیری از ارسال تکراری"""
+
     active_sessions: Set[str]
     active_kill_zones: Set[str]
     last_check: Optional[datetime]
@@ -128,7 +128,9 @@ class SessionAlertService:
         session_info = self._session_service.get_current_session()
 
         # مجموعه سشن‌های فعلی
-        current_sessions: Set[str] = set(session_info.active_sessions) if session_info.active_sessions else set()
+        current_sessions: Set[str] = (
+            set(session_info.active_sessions) if session_info.active_sessions else set()
+        )
         current_kill_zones: Set[str] = set()
         if session_info.is_kill_zone and session_info.kill_zone != KillZoneType.NONE:
             current_kill_zones.add(session_info.kill_zone.value)
@@ -137,48 +139,57 @@ class SessionAlertService:
         newly_opened = current_sessions - self._state.active_sessions
         for session_name in newly_opened:
             logger.info(f"📢 سشن جدید باز شد: {session_name}")
-            await self._send_alert("SESSION_OPEN", {
-                "session_name": session_name,
-                "session_type": session_info.session_type.value,
-                "kill_zone": session_info.kill_zone.value,
-                "is_overlap": session_info.is_overlap,
-                "can_trade": session_info.can_trade,
-                "session_score": session_info.session_score,
-                "utc_time": now.strftime("%H:%M UTC"),
-                "minutes_to_london": session_info.minutes_to_london_open,
-                "minutes_to_ny": session_info.minutes_to_ny_open
-            })
+            await self._send_alert(
+                "SESSION_OPEN",
+                {
+                    "session_name": session_name,
+                    "session_type": session_info.session_type.value,
+                    "kill_zone": session_info.kill_zone.value,
+                    "is_overlap": session_info.is_overlap,
+                    "can_trade": session_info.can_trade,
+                    "session_score": session_info.session_score,
+                    "utc_time": now.strftime("%H:%M UTC"),
+                    "minutes_to_london": session_info.minutes_to_london_open,
+                    "minutes_to_ny": session_info.minutes_to_ny_open,
+                },
+            )
 
         # ─── هشدار بسته شدن سشن ───
         newly_closed = self._state.active_sessions - current_sessions
         for session_name in newly_closed:
             logger.info(f"🔔 سشن بسته شد: {session_name}")
-            await self._send_alert("SESSION_CLOSE", {
-                "session_name": session_name,
-                "utc_time": now.strftime("%H:%M UTC"),
-                "remaining_sessions": list(current_sessions)
-            })
+            await self._send_alert(
+                "SESSION_CLOSE",
+                {
+                    "session_name": session_name,
+                    "utc_time": now.strftime("%H:%M UTC"),
+                    "remaining_sessions": list(current_sessions),
+                },
+            )
 
         # ─── هشدار فعال شدن Kill Zone ───
         newly_active_kz = current_kill_zones - self._state.active_kill_zones
         for kz_name in newly_active_kz:
             logger.info(f"🎯 Kill Zone فعال شد: {kz_name}")
-            await self._send_alert("KILL_ZONE_OPEN", {
-                "kill_zone_name": kz_name,
-                "session_type": session_info.session_type.value,
-                "session_score": session_info.session_score,
-                "can_trade": session_info.can_trade,
-                "utc_time": now.strftime("%H:%M UTC")
-            })
+            await self._send_alert(
+                "KILL_ZONE_OPEN",
+                {
+                    "kill_zone_name": kz_name,
+                    "session_type": session_info.session_type.value,
+                    "session_score": session_info.session_score,
+                    "can_trade": session_info.can_trade,
+                    "utc_time": now.strftime("%H:%M UTC"),
+                },
+            )
 
         # ─── هشدار پایان Kill Zone ───
         newly_closed_kz = self._state.active_kill_zones - current_kill_zones
         for kz_name in newly_closed_kz:
             logger.info(f"⏰ Kill Zone پایان یافت: {kz_name}")
-            await self._send_alert("KILL_ZONE_CLOSE", {
-                "kill_zone_name": kz_name,
-                "utc_time": now.strftime("%H:%M UTC")
-            })
+            await self._send_alert(
+                "KILL_ZONE_CLOSE",
+                {"kill_zone_name": kz_name, "utc_time": now.strftime("%H:%M UTC")},
+            )
 
         # ─── بروزرسانی state ───
         self._state.active_sessions = current_sessions
@@ -208,7 +219,7 @@ class SessionAlertService:
             "check_interval_seconds": self._check_interval,
             "active_sessions": list(self._state.active_sessions),
             "active_kill_zones": list(self._state.active_kill_zones),
-            "last_check": self._state.last_check.isoformat() if self._state.last_check else None
+            "last_check": self._state.last_check.isoformat() if self._state.last_check else None,
         }
 
 

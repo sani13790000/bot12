@@ -19,70 +19,74 @@
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional
-from enum import Enum
-import math
+
 import logging
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class ZoneType(Enum):
     """انواع ناحیه‌های SMC"""
-    ORDER_BLOCK       = "order_block"
-    MITIGATION_BLOCK  = "mitigation_block"
-    BREAKER_BLOCK     = "breaker_block"
-    REJECTION_BLOCK   = "rejection_block"
-    FVG               = "fvg"
-    IFVG              = "ifvg"
-    LIQUIDITY         = "liquidity"
+
+    ORDER_BLOCK = "order_block"
+    MITIGATION_BLOCK = "mitigation_block"
+    BREAKER_BLOCK = "breaker_block"
+    REJECTION_BLOCK = "rejection_block"
+    FVG = "fvg"
+    IFVG = "ifvg"
+    LIQUIDITY = "liquidity"
     SESSION_LIQUIDITY = "session_liquidity"
-    EQUILIBRIUM       = "equilibrium"
+    EQUILIBRIUM = "equilibrium"
 
 
 class MarketBias(Enum):
     """جهت کلی بازار"""
-    BULLISH     = "bullish"
-    BEARISH     = "bearish"
-    NEUTRAL     = "neutral"
-    RANGING     = "ranging"
+
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+    NEUTRAL = "neutral"
+    RANGING = "ranging"
 
 
 @dataclass
 class ZoneScoreInput:
     """ورودی‌های محاسبه امتیاز ناحیه SMC"""
-    zone_type:          ZoneType
-    direction:          str              # "bullish" یا "bearish"
-    touch_count:        int = 0          # تعداد دفعات تست ناحیه
-    age_candles:        int = 0          # سن ناحیه (به کندل)
-    volume_ratio:       float = 1.0      # نسبت حجم به میانگین
-    premium_discount:   float = 0.5      # موقعیت در PD Zone (0=discount, 1=premium)
-    in_kill_zone:       bool = False      # آیا در Kill Zone است؟
-    htf_aligned:        bool = False      # همسو با تایم‌فریم بالاتر؟
-    mtf_aligned:        bool = False      # همسو با تایم‌فریم میانی؟
-    market_bias:        MarketBias = MarketBias.NEUTRAL
-    bos_confirmed:      bool = False      # BOS تأیید شده؟
-    choch_confirmed:    bool = False      # CHOCH تأیید شده؟
-    liquidity_swept:    bool = False      # لیکوئیدیتی sweep شده؟
-    fvg_nearby:         bool = False      # FVG نزدیک وجود دارد؟
-    rejection_strength: float = 0.0      # قدرت rejection (0-1)
-    imbalance_size:     float = 0.0      # اندازه imbalance (پوینت)
-    near_higher_tf_ob:  bool = False      # نزدیک OB تایم‌فریم بالاتر؟
+
+    zone_type: ZoneType
+    direction: str  # "bullish" یا "bearish"
+    touch_count: int = 0  # تعداد دفعات تست ناحیه
+    age_candles: int = 0  # سن ناحیه (به کندل)
+    volume_ratio: float = 1.0  # نسبت حجم به میانگین
+    premium_discount: float = 0.5  # موقعیت در PD Zone (0=discount, 1=premium)
+    in_kill_zone: bool = False  # آیا در Kill Zone است؟
+    htf_aligned: bool = False  # همسو با تایم‌فریم بالاتر؟
+    mtf_aligned: bool = False  # همسو با تایم‌فریم میانی؟
+    market_bias: MarketBias = MarketBias.NEUTRAL
+    bos_confirmed: bool = False  # BOS تأیید شده؟
+    choch_confirmed: bool = False  # CHOCH تأیید شده؟
+    liquidity_swept: bool = False  # لیکوئیدیتی sweep شده؟
+    fvg_nearby: bool = False  # FVG نزدیک وجود دارد؟
+    rejection_strength: float = 0.0  # قدرت rejection (0-1)
+    imbalance_size: float = 0.0  # اندازه imbalance (پوینت)
+    near_higher_tf_ob: bool = False  # نزدیک OB تایم‌فریم بالاتر؟
 
 
 @dataclass
 class ZoneScore:
     """نتیجه امتیازدهی ناحیه"""
-    total_score:        float = 0.0      # امتیاز کل (0-100)
-    base_score:         float = 0.0      # امتیاز پایه
-    structure_score:    float = 0.0      # امتیاز ساختار
-    confluence_score:   float = 0.0      # امتیاز همگرایی
-    timing_score:       float = 0.0      # امتیاز زمان‌بندی
-    quality_grade:      str   = "F"      # درجه کیفیت: A+, A, B, C, D, F
-    is_tradeable:       bool  = False    # آیا قابل معامله است؟
-    min_rr_ratio:       float = 1.5      # حداقل نسبت ریسک به ریوارد
-    detail:             dict  = field(default_factory=dict)
+
+    total_score: float = 0.0  # امتیاز کل (0-100)
+    base_score: float = 0.0  # امتیاز پایه
+    structure_score: float = 0.0  # امتیاز ساختار
+    confluence_score: float = 0.0  # امتیاز همگرایی
+    timing_score: float = 0.0  # امتیاز زمان‌بندی
+    quality_grade: str = "F"  # درجه کیفیت: A+, A, B, C, D, F
+    is_tradeable: bool = False  # آیا قابل معامله است؟
+    min_rr_ratio: float = 1.5  # حداقل نسبت ریسک به ریوارد
+    detail: dict = field(default_factory=dict)
 
 
 class SMCScoringEngine:
@@ -99,29 +103,27 @@ class SMCScoringEngine:
 
     # وزن‌های امتیازدهی
     WEIGHTS = {
-        "base":        0.25,   # وزن امتیاز پایه
-        "structure":   0.35,   # وزن ساختار (مهم‌ترین)
-        "confluence":  0.25,   # وزن همگرایی
-        "timing":      0.15,   # وزن زمان‌بندی
+        "base": 0.25,  # وزن امتیاز پایه
+        "structure": 0.35,  # وزن ساختار (مهم‌ترین)
+        "confluence": 0.25,  # وزن همگرایی
+        "timing": 0.15,  # وزن زمان‌بندی
     }
 
     # امتیاز پایه هر نوع ناحیه
     BASE_SCORES = {
-        ZoneType.ORDER_BLOCK:       85,
-        ZoneType.BREAKER_BLOCK:     80,
-        ZoneType.MITIGATION_BLOCK:  75,
-        ZoneType.REJECTION_BLOCK:   70,
-        ZoneType.FVG:               65,
-        ZoneType.IFVG:              60,
-        ZoneType.LIQUIDITY:         70,
+        ZoneType.ORDER_BLOCK: 85,
+        ZoneType.BREAKER_BLOCK: 80,
+        ZoneType.MITIGATION_BLOCK: 75,
+        ZoneType.REJECTION_BLOCK: 70,
+        ZoneType.FVG: 65,
+        ZoneType.IFVG: 60,
+        ZoneType.LIQUIDITY: 70,
         ZoneType.SESSION_LIQUIDITY: 75,
-        ZoneType.EQUILIBRIUM:       55,
+        ZoneType.EQUILIBRIUM: 55,
     }
 
     # آستانه‌های درجه‌بندی
-    GRADE_THRESHOLDS = {
-        "A+": 90, "A": 80, "B": 70, "C": 60, "D": 50
-    }
+    GRADE_THRESHOLDS = {"A+": 90, "A": 80, "B": 70, "C": 60, "D": 50}
 
     # حداقل امتیاز برای قابل معامله بودن
     MIN_TRADEABLE_SCORE = 65.0
@@ -161,35 +163,37 @@ class SMCScoringEngine:
 
         # ۵. امتیاز کل وزن‌دار
         result.total_score = (
-            result.base_score       * self.WEIGHTS["base"] +
-            result.structure_score  * self.WEIGHTS["structure"] +
-            result.confluence_score * self.WEIGHTS["confluence"] +
-            result.timing_score     * self.WEIGHTS["timing"]
+            result.base_score * self.WEIGHTS["base"]
+            + result.structure_score * self.WEIGHTS["structure"]
+            + result.confluence_score * self.WEIGHTS["confluence"]
+            + result.timing_score * self.WEIGHTS["timing"]
         )
         result.total_score = min(100.0, max(0.0, result.total_score))
 
         # ۶. درجه‌بندی کیفیت
         result.quality_grade = self._get_grade(result.total_score)
-        result.is_tradeable  = result.total_score >= self.min_tradeable_score
+        result.is_tradeable = result.total_score >= self.min_tradeable_score
 
         # ۷. محاسبه حداقل RR پیشنهادی
         result.min_rr_ratio = self._calculate_min_rr(inp, result.total_score)
 
         # ۸. جزئیات برای لاگ
         result.detail = {
-            "zone_type":        inp.zone_type.value,
-            "direction":        inp.direction,
-            "base_score":       round(result.base_score, 2),
-            "structure_score":  round(result.structure_score, 2),
+            "zone_type": inp.zone_type.value,
+            "direction": inp.direction,
+            "base_score": round(result.base_score, 2),
+            "structure_score": round(result.structure_score, 2),
             "confluence_score": round(result.confluence_score, 2),
-            "timing_score":     round(result.timing_score, 2),
-            "total_score":      round(result.total_score, 2),
-            "grade":            result.quality_grade,
-            "tradeable":        result.is_tradeable,
-            "min_rr":           result.min_rr_ratio,
+            "timing_score": round(result.timing_score, 2),
+            "total_score": round(result.total_score, 2),
+            "grade": result.quality_grade,
+            "tradeable": result.is_tradeable,
+            "min_rr": result.min_rr_ratio,
         }
 
-        logger.debug(f"امتیاز ناحیه {inp.zone_type.value}: {result.total_score:.1f} ({result.quality_grade})")
+        logger.debug(
+            f"امتیاز ناحیه {inp.zone_type.value}: {result.total_score:.1f} ({result.quality_grade})"
+        )
         return result
 
     def _calculate_base_score(self, inp: ZoneScoreInput) -> float:
@@ -262,19 +266,19 @@ class SMCScoringEngine:
         # برای فروش باید premium (>0.6) و برای خرید باید discount (<0.4)
         if inp.direction == "bullish":
             if inp.premium_discount < 0.35:
-                score += 25   # ناحیه discount قوی
+                score += 25  # ناحیه discount قوی
             elif inp.premium_discount < 0.45:
-                score += 15   # equilibrium قابل قبول
+                score += 15  # equilibrium قابل قبول
             else:
-                score -= 20   # خرید در premium بد است
+                score -= 20  # خرید در premium بد است
 
         elif inp.direction == "bearish":
             if inp.premium_discount > 0.65:
-                score += 25   # ناحیه premium قوی
+                score += 25  # ناحیه premium قوی
             elif inp.premium_discount > 0.55:
-                score += 15   # equilibrium قابل قبول
+                score += 15  # equilibrium قابل قبول
             else:
-                score -= 20   # فروش در discount بد است
+                score -= 20  # فروش در discount بد است
 
         # حجم بالا = ناحیه معتبرتر
         if inp.volume_ratio > 2.0:
@@ -282,7 +286,7 @@ class SMCScoringEngine:
         elif inp.volume_ratio > 1.5:
             score += 10
         elif inp.volume_ratio < 0.8:
-            score -= 10   # حجم کم ناحیه را ضعیف می‌کند
+            score -= 10  # حجم کم ناحیه را ضعیف می‌کند
 
         # FVG نزدیک = confluence اضافه
         if inp.fvg_nearby:
@@ -300,25 +304,30 @@ class SMCScoringEngine:
 
         # سن ناحیه (تازه‌تر = بهتر)
         if inp.age_candles <= 5:
-            score += 20   # ناحیه بسیار تازه
+            score += 20  # ناحیه بسیار تازه
         elif inp.age_candles <= 15:
             score += 10
         elif inp.age_candles <= 30:
-            score += 0    # قابل قبول
+            score += 0  # قابل قبول
         elif inp.age_candles <= 60:
             score -= 10
         else:
-            score -= 25   # ناحیه قدیمی ضعیف است
+            score -= 25  # ناحیه قدیمی ضعیف است
 
         return min(100.0, max(0.0, score))
 
     def _get_grade(self, score: float) -> str:
         """درجه‌بندی کیفیت بر اساس امتیاز"""
-        if score >= 90: return "A+"
-        if score >= 80: return "A"
-        if score >= 70: return "B"
-        if score >= 60: return "C"
-        if score >= 50: return "D"
+        if score >= 90:
+            return "A+"
+        if score >= 80:
+            return "A"
+        if score >= 70:
+            return "B"
+        if score >= 60:
+            return "C"
+        if score >= 50:
+            return "D"
         return "F"
 
     def _calculate_min_rr(self, inp: ZoneScoreInput, score: float) -> float:
@@ -335,7 +344,9 @@ class SMCScoringEngine:
         else:
             return 3.0
 
-    def score_multiple_zones(self, zones: list[ZoneScoreInput]) -> list[tuple[ZoneScoreInput, ZoneScore]]:
+    def score_multiple_zones(
+        self, zones: list[ZoneScoreInput]
+    ) -> list[tuple[ZoneScoreInput, ZoneScore]]:
         """
         امتیازدهی به چندین ناحیه و مرتب‌سازی بر اساس امتیاز
 
@@ -350,7 +361,9 @@ class SMCScoringEngine:
         scored.sort(key=lambda x: x[1].total_score, reverse=True)
         return scored
 
-    def get_best_zone(self, zones: list[ZoneScoreInput]) -> Optional[tuple[ZoneScoreInput, ZoneScore]]:
+    def get_best_zone(
+        self, zones: list[ZoneScoreInput]
+    ) -> Optional[tuple[ZoneScoreInput, ZoneScore]]:
         """
         بهترین ناحیه قابل معامله را برمی‌گرداند
 

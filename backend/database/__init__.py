@@ -86,9 +86,7 @@ class DatabaseWrapper:
         columns: str = "*",
     ) -> List[Dict[str, Any]]:
         """Alias for select_many() - F-1 backward compat."""
-        return await self.select_many(
-            table, filters, order_by, order_desc, limit, offset, columns
-        )
+        return await self.select_many(table, filters, order_by, order_desc, limit, offset, columns)
 
     async def insert(
         self,
@@ -133,9 +131,7 @@ class DatabaseWrapper:
         data: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
         if not filters:
-            raise ValueError(
-                f"db.update({table!r}): filters must not be empty"
-            )
+            raise ValueError(f"db.update({table!r}): filters must not be empty")
         client = await self._client()
 
         def _q():
@@ -159,8 +155,7 @@ class DatabaseWrapper:
         # G-1 CRITICAL: empty filters would delete ALL rows
         if not filters:
             raise ValueError(
-                f"db.delete({table!r}): filters must not be empty - "
-                "refusing to delete entire table"
+                f"db.delete({table!r}): filters must not be empty - refusing to delete entire table"
             )
         client = await self._client()
 
@@ -187,11 +182,7 @@ class DatabaseWrapper:
         client = await self._client()
 
         def _q():
-            return (
-                client.table(table)
-                .upsert(data, on_conflict=on_conflict)
-                .execute()
-            )
+            return client.table(table).upsert(data, on_conflict=on_conflict).execute()
 
         try:
             result = await self._run(_q)

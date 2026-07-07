@@ -2,12 +2,16 @@
 Phase 17 — Docker, Deployment & Production Readiness
 96 tests across 8 classes
 """
-import base64, hashlib, json, os, re, subprocess, tempfile, textwrap, time
+
+import os
+import re
+
 import pytest
 import yaml
 
 # ─────────────────────────────────────────────────────────────
 REPO = "/home/definable/phase17/repo"
+
 
 def _file(relpath):
     p = os.path.join(REPO, relpath.lstrip("/"))
@@ -15,6 +19,7 @@ def _file(relpath):
         with open(p) as f:
             return f.read()
     raise FileNotFoundError(f"Not found: {relpath}")
+
 
 def _yaml(relpath):
     return yaml.safe_load(_file(relpath))

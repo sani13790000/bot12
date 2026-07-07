@@ -18,18 +18,19 @@ Galaxy Vast AI Trading Platform
 """
 
 import logging
+
 from aiogram import Dispatcher
 
-from .start import register_start_handlers
-from .control import register_control_handlers
-from .trades import register_trade_handlers
-from .signals import register_signal_handlers
-from .reports import register_report_handlers
-from .alerts import register_alert_handlers
-from .settings import register_settings_handlers
 from .admin_users import register_admin_user_handlers
-from .semi_auto import register_semi_auto_handlers
+from .alerts import register_alert_handlers
+from .control import register_control_handlers
 from .intelligence import register_intelligence_handlers
+from .reports import register_report_handlers
+from .semi_auto import register_semi_auto_handlers
+from .settings import register_settings_handlers
+from .signals import register_signal_handlers
+from .start import register_start_handlers
+from .trades import register_trade_handlers
 
 logger = logging.getLogger("telegram.handlers")
 

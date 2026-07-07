@@ -9,12 +9,12 @@ Fix applied:
   Fix: news=0.05, execution=0.05 → total = 1.00
 - ARCH-10 FIX: added .agents property so deps.py can inject them into VotingEngine
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from backend.core.config import settings
 from backend.core.logger import get_logger
 
 from .ai_prediction_agent import AIPredictionAgent
@@ -32,17 +32,25 @@ logger = get_logger(__name__)
 @dataclass
 class AgentWeightConfig:
     """Weight config for agents. Total MUST equal 1.00."""
+
     market_structure: float = 0.20
-    liquidity:        float = 0.15
-    smc:              float = 0.20
-    ai_prediction:    float = 0.20
-    risk:             float = 0.15
-    news:             float = 0.05
-    execution:        float = 0.05
+    liquidity: float = 0.15
+    smc: float = 0.20
+    ai_prediction: float = 0.20
+    risk: float = 0.15
+    news: float = 0.05
+    execution: float = 0.05
 
     def total(self) -> float:
-        return (self.market_structure + self.liquidity + self.smc +
-                self.ai_prediction + self.risk + self.news + self.execution)
+        return (
+            self.market_structure
+            + self.liquidity
+            + self.smc
+            + self.ai_prediction
+            + self.risk
+            + self.news
+            + self.execution
+        )
 
     def validate(self) -> None:
         t = self.total()
@@ -62,11 +70,13 @@ class AgentService:
         self._weights = weights or AgentWeightConfig()
         self._weights.validate()
         self._min_score = min_score_threshold
-        self._min_conf  = min_confidence_threshold
+        self._min_conf = min_confidence_threshold
         self._engine: Optional[VotingEngine] = None
         logger.info(
             "AgentService init | weights_total=%.2f | min_score=%.1f | min_conf=%.1f",
-            self._weights.total(), min_score_threshold, min_confidence_threshold,
+            self._weights.total(),
+            min_score_threshold,
+            min_confidence_threshold,
         )
 
     @property
@@ -96,19 +106,21 @@ class AgentService:
         self._weights.validate()
         if self._engine is not None:
             self._engine.update_weights(weight_map)
-        logger.info("AgentService weights updated: %s (total=%.2f)", weight_map, self._weights.total())
+        logger.info(
+            "AgentService weights updated: %s (total=%.2f)", weight_map, self._weights.total()
+        )
         return self.get_weights()
 
     def get_weights(self) -> Dict[str, float]:
         return {
             "market_structure": self._weights.market_structure,
-            "liquidity":        self._weights.liquidity,
-            "smc":              self._weights.smc,
-            "ai_prediction":    self._weights.ai_prediction,
-            "risk":             self._weights.risk,
-            "news":             self._weights.news,
-            "execution":        self._weights.execution,
-            "total":            round(self._weights.total(), 4),
+            "liquidity": self._weights.liquidity,
+            "smc": self._weights.smc,
+            "ai_prediction": self._weights.ai_prediction,
+            "risk": self._weights.risk,
+            "news": self._weights.news,
+            "execution": self._weights.execution,
+            "total": round(self._weights.total(), 4),
         }
 
     def set_threshold(self, threshold: float) -> None:
@@ -119,10 +131,7 @@ class AgentService:
     def get_agent_status(self) -> Dict[str, Any]:
         if self._engine is None:
             return {"status": "not_initialized"}
-        return {
-            a.name: {"enabled": a.enabled, "weight": a.weight}
-            for a in self._engine.agents
-        }
+        return {a.name: {"enabled": a.enabled, "weight": a.weight} for a in self._engine.agents}
 
     def _build_engine(self) -> VotingEngine:
         w = self._weights

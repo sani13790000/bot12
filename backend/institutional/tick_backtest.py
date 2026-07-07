@@ -1,6 +1,7 @@
 """Tick-Level Backtesting Engine with spread, slippage, commission simulation."""
 
 from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -15,10 +16,11 @@ class Direction(str, Enum):
 @dataclass
 class SymbolSpec:
     """Symbol-specific parameters for accurate pip/lot calculations."""
+
     symbol: str
-    pip_size: float          # e.g. 0.1 for XAUUSD, 0.0001 for EURUSD
-    contract_size: float     # e.g. 100 for XAUUSD, 100_000 for Forex
-    point_value: float       # USD per pip per lot
+    pip_size: float  # e.g. 0.1 for XAUUSD, 0.0001 for EURUSD
+    contract_size: float  # e.g. 100 for XAUUSD, 100_000 for Forex
+    point_value: float  # USD per pip per lot
     min_lot: float = 0.01
     max_lot: float = 100.0
     lot_step: float = 0.01
@@ -28,15 +30,69 @@ class SymbolSpec:
     @classmethod
     def for_symbol(cls, symbol: str) -> "SymbolSpec":
         specs: Dict[str, Dict] = {
-            "XAUUSD": dict(pip_size=0.1, contract_size=100.0, point_value=1.0, avg_spread_pips=3.0, commission_per_lot=5.0),
-            "XAGUSD": dict(pip_size=0.01, contract_size=5000.0, point_value=5.0, avg_spread_pips=5.0, commission_per_lot=4.0),
-            "EURUSD": dict(pip_size=0.0001, contract_size=100_000.0, point_value=10.0, avg_spread_pips=1.0, commission_per_lot=3.5),
-            "GBPUSD": dict(pip_size=0.0001, contract_size=100_000.0, point_value=10.0, avg_spread_pips=1.5, commission_per_lot=3.5),
-            "USDJPY": dict(pip_size=0.01, contract_size=100_000.0, point_value=9.0, avg_spread_pips=1.0, commission_per_lot=3.5),
-            "GBPJPY": dict(pip_size=0.01, contract_size=100_000.0, point_value=9.0, avg_spread_pips=2.5, commission_per_lot=3.5),
-            "US30":   dict(pip_size=1.0, contract_size=1.0, point_value=1.0, avg_spread_pips=3.0, commission_per_lot=2.0),
-            "NAS100": dict(pip_size=0.25, contract_size=1.0, point_value=1.0, avg_spread_pips=1.0, commission_per_lot=2.0),
-            "BTCUSD": dict(pip_size=1.0, contract_size=1.0, point_value=1.0, avg_spread_pips=50.0, commission_per_lot=10.0),
+            "XAUUSD": dict(
+                pip_size=0.1,
+                contract_size=100.0,
+                point_value=1.0,
+                avg_spread_pips=3.0,
+                commission_per_lot=5.0,
+            ),
+            "XAGUSD": dict(
+                pip_size=0.01,
+                contract_size=5000.0,
+                point_value=5.0,
+                avg_spread_pips=5.0,
+                commission_per_lot=4.0,
+            ),
+            "EURUSD": dict(
+                pip_size=0.0001,
+                contract_size=100_000.0,
+                point_value=10.0,
+                avg_spread_pips=1.0,
+                commission_per_lot=3.5,
+            ),
+            "GBPUSD": dict(
+                pip_size=0.0001,
+                contract_size=100_000.0,
+                point_value=10.0,
+                avg_spread_pips=1.5,
+                commission_per_lot=3.5,
+            ),
+            "USDJPY": dict(
+                pip_size=0.01,
+                contract_size=100_000.0,
+                point_value=9.0,
+                avg_spread_pips=1.0,
+                commission_per_lot=3.5,
+            ),
+            "GBPJPY": dict(
+                pip_size=0.01,
+                contract_size=100_000.0,
+                point_value=9.0,
+                avg_spread_pips=2.5,
+                commission_per_lot=3.5,
+            ),
+            "US30": dict(
+                pip_size=1.0,
+                contract_size=1.0,
+                point_value=1.0,
+                avg_spread_pips=3.0,
+                commission_per_lot=2.0,
+            ),
+            "NAS100": dict(
+                pip_size=0.25,
+                contract_size=1.0,
+                point_value=1.0,
+                avg_spread_pips=1.0,
+                commission_per_lot=2.0,
+            ),
+            "BTCUSD": dict(
+                pip_size=1.0,
+                contract_size=1.0,
+                point_value=1.0,
+                avg_spread_pips=50.0,
+                commission_per_lot=10.0,
+            ),
         }
         s = symbol.upper()
         if s in specs:
@@ -51,8 +107,8 @@ class TickBacktestConfig:
     timeframe: str = "M15"
     initial_balance: float = 10_000.0
     risk_pct_per_trade: float = 1.0
-    spread_multiplier: float = 1.0    # 1.0 = realistic, 2.0 = conservative
-    slippage_pips: float = 0.5        # extra slippage on market orders
+    spread_multiplier: float = 1.0  # 1.0 = realistic, 2.0 = conservative
+    slippage_pips: float = 0.5  # extra slippage on market orders
     use_commission: bool = True
     max_open_trades: int = 3
     start_date: Optional[str] = None  # "2018-01-01"
@@ -203,9 +259,7 @@ class TickBacktestEngine:
     #  Internal methods                                                     #
     # ------------------------------------------------------------------ #
 
-    def _open_trade(
-        self, candle: Dict, signal: Dict
-    ) -> Optional[BacktestTrade]:
+    def _open_trade(self, candle: Dict, signal: Dict) -> Optional[BacktestTrade]:
         direction = Direction(signal["direction"])
         sl = signal["stop_loss"]
         tp = signal["take_profit"]
@@ -228,12 +282,26 @@ class TickBacktestEngine:
         lot_size = risk_usd / (sl_pips * self._spec.point_value)
         lot_size = max(
             self._spec.min_lot,
-            min(self._spec.max_lot, round(lot_size / self._spec.lot_step) * self._spec.lot_step)
+            min(self._spec.max_lot, round(lot_size / self._spec.lot_step) * self._spec.lot_step),
         )
 
         commission = lot_size * self._spec.commission_per_lot if self.config.use_commission else 0.0
-        spread_cost = spread * lot_size * self._spec.contract_size / self._spec.pip_size * self._spec.point_value / self._spec.contract_size
-        slippage_cost = slippage * lot_size * self._spec.contract_size / self._spec.pip_size * self._spec.point_value / self._spec.contract_size
+        spread_cost = (
+            spread
+            * lot_size
+            * self._spec.contract_size
+            / self._spec.pip_size
+            * self._spec.point_value
+            / self._spec.contract_size
+        )
+        slippage_cost = (
+            slippage
+            * lot_size
+            * self._spec.contract_size
+            / self._spec.pip_size
+            * self._spec.point_value
+            / self._spec.contract_size
+        )
 
         self._trade_counter += 1
         trade = BacktestTrade(
@@ -269,9 +337,7 @@ class TickBacktestEngine:
             elif lo <= trade.take_profit:
                 self._close_trade(trade, trade.take_profit, candle["timestamp"], "tp")
 
-    def _close_trade(
-        self, trade: BacktestTrade, price: float, ts: float, reason: str
-    ) -> None:
+    def _close_trade(self, trade: BacktestTrade, price: float, ts: float, reason: str) -> None:
         trade.close_price = price
         trade.close_time = ts
         trade.close_reason = reason
@@ -296,15 +362,30 @@ class TickBacktestEngine:
         trades = self._trades
         if not trades:
             return TickBacktestResult(
-                config=self.config, trades=[], equity_curve=self._equity_curve,
-                initial_balance=self.config.initial_balance, final_balance=self._balance,
-                total_trades=0, winning_trades=0, losing_trades=0,
-                win_rate=0.0, profit_factor=0.0, total_net_profit=0.0,
-                total_commission=0.0, total_spread_cost=0.0, total_slippage_cost=0.0,
-                max_drawdown_pct=0.0, max_drawdown_usd=0.0,
-                sharpe_ratio=0.0, sortino_ratio=0.0, calmar_ratio=0.0,
-                recovery_factor=0.0, expectancy_usd=0.0,
-                avg_win_usd=0.0, avg_loss_usd=0.0, avg_rr=0.0,
+                config=self.config,
+                trades=[],
+                equity_curve=self._equity_curve,
+                initial_balance=self.config.initial_balance,
+                final_balance=self._balance,
+                total_trades=0,
+                winning_trades=0,
+                losing_trades=0,
+                win_rate=0.0,
+                profit_factor=0.0,
+                total_net_profit=0.0,
+                total_commission=0.0,
+                total_spread_cost=0.0,
+                total_slippage_cost=0.0,
+                max_drawdown_pct=0.0,
+                max_drawdown_usd=0.0,
+                sharpe_ratio=0.0,
+                sortino_ratio=0.0,
+                calmar_ratio=0.0,
+                recovery_factor=0.0,
+                expectancy_usd=0.0,
+                avg_win_usd=0.0,
+                avg_loss_usd=0.0,
+                avg_rr=0.0,
             )
 
         winners = [t for t in trades if t.net_profit > 0]
@@ -314,15 +395,19 @@ class TickBacktestEngine:
 
         returns = [t.net_profit / self.config.initial_balance for t in trades]
         avg_ret = sum(returns) / len(returns) if returns else 0
-        std_ret = math.sqrt(sum((r - avg_ret) ** 2 for r in returns) / len(returns)) if returns else 1
+        std_ret = (
+            math.sqrt(sum((r - avg_ret) ** 2 for r in returns) / len(returns)) if returns else 1
+        )
         downside = [r for r in returns if r < 0]
-        std_down = math.sqrt(sum(r ** 2 for r in downside) / len(downside)) if downside else std_ret
+        std_down = math.sqrt(sum(r**2 for r in downside) / len(downside)) if downside else std_ret
 
         sharpe = (avg_ret / std_ret) * math.sqrt(252) if std_ret > 0 else 0
         sortino = (avg_ret / std_down) * math.sqrt(252) if std_down > 0 else 0
         max_dd_pct = (self._max_dd_usd / self._peak_equity * 100) if self._peak_equity > 0 else 0
         total_net = sum(t.net_profit for t in trades)
-        calmar = (total_net / self.config.initial_balance * 100) / max_dd_pct if max_dd_pct > 0 else 0
+        calmar = (
+            (total_net / self.config.initial_balance * 100) / max_dd_pct if max_dd_pct > 0 else 0
+        )
         recovery = total_net / self._max_dd_usd if self._max_dd_usd > 0 else 0
 
         return TickBacktestResult(

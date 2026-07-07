@@ -15,12 +15,13 @@ Usage::
     stats = await analytics_service.get_performance_stats(days=30)
     print(stats["win_rate"], stats["net_pnl"])
 """
+
 from __future__ import annotations
 
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,9 @@ class AnalyticsService:
     """
 
     def __init__(self, cache_ttl_s: float = 60.0) -> None:
-        self._cache_ttl  = cache_ttl_s
-        self._cache:     Dict[str, Any] = {}
-        self._cache_ts:  Dict[str, float] = {}
+        self._cache_ttl = cache_ttl_s
+        self._cache: Dict[str, Any] = {}
+        self._cache_ts: Dict[str, float] = {}
 
     # ── Public API ──────────────────────────────────────────────────────────── #
 
@@ -56,7 +57,7 @@ class AnalyticsService:
             return self._cache[cache_key]
 
         trades = await self._fetch_closed_trades(days)
-        stats  = self._compute_stats(trades)
+        stats = self._compute_stats(trades)
         self._set_cache(cache_key, stats)
         return stats
 
@@ -101,17 +102,17 @@ class AnalyticsService:
             active_signals = await self._count_active_signals()
 
             summary = {
-                "total_trades":   stats.get("total_trades", 0),
-                "win_rate":       round(stats.get("win_rate", 0.0), 4),
-                "total_pnl":      round(stats.get("net_pnl", 0.0), 2),
-                "avg_rr":         round(stats.get("avg_rr", 0.0), 3),
+                "total_trades": stats.get("total_trades", 0),
+                "win_rate": round(stats.get("win_rate", 0.0), 4),
+                "total_pnl": round(stats.get("net_pnl", 0.0), 2),
+                "avg_rr": round(stats.get("avg_rr", 0.0), 3),
                 "active_signals": active_signals,
-                "max_drawdown":   round(stats.get("max_drawdown", 0.0), 4),
-                "best_trade":     round(stats.get("best_trade", 0.0), 2),
-                "worst_trade":    round(stats.get("worst_trade", 0.0), 2),
-                "data_source":    "live_db",
-                "period_days":    30,
-                "as_of":          datetime.now(timezone.utc).isoformat(),
+                "max_drawdown": round(stats.get("max_drawdown", 0.0), 4),
+                "best_trade": round(stats.get("best_trade", 0.0), 2),
+                "worst_trade": round(stats.get("worst_trade", 0.0), 2),
+                "data_source": "live_db",
+                "period_days": 30,
+                "as_of": datetime.now(timezone.utc).isoformat(),
             }
             self._set_cache(cache_key, summary)
             return summary
@@ -120,17 +121,17 @@ class AnalyticsService:
             logger.warning("get_analytics_summary DB error: %s — returning zeros", exc)
             # Graceful fallback — never crash dashboard
             return {
-                "total_trades":   0,
-                "win_rate":       0.0,
-                "total_pnl":      0.0,
-                "avg_rr":         0.0,
+                "total_trades": 0,
+                "win_rate": 0.0,
+                "total_pnl": 0.0,
+                "avg_rr": 0.0,
                 "active_signals": 0,
-                "max_drawdown":   0.0,
-                "best_trade":     0.0,
-                "worst_trade":    0.0,
-                "data_source":    "fallback_db_error",
-                "period_days":    30,
-                "as_of":          datetime.now(timezone.utc).isoformat(),
+                "max_drawdown": 0.0,
+                "best_trade": 0.0,
+                "worst_trade": 0.0,
+                "data_source": "fallback_db_error",
+                "period_days": 30,
+                "as_of": datetime.now(timezone.utc).isoformat(),
             }
 
     # ── Computation ──────────────────────────────────────────────────────────── #
@@ -140,29 +141,29 @@ class AnalyticsService:
         """Derive key metrics from a list of closed trade records."""
         if not trades:
             return {
-                "total_trades":   0,
+                "total_trades": 0,
                 "winning_trades": 0,
-                "losing_trades":  0,
-                "win_rate":       0.0,
-                "net_pnl":        0.0,
-                "gross_pnl":      0.0,
-                "max_drawdown":   0.0,
-                "avg_rr":         0.0,
-                "best_trade":     0.0,
-                "worst_trade":    0.0,
+                "losing_trades": 0,
+                "win_rate": 0.0,
+                "net_pnl": 0.0,
+                "gross_pnl": 0.0,
+                "max_drawdown": 0.0,
+                "avg_rr": 0.0,
+                "best_trade": 0.0,
+                "worst_trade": 0.0,
             }
 
-        pnls     = [float(t.get("pnl", 0.0)) for t in trades]
-        rrs      = [float(t.get("risk_reward", 0.0)) for t in trades if t.get("risk_reward")]
-        winners  = [p for p in pnls if p > 0]
-        losers   = [p for p in pnls if p < 0]
-        gross    = sum(winners)
-        net      = sum(pnls)
+        pnls = [float(t.get("pnl", 0.0)) for t in trades]
+        rrs = [float(t.get("risk_reward", 0.0)) for t in trades if t.get("risk_reward")]
+        winners = [p for p in pnls if p > 0]
+        losers = [p for p in pnls if p < 0]
+        gross = sum(winners)
+        net = sum(pnls)
 
         # Max drawdown: largest peak-to-trough drop in cumulative P&L
         cumulative = 0.0
-        peak       = 0.0
-        max_dd     = 0.0
+        peak = 0.0
+        max_dd = 0.0
         for p in pnls:
             cumulative += p
             if cumulative > peak:
@@ -172,26 +173,25 @@ class AnalyticsService:
                 max_dd = dd
 
         return {
-            "total_trades":   len(trades),
+            "total_trades": len(trades),
             "winning_trades": len(winners),
-            "losing_trades":  len(losers),
-            "win_rate":       len(winners) / len(trades) if trades else 0.0,
-            "net_pnl":        round(net, 2),
-            "gross_pnl":      round(gross, 2),
-            "max_drawdown":   round(max_dd, 4),
-            "avg_rr":         round(sum(rrs) / len(rrs), 3) if rrs else 0.0,
-            "best_trade":     round(max(pnls), 2) if pnls else 0.0,
-            "worst_trade":    round(min(pnls), 2) if pnls else 0.0,
+            "losing_trades": len(losers),
+            "win_rate": len(winners) / len(trades) if trades else 0.0,
+            "net_pnl": round(net, 2),
+            "gross_pnl": round(gross, 2),
+            "max_drawdown": round(max_dd, 4),
+            "avg_rr": round(sum(rrs) / len(rrs), 3) if rrs else 0.0,
+            "best_trade": round(max(pnls), 2) if pnls else 0.0,
+            "worst_trade": round(min(pnls), 2) if pnls else 0.0,
         }
 
     # ── DB helpers ───────────────────────────────────────────────────────────── #
 
-    async def _fetch_closed_trades(
-        self, days: int
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_closed_trades(self, days: int) -> List[Dict[str, Any]]:
         """Fetch closed trades from Supabase for the last *days* days."""
         try:
             from backend.database.connection import get_db_client
+
             db = get_db_client()
             since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
             result = (
@@ -211,12 +211,10 @@ class AnalyticsService:
         """Count active (pending) signals from DB."""
         try:
             from backend.database.connection import get_db_client
+
             db = get_db_client()
             result = (
-                db.table("signals")
-                .select("id", count="exact")
-                .eq("status", "ACTIVE")
-                .execute()
+                db.table("signals").select("id", count="exact").eq("status", "ACTIVE").execute()
             )
             return result.count or 0
         except Exception as exc:
@@ -231,7 +229,7 @@ class AnalyticsService:
         return (time.monotonic() - self._cache_ts.get(key, 0)) < self._cache_ttl
 
     def _set_cache(self, key: str, value: Any) -> None:
-        self._cache[key]    = value
+        self._cache[key] = value
         self._cache_ts[key] = time.monotonic()
 
     def invalidate_cache(self) -> None:

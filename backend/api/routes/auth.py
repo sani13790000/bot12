@@ -10,6 +10,7 @@ SEC-18 registration rate-limit: 5 per hour per IP
 SEC-19 asyncio.Lock used properly for lockout
 PROD-FIX-4: TokenResponse now includes access_token, refresh_token, user
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,12 +18,14 @@ import logging
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from backend.core.client_ip import get_client_ip
 from backend.core.config import get_settings
+from backend.core.deps import get_current_user, get_db
 from backend.core.security import (
     create_access_token,
     create_refresh_token,
@@ -30,21 +33,19 @@ from backend.core.security import (
     validate_refresh_token,
     verify_password,
 )
-from backend.core.deps import get_current_user, get_db
-from backend.core.client_ip import get_client_ip
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["Authentication"])
 
 _LOCKOUT_MAX_ATTEMPTS: int = 5
-_LOCKOUT_WINDOW_SEC:   int = 15 * 60
-_MAX_TRACKED_IPS:      int = 50_000
-_REG_MAX:    int = 5
+_LOCKOUT_WINDOW_SEC: int = 15 * 60
+_MAX_TRACKED_IPS: int = 50_000
+_REG_MAX: int = 5
 _REG_WINDOW: int = 3600
 
-_attempts:      Dict[str, deque] = defaultdict(lambda: deque(maxlen=_LOCKOUT_MAX_ATTEMPTS))
+_attempts: Dict[str, deque] = defaultdict(lambda: deque(maxlen=_LOCKOUT_MAX_ATTEMPTS))
 _lockout_until: Dict[str, float] = {}
-_reg_attempts:  Dict[str, deque] = defaultdict(lambda: deque(maxlen=_REG_MAX))
+_reg_attempts: Dict[str, deque] = defaultdict(lambda: deque(maxlen=_REG_MAX))
 _lock = asyncio.Lock()
 
 _DUMMY_HASH: str = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
@@ -102,18 +103,22 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     is_prod = settings.ENVIRONMENT == "production"
     kw = dict(httponly=True, secure=is_prod, samesite="strict", path="/")
     response.set_cookie(
-        key="access_token", value=access_token,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, **kw,
+        key="access_token",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **kw,
     )
     response.set_cookie(
-        key="refresh_token", value=refresh_token,
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86_400, **kw,
+        key="refresh_token",
+        value=refresh_token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86_400,
+        **kw,
     )
 
 
 class RegisterRequest(BaseModel):
-    email:     EmailStr
-    password:  str = Field(min_length=8, max_length=72)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=72)
     full_name: str = Field(min_length=1, max_length=100)
 
     @field_validator("password")
@@ -127,7 +132,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email:    EmailStr
+    email: EmailStr
     password: str = Field(min_length=1, max_length=72)
 
 
@@ -135,11 +140,12 @@ class TokenResponse(BaseModel):
     """PROD-FIX-4: Include tokens in response body for Bearer header auth.
     httpOnly cookie is ALSO set for refresh endpoint security (dual mode).
     """
-    token_type:    str  = "bearer"
-    expires_in:    int
-    access_token:  str  = ""
-    refresh_token: str  = ""
-    user:          dict = {}
+
+    token_type: str = "bearer"
+    expires_in: int
+    access_token: str = ""
+    refresh_token: str = ""
+    user: dict = {}
 
 
 async def _store_refresh_jti(db, user_id: str, jti: str) -> None:
@@ -195,16 +201,19 @@ async def register(
     hashed = hash_password(body.password)
     now = datetime.now(timezone.utc).isoformat()
     try:
-        result = await db.insert("users", {
-            "email":         body.email,
-            "password_hash": hashed,
-            "full_name":     body.full_name,
-            "role":          "user",
-            "is_active":     True,
-            "is_blocked":    False,
-            "created_at":    now,
-            "updated_at":    now,
-        })
+        result = await db.insert(
+            "users",
+            {
+                "email": body.email,
+                "password_hash": hashed,
+                "full_name": body.full_name,
+                "role": "user",
+                "is_active": True,
+                "is_blocked": False,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
         user = result[0] if result else None
         if not user:
             raise HTTPException(status_code=500, detail="Registration failed")
@@ -244,7 +253,8 @@ async def login(
         )
     try:
         user = await db.select_one(
-            "users", {"email": body.email},
+            "users",
+            {"email": body.email},
             columns="id,email,password_hash,role,is_active",
         )
     except Exception as exc:
@@ -299,7 +309,7 @@ async def refresh_token(
             detail="Invalid refresh token",
         )
     user_id = payload.get("sub")
-    jti     = payload.get("jti")
+    jti = payload.get("jti")
     if not user_id or not jti:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -362,5 +372,5 @@ async def logout(
 async def get_me(current_user: dict = Depends(get_current_user)) -> dict:
     return {
         "user_id": current_user.get("sub"),
-        "role":    current_user.get("role"),
+        "role": current_user.get("role"),
     }

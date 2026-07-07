@@ -17,11 +17,11 @@ Galaxy Vast AI Trading Platform
 
 from __future__ import annotations
 
+import asyncio
 import math
 import random
-import asyncio
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from ...core.logger import get_logger
 from .engine import BacktestTrade
@@ -36,6 +36,7 @@ class MonteCarloResult:
 
     شامل توزیع احتمال نتایج در N شبیه‌سازی مختلف.
     """
+
     simulations_count: int
     initial_balance: float
 
@@ -49,10 +50,10 @@ class MonteCarloResult:
     # ─── توزیع Max Drawdown ───
     median_max_drawdown: float
     worst_max_drawdown: float
-    probability_ruin: float        # احتمال رسیدن drawdown به ۵۰٪+
+    probability_ruin: float  # احتمال رسیدن drawdown به ۵۰٪+
 
     # ─── Value at Risk ───
-    var_90: float    # در ۹۰٪ موارد ضرر از این مقدار بیشتر نیست
+    var_90: float  # در ۹۰٪ موارد ضرر از این مقدار بیشتر نیست
     var_95: float
     var_99: float
 
@@ -131,10 +132,7 @@ class MonteCarloSimulator:
         if len(trades) < 10:
             raise ValueError("حداقل ۱۰ معامله برای مونت کارلو لازم است")
 
-        logger.info(
-            f"شروع مونت کارلو | معاملات: {len(trades)} | "
-            f"شبیه‌سازی: {self._simulations}"
-        )
+        logger.info(f"شروع مونت کارلو | معاملات: {len(trades)} | شبیه‌سازی: {self._simulations}")
 
         pnl_list = [t.pnl_money for t in trades]
         ruin_threshold = initial_balance * (1 - ruin_threshold_percent / 100)
@@ -179,10 +177,7 @@ class MonteCarloSimulator:
         all_final_balances.sort()
         all_max_drawdowns.sort()
 
-        returns = [
-            ((b - initial_balance) / initial_balance) * 100
-            for b in all_final_balances
-        ]
+        returns = [((b - initial_balance) / initial_balance) * 100 for b in all_final_balances]
 
         median_idx = len(returns) // 2
         mean_return = sum(returns) / len(returns)
@@ -229,7 +224,7 @@ class MonteCarloSimulator:
 
         logger.info(
             f"مونت کارلو کامل | "
-            f"احتمال سود: {result.probability_profit*100:.1f}% | "
+            f"احتمال سود: {result.probability_profit * 100:.1f}% | "
             f"Median Return: {result.median_return:.1f}% | "
             f"Worst DD: {result.worst_max_drawdown:.1f}%"
         )

@@ -10,6 +10,7 @@ Fixes applied:
   SEC-6: Suspicious pattern detection (unchanged)
   SEC-7: Security event logging (unchanged)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -21,7 +22,6 @@ import threading
 import time
 from typing import Any, Dict, List, Optional, Set
 
-from .config import get_settings
 from .logger import get_logger
 
 logger = get_logger("core.security")
@@ -98,6 +98,7 @@ _load_blacklist_from_disk()
 
 
 # ── Request Signature Validation ─────────────────────────────────────────────────────
+
 
 def validate_request_signature(
     body: bytes,
@@ -180,6 +181,7 @@ def detect_suspicious_input(value: str) -> bool:
 
 
 # ── Security Event Logger ───────────────────────────────────────────────────────────────
+
 
 def log_security_event(
     event_type: str,

@@ -1,10 +1,13 @@
 """PHASE 35 - FINAL ACCEPTANCE CRITERIA"""
+
 from __future__ import annotations
+
 import pytest
 
 try:
+    from backend.core.enums import MarketSession, TradeDirection, TradingSession
     from backend.risk.kill_switch import KillSwitch, KillSwitchState
-    from backend.core.enums import TradeDirection, MarketSession, TradingSession
+
     HAS_MODULES = True
 except ImportError:
     HAS_MODULES = False

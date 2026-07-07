@@ -19,24 +19,27 @@ Galaxy Vast AI Trading Platform
     SUPABASE_KEY      — کلید Supabase
     BACKEND_URL       — آدرس backend (پیش‌فرض: http://localhost:8000)
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
 import time
-import pytest
+
 import httpx
+import pytest
 
 # ── تنظیمات ──────────────────────────────────────────────────────────────── #
-GW_URL      = os.environ.get("MT5_GATEWAY_URL", "http://localhost:8080")
-GW_KEY      = os.environ.get("GATEWAY_API_KEY", "")
+GW_URL = os.environ.get("MT5_GATEWAY_URL", "http://localhost:8080")
+GW_KEY = os.environ.get("GATEWAY_API_KEY", "")
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
-GW_HEADERS  = {"X-Gateway-Key": GW_KEY} if GW_KEY else {}
+GW_HEADERS = {"X-Gateway-Key": GW_KEY} if GW_KEY else {}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # S-A: MT5 Gateway Live Tests
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.live
 class TestGatewayLive:
@@ -100,7 +103,9 @@ class TestGatewayLive:
         """
         demo_mode = os.environ.get("MT5_DEMO_MODE", "true").lower()
         if demo_mode not in ("false", "0", "no", "off"):
-            pytest.skip("MT5_DEMO_MODE=true — تست trade واقعی skip شد. برای اجرا: MT5_DEMO_MODE=false")
+            pytest.skip(
+                "MT5_DEMO_MODE=true — تست trade واقعی skip شد. برای اجرا: MT5_DEMO_MODE=false"
+            )
 
         open_payload = {
             "symbol": "EURUSD",
@@ -108,9 +113,11 @@ class TestGatewayLive:
             "lot": 0.01,
             "sl": None,
             "tp": None,
-            "comment": "pytest_phase_s"
+            "comment": "pytest_phase_s",
         }
-        r_open = httpx.post(f"{GW_URL}/order/open", json=open_payload, headers=GW_HEADERS, timeout=15.0)
+        r_open = httpx.post(
+            f"{GW_URL}/order/open", json=open_payload, headers=GW_HEADERS, timeout=15.0
+        )
         assert r_open.status_code == 200, f"open order failed: {r_open.status_code} {r_open.text}"
         open_data = r_open.json()
         assert "ticket" in open_data, f"ticket در پاسخ open نیست: {open_data}"
@@ -120,8 +127,12 @@ class TestGatewayLive:
         time.sleep(1)
 
         close_payload = {"ticket": ticket}
-        r_close = httpx.post(f"{GW_URL}/order/close", json=close_payload, headers=GW_HEADERS, timeout=15.0)
-        assert r_close.status_code == 200, f"close order failed: {r_close.status_code} {r_close.text}"
+        r_close = httpx.post(
+            f"{GW_URL}/order/close", json=close_payload, headers=GW_HEADERS, timeout=15.0
+        )
+        assert r_close.status_code == 200, (
+            f"close order failed: {r_close.status_code} {r_close.text}"
+        )
         close_data = r_close.json()
         assert close_data.get("closed") is True, f"closed=False در پاسخ: {close_data}"
 
@@ -129,6 +140,7 @@ class TestGatewayLive:
 # ══════════════════════════════════════════════════════════════════════════════
 # S-B: Backend HTTP Live Tests
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.http
 class TestBackendLive:
@@ -179,6 +191,7 @@ class TestBackendLive:
 # S-C: Supabase Live Tests
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.db
 class TestSupabaseLive:
     """
@@ -193,6 +206,7 @@ class TestSupabaseLive:
         if not supabase_url or not supabase_key:
             pytest.skip("SUPABASE_URL یا SUPABASE_KEY تنظیم نشده")
         from backend.database.connection import get_db_client
+
         db = get_db_client()
         result = db.table("signals").select("id").limit(1).execute()
         assert result is not None
@@ -203,6 +217,7 @@ class TestSupabaseLive:
         if not supabase_url:
             pytest.skip("SUPABASE_URL تنظیم نشده")
         from backend.database.connection import get_db_client
+
         db = get_db_client()
         result = db.table("signals").select("id,symbol,direction,confidence").limit(5).execute()
         assert hasattr(result, "data")
@@ -213,6 +228,7 @@ class TestSupabaseLive:
         if not supabase_url:
             pytest.skip("SUPABASE_URL تنظیم نشده")
         from backend.database.connection import get_db_client
+
         db = get_db_client()
         result = db.table("trades").select("id,ticket,symbol,direction").limit(5).execute()
         assert hasattr(result, "data")
@@ -223,6 +239,7 @@ class TestSupabaseLive:
         if not supabase_url:
             pytest.skip("SUPABASE_URL تنظیم نشده")
         from backend.database.connection import get_db_client
+
         db = get_db_client()
         result = db.table("users").select("id,telegram_id").limit(5).execute()
         assert hasattr(result, "data")
@@ -231,6 +248,7 @@ class TestSupabaseLive:
 # ══════════════════════════════════════════════════════════════════════════════
 # S-D: MT5Connector Live Integration
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.live
 class TestMT5ConnectorLive:
@@ -245,6 +263,7 @@ class TestMT5ConnectorLive:
         if not GW_KEY:
             pytest.skip("GATEWAY_API_KEY تنظیم نشده")
         from backend.execution.mt5_connector import MT5Connector
+
         connector = MT5Connector(base_url=GW_URL, demo=False)
         await connector.connect()
         assert connector._connected is True
@@ -259,6 +278,7 @@ class TestMT5ConnectorLive:
         if not GW_KEY:
             pytest.skip("GATEWAY_API_KEY تنظیم نشده")
         from backend.execution.mt5_connector import MT5Connector
+
         async with MT5Connector(base_url=GW_URL, demo=False) as connector:
             candles = await connector.get_candles("EURUSD", "H1", 10)
             assert len(candles) > 0
@@ -273,6 +293,7 @@ class TestMT5ConnectorLive:
         if not GW_KEY:
             pytest.skip("GATEWAY_API_KEY تنظیم نشده")
         from backend.execution.mt5_connector import MT5Connector
+
         async with MT5Connector(base_url=GW_URL, demo=False) as connector:
             info = await connector.get_account_info()
             assert "balance" in info
@@ -291,10 +312,10 @@ class TestMT5ConnectorLive:
         if not GW_KEY:
             pytest.skip("GATEWAY_API_KEY تنظیم نشده")
 
-        from backend.execution.mt5_connector import MT5Connector
-        from backend.analysis.smc_engine import SMCEngine, Candle
         from backend.analysis.decision_engine import DecisionEngine, EngineVote, TradeDirection
+        from backend.analysis.smc_engine import Candle, SMCEngine
         from backend.execution.execution_service import ExecutionService, TradeSignal
+        from backend.execution.mt5_connector import MT5Connector
 
         async with MT5Connector(base_url=GW_URL, demo=False) as connector:
             raw_candles = await connector.get_candles("EURUSD", "H1", 200)
@@ -303,7 +324,10 @@ class TestMT5ConnectorLive:
             candles = [
                 Candle(
                     time=int(c.time.timestamp()),
-                    open=c.open, high=c.high, low=c.low, close=c.close,
+                    open=c.open,
+                    high=c.high,
+                    low=c.low,
+                    close=c.close,
                     tick_volume=c.volume,
                 )
                 for c in raw_candles
@@ -323,7 +347,9 @@ class TestMT5ConnectorLive:
             decision = de.decide(votes, "EURUSD", "H1")
 
             if not decision.should_trade:
-                pytest.skip(f"DecisionEngine تصمیم به trade نگرفت: confidence={analysis.confidence:.2f}")
+                pytest.skip(
+                    f"DecisionEngine تصمیم به trade نگرفت: confidence={analysis.confidence:.2f}"
+                )
 
             svc = ExecutionService(connector=connector)
             sig = TradeSignal(

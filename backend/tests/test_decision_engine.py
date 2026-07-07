@@ -6,26 +6,23 @@
 نویسنده: MT5 Trading Team
 """
 
-import pytest
-import numpy as np
-from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
+
+import numpy as np
 
 from backend.analysis.decision_engine import (
     DecisionEngine,
     DecisionResult,
     MultiTimeframeEngine,
-    MultiTimeframeResult,
     TimeframeAnalysis,
     TrendDirection,
-    DecisionStage,
 )
-
 
 # =====================================================
 # Helper: ساخت داده ورودی تستی
 # =====================================================
+
 
 def make_decision_input(
     symbol="EURUSD",
@@ -34,7 +31,7 @@ def make_decision_input(
     spread=0.0002,
     atr=0.0015,
     session_score=80,
-    override_direction=None
+    override_direction=None,
 ) -> Dict[str, Any]:
     """ساخت DecisionInput تستی"""
     return {
@@ -56,7 +53,7 @@ def make_decision_input(
                 "closes": np.array([1.0992 + i * 0.0001 for i in range(100)]),
                 "volumes": np.array([1000.0] * 100),
                 "timestamps": [datetime.utcnow()] * 100,
-            }
+            },
         },
         "smc_data": {
             "trend": "bullish",
@@ -64,7 +61,9 @@ def make_decision_input(
             "structure_pattern": "HH_HL",
             "bos_events": [{"direction": "bullish", "price": 1.0980}],
             "choch_events": [],
-            "order_blocks": [{"zone_type": "bullish_ob", "high": 1.0970, "low": 1.0960, "strength": 0.8}],
+            "order_blocks": [
+                {"zone_type": "bullish_ob", "high": 1.0970, "low": 1.0960, "strength": 0.8}
+            ],
             "fvg_zones": [{"zone_type": "bullish_fvg", "high": 1.0965, "low": 1.0960}],
             "liquidity_levels": [],
             "key_levels": {"resistance": 1.1050, "support": 1.0950},
@@ -96,7 +95,7 @@ def make_smc_score_result(direction="bullish", score=75) -> Dict[str, Any]:
             "fvg": 65,
             "liquidity": 75,
             "session": 80,
-        }
+        },
     }
 
 
@@ -113,6 +112,7 @@ def make_pa_score_result(bias="bullish", score=70) -> Dict[str, Any]:
 # =====================================================
 # تست DecisionEngine
 # =====================================================
+
 
 class TestDecisionEngine:
     """تست موتور تصمیم‌گیری"""
@@ -258,6 +258,7 @@ class TestDecisionEngine:
 # تست MultiTimeframeEngine
 # =====================================================
 
+
 class TestMultiTimeframeEngine:
     """تست موتور چند تایم‌فریمی"""
 
@@ -336,6 +337,7 @@ class TestMultiTimeframeEngine:
 # تست DecisionResult
 # =====================================================
 
+
 class TestDecisionResult:
     """تست ساختار DecisionResult"""
 
@@ -387,6 +389,7 @@ class TestDecisionResult:
 # =====================================================
 # تست یکپارچه Decision Pipeline
 # =====================================================
+
 
 class TestDecisionPipelineIntegration:
     """تست یکپارچه pipeline کامل"""

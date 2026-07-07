@@ -7,12 +7,13 @@ FastAPI process. All primitives are asyncio-based (no threads).
 
 FIX: nested f-string f"sched:{"name"}" replaced with string concat.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Coroutine, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TaskInfo:
     """Metadata for a registered periodic task."""
-    name:        str
-    coro_fn:     Callable[..., Coroutine[Any, Any, None]]
-    interval_s:  float
-    enabled:     bool  = True
-    last_run:    float = 0.0
-    run_count:   int   = 0
-    error_count: int   = 0
+
+    name: str
+    coro_fn: Callable[..., Coroutine[Any, Any, None]]
+    interval_s: float
+    enabled: bool = True
+    last_run: float = 0.0
+    run_count: int = 0
+    error_count: int = 0
 
 
 class Scheduler:
@@ -44,9 +46,9 @@ class Scheduler:
 
     def __init__(self) -> None:
         self._registry: Dict[str, TaskInfo] = {}
-        self._tasks:    Dict[str, asyncio.Task] = {}
-        self._running:  bool = False
-        self._lock:     asyncio.Lock = asyncio.Lock()
+        self._tasks: Dict[str, asyncio.Task] = {}
+        self._running: bool = False
+        self._lock: asyncio.Lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -54,10 +56,10 @@ class Scheduler:
 
     def register(
         self,
-        name:       str,
-        coro_fn:    Callable[..., Coroutine[Any, Any, None]],
+        name: str,
+        coro_fn: Callable[..., Coroutine[Any, Any, None]],
         interval_s: float = 60.0,
-        enabled:    bool  = True,
+        enabled: bool = True,
     ) -> None:
         """Register a periodic coroutine. Call before start()."""
         self._registry[name] = TaskInfo(
@@ -80,8 +82,11 @@ class Scheduler:
                 continue
             task = asyncio.create_task(self._run_task(name), name=("sched:" + str(name)))
             task.add_done_callback(
-                lambda t: logger.warning("[Scheduler] DEAD task: '%s'", t.get_name())
-                if t.cancelled() or t.exception() else None
+                lambda t: (
+                    logger.warning("[Scheduler] DEAD task: '%s'", t.get_name())
+                    if t.cancelled() or t.exception()
+                    else None
+                )
             )
             self._tasks[name] = task
         logger.info("[Scheduler] started %d tasks", len(self._tasks))
@@ -128,7 +133,10 @@ class Scheduler:
                 info.error_count += 1
                 logger.error(
                     "[Scheduler] '%s' error #%d: %s",
-                    name, info.error_count, exc, exc_info=True,
+                    name,
+                    info.error_count,
+                    exc,
+                    exc_info=True,
                 )
         logger.info("[Scheduler] task '%s' stopped", name)
 

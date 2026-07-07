@@ -4,11 +4,12 @@ Galaxy Vast AI Trading Platform
 Agent 4: AI Prediction Agent
 مسئولیت: پیش‌بینی XGBoost، probability، confidence
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 
 class AIPredictionAgent(BaseAgent):
@@ -31,16 +32,17 @@ class AIPredictionAgent(BaseAgent):
         probability = float(ai_output.get("probability", 0.0))
         ai_confidence = float(ai_output.get("confidence", 0.0))
         risk_level = ai_output.get("risk", "UNKNOWN")
-        model_auc  = float(ai_output.get("model_auc", 0.0))
+        model_auc = float(ai_output.get("model_auc", 0.0))
 
         if not ai_output:
             # بدون مدل — از decision_score استفاده می‌شود
             decision_score = float(context.get("decision_score", 50.0))
-            score      = decision_score
+            score = decision_score
             confidence = 40.0
             reasons.append(f"No ML model — using decision_score={decision_score:.1f}")
             return AgentVote(
-                score=score, confidence=confidence,
+                score=score,
+                confidence=confidence,
                 direction=context.get("direction", "NEUTRAL"),
                 status=AgentStatus.WARNING,
                 reason=" | ".join(reasons),
@@ -64,7 +66,7 @@ class AIPredictionAgent(BaseAgent):
         if model_auc > 0:
             reasons.append(f"Model AUC={model_auc:.3f}")
 
-        score      = max(0.0, min(100.0, score))
+        score = max(0.0, min(100.0, score))
         confidence = max(0.0, min(100.0, confidence))
 
         return AgentVote(

@@ -1,17 +1,14 @@
 # test_phase14_release.py - Phase 14: 96 tests
 import base64
 import hashlib
-import hmac
 import json
-import os
+import shutil
 import sys
+import tempfile
 import time
 import zipfile
 from dataclasses import asdict
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import tempfile
-import shutil
 
 import pytest
 
@@ -19,18 +16,22 @@ SCRIPTS = Path(__file__).parent.parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from build_release import (
-    ReleaseManifest, ReleaseResult,
-    sha256_file, sha256_bytes, git_sha,
-    compile_ea, verify_no_source_leak,
-    generate_checksums, generate_download_token,
-    verify_download_token, build_release,
-    SOURCE_EXTENSIONS, RELEASE_DIR, EA_SOURCE,
+    SOURCE_EXTENSIONS,
+    ReleaseManifest,
+    build_release,
+    generate_checksums,
+    generate_download_token,
+    verify_download_token,
+    verify_no_source_leak,
 )
-from verify_release import verify_zip, VerifyResult
 from generate_download_token import (
-    generate_token, verify_token,
+    generate_token,
+    verify_token,
+)
+from generate_download_token import (
     sha256_file as gdt_sha256,
 )
+from verify_release import VerifyResult, verify_zip
 
 SECRET = "test-build-secret-phase14"
 
@@ -38,7 +39,8 @@ SECRET = "test-build-secret-phase14"
 class TestReleaseManifest:
     def _manifest(self) -> ReleaseManifest:
         return ReleaseManifest(
-            version="3.20", env="production",
+            version="3.20",
+            env="production",
             build_time_utc="2026-06-26T16:00:00+00:00",
             git_sha="abc1234",
             ea_source_sha256="a" * 64,
@@ -101,8 +103,15 @@ class TestReleaseManifest:
     def test_manifest_has_all_required_fields(self):
         m = self._manifest()
         d = asdict(m)
-        for f in ["version", "env", "build_time_utc", "git_sha",
-                  "ea_source_sha256", "ea_binary_sha256", "files"]:
+        for f in [
+            "version",
+            "env",
+            "build_time_utc",
+            "git_sha",
+            "ea_source_sha256",
+            "ea_binary_sha256",
+            "files",
+        ]:
             assert f in d
 
     def test_source_sha_vs_binary_sha_different(self):
@@ -124,7 +133,9 @@ class TestVerifyNoSourceLeak:
         return zp
 
     def test_clean_zip_no_violations(self, tmp_path):
-        zp = self._make_zip(["MQL5/Experts/EA.ex5", "README_INSTALL.txt", "manifest.json"], tmp_path)
+        zp = self._make_zip(
+            ["MQL5/Experts/EA.ex5", "README_INSTALL.txt", "manifest.json"], tmp_path
+        )
         assert verify_no_source_leak(zp) == []
 
     def test_mq5_detected(self, tmp_path):
@@ -182,23 +193,28 @@ class TestVerifyNoSourceLeak:
 
 class TestGenerateChecksums:
     def test_header_present(self, tmp_path):
-        f = tmp_path / "a.ex5"; f.write_bytes(b"binary")
+        f = tmp_path / "a.ex5"
+        f.write_bytes(b"binary")
         cs = generate_checksums({"a.ex5": f})
         assert "SHA-256" in cs
 
     def test_sha256_correct(self, tmp_path):
-        f = tmp_path / "a.txt"; f.write_bytes(b"hello")
+        f = tmp_path / "a.txt"
+        f.write_bytes(b"hello")
         cs = generate_checksums({"a.txt": f})
         assert hashlib.sha256(b"hello").hexdigest() in cs
 
     def test_multiple_files(self, tmp_path):
-        f1 = tmp_path / "a.ex5"; f1.write_bytes(b"aaa")
-        f2 = tmp_path / "b.txt"; f2.write_bytes(b"bbb")
+        f1 = tmp_path / "a.ex5"
+        f1.write_bytes(b"aaa")
+        f2 = tmp_path / "b.txt"
+        f2.write_bytes(b"bbb")
         cs = generate_checksums({"a.ex5": f1, "b.txt": f2})
         assert "a.ex5" in cs and "b.txt" in cs
 
     def test_gnu_format_double_space(self, tmp_path):
-        f = tmp_path / "x.ex5"; f.write_bytes(b"x")
+        f = tmp_path / "x.ex5"
+        f.write_bytes(b"x")
         cs = generate_checksums({"x.ex5": f})
         lines = [l for l in cs.splitlines() if not l.startswith("#") and l.strip()]
         assert "  " in lines[0]
@@ -208,41 +224,49 @@ class TestGenerateChecksums:
         assert "SHA-256" in cs
 
     def test_sorted_order(self, tmp_path):
-        fb = tmp_path / "b.txt"; fb.write_bytes(b"b")
-        fa = tmp_path / "a.txt"; fa.write_bytes(b"a")
+        fb = tmp_path / "b.txt"
+        fb.write_bytes(b"b")
+        fa = tmp_path / "a.txt"
+        fa.write_bytes(b"a")
         cs = generate_checksums({"b.txt": fb, "a.txt": fa})
         lines = [l for l in cs.splitlines() if not l.startswith("#") and l.strip()]
         names = [l.split("  ")[1] for l in lines]
         assert names == sorted(names)
 
     def test_large_file(self, tmp_path):
-        f = tmp_path / "large.ex5"; f.write_bytes(b"x" * 1_000_000)
+        f = tmp_path / "large.ex5"
+        f.write_bytes(b"x" * 1_000_000)
         cs = generate_checksums({"large.ex5": f})
         assert hashlib.sha256(b"x" * 1_000_000).hexdigest() in cs
 
     def test_binary_content(self, tmp_path):
-        f = tmp_path / "a.ex5"; f.write_bytes(bytes(range(256)))
+        f = tmp_path / "a.ex5"
+        f.write_bytes(bytes(range(256)))
         cs = generate_checksums({"a.ex5": f})
         assert hashlib.sha256(bytes(range(256))).hexdigest() in cs
 
     def test_unicode_filename(self, tmp_path):
-        f = tmp_path / "file.ex5"; f.write_bytes(b"u")
+        f = tmp_path / "file.ex5"
+        f.write_bytes(b"u")
         cs = generate_checksums({"MT5/Experts/EA.ex5": f})
         assert "MT5/Experts/EA.ex5" in cs
 
     def test_newline_terminated(self, tmp_path):
-        f = tmp_path / "a.ex5"; f.write_bytes(b"a")
+        f = tmp_path / "a.ex5"
+        f.write_bytes(b"a")
         cs = generate_checksums({"a.ex5": f})
         assert cs.endswith("\n")
 
     def test_no_private_data_in_checksums(self, tmp_path):
-        f = tmp_path / "a.ex5"; f.write_bytes(b"a")
+        f = tmp_path / "a.ex5"
+        f.write_bytes(b"a")
         cs = generate_checksums({"a.ex5": f})
         for secret in ["password", "key", "secret", "token"]:
             assert secret.lower() not in cs.lower()
 
     def test_sha256_length_64_chars(self, tmp_path):
-        f = tmp_path / "a.ex5"; f.write_bytes(b"a")
+        f = tmp_path / "a.ex5"
+        f.write_bytes(b"a")
         cs = generate_checksums({"a.ex5": f})
         lines = [l for l in cs.splitlines() if not l.startswith("#") and l.strip()]
         sha = lines[0].split("  ")[0]
@@ -305,7 +329,8 @@ class TestDownloadToken:
         assert p["max_downloads"] == 5
 
     def test_generate_token_gdt(self, tmp_path):
-        f = tmp_path / "a.zip"; f.write_bytes(b"zip")
+        f = tmp_path / "a.zip"
+        f.write_bytes(b"zip")
         sha = gdt_sha256(f)
         t = generate_token("3.20", sha, "cust_001", secret=SECRET)
         p = verify_token(t, SECRET)
@@ -350,10 +375,16 @@ class TestVerifyZip:
         ex5_sha = hashlib.sha256(ex5_data).hexdigest()
         readme_sha = hashlib.sha256(readme).hexdigest()
         checksums = f"# SHA-256 Checksums\n\n{ex5_sha}  MQL5/Experts/EA.ex5\n{readme_sha}  README_INSTALL.txt\n"
-        manifest = {"version": "3.20", "env": "production",
-                    "build_time_utc": "2026-06-26T00:00:00+00:00",
-                    "git_sha": "abc", "ea_source_sha256": "s" * 64,
-                    "ea_binary_sha256": ex5_sha, "files": [], "signature": ""}
+        manifest = {
+            "version": "3.20",
+            "env": "production",
+            "build_time_utc": "2026-06-26T00:00:00+00:00",
+            "git_sha": "abc",
+            "ea_source_sha256": "s" * 64,
+            "ea_binary_sha256": ex5_sha,
+            "files": [],
+            "signature": "",
+        }
         zp = tmp_path / "release.zip"
         with zipfile.ZipFile(zp, "w") as zf:
             zf.writestr("MQL5/Experts/EA.ex5", ex5_data)
@@ -389,8 +420,8 @@ class TestVerifyZip:
         with zipfile.ZipFile(zp, "w") as zf:
             zf.writestr("EA.ex5", b"real")
             zf.writestr("README_INSTALL.txt", "x")
-            zf.writestr("manifest.json", json.dumps({"ea_binary_sha256": "x"*64}))
-            zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n" + "a"*64 + "  EA.ex5\n")
+            zf.writestr("manifest.json", json.dumps({"ea_binary_sha256": "x" * 64}))
+            zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n" + "a" * 64 + "  EA.ex5\n")
         assert not verify_zip(zp).ok
 
     def test_nonexistent_file_fails(self, tmp_path):
@@ -405,7 +436,10 @@ class TestVerifyZip:
         with zipfile.ZipFile(zp, "w") as zf:
             zf.writestr("MQL5/EA.ex5", b"binary")
             zf.writestr("README_INSTALL.txt", "x")
-            zf.writestr("manifest.json", json.dumps({"ea_binary_sha256": "f"*64, "files": [], "signature": ""}))
+            zf.writestr(
+                "manifest.json",
+                json.dumps({"ea_binary_sha256": "f" * 64, "files": [], "signature": ""}),
+            )
             zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n")
         r = verify_zip(zp)
         assert not r.ok or r.warnings
@@ -420,8 +454,11 @@ class TestVerifyZip:
     def test_multiple_source_files_all_listed(self, tmp_path):
         zp = tmp_path / "r.zip"
         with zipfile.ZipFile(zp, "w") as zf:
-            zf.writestr("a.mq5", b"x"); zf.writestr("b.mqh", b"x"); zf.writestr("c.py", b"x")
-            zf.writestr("manifest.json", "{}"); zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n")
+            zf.writestr("a.mq5", b"x")
+            zf.writestr("b.mqh", b"x")
+            zf.writestr("c.py", b"x")
+            zf.writestr("manifest.json", "{}")
+            zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n")
             zf.writestr("README_INSTALL.txt", "x")
         r = verify_zip(zp)
         assert not r.ok and len(r.errors) >= 3
@@ -430,7 +467,8 @@ class TestVerifyZip:
         zp = tmp_path / "r.zip"
         with zipfile.ZipFile(zp, "w") as zf:
             zf.writestr("setup.sh", b"#!/bin/bash")
-            zf.writestr("manifest.json", "{}"); zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n")
+            zf.writestr("manifest.json", "{}")
+            zf.writestr("CHECKSUMS.txt", "# SHA-256\n\n")
             zf.writestr("README_INSTALL.txt", "x")
         assert not verify_zip(zp).ok
 
@@ -438,19 +476,24 @@ class TestVerifyZip:
 class TestBuildRelease:
     def setup_method(self):
         import build_release as br
+
         self._br = br
         self.tmp = Path(tempfile.mkdtemp())
         (self.tmp / "mql5" / "Experts" / "MT5Trading").mkdir(parents=True)
         mq5 = self.tmp / "mql5" / "Experts" / "MT5Trading" / "MT5TradingEA_Complete.mq5"
         mq5.write_text("// mock source")
-        self.old_ea = br.EA_SOURCE; self.old_rd = br.RELEASE_DIR; self.old_sa = br.SOURCE_ARCHIVE_DIR
+        self.old_ea = br.EA_SOURCE
+        self.old_rd = br.RELEASE_DIR
+        self.old_sa = br.SOURCE_ARCHIVE_DIR
         br.EA_SOURCE = mq5
         br.RELEASE_DIR = self.tmp / "releases"
         br.SOURCE_ARCHIVE_DIR = self.tmp / "releases" / "source_archive"
         br.RELEASE_DIR.mkdir()
 
     def teardown_method(self):
-        self._br.EA_SOURCE = self.old_ea; self._br.RELEASE_DIR = self.old_rd; self._br.SOURCE_ARCHIVE_DIR = self.old_sa
+        self._br.EA_SOURCE = self.old_ea
+        self._br.RELEASE_DIR = self.old_rd
+        self._br.SOURCE_ARCHIVE_DIR = self.old_sa
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def test_build_dry_run_succeeds(self):
@@ -514,7 +557,8 @@ class TestSourceProtectionFiles:
             Path(__file__).parent.parent.parent.parent / ".gitignore",
             Path(__file__).parent.parent.parent / ".gitignore_additions",
         ]:
-            if p.exists(): return p.read_text()
+            if p.exists():
+                return p.read_text()
         return ""
 
     def _get_dockerignore(self):
@@ -522,7 +566,8 @@ class TestSourceProtectionFiles:
             Path(__file__).parent.parent.parent.parent / ".dockerignore",
             Path(__file__).parent.parent.parent / ".dockerignore_additions",
         ]:
-            if p.exists(): return p.read_text()
+            if p.exists():
+                return p.read_text()
         return ""
 
     def test_gitignore_has_releases(self):
@@ -571,24 +616,51 @@ class TestEAReleaseWorkflow:
             Path(__file__).parent.parent.parent / ".github/workflows/ea_release.yml",
         ]
         for p in paths:
-            if p.exists(): return p.read_text()
+            if p.exists():
+                return p.read_text()
         return ""
 
-    def test_workflow_file_exists(self): assert self._load_workflow() != ""
-    def test_triggered_on_version_tags(self): assert "tags" in self._load_workflow()
-    def test_has_source_protection_job(self): assert "source-protection" in self._load_workflow()
-    def test_has_build_ea_job(self): assert "build-ea" in self._load_workflow()
-    def test_has_verify_step(self): assert "verify_release" in self._load_workflow() or "verify-release" in self._load_workflow()
-    def test_has_upload_artifact(self): assert "upload-artifact" in self._load_workflow()
+    def test_workflow_file_exists(self):
+        assert self._load_workflow() != ""
+
+    def test_triggered_on_version_tags(self):
+        assert "tags" in self._load_workflow()
+
+    def test_has_source_protection_job(self):
+        assert "source-protection" in self._load_workflow()
+
+    def test_has_build_ea_job(self):
+        assert "build-ea" in self._load_workflow()
+
+    def test_has_verify_step(self):
+        assert (
+            "verify_release" in self._load_workflow() or "verify-release" in self._load_workflow()
+        )
+
+    def test_has_upload_artifact(self):
+        assert "upload-artifact" in self._load_workflow()
+
     def test_has_no_source_extension_in_artifact(self):
         wf = self._load_workflow()
-        assert ".mq5" not in wf.replace("*.mq5", "") or "source leak" in wf.lower() or "SOURCE LEAK" in wf
-    def test_has_github_release_job(self): assert "github-release" in self._load_workflow() or "Release" in self._load_workflow()
+        assert (
+            ".mq5" not in wf.replace("*.mq5", "")
+            or "source leak" in wf.lower()
+            or "SOURCE LEAK" in wf
+        )
+
+    def test_has_github_release_job(self):
+        assert "github-release" in self._load_workflow() or "Release" in self._load_workflow()
+
     def test_needs_ordering_correct(self):
         wf = self._load_workflow()
         assert wf.find("build-ea") < wf.find("github-release")
+
     def test_has_final_source_check_before_publish(self):
         wf = self._load_workflow()
         assert "Final source" in wf or "final source" in wf or "SOURCE LEAK" in wf
-    def test_has_telegram_notify(self): assert "telegram" in self._load_workflow().lower() or "TELEGRAM" in self._load_workflow()
-    def test_has_build_secret_env(self): assert "BUILD_SECRET" in self._load_workflow()
+
+    def test_has_telegram_notify(self):
+        assert "telegram" in self._load_workflow().lower() or "TELEGRAM" in self._load_workflow()
+
+    def test_has_build_secret_env(self):
+        assert "BUILD_SECRET" in self._load_workflow()

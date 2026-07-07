@@ -12,6 +12,7 @@ Endpoints:
 
 BUG-AA1 fix: fake_trades renamed to mc_trades (cosmetic — logic unchanged)
 """
+
 from __future__ import annotations
 
 import logging
@@ -28,30 +29,30 @@ router = APIRouter(tags=["research"])
 
 
 class BacktestRunRequest(BaseModel):
-    symbol:          str   = Field(...,   description="Trading symbol e.g. EURUSD")
-    timeframe:       str   = Field("H1", description="MT5 timeframe: M1/M5/M15/H1/H4/D1")
-    start_date:      Optional[date] = None
-    end_date:        Optional[date] = None
-    strategy:        str   = Field("smc", description="Strategy: smc / pa / hybrid")
+    symbol: str = Field(..., description="Trading symbol e.g. EURUSD")
+    timeframe: str = Field("H1", description="MT5 timeframe: M1/M5/M15/H1/H4/D1")
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    strategy: str = Field("smc", description="Strategy: smc / pa / hybrid")
     initial_balance: float = Field(10_000.0, gt=0)
-    risk_pct:        float = Field(1.0, gt=0, le=10)
-    parameters:      Dict[str, Any] = Field(default_factory=dict)
+    risk_pct: float = Field(1.0, gt=0, le=10)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
 class MonteCarloRequest(BaseModel):
-    trades_pnl:       List[float] = Field(..., description="List of trade PnL values")
-    n_iterations:     int         = Field(1_000, ge=100, le=50_000)
-    confidence_level: float       = Field(0.95, ge=0.80, le=0.99)
+    trades_pnl: List[float] = Field(..., description="List of trade PnL values")
+    n_iterations: int = Field(1_000, ge=100, le=50_000)
+    confidence_level: float = Field(0.95, ge=0.80, le=0.99)
 
 
 class WalkForwardRequest(BaseModel):
-    symbol:     str   = Field(...)
-    timeframe:  str   = Field("H1")
+    symbol: str = Field(...)
+    timeframe: str = Field("H1")
     start_date: Optional[date] = None
-    end_date:   Optional[date] = None
-    strategy:   str   = Field("smc")
-    train_pct:  float = Field(0.7, gt=0.5, lt=1.0)
-    n_splits:   int   = Field(5, ge=2, le=20)
+    end_date: Optional[date] = None
+    strategy: str = Field("smc")
+    train_pct: float = Field(0.7, gt=0.5, lt=1.0)
+    n_splits: int = Field(5, ge=2, le=20)
 
 
 @router.post("/backtest/run")
@@ -98,24 +99,24 @@ async def run_monte_carlo(
 ) -> Dict[str, Any]:
     """Run Monte Carlo simulation. BUG-AA1 fix: mc_trades (was fake_trades)."""
     try:
-        from backend.research.backtest.monte_carlo import MonteCarloSimulator
         from backend.research.backtest.engine import BacktestTrade, TradeDirection
+        from backend.research.backtest.monte_carlo import MonteCarloSimulator
 
         mc_trades = []  # BUG-AA1 fix: was fake_trades
         for i, pnl in enumerate(req.trades_pnl):
             t = BacktestTrade(
-                trade_id    = str(i),
-                direction   = TradeDirection.BUY,
-                entry_price = 1.0,
-                entry_time  = None,
+                trade_id=str(i),
+                direction=TradeDirection.BUY,
+                entry_price=1.0,
+                entry_time=None,
             )
             t.pnl_dollar = pnl
-            t.is_winner  = pnl > 0
+            t.is_winner = pnl > 0
             mc_trades.append(t)
 
         simulator = MonteCarloSimulator(
-            n_iterations     = req.n_iterations,
-            confidence_level = req.confidence_level,
+            n_iterations=req.n_iterations,
+            confidence_level=req.confidence_level,
         )
         result = simulator.run(trades=mc_trades)
         return {"status": "ok", "data": result}
@@ -147,8 +148,10 @@ async def run_walk_forward(
                 detail=f"No candle data available for {req.symbol} {req.timeframe}",
             )
         analyzer = WalkForwardAnalyzer(
-            symbol=req.symbol.upper(), timeframe=req.timeframe.upper(),
-            train_pct=req.train_pct, n_splits=req.n_splits,
+            symbol=req.symbol.upper(),
+            timeframe=req.timeframe.upper(),
+            train_pct=req.train_pct,
+            n_splits=req.n_splits,
         )
         result = analyzer.run(candles=candles, strategy=req.strategy)
         return {"status": "ok", "data": result}
@@ -163,15 +166,18 @@ async def run_walk_forward(
 async def replay_symbol(
     symbol: str,
     timeframe: str = Query("H1"),
-    limit:     int = Query(500, ge=50, le=5000),
+    limit: int = Query(500, ge=50, le=5000),
     _current_user: Any = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Return historical candles for manual chart replay."""
     try:
         from backend.research.data_provider import DataProvider
+
         provider = DataProvider()
         candles = await provider.get_candles(
-            symbol=symbol.upper(), timeframe=timeframe.upper(), limit=limit,
+            symbol=symbol.upper(),
+            timeframe=timeframe.upper(),
+            limit=limit,
         )
         return {
             "status": "ok",

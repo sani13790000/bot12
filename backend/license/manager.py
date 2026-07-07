@@ -11,14 +11,13 @@
 نویسنده: MT5 Trading Team
 """
 
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
-from enum import Enum
-import hashlib
 import secrets
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
+from ..core.exceptions import FeatureNotLicensedError, LicenseError, LicenseExpiredError
 from ..core.logger import get_logger
-from ..core.exceptions import LicenseError, LicenseExpiredError, FeatureNotLicensedError
 from ..database import db
 
 logger = get_logger("license")
@@ -26,25 +25,28 @@ logger = get_logger("license")
 
 class LicenseType(str, Enum):
     """انواع لایسنس"""
-    TRIAL = "trial"           # آزمایشی (7 روز)
-    BASIC = "basic"           # پایه (1 ماه)
-    PRO = "pro"               # حرفه‌ای (3 ماه)
-    ENTERPRISE = "enterprise" # سازمانی (1 سال)
-    LIFETIME = "lifetime"     # مادام‌العمر
+
+    TRIAL = "trial"  # آزمایشی (7 روز)
+    BASIC = "basic"  # پایه (1 ماه)
+    PRO = "pro"  # حرفه‌ای (3 ماه)
+    ENTERPRISE = "enterprise"  # سازمانی (1 سال)
+    LIFETIME = "lifetime"  # مادام‌العمر
 
 
 class PermissionLevel(str, Enum):
     """سطوح دسترسی"""
-    READ_ONLY = "read_only"           # فقط مشاهده
-    SIGNALS_ONLY = "signals_only"    # فقط سیگنال
-    MANUAL_TRADE = "manual_trade"    # معامله دستی
-    AUTO_TRADE = "auto_trade"         # معامله خودکار
-    FULL_ACCESS = "full_access"       # دسترسی کامل
-    ADMIN = "admin"                   # مدیر
+
+    READ_ONLY = "read_only"  # فقط مشاهده
+    SIGNALS_ONLY = "signals_only"  # فقط سیگنال
+    MANUAL_TRADE = "manual_trade"  # معامله دستی
+    AUTO_TRADE = "auto_trade"  # معامله خودکار
+    FULL_ACCESS = "full_access"  # دسترسی کامل
+    ADMIN = "admin"  # مدیر
 
 
 class Feature(str, Enum):
     """ویژگی‌های سیستم"""
+
     # تحلیل
     SMC_ANALYSIS = "smc_analysis"
     PRICE_ACTION = "price_action"
@@ -144,7 +146,7 @@ class LicenseManager:
         user_id: str,
         license_type: LicenseType,
         devices_limit: int = 1,
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ایجاد لایسنس جدید
@@ -176,7 +178,7 @@ class LicenseManager:
             "expires_at": expires_at.isoformat(),
             "created_at": datetime.utcnow().isoformat(),
             "created_by": created_by,
-            "features": [f.value for f in LICENSE_FEATURES[license_type]]
+            "features": [f.value for f in LICENSE_FEATURES[license_type]],
         }
 
         # ذخیره در دیتابیس
@@ -187,9 +189,7 @@ class LicenseManager:
         return result
 
     async def validate_license(
-        self,
-        license_key: str,
-        device_id: Optional[str] = None
+        self, license_key: str, device_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         اعتبارسنجی لایسنس
@@ -209,7 +209,9 @@ class LicenseManager:
         if license_key in self._cache:
             cached = self._cache[license_key]
             # بررسی کش (5 دقیقه)
-            if (datetime.utcnow() - datetime.fromisoformat(cached["_cached_at"])).total_seconds() < 300:
+            if (
+                datetime.utcnow() - datetime.fromisoformat(cached["_cached_at"])
+            ).total_seconds() < 300:
                 return cached
 
         # دریافت از دیتابیس
@@ -239,11 +241,7 @@ class LicenseManager:
 
         return license_data
 
-    async def check_feature(
-        self,
-        license_key: str,
-        feature: Feature
-    ) -> bool:
+    async def check_feature(self, license_key: str, feature: Feature) -> bool:
         """
         بررسی دسترسی به ویژگی
 
@@ -281,7 +279,7 @@ class LicenseManager:
             filters={"user_id": user_id, "status": "active"},
             order_by="created_at",
             order_desc=True,
-            limit=1
+            limit=1,
         )
 
         if not licenses:
@@ -290,10 +288,7 @@ class LicenseManager:
         return licenses[0]
 
     async def activate_device(
-        self,
-        license_key: str,
-        device_id: str,
-        device_name: Optional[str] = None
+        self, license_key: str, device_id: str, device_name: Optional[str] = None
     ) -> bool:
         """
         فعال‌سازی دستگاه جدید
@@ -316,52 +311,47 @@ class LicenseManager:
         devices_limit = license_data.get("devices_limit", 1)
 
         # بررسی دستگاه قبلاً ثبت شده
-        existing = await db.select_one("license_devices", {
-            "license_key": license_key,
-            "device_id": device_id
-        })
+        existing = await db.select_one(
+            "license_devices", {"license_key": license_key, "device_id": device_id}
+        )
 
         if existing:
             # به‌روزرسانی آخرین استفاده
             await db.update(
                 "license_devices",
                 {"id": existing["id"]},
-                {"last_used_at": datetime.utcnow().isoformat()}
+                {"last_used_at": datetime.utcnow().isoformat()},
             )
             return True
 
         # بررسی محدودیت
         if devices_used >= devices_limit:
             raise LicenseError(
-                f"حداکثر {devices_limit} دستگاه مجاز است. "
-                "لطفاً یک دستگاه را غیرفعال کنید."
+                f"حداکثر {devices_limit} دستگاه مجاز است. لطفاً یک دستگاه را غیرفعال کنید."
             )
 
         # ثبت دستگاه جدید
-        await db.insert("license_devices", {
-            "license_key": license_key,
-            "device_id": device_id,
-            "device_name": device_name or f"Device-{device_id[:8]}",
-            "activated_at": datetime.utcnow().isoformat(),
-            "last_used_at": datetime.utcnow().isoformat()
-        })
+        await db.insert(
+            "license_devices",
+            {
+                "license_key": license_key,
+                "device_id": device_id,
+                "device_name": device_name or f"Device-{device_id[:8]}",
+                "activated_at": datetime.utcnow().isoformat(),
+                "last_used_at": datetime.utcnow().isoformat(),
+            },
+        )
 
         # به‌روزرسانی تعداد
         await db.update(
-            "licenses",
-            {"license_key": license_key},
-            {"devices_used": devices_used + 1}
+            "licenses", {"license_key": license_key}, {"devices_used": devices_used + 1}
         )
 
         logger.info(f"دستگاه جدید فعال شد: {device_id} برای لایسنس {license_key}")
 
         return True
 
-    async def deactivate_device(
-        self,
-        license_key: str,
-        device_id: str
-    ) -> bool:
+    async def deactivate_device(self, license_key: str, device_id: str) -> bool:
         """
         غیرفعال‌سازی دستگاه
 
@@ -373,10 +363,9 @@ class LicenseManager:
             True اگر موفق باشد
         """
         # حذف دستگاه
-        deleted = await db.delete("license_devices", {
-            "license_key": license_key,
-            "device_id": device_id
-        })
+        deleted = await db.delete(
+            "license_devices", {"license_key": license_key, "device_id": device_id}
+        )
 
         if deleted:
             # کاهش تعداد
@@ -385,7 +374,7 @@ class LicenseManager:
                 await db.update(
                     "licenses",
                     {"license_key": license_key},
-                    {"devices_used": max(0, license_data.get("devices_used", 1) - 1)}
+                    {"devices_used": max(0, license_data.get("devices_used", 1) - 1)},
                 )
 
         logger.info(f"دستگاه غیرفعال شد: {device_id}")
@@ -405,7 +394,7 @@ class LicenseManager:
         result = await db.update(
             "licenses",
             {"license_key": license_key},
-            {"status": "revoked", "revoked_at": datetime.utcnow().isoformat()}
+            {"status": "revoked", "revoked_at": datetime.utcnow().isoformat()},
         )
 
         # حذف از کش
@@ -416,11 +405,7 @@ class LicenseManager:
 
         return bool(result)
 
-    async def extend_license(
-        self,
-        license_key: str,
-        days: int
-    ) -> Dict[str, Any]:
+    async def extend_license(self, license_key: str, days: int) -> Dict[str, Any]:
         """
         تمدید لایسنس
 
@@ -447,10 +432,7 @@ class LicenseManager:
         result = await db.update(
             "licenses",
             {"license_key": license_key},
-            {
-                "expires_at": new_expiry.isoformat(),
-                "status": "active"
-            }
+            {"expires_at": new_expiry.isoformat(), "status": "active"},
         )
 
         # حذف از کش
@@ -474,10 +456,7 @@ class LicenseManager:
         license_data = await self.validate_license(license_key)
 
         # دریافت دستگاه‌ها
-        devices = await db.select_many(
-            "license_devices",
-            filters={"license_key": license_key}
-        )
+        devices = await db.select_many("license_devices", filters={"license_key": license_key})
 
         # محاسبه روزهای باقی‌مانده
         expires_at = datetime.fromisoformat(license_data["expires_at"])
@@ -491,9 +470,9 @@ class LicenseManager:
             "devices": {
                 "limit": license_data["devices_limit"],
                 "used": license_data["devices_used"],
-                "list": devices
+                "list": devices,
             },
-            "features": license_data["features"]
+            "features": license_data["features"],
         }
 
     def _generate_license_key(self) -> str:
@@ -505,17 +484,10 @@ class LicenseManager:
         """
         # فرمت: MT5-XXXX-XXXX-XXXX-XXXX
         random_bytes = secrets.token_hex(8)
-        parts = [
-            random_bytes[i:i+4].upper()
-            for i in range(0, 16, 4)
-        ]
+        parts = [random_bytes[i : i + 4].upper() for i in range(0, 16, 4)]
         return f"MT5-{parts[0]}-{parts[1]}-{parts[2]}-{parts[3]}"
 
-    async def _check_device(
-        self,
-        license_data: Dict[str, Any],
-        device_id: str
-    ) -> bool:
+    async def _check_device(self, license_data: Dict[str, Any], device_id: str) -> bool:
         """
         بررسی دستگاه
 
@@ -530,17 +502,16 @@ class LicenseManager:
             LicenseError: اگر دستگاه مجاز نباشد
         """
         # بررسی دستگاه ثبت شده
-        device = await db.select_one("license_devices", {
-            "license_key": license_data["license_key"],
-            "device_id": device_id
-        })
+        device = await db.select_one(
+            "license_devices", {"license_key": license_data["license_key"], "device_id": device_id}
+        )
 
         if device:
             # به‌روزرسانی آخرین استفاده
             await db.update(
                 "license_devices",
                 {"id": device["id"]},
-                {"last_used_at": datetime.utcnow().isoformat()}
+                {"last_used_at": datetime.utcnow().isoformat()},
             )
             return True
 
@@ -550,8 +521,7 @@ class LicenseManager:
 
         if devices_used >= devices_limit:
             raise LicenseError(
-                f"این دستگاه مجاز نیست. "
-                f"حداکثر {devices_limit} دستگاه می‌توانید استفاده کنید."
+                f"این دستگاه مجاز نیست. حداکثر {devices_limit} دستگاه می‌توانید استفاده کنید."
             )
 
         return True

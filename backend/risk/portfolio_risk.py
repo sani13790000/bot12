@@ -5,6 +5,7 @@ Galaxy Vast AI Trading Platform — Portfolio Risk Gate
 Checks portfolio-level risk: max open positions, net delta, sector concentration.
 Uses canonical TradeDirection from core/enums.py (single source of truth).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,34 +22,34 @@ except ImportError:
     from enum import Enum
 
     class TradeDirection(str, Enum):  # type: ignore[no-redef]
-        BUY  = "BUY"
+        BUY = "BUY"
         SELL = "SELL"
 
 
 @dataclass
 class PortfolioConfig:
-    max_open_positions: int   = 10
-    max_net_delta_pct:  float = 5.0
+    max_open_positions: int = 10
+    max_net_delta_pct: float = 5.0
     max_correlated_pct: float = 8.0
-    enabled:            bool  = True
+    enabled: bool = True
 
 
 @dataclass
 class PortfolioPosition:
-    symbol:       str
-    direction:    str
+    symbol: str
+    direction: str
     risk_percent: float = 1.0
-    lot_size:     float = 0.0
-    pnl_usd:      float = 0.0
+    lot_size: float = 0.0
+    pnl_usd: float = 0.0
 
 
 @dataclass
 class PortfolioCheckResult:
-    approved:       bool
-    reason:         str            = ""
-    open_positions: int            = 0
-    net_delta_pct:  float          = 0.0
-    details:        Dict[str, Any] = field(default_factory=dict)
+    approved: bool
+    reason: str = ""
+    open_positions: int = 0
+    net_delta_pct: float = 0.0
+    details: Dict[str, Any] = field(default_factory=dict)
 
 
 class PortfolioRiskEngine:
@@ -66,10 +67,10 @@ class PortfolioRiskEngine:
 
     def check(
         self,
-        new_symbol:       str,
-        new_direction:    str,
+        new_symbol: str,
+        new_direction: str,
         new_risk_percent: float,
-        open_positions:   List[PortfolioPosition],
+        open_positions: List[PortfolioPosition],
     ) -> PortfolioCheckResult:
         """Synchronous check — no I/O required."""
         if not self._cfg.enabled:
@@ -83,10 +84,12 @@ class PortfolioRiskEngine:
                 open_positions=n_open,
             )
 
-        buy_pct  = sum(p.risk_percent for p in open_positions
-                       if p.direction.upper() == TradeDirection.BUY)
-        sell_pct = sum(p.risk_percent for p in open_positions
-                       if p.direction.upper() == TradeDirection.SELL)
+        buy_pct = sum(
+            p.risk_percent for p in open_positions if p.direction.upper() == TradeDirection.BUY
+        )
+        sell_pct = sum(
+            p.risk_percent for p in open_positions if p.direction.upper() == TradeDirection.SELL
+        )
 
         if new_direction.upper() == TradeDirection.BUY:
             buy_pct += new_risk_percent

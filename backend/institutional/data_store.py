@@ -8,6 +8,7 @@ Performance improvements in this version:
   * _utc_now_iso uses datetime.now(timezone.utc) — no deprecated gmtime()
   * MAX_MEMORY_RECORDS caps in-memory lists to avoid unbounded growth
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────
 MAX_MEMORY_RECORDS = 10_000
-BATCH_SIZE = 100          # flush after this many queued writes
+BATCH_SIZE = 100  # flush after this many queued writes
 FLUSH_INTERVAL_SECONDS = 5.0
 _RETRY_ATTEMPTS = 2
 _RETRY_DELAY = 0.5
@@ -101,9 +102,7 @@ class DataStore:
                 return
             except Exception as exc:  # noqa: BLE001
                 if attempt <= _RETRY_ATTEMPTS:
-                    logger.warning(
-                        "data_store: connect attempt %d failed: %s", attempt, exc
-                    )
+                    logger.warning("data_store: connect attempt %d failed: %s", attempt, exc)
                     await asyncio.sleep(_RETRY_DELAY)
                 else:
                     logger.error(
@@ -121,9 +120,7 @@ class DataStore:
 
     # ── Batch write ─────────────────────────────────────
 
-    async def _post_batch(
-        self, table: str, records: List[Dict[str, Any]]
-    ) -> bool:
+    async def _post_batch(self, table: str, records: List[Dict[str, Any]]) -> bool:
         if not records:
             return True
         try:

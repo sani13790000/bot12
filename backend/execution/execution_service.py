@@ -13,6 +13,7 @@ FIX K-2: retry with exponential backoff max 3 attempts.
 FIX K-3: circuit breaker integration.
 FIX K-4: Telegram alert on permanent order failure.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -23,34 +24,34 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_MAX_RETRIES   = 3
-_BASE_DELAY    = 1.0   # exponential: 1, 2, 4
+_MAX_RETRIES = 3
+_BASE_DELAY = 1.0  # exponential: 1, 2, 4
 
 
 @dataclass
 class TradeSignal:
     """Minimal signal that ExecutionService needs to place a trade."""
-    symbol:     str
-    direction:  str            # "BUY" | "SELL"
-    volume:     float
-    entry:      Optional[float] = None
-    sl:         Optional[float] = None
-    tp:         Optional[float] = None
-    strategy:   str = "unknown"
+
+    symbol: str
+    direction: str  # "BUY" | "SELL"
+    volume: float
+    entry: Optional[float] = None
+    sl: Optional[float] = None
+    tp: Optional[float] = None
+    strategy: str = "unknown"
     confidence: float = 0.0
-    meta:       Dict[str, Any] = field(default_factory=dict)
+    meta: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ExecutionResult:
     """Outcome of an execution attempt."""
-    success:    bool
-    ticket:     Optional[int]   = None
+
+    success: bool
+    ticket: Optional[int] = None
     open_price: Optional[float] = None
-    error:      Optional[str]   = None
-    executed_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    error: Optional[str] = None
+    executed_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class ExecutionService:
@@ -64,30 +65,35 @@ class ExecutionService:
 
     def __init__(
         self,
-        connector:     Any = None,
+        connector: Any = None,
         state_machine: Any = None,
-        db_client:     Any = None,
-        kill_switch:   Any = None,
-        notifier:      Any = None,
+        db_client: Any = None,
+        kill_switch: Any = None,
+        notifier: Any = None,
     ) -> None:
         if connector is None:
             from backend.execution.mt5_connector import mt5_connector
+
             connector = mt5_connector
         if state_machine is None:
             from backend.execution.order_state_machine import order_state_machine
+
             state_machine = order_state_machine
 
-        self._connector     = connector
+        self._connector = connector
         self._state_machine = state_machine
-        self._db            = db_client
-        self._kill_switch   = kill_switch
-        self._notifier      = notifier
+        self._db = db_client
+        self._kill_switch = kill_switch
+        self._notifier = notifier
 
     async def execute(self, signal: TradeSignal) -> ExecutionResult:
         """Execute a trade signal end-to-end with retry and alerting."""
         logger.info(
             "[ExecutionService] execute %s %s vol=%.2f conf=%.2f",
-            signal.direction, signal.symbol, signal.volume, signal.confidence,
+            signal.direction,
+            signal.symbol,
+            signal.volume,
+            signal.confidence,
         )
 
         if self._kill_switch is not None:
@@ -116,13 +122,17 @@ class ExecutionService:
                     delay = _BASE_DELAY * (2 ** (attempt - 1))
                     logger.warning(
                         "[ExecutionService] place_order attempt %d/%d failed: %s --retry in %.1fs",
-                        attempt, _MAX_RETRIES, exc, delay,
+                        attempt,
+                        _MAX_RETRIES,
+                        exc,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 else:
                     logger.error(
                         "[ExecutionService] place_order FAILED after %d attempts: %s",
-                        _MAX_RETRIES, exc,
+                        _MAX_RETRIES,
+                        exc,
                     )
                     await self._send_failure_alert(signal, last_error)
                     return ExecutionResult(success=False, error=last_error)
@@ -139,7 +149,8 @@ class ExecutionService:
 
         logger.info(
             "[ExecutionService] order OPEN ticket=%d price=%.5f",
-            order.ticket, order.open_price,
+            order.ticket,
+            order.open_price,
         )
         return ExecutionResult(
             success=True,
@@ -166,7 +177,10 @@ class ExecutionService:
                     delay = _BASE_DELAY * (2 ** (attempt - 1))
                     logger.warning(
                         "[ExecutionService] close attempt %d/%d failed: %s --retry in %.1fs",
-                        attempt, _MAX_RETRIES, exc, delay,
+                        attempt,
+                        _MAX_RETRIES,
+                        exc,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -183,14 +197,17 @@ class ExecutionService:
         if self._db is None:
             return
         try:
-            await self._db.insert("executions", {
-                "ticket":     order.ticket,
-                "symbol":     signal.symbol,
-                "direction":  signal.direction,
-                "volume":     signal.volume,
-                "strategy":   signal.strategy,
-                "confidence": signal.confidence,
-            })
+            await self._db.insert(
+                "executions",
+                {
+                    "ticket": order.ticket,
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "volume": signal.volume,
+                    "strategy": signal.strategy,
+                    "confidence": signal.confidence,
+                },
+            )
         except Exception as exc:
             logger.warning("[ExecutionService] DB persist failed non-fatal: %s", exc)
 
@@ -199,6 +216,7 @@ class ExecutionService:
         if self._notifier is None:
             try:
                 from backend.telegram.notifier import get_notifier
+
                 self._notifier = get_notifier()
             except Exception:
                 logger.warning("[ExecutionService] notifier unavailable")
@@ -223,6 +241,7 @@ _execution_service_instance: "ExecutionService | None" = None
 
 class _LazyProxy:
     """Transparent proxy; initialises ExecutionService on first attribute access."""
+
     def __getattr__(self, name: str):  # type: ignore[override]
         global _execution_service_instance
         if _execution_service_instance is None:

@@ -8,14 +8,13 @@ Run:
 """
 
 import math
-import pytest
 from datetime import datetime, timedelta
 from typing import List
 
-from analytics.metrics_engine import MetricsEngine, TradeRecord, AnalyticsResult
-
+from analytics.metrics_engine import MetricsEngine, TradeRecord
 
 # ── Test helpers ─────────────────────────────────────────────────────────────
+
 
 def make_trade(
     ticket: int,
@@ -26,8 +25,8 @@ def make_trade(
     symbol: str = "XAUUSD",
     session: str = "LONDON",
 ) -> TradeRecord:
-    now  = datetime.utcnow()
-    open_t  = now - timedelta(days=days_ago_open)
+    now = datetime.utcnow()
+    open_t = now - timedelta(days=days_ago_open)
     close_t = open_t + timedelta(hours=duration_hours)
     return TradeRecord(
         ticket=ticket,
@@ -48,33 +47,35 @@ def make_trade(
 def make_trades_mixed() -> List[TradeRecord]:
     """A realistic mix: 6 wins, 4 losses."""
     return [
-        make_trade(1,  +200, days_ago_open=30, risk_amount=100),
-        make_trade(2,  -100, days_ago_open=28, risk_amount=100),
-        make_trade(3,  +150, days_ago_open=25, risk_amount=100),
-        make_trade(4,  +180, days_ago_open=22, risk_amount=100),
-        make_trade(5,  -120, days_ago_open=20, risk_amount=100),
-        make_trade(6,  +220, days_ago_open=18, risk_amount=100),
-        make_trade(7,  -80,  days_ago_open=15, risk_amount=100),
-        make_trade(8,  +160, days_ago_open=12, risk_amount=100),
-        make_trade(9,  +130, days_ago_open=8,  risk_amount=100),
-        make_trade(10, -90,  days_ago_open=3,  risk_amount=100),
+        make_trade(1, +200, days_ago_open=30, risk_amount=100),
+        make_trade(2, -100, days_ago_open=28, risk_amount=100),
+        make_trade(3, +150, days_ago_open=25, risk_amount=100),
+        make_trade(4, +180, days_ago_open=22, risk_amount=100),
+        make_trade(5, -120, days_ago_open=20, risk_amount=100),
+        make_trade(6, +220, days_ago_open=18, risk_amount=100),
+        make_trade(7, -80, days_ago_open=15, risk_amount=100),
+        make_trade(8, +160, days_ago_open=12, risk_amount=100),
+        make_trade(9, +130, days_ago_open=8, risk_amount=100),
+        make_trade(10, -90, days_ago_open=3, risk_amount=100),
     ]
 
 
 # ── Test: empty trades ────────────────────────────────────────────────────────
 
+
 class TestEmptyTrades:
     def test_empty_returns_zero_metrics(self):
         engine = MetricsEngine()
         result = engine.calculate([], initial_balance=10_000)
-        assert result.total_trades     == 0
-        assert result.sharpe_ratio     == 0.0
-        assert result.sortino_ratio    == 0.0
-        assert result.profit_factor    == 0.0
+        assert result.total_trades == 0
+        assert result.sharpe_ratio == 0.0
+        assert result.sortino_ratio == 0.0
+        assert result.profit_factor == 0.0
         assert result.max_drawdown_pct == 0.0
 
 
 # ── Test: basic counts ────────────────────────────────────────────────────────
+
 
 class TestBasicCounts:
     def setup_method(self):
@@ -96,6 +97,7 @@ class TestBasicCounts:
 
 
 # ── Test: P&L ────────────────────────────────────────────────────────────────
+
 
 class TestProfitLoss:
     def setup_method(self):
@@ -122,6 +124,7 @@ class TestProfitLoss:
 
 
 # ── Test: Ratios ──────────────────────────────────────────────────────────────
+
 
 class TestRatios:
     def setup_method(self):
@@ -152,12 +155,13 @@ class TestRatios:
 
 # ── Test: Drawdown ────────────────────────────────────────────────────────────
 
+
 class TestDrawdown:
     def setup_method(self):
         self.engine = MetricsEngine()
 
     def test_no_drawdown_all_winners(self):
-        trades = [make_trade(i, +100, days_ago_open=30-i) for i in range(5)]
+        trades = [make_trade(i, +100, days_ago_open=30 - i) for i in range(5)]
         result = self.engine.calculate(trades, initial_balance=10_000)
         assert result.max_drawdown_pct == 0.0
 
@@ -183,6 +187,7 @@ class TestDrawdown:
 
 # ── Test: Expectancy ──────────────────────────────────────────────────────────
 
+
 class TestExpectancy:
     def setup_method(self):
         self.engine = MetricsEngine()
@@ -200,6 +205,7 @@ class TestExpectancy:
 
 
 # ── Test: Consecutive Streaks ─────────────────────────────────────────────────
+
 
 class TestStreaks:
     def setup_method(self):
@@ -227,14 +233,15 @@ class TestStreaks:
 
 # ── Test: Breakdowns ─────────────────────────────────────────────────────────
 
+
 class TestBreakdowns:
     def setup_method(self):
         self.engine = MetricsEngine()
         self.trades = [
             make_trade(1, +100, symbol="XAUUSD", session="LONDON"),
-            make_trade(2, -50,  symbol="EURUSD", session="NY"),
-            make_trade(3, +80,  symbol="XAUUSD", session="NY"),
-            make_trade(4, -60,  symbol="GBPUSD", session="LONDON"),
+            make_trade(2, -50, symbol="EURUSD", session="NY"),
+            make_trade(3, +80, symbol="XAUUSD", session="NY"),
+            make_trade(4, -60, symbol="GBPUSD", session="LONDON"),
         ]
         self.result = self.engine.calculate(self.trades)
 
@@ -245,16 +252,17 @@ class TestBreakdowns:
 
     def test_by_session_contains_sessions(self):
         assert "LONDON" in self.result.by_session
-        assert "NY"     in self.result.by_session
+        assert "NY" in self.result.by_session
 
     def test_symbol_win_rate_correct(self):
         xau = self.result.by_symbol["XAUUSD"]
         assert xau["trades"] == 2
-        assert xau["wins"]   == 2
+        assert xau["wins"] == 2
         assert xau["win_rate"] == 1.0
 
 
 # ── Test: to_dict serialization ───────────────────────────────────────────────
+
 
 class TestSerialization:
     def test_to_dict_has_all_keys(self):
@@ -262,10 +270,20 @@ class TestSerialization:
         result = engine.calculate(make_trades_mixed(), initial_balance=10_000)
         d = result.to_dict()
         required = [
-            "sharpe_ratio", "sortino_ratio", "calmar_ratio",
-            "profit_factor", "recovery_factor", "expectancy_r",
-            "max_drawdown_pct", "win_rate", "total_trades", "net_profit",
-            "equity_curve", "drawdown_curve", "by_symbol", "by_session",
+            "sharpe_ratio",
+            "sortino_ratio",
+            "calmar_ratio",
+            "profit_factor",
+            "recovery_factor",
+            "expectancy_r",
+            "max_drawdown_pct",
+            "win_rate",
+            "total_trades",
+            "net_profit",
+            "equity_curve",
+            "drawdown_curve",
+            "by_symbol",
+            "by_session",
         ]
         for key in required:
             assert key in d, f"Missing key: {key}"
@@ -273,9 +291,13 @@ class TestSerialization:
     def test_to_dict_no_inf_values(self):
         engine = MetricsEngine()
         # all winners → recovery_factor = inf normally
-        trades = [make_trade(i, +100, days_ago_open=10-i) for i in range(5)]
+        trades = [make_trade(i, +100, days_ago_open=10 - i) for i in range(5)]
         result = engine.calculate(trades, initial_balance=10_000)
         d = result.to_dict()
         for k, v in d.items():
             if isinstance(v, float):
-                assert not math.isinf(v) or k in ("profit_factor", "recovery_factor", "calmar_ratio")
+                assert not math.isinf(v) or k in (
+                    "profit_factor",
+                    "recovery_factor",
+                    "calmar_ratio",
+                )

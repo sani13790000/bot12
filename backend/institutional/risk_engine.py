@@ -1,10 +1,10 @@
 """Institutional Risk Engine — VaR, CVaR, position sizing, circuit breakers."""
 
 from __future__ import annotations
+
 import logging
-import math
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +35,16 @@ class RiskReport:
 class InstitutionalRiskEngine:
     """Institutional Risk Engine with VaR, CVaR, circuit breakers."""
 
-    def __init__(self, initial_equity: float = 10_000.0, max_risk_pct: float = 1.0,
-                 max_daily_loss_pct: float = 3.0, max_weekly_loss_pct: float = 6.0,
-                 max_total_exposure_pct: float = 10.0, max_open_trades: int = 5,
-                 pip_value: float = 1.0):
+    def __init__(
+        self,
+        initial_equity: float = 10_000.0,
+        max_risk_pct: float = 1.0,
+        max_daily_loss_pct: float = 3.0,
+        max_weekly_loss_pct: float = 6.0,
+        max_total_exposure_pct: float = 10.0,
+        max_open_trades: int = 5,
+        pip_value: float = 1.0,
+    ):
         self.initial_equity = initial_equity
         self.current_equity = initial_equity
         self.max_risk_pct = max_risk_pct
@@ -74,8 +80,10 @@ class InstitutionalRiskEngine:
         # AUDIT-FIX-3: cap at max_open_trades * 3 to prevent unbounded growth
         max_cap = max(self.max_open_trades * 3, 30)
         if len(self._open_trades) >= max_cap:
-            logger.warning("[InstitutionalRisk] _open_trades at cap %d — dropping oldest entry", max_cap)
-            self._open_trades = self._open_trades[-(max_cap - 1):]
+            logger.warning(
+                "[InstitutionalRisk] _open_trades at cap %d — dropping oldest entry", max_cap
+            )
+            self._open_trades = self._open_trades[-(max_cap - 1) :]
         self._open_trades.append(trade)
 
     def remove_open_trade(self, trade_id: int) -> None:
@@ -87,8 +95,9 @@ class InstitutionalRiskEngine:
             self._circuit_breaker = False
             self._circuit_reason = ""
 
-    def assess_trade(self, stop_loss_pips: float, current_atr: float = 10.0,
-                     symbol: str = "XAUUSD") -> RiskReport:
+    def assess_trade(
+        self, stop_loss_pips: float, current_atr: float = 10.0, symbol: str = "XAUUSD"
+    ) -> RiskReport:
         risk_usd = self.current_equity * (self.max_risk_pct / 100)
         lot = risk_usd / (stop_loss_pips * self.pip_value) if stop_loss_pips > 0 else 0
         lot = round(max(0.01, min(100.0, lot)), 2)
@@ -104,15 +113,26 @@ class InstitutionalRiskEngine:
         weekly_hit = weekly_loss_pct >= self.max_weekly_loss_pct
         var95, var99, cvar95 = self._compute_var()
         return RiskReport(
-            var_95_usd=round(var95, 2), var_99_usd=round(var99, 2), cvar_95_usd=round(cvar95, 2),
-            recommended_lot=adjusted_lot, max_allowed_lot=lot, risk_usd=round(risk_usd, 2),
-            risk_pct=self.max_risk_pct, total_exposure_usd=round(total_exp, 2),
-            total_exposure_pct=round(exp_pct, 2), open_trades_count=len(self._open_trades),
-            daily_loss_usd=round(daily_loss, 2), daily_loss_pct=round(daily_loss_pct, 2),
-            daily_limit_hit=daily_hit, weekly_loss_usd=round(weekly_loss, 2),
-            weekly_limit_hit=weekly_hit, circuit_breaker_active=self._circuit_breaker,
-            circuit_breaker_reason=self._circuit_reason, volatility_regime=vol_regime,
-            suggested_risk_multiplier=vol_mult)
+            var_95_usd=round(var95, 2),
+            var_99_usd=round(var99, 2),
+            cvar_95_usd=round(cvar95, 2),
+            recommended_lot=adjusted_lot,
+            max_allowed_lot=lot,
+            risk_usd=round(risk_usd, 2),
+            risk_pct=self.max_risk_pct,
+            total_exposure_usd=round(total_exp, 2),
+            total_exposure_pct=round(exp_pct, 2),
+            open_trades_count=len(self._open_trades),
+            daily_loss_usd=round(daily_loss, 2),
+            daily_loss_pct=round(daily_loss_pct, 2),
+            daily_limit_hit=daily_hit,
+            weekly_loss_usd=round(weekly_loss, 2),
+            weekly_limit_hit=weekly_hit,
+            circuit_breaker_active=self._circuit_breaker,
+            circuit_breaker_reason=self._circuit_reason,
+            volatility_regime=vol_regime,
+            suggested_risk_multiplier=vol_mult,
+        )
 
     def _check_circuit_breakers(self) -> None:
         daily_loss = abs(min(0, sum(self._daily_pnl)))

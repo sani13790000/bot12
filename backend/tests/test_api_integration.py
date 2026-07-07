@@ -6,26 +6,28 @@
 نویسنده: MT5 Trading Team
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 
 # =====================================================
 # Mock Fixtures
 # =====================================================
 
+
 @pytest.fixture
 def mock_db():
     """Mock دیتابیس"""
     db = MagicMock()
-    db.select_one = AsyncMock(return_value={
-        "id": "test-user-123",
-        "email": "test@example.com",
-        "role": "user",
-        "status": "active"
-    })
+    db.select_one = AsyncMock(
+        return_value={
+            "id": "test-user-123",
+            "email": "test@example.com",
+            "role": "user",
+            "status": "active",
+        }
+    )
     db.select_many = AsyncMock(return_value=[])
     db.insert = AsyncMock(return_value={"id": "new-id"})
     db.update = AsyncMock(return_value=[{"id": "updated-id"}])
@@ -36,12 +38,7 @@ def mock_db():
 @pytest.fixture
 def mock_user():
     """کاربر نمونه"""
-    return {
-        "id": "test-user-123",
-        "email": "test@example.com",
-        "role": "user",
-        "status": "active"
-    }
+    return {"id": "test-user-123", "email": "test@example.com", "role": "user", "status": "active"}
 
 
 @pytest.fixture
@@ -55,7 +52,7 @@ def mock_license():
         "expires_at": "2099-12-31T00:00:00",
         "features": ["auto_trading", "signals", "dashboard"],
         "devices_limit": 3,
-        "devices_used": 1
+        "devices_used": 1,
     }
 
 
@@ -77,13 +74,9 @@ def mock_decision_output():
             "entry_zone": 1.0850,
             "stop_loss": 1.0825,
             "take_profit_1": 1.0890,
-            "risk_reward_ratio": 2.6
+            "risk_reward_ratio": 2.6,
         },
-        "score_breakdown": {
-            "smc": 75,
-            "price_action": 70,
-            "session": 80
-        }
+        "score_breakdown": {"smc": 75, "price_action": 70, "session": 80},
     }
 
 
@@ -101,6 +94,7 @@ def valid_jwt_payload():
 # =====================================================
 # تست‌های Health
 # =====================================================
+
 
 class TestHealthEndpoints:
     """تست endpointهای سلامت"""
@@ -123,6 +117,7 @@ class TestHealthEndpoints:
 # تست‌های License
 # =====================================================
 
+
 class TestLicenseEndpoints:
     """تست endpointهای لایسنس"""
 
@@ -136,10 +131,7 @@ class TestLicenseEndpoints:
     @pytest.mark.asyncio
     async def test_validate_license_expired(self):
         """تست لایسنس منقضی شده"""
-        expired_license = {
-            "status": "expired",
-            "expires_at": "2020-01-01T00:00:00"
-        }
+        expired_license = {"status": "expired", "expires_at": "2020-01-01T00:00:00"}
         assert expired_license["status"] == "expired"
 
     @pytest.mark.asyncio
@@ -155,6 +147,7 @@ class TestLicenseEndpoints:
 # =====================================================
 # تست‌های Decision
 # =====================================================
+
 
 class TestDecisionEndpoints:
     """تست endpointهای تصمیم‌گیری"""
@@ -183,7 +176,7 @@ class TestDecisionEndpoints:
         no_trade_output = {
             "decision": "NO_TRADE",
             "allowed": True,
-            "reason_codes": ["INSUFFICIENT_SCORE", "OUTSIDE_KILLZONE"]
+            "reason_codes": ["INSUFFICIENT_SCORE", "OUTSIDE_KILLZONE"],
         }
         assert no_trade_output["decision"] == "NO_TRADE"
         assert len(no_trade_output["reason_codes"]) > 0
@@ -195,7 +188,7 @@ class TestDecisionEndpoints:
             "decision": "NO_TRADE",
             "allowed": False,
             "blocked_reasons": ["LICENSE_INVALID"],
-            "reasons": ["لایسنس نامعتبر است"]
+            "reasons": ["لایسنس نامعتبر است"],
         }
         assert blocked_output["allowed"] is False
         assert len(blocked_output["blocked_reasons"]) > 0
@@ -205,6 +198,7 @@ class TestDecisionEndpoints:
 # تست‌های Signal
 # =====================================================
 
+
 class TestSignalEndpoints:
     """تست endpointهای سیگنال"""
 
@@ -212,9 +206,7 @@ class TestSignalEndpoints:
     async def test_get_signals(self, mock_db, mock_user):
         """تست دریافت سیگنال‌ها"""
         signals = await mock_db.select_many(
-            "signals",
-            filters={"user_id": mock_user["id"]},
-            limit=10
+            "signals", filters={"user_id": mock_user["id"]}, limit=10
         )
         assert signals == []
 
@@ -222,15 +214,8 @@ class TestSignalEndpoints:
     async def test_active_signals_filter(self):
         """تست فیلتر سیگنال‌های فعال"""
         now = datetime.utcnow().isoformat()
-        signal = {
-            "id": "signal-1",
-            "status": "generated",
-            "valid_until": "2099-12-31T00:00:00"
-        }
-        is_active = (
-            signal["status"] == "generated" and
-            signal["valid_until"] > now
-        )
+        signal = {"id": "signal-1", "status": "generated", "valid_until": "2099-12-31T00:00:00"}
+        is_active = signal["status"] == "generated" and signal["valid_until"] > now
         assert is_active is True
 
     @pytest.mark.asyncio
@@ -239,7 +224,7 @@ class TestSignalEndpoints:
         result = await mock_db.update(
             "signals",
             {"id": "signal-1"},
-            {"status": "executed", "executed_at": datetime.utcnow().isoformat()}
+            {"status": "executed", "executed_at": datetime.utcnow().isoformat()},
         )
         assert result is not None
 
@@ -248,17 +233,14 @@ class TestSignalEndpoints:
 # تست‌های Trade
 # =====================================================
 
+
 class TestTradeEndpoints:
     """تست endpointهای معاملات"""
 
     @pytest.mark.asyncio
     async def test_get_trades(self, mock_db, mock_user):
         """تست دریافت معاملات"""
-        trades = await mock_db.select_many(
-            "trades",
-            filters={"user_id": mock_user["id"]},
-            limit=10
-        )
+        trades = await mock_db.select_many("trades", filters={"user_id": mock_user["id"]}, limit=10)
         assert trades == []
 
     @pytest.mark.asyncio
@@ -269,7 +251,7 @@ class TestTradeEndpoints:
             "symbol": "EURUSD",
             "direction": "buy",
             "entry_price": 1.0850,
-            "status": "open"
+            "status": "open",
         }
         result = await mock_db.insert("trades", trade_data)
         assert result["id"] == "new-id"
@@ -280,11 +262,7 @@ class TestTradeEndpoints:
         result = await mock_db.update(
             "trades",
             {"id": "trade-1", "user_id": mock_user["id"]},
-            {
-                "status": "closed",
-                "exit_price": 1.0900,
-                "profit_money": 50.0
-            }
+            {"status": "closed", "exit_price": 1.0900, "profit_money": 50.0},
         )
         assert result is not None
 
@@ -295,7 +273,7 @@ class TestTradeEndpoints:
             {"profit_money": 100},
             {"profit_money": -50},
             {"profit_money": 75},
-            {"profit_money": -25}
+            {"profit_money": -25},
         ]
         total_profit = sum(t["profit_money"] for t in trades)
         winning = len([t for t in trades if t["profit_money"] > 0])
@@ -308,6 +286,7 @@ class TestTradeEndpoints:
 # =====================================================
 # تست‌های Dashboard
 # =====================================================
+
 
 class TestDashboardEndpoints:
     """تست endpointهای داشبورد"""
@@ -325,7 +304,7 @@ class TestDashboardEndpoints:
             "open_trades": 2,
             "active_signals": 3,
             "today_profit": 150.0,
-            "win_rate": 65.5
+            "win_rate": 65.5,
         }
         assert quick_stats["open_trades"] >= 0
         assert quick_stats["win_rate"] >= 0
@@ -333,11 +312,7 @@ class TestDashboardEndpoints:
     @pytest.mark.asyncio
     async def test_equity_curve(self):
         """تست محاسبه equity curve"""
-        trades = [
-            {"profit_money": 100},
-            {"profit_money": -50},
-            {"profit_money": 75}
-        ]
+        trades = [{"profit_money": 100}, {"profit_money": -50}, {"profit_money": 75}]
         balance = 10000
         equity_curve = [{"balance": balance}]
         for trade in trades:
@@ -350,6 +325,7 @@ class TestDashboardEndpoints:
 # =====================================================
 # تست‌های Authorization — رفع‌شده
 # =====================================================
+
 
 class TestAuthorization:
     """تست احراز هویت و مجوزها"""
@@ -375,6 +351,7 @@ class TestAuthorization:
 
         # توکن باید منقضی نشده باشد
         import time
+
         is_not_expired = exp > time.time()
 
         assert user_id == "test-user-123"
@@ -393,6 +370,7 @@ class TestAuthorization:
 # =====================================================
 # تست‌های Error Handling
 # =====================================================
+
 
 class TestErrorHandling:
     """تست مدیریت خطا"""

@@ -16,8 +16,7 @@
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Set
-from functools import wraps
+from typing import Dict, Optional, Set
 
 from ..core.logger import get_logger
 
@@ -25,16 +24,16 @@ from ..core.logger import get_logger
 logger = get_logger("telegram.rbac")
 
 
-
 class UserRole(str, Enum):
     """نقش‌های کاربری — ۷ سطح"""
-    VIEWER = "viewer"           # فقط مشاهده
-    USER = "user"               # کاربر عادی
-    OPERATOR = "operator"       # اپراتور (کنترل بدون تنظیمات)
-    TRADER = "trader"           # معامله‌گر
-    ADMIN = "admin"             # مدیر
-    SUPER_ADMIN = "super_admin" # مدیر کل
-    OWNER = "owner"             # مالک سیستم
+
+    VIEWER = "viewer"  # فقط مشاهده
+    USER = "user"  # کاربر عادی
+    OPERATOR = "operator"  # اپراتور (کنترل بدون تنظیمات)
+    TRADER = "trader"  # معامله‌گر
+    ADMIN = "admin"  # مدیر
+    SUPER_ADMIN = "super_admin"  # مدیر کل
+    OWNER = "owner"  # مالک سیستم
 
 
 class Permission(str, Enum):
@@ -192,13 +191,13 @@ _OWNER_PERMS: Set[Permission] = _SUPER_ADMIN_PERMS | {
 }
 
 ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
-    UserRole.VIEWER:      set(_VIEWER_PERMS),
-    UserRole.USER:        set(_USER_PERMS),
-    UserRole.OPERATOR:    set(_OPERATOR_PERMS),
-    UserRole.TRADER:      set(_TRADER_PERMS),
-    UserRole.ADMIN:       set(_ADMIN_PERMS),
+    UserRole.VIEWER: set(_VIEWER_PERMS),
+    UserRole.USER: set(_USER_PERMS),
+    UserRole.OPERATOR: set(_OPERATOR_PERMS),
+    UserRole.TRADER: set(_TRADER_PERMS),
+    UserRole.ADMIN: set(_ADMIN_PERMS),
     UserRole.SUPER_ADMIN: set(_SUPER_ADMIN_PERMS),
-    UserRole.OWNER:       set(_OWNER_PERMS),
+    UserRole.OWNER: set(_OWNER_PERMS),
 }
 
 
@@ -207,61 +206,53 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
 # ═══════════════════════════════════════════════════════════════
 COMMAND_PERMISSIONS: Dict[str, Permission] = {
     # گزارش‌ها
-    "/daily":    Permission.VIEW_DAILY_REPORT,
-    "/weekly":   Permission.VIEW_WEEKLY_REPORT,
-    "/monthly":  Permission.VIEW_MONTHLY_REPORT,
-    "/profit":   Permission.VIEW_PROFIT_REPORT,
-    "/loss":     Permission.VIEW_LOSS_REPORT,
-    "/winrate":  Permission.VIEW_WINRATE_REPORT,
-    "/reports":  Permission.VIEW_ALL_REPORTS,
-
+    "/daily": Permission.VIEW_DAILY_REPORT,
+    "/weekly": Permission.VIEW_WEEKLY_REPORT,
+    "/monthly": Permission.VIEW_MONTHLY_REPORT,
+    "/profit": Permission.VIEW_PROFIT_REPORT,
+    "/loss": Permission.VIEW_LOSS_REPORT,
+    "/winrate": Permission.VIEW_WINRATE_REPORT,
+    "/reports": Permission.VIEW_ALL_REPORTS,
     # سیگنال‌ها
-    "/signal":   Permission.VIEW_LATEST_SIGNAL,
-    "/signals":  Permission.VIEW_SIGNALS,
+    "/signal": Permission.VIEW_LATEST_SIGNAL,
+    "/signals": Permission.VIEW_SIGNALS,
     "/decision": Permission.VIEW_LATEST_DECISION,
     "/history_signals": Permission.VIEW_SIGNAL_HISTORY,
-
     # معاملات — مشاهده
-    "/trades":    Permission.VIEW_TRADES,
+    "/trades": Permission.VIEW_TRADES,
     "/positions": Permission.VIEW_OPEN_POSITIONS,
-    "/history":   Permission.VIEW_TRADE_HISTORY,
-    "/stats":     Permission.VIEW_TRADE_STATS,
-
+    "/history": Permission.VIEW_TRADE_HISTORY,
+    "/stats": Permission.VIEW_TRADE_STATS,
     # معاملات — اجرا
-    "/close_all":  Permission.CLOSE_ALL_TRADES,
-    "/close_buy":  Permission.CLOSE_BUY_TRADES,
+    "/close_all": Permission.CLOSE_ALL_TRADES,
+    "/close_buy": Permission.CLOSE_BUY_TRADES,
     "/close_sell": Permission.CLOSE_SELL_TRADES,
-
     # کنترل ربات
-    "/start_bot":  Permission.START_BOT,
-    "/stop_bot":   Permission.STOP_BOT,
-    "/pause":      Permission.PAUSE_BOT,
-    "/resume":     Permission.RESUME_BOT,
-    "/restart":    Permission.RESTART_BOT,
-    "/status":     Permission.VIEW_BOT_STATUS,
-
+    "/start_bot": Permission.START_BOT,
+    "/stop_bot": Permission.STOP_BOT,
+    "/pause": Permission.PAUSE_BOT,
+    "/resume": Permission.RESUME_BOT,
+    "/restart": Permission.RESTART_BOT,
+    "/status": Permission.VIEW_BOT_STATUS,
     # مدیریت کاربران
-    "/users":       Permission.VIEW_ALL_USERS,
-    "/add_user":    Permission.ADD_USER,
+    "/users": Permission.VIEW_ALL_USERS,
+    "/add_user": Permission.ADD_USER,
     "/remove_user": Permission.REMOVE_USER,
-    "/set_role":    Permission.CHANGE_USER_ROLE,
-
+    "/set_role": Permission.CHANGE_USER_ROLE,
     # لایسنس
-    "/licenses":       Permission.VIEW_LICENSES,
+    "/licenses": Permission.VIEW_LICENSES,
     "/revoke_license": Permission.REVOKE_LICENSE,
-    "/issue_license":  Permission.ISSUE_LICENSE,
-
+    "/issue_license": Permission.ISSUE_LICENSE,
     # تنظیمات
-    "/settings":      Permission.VIEW_SETTINGS,
-    "/set_risk":      Permission.MANAGE_RISK_SETTINGS,
-    "/set_symbol":    Permission.MANAGE_SYMBOL_SETTINGS,
-
+    "/settings": Permission.VIEW_SETTINGS,
+    "/set_risk": Permission.MANAGE_RISK_SETTINGS,
+    "/set_symbol": Permission.MANAGE_SYMBOL_SETTINGS,
     # سیستم
-    "/audit":         Permission.VIEW_AUDIT_LOGS,
-    "/health":        Permission.VIEW_SYSTEM_HEALTH,
-    "/maintenance":   Permission.SYSTEM_MAINTENANCE,
+    "/audit": Permission.VIEW_AUDIT_LOGS,
+    "/health": Permission.VIEW_SYSTEM_HEALTH,
+    "/maintenance": Permission.SYSTEM_MAINTENANCE,
     "/subscriptions": Permission.MANAGE_SUBSCRIPTIONS,
-    "/api_keys":      Permission.MANAGE_API_KEYS,
+    "/api_keys": Permission.MANAGE_API_KEYS,
 }
 
 
@@ -269,30 +260,31 @@ COMMAND_PERMISSIONS: Dict[str, Permission] = {
 # سطح عددی هر نقش (برای مقایسه)
 # ═══════════════════════════════════════════════════════════════
 ROLE_LEVELS: Dict[UserRole, int] = {
-    UserRole.VIEWER:      0,
-    UserRole.USER:        1,
-    UserRole.OPERATOR:    2,
-    UserRole.TRADER:      3,
-    UserRole.ADMIN:       4,
+    UserRole.VIEWER: 0,
+    UserRole.USER: 1,
+    UserRole.OPERATOR: 2,
+    UserRole.TRADER: 3,
+    UserRole.ADMIN: 4,
     UserRole.SUPER_ADMIN: 5,
-    UserRole.OWNER:       6,
+    UserRole.OWNER: 6,
 }
 
 # نام فارسی هر نقش
 ROLE_NAMES_FA: Dict[UserRole, str] = {
-    UserRole.VIEWER:      "بیننده",
-    UserRole.USER:        "کاربر",
-    UserRole.OPERATOR:    "اپراتور",
-    UserRole.TRADER:      "معامله‌گر",
-    UserRole.ADMIN:       "مدیر",
+    UserRole.VIEWER: "بیننده",
+    UserRole.USER: "کاربر",
+    UserRole.OPERATOR: "اپراتور",
+    UserRole.TRADER: "معامله‌گر",
+    UserRole.ADMIN: "مدیر",
     UserRole.SUPER_ADMIN: "مدیر کل",
-    UserRole.OWNER:       "مالک",
+    UserRole.OWNER: "مالک",
 }
 
 
 # ═══════════════════════════════════════════════════════════════
 # توابع کمکی
 # ═══════════════════════════════════════════════════════════════
+
 
 def get_role_permissions(role: UserRole) -> Set[Permission]:
     """
@@ -402,7 +394,6 @@ PERMISSION_DENIED_MESSAGES = {
 
 📞 پشتیبانی: @GalaxyVast_Support
     """,
-
     "no_permission": """
 🚫 <b>دسترسی غیرمجاز</b>
 
@@ -414,7 +405,6 @@ PERMISSION_DENIED_MESSAGES = {
 برای ارتقا با پشتیبانی تماس بگیرید.
 📞 @GalaxyVast_Support
     """,
-
     "license_expired": """
 🚫 <b>لایسنس منقضی</b>
 
@@ -423,7 +413,6 @@ PERMISSION_DENIED_MESSAGES = {
 برای تمدید با پشتیبانی تماس بگیرید.
 📞 @GalaxyVast_Support
     """,
-
     "license_invalid": """
 🚫 <b>لایسنس نامعتبر</b>
 
@@ -432,7 +421,6 @@ PERMISSION_DENIED_MESSAGES = {
 برای حل مشکل با پشتیبانی تماس بگیرید.
 📞 @GalaxyVast_Support
     """,
-
     "feature_not_allowed": """
 🚫 <b>ویژگی مجاز نیست</b>
 
@@ -441,7 +429,6 @@ PERMISSION_DENIED_MESSAGES = {
 برای دسترسی پلن خود را ارتقا دهید.
 📞 @GalaxyVast_Support
     """,
-
     "operator_only": """
 🔒 <b>فقط اپراتور و بالاتر</b>
 
@@ -449,7 +436,6 @@ PERMISSION_DENIED_MESSAGES = {
 
 نقش فعلی: {role}
     """,
-
     "owner_only": """
 👑 <b>فقط مالک سیستم</b>
 
@@ -459,9 +445,7 @@ PERMISSION_DENIED_MESSAGES = {
 
 
 def get_permission_denied_message(
-    reason: str,
-    role: Optional[str] = None,
-    required_role: Optional[str] = None
+    reason: str, role: Optional[str] = None, required_role: Optional[str] = None
 ) -> str:
     """
     دریافت پیام فارسی خطای دسترسی
@@ -476,15 +460,17 @@ def get_permission_denied_message(
     """
     template = PERMISSION_DENIED_MESSAGES.get(reason, "🚫 خطای دسترسی")
 
-    role_display = ROLE_NAMES_FA.get(
-        UserRole(role) if role else None,
-        role or "نامشخص"
-    ) if role else "نامشخص"
+    role_display = (
+        ROLE_NAMES_FA.get(UserRole(role) if role else None, role or "نامشخص") if role else "نامشخص"
+    )
 
-    required_display = ROLE_NAMES_FA.get(
-        UserRole(required_role) if required_role else None,
-        required_role or "نامشخص"
-    ) if required_role else "نامشخص"
+    required_display = (
+        ROLE_NAMES_FA.get(
+            UserRole(required_role) if required_role else None, required_role or "نامشخص"
+        )
+        if required_role
+        else "نامشخص"
+    )
 
     try:
         return template.format(role=role_display, required_role=required_display)

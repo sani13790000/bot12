@@ -13,6 +13,7 @@ Security decisions:
     is used as fallback.
   - TRUSTED_PROXY_CIDRS can be overridden via settings.TRUSTED_PROXY_CIDRS.
 """
+
 from __future__ import annotations
 
 import ipaddress
@@ -55,17 +56,9 @@ def _get_trusted_networks() -> tuple[ipaddress._BaseNetwork, ...]:
 
         if trusted_proxy_cidrs:
             if isinstance(trusted_proxy_cidrs, str):
-                raw_cidrs = [
-                    c.strip()
-                    for c in trusted_proxy_cidrs.split(",")
-                    if c.strip()
-                ]
+                raw_cidrs = [c.strip() for c in trusted_proxy_cidrs.split(",") if c.strip()]
             else:
-                raw_cidrs = [
-                    str(c).strip()
-                    for c in trusted_proxy_cidrs
-                    if str(c).strip()
-                ]
+                raw_cidrs = [str(c).strip() for c in trusted_proxy_cidrs if str(c).strip()]
 
     except Exception as exc:
         log.debug("client_ip: failed to load TRUSTED_PROXY_CIDRS: %s", exc)

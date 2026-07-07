@@ -11,6 +11,7 @@ Commands
 /report monthly  – last 30 days
 /report all      – all-time stats
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,14 +23,15 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 PERIOD_DAYS: dict[str, int] = {
-    "daily":   1,
-    "weekly":  7,
+    "daily": 1,
+    "weekly": 7,
     "monthly": 30,
-    "all":     0,
+    "all": 0,
 }
 
 
 # ── Formatter ────────────────────────────────────────────────────── #
+
 
 def _format_report(stats: dict, period: str) -> str:
     """
@@ -41,17 +43,17 @@ def _format_report(stats: dict, period: str) -> str:
         best_trade, worst_trade
     """
     period_label = period.upper()
-    total  = stats.get("total_trades", 0)
-    wins   = stats.get("winning_trades", 0)
+    total = stats.get("total_trades", 0)
+    wins = stats.get("winning_trades", 0)
     losses = stats.get("losing_trades", 0)
-    wr     = stats.get("win_rate", 0.0) * 100
-    net    = stats.get("net_pnl", 0.0)
-    gross  = stats.get("gross_pnl", 0.0)
-    dd     = stats.get("max_drawdown", 0.0) * 100
-    rr     = stats.get("avg_rr", 0.0)
-    best   = stats.get("best_trade", 0.0)
-    worst  = stats.get("worst_trade", 0.0)
-    sign   = "💰" if net >= 0 else "💸"
+    wr = stats.get("win_rate", 0.0) * 100
+    net = stats.get("net_pnl", 0.0)
+    gross = stats.get("gross_pnl", 0.0)
+    dd = stats.get("max_drawdown", 0.0) * 100
+    rr = stats.get("avg_rr", 0.0)
+    best = stats.get("best_trade", 0.0)
+    worst = stats.get("worst_trade", 0.0)
+    sign = "💰" if net >= 0 else "💸"
 
     return (
         f"📊 *گزارش عملکرد — {period_label}*\n\n"
@@ -69,6 +71,7 @@ def _format_report(stats: dict, period: str) -> str:
 
 # ── Command handlers ─────────────────────────────────────────────── #
 
+
 @router.message(Command("report"))
 async def cmd_report(message: types.Message) -> None:
     """
@@ -77,22 +80,21 @@ async def cmd_report(message: types.Message) -> None:
     Defaults to daily when no argument is given.
     """
     try:
-        args   = (message.text or "").split()[1:]
+        args = (message.text or "").split()[1:]
         period = args[0].lower() if args else "daily"
 
         if period not in PERIOD_DAYS:
             await message.answer(
-                "⚠️ دوره معتبر نیست.\n"
-                "*گزینه‌ها:* daily | weekly | monthly | all",
+                "⚠️ دوره معتبر نیست.\n*گزینه‌ها:* daily | weekly | monthly | all",
                 parse_mode="Markdown",
             )
             return
 
         await message.answer("⏳ در حال دریافت گزارش ...")
 
-        days  = PERIOD_DAYS[period]
+        days = PERIOD_DAYS[period]
         stats = await _fetch_stats(days)
-        text  = _format_report(stats, period)
+        text = _format_report(stats, period)
         await message.answer(text, parse_mode="Markdown")
 
     except Exception as exc:
@@ -105,10 +107,12 @@ async def cmd_report(message: types.Message) -> None:
 
 # ── Data access ──────────────────────────────────────────────────── #
 
+
 async def _fetch_stats(days: int) -> dict:
     """Fetch aggregated performance stats from the analytics service."""
     try:
         from backend.analytics.analytics_service import analytics_service
+
         return await analytics_service.get_performance_stats(days=days)
     except Exception as exc:
         logger.warning("[reports] _fetch_stats(%d) failed: %s", days, exc)

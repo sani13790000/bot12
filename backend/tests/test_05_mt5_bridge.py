@@ -11,21 +11,24 @@ Galaxy Vast AI Trading Platform
 4. SignalProcessor → VotingEngine → ExecutionService pipeline
 5. MT5Gateway Agent endpoints (با httpx mock)
 """
+
 from __future__ import annotations
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Fixtures
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def connector_demo():
     """MT5Connector در demo mode."""
     from backend.execution.mt5_connector import MT5Connector
+
     return MT5Connector(demo=True)
 
 
@@ -33,6 +36,7 @@ def connector_demo():
 def connector_live():
     """MT5Connector در LIVE mode با mock session."""
     from backend.execution.mt5_connector import MT5Connector
+
     c = MT5Connector(base_url="http://localhost:8080", demo=False)
     return c
 
@@ -41,6 +45,7 @@ def connector_live():
 # TestMT5ConnectorDemo
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestMT5ConnectorDemo:
     def test_demo_flag_true(self, connector_demo):
         assert connector_demo.demo is True
@@ -48,6 +53,7 @@ class TestMT5ConnectorDemo:
     def test_demo_flag_env_false(self):
         """MT5_DEMO_MODE=false → demo=False."""
         from backend.execution.mt5_connector import MT5Connector
+
         with patch.dict("os.environ", {"MT5_DEMO_MODE": "false"}):
             c = MT5Connector()
             assert c.demo is False
@@ -55,6 +61,7 @@ class TestMT5ConnectorDemo:
     def test_demo_flag_env_true(self):
         """MT5_DEMO_MODE=true → demo=True."""
         from backend.execution.mt5_connector import MT5Connector
+
         with patch.dict("os.environ", {"MT5_DEMO_MODE": "true"}):
             c = MT5Connector()
             assert c.demo is True
@@ -88,8 +95,8 @@ class TestMT5ConnectorDemo:
         for c in candles:
             assert c.high >= c.open
             assert c.high >= c.close
-            assert c.low  <= c.open
-            assert c.low  <= c.close
+            assert c.low <= c.open
+            assert c.low <= c.close
 
     @pytest.mark.asyncio
     async def test_get_symbol_info_demo(self, connector_demo):
@@ -116,6 +123,7 @@ class TestMT5ConnectorDemo:
     @pytest.mark.asyncio
     async def test_context_manager(self):
         from backend.execution.mt5_connector import MT5Connector
+
         async with MT5Connector(demo=True) as c:
             assert c._connected is True
         assert c._connected is False
@@ -124,6 +132,7 @@ class TestMT5ConnectorDemo:
 # ══════════════════════════════════════════════════════════════════════════════
 # TestMT5ConnectorLive
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestMT5ConnectorLive:
     @pytest.mark.asyncio
@@ -148,12 +157,21 @@ class TestMT5ConnectorLive:
         """get_candles در LIVE باید به /candles بزند."""
         mock_response = AsyncMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={
-            "candles": [
-                {"time": "2026-01-01T00:00:00", "open": 1.10, "high": 1.11,
-                 "low": 1.09, "close": 1.105, "volume": 1000, "spread": 1}
-            ]
-        })
+        mock_response.json = AsyncMock(
+            return_value={
+                "candles": [
+                    {
+                        "time": "2026-01-01T00:00:00",
+                        "open": 1.10,
+                        "high": 1.11,
+                        "low": 1.09,
+                        "close": 1.105,
+                        "volume": 1000,
+                        "spread": 1,
+                    }
+                ]
+            }
+        )
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
 
@@ -172,35 +190,41 @@ class TestMT5ConnectorLive:
 # TestSignalProcessor
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestSignalProcessor:
     @pytest.mark.asyncio
     async def test_reject_no_trade(self):
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         sp = SignalProcessor()
-        sig = RawSignal(symbol="EURUSD", timeframe="H1",
-                        direction="NO_TRADE", confidence=0.75)
+        sig = RawSignal(symbol="EURUSD", timeframe="H1", direction="NO_TRADE", confidence=0.75)
         result = await sp.process(sig)
         assert result.accepted is False
         assert "NO_TRADE" in result.reason
 
     @pytest.mark.asyncio
     async def test_reject_low_confidence(self):
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         sp = SignalProcessor()
-        sig = RawSignal(symbol="EURUSD", timeframe="H1",
-                        direction="BUY", confidence=0.40)
+        sig = RawSignal(symbol="EURUSD", timeframe="H1", direction="BUY", confidence=0.40)
         result = await sp.process(sig)
         assert result.accepted is False
         assert "confidence" in result.reason
 
     @pytest.mark.asyncio
     async def test_reject_low_rr(self):
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         sp = SignalProcessor()
         sig = RawSignal(
-            symbol="EURUSD", timeframe="H1",
-            direction="BUY", confidence=0.80,
-            entry_price=1.10, sl_price=1.09, tp_price=1.105,
+            symbol="EURUSD",
+            timeframe="H1",
+            direction="BUY",
+            confidence=0.80,
+            entry_price=1.10,
+            sl_price=1.09,
+            tp_price=1.105,
         )
         result = await sp.process(sig)
         assert result.accepted is False
@@ -208,14 +232,15 @@ class TestSignalProcessor:
 
     @pytest.mark.asyncio
     async def test_accept_with_mock_execution(self):
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
+
         sp = SignalProcessor()
         sp._voting_engine = None
 
         mock_result = MagicMock()
         mock_result.success = True
-        mock_result.ticket  = 123456
-        mock_result.error   = None
+        mock_result.ticket = 123456
+        mock_result.error = None
 
         mock_exec = MagicMock()
         mock_exec.execute = AsyncMock(return_value=mock_result)
@@ -226,9 +251,13 @@ class TestSignalProcessor:
         sp._db = mock_db
 
         sig = RawSignal(
-            symbol="EURUSD", timeframe="H1",
-            direction="BUY", confidence=0.85,
-            entry_price=1.10, sl_price=1.09, tp_price=1.12,
+            symbol="EURUSD",
+            timeframe="H1",
+            direction="BUY",
+            confidence=0.85,
+            entry_price=1.10,
+            sl_price=1.09,
+            tp_price=1.12,
             meta={"volume": 0.01},
         )
         result = await sp.process(sig)
@@ -238,7 +267,7 @@ class TestSignalProcessor:
     @pytest.mark.asyncio
     async def test_voting_timeout_continues(self):
         """اگر VotingEngine timeout شود، پردازش ادامه می‌یابد."""
-        from backend.services.signal_processor import SignalProcessor, RawSignal
+        from backend.services.signal_processor import RawSignal, SignalProcessor
 
         async def slow_vote(*args, **kwargs):
             await asyncio.sleep(100)
@@ -251,8 +280,8 @@ class TestSignalProcessor:
 
         mock_result = MagicMock()
         mock_result.success = True
-        mock_result.ticket  = 999
-        mock_result.error   = None
+        mock_result.ticket = 999
+        mock_result.error = None
         mock_exec = MagicMock()
         mock_exec.execute = AsyncMock(return_value=mock_result)
         sp._execution_service = mock_exec
@@ -260,9 +289,13 @@ class TestSignalProcessor:
         sp._db.insert = AsyncMock()
 
         sig = RawSignal(
-            symbol="GBPUSD", timeframe="H4",
-            direction="SELL", confidence=0.72,
-            entry_price=1.27, sl_price=1.28, tp_price=1.25,
+            symbol="GBPUSD",
+            timeframe="H4",
+            direction="SELL",
+            confidence=0.72,
+            entry_price=1.27,
+            sl_price=1.28,
+            tp_price=1.25,
             meta={"volume": 0.01},
         )
         result = await asyncio.wait_for(sp.process(sig), timeout=15.0)
@@ -272,6 +305,7 @@ class TestSignalProcessor:
 # ══════════════════════════════════════════════════════════════════════════════
 # TestMT5GatewayAgent
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestMT5GatewayAgent:
     def test_import_gateway(self):
@@ -285,6 +319,7 @@ class TestMT5GatewayAgent:
 # TestE2EPipelineSimulated
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestE2EPipelineSimulated:
     @pytest.mark.asyncio
     async def test_full_pipeline_demo(self):
@@ -292,23 +327,27 @@ class TestE2EPipelineSimulated:
         End-to-end در demo mode:
         RawSignal → SignalProcessor → ExecutionService(demo) → ticket
         """
-        from backend.services.signal_processor import SignalProcessor, RawSignal
         from backend.execution.execution_service import ExecutionService
         from backend.execution.mt5_connector import MT5Connector
+        from backend.services.signal_processor import RawSignal, SignalProcessor
 
         connector = MT5Connector(demo=True)
         await connector.connect()
 
         svc = ExecutionService(connector=connector)
-        sp  = SignalProcessor()
-        sp._voting_engine     = None
+        sp = SignalProcessor()
+        sp._voting_engine = None
         sp._execution_service = svc
-        sp._db                = None
+        sp._db = None
 
         sig = RawSignal(
-            symbol="EURUSD", timeframe="H1",
-            direction="BUY", confidence=0.90,
-            entry_price=1.10000, sl_price=1.09000, tp_price=1.12000,
+            symbol="EURUSD",
+            timeframe="H1",
+            direction="BUY",
+            confidence=0.90,
+            entry_price=1.10000,
+            sl_price=1.09000,
+            tp_price=1.12000,
             meta={"volume": 0.01},
         )
         result = await sp.process(sig)
@@ -319,8 +358,8 @@ class TestE2EPipelineSimulated:
     @pytest.mark.asyncio
     async def test_candles_fed_to_smc(self):
         """get_candles → SMCEngine.analyse() باید بدون crash اجرا شود."""
+        from backend.analysis.smc_engine import Candle, SMCEngine
         from backend.execution.mt5_connector import MT5Connector
-        from backend.analysis.smc_engine import SMCEngine, Candle
 
         connector = MT5Connector(demo=True)
         await connector.connect()
@@ -330,7 +369,10 @@ class TestE2EPipelineSimulated:
         candles = [
             Candle(
                 timestamp=c.time.isoformat(),
-                open=c.open, high=c.high, low=c.low, close=c.close,
+                open=c.open,
+                high=c.high,
+                low=c.low,
+                close=c.close,
                 volume=c.volume,
             )
             for c in raw_candles

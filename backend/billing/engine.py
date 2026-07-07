@@ -7,39 +7,51 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
 from .provider import (
-    Currency, PaymentProvider, PaymentRequest,
-    PaymentResult, PaymentStatus, ProviderName,
+    Currency,
+    PaymentProvider,
+    PaymentRequest,
+    PaymentResult,
+    PaymentStatus,
+    ProviderName,
 )
 
 
 class SubscriptionStatus(str, enum.Enum):
-    TRIAL     = "trial"
-    ACTIVE    = "active"
-    PAST_DUE  = "past_due"
+    TRIAL = "trial"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
     SUSPENDED = "suspended"
-    EXPIRED   = "expired"
+    EXPIRED = "expired"
     CANCELLED = "cancelled"
-    REVOKED   = "revoked"
+    REVOKED = "revoked"
 
 
 _SUB_FSM: Dict[SubscriptionStatus, set] = {
-    SubscriptionStatus.TRIAL:     {SubscriptionStatus.ACTIVE,
-                                   SubscriptionStatus.EXPIRED,
-                                   SubscriptionStatus.CANCELLED},
-    SubscriptionStatus.ACTIVE:    {SubscriptionStatus.PAST_DUE,
-                                   SubscriptionStatus.EXPIRED,
-                                   SubscriptionStatus.CANCELLED,
-                                   SubscriptionStatus.SUSPENDED},
-    SubscriptionStatus.PAST_DUE:  {SubscriptionStatus.ACTIVE,
-                                   SubscriptionStatus.SUSPENDED,
-                                   SubscriptionStatus.EXPIRED,
-                                   SubscriptionStatus.CANCELLED},
-    SubscriptionStatus.SUSPENDED: {SubscriptionStatus.ACTIVE,
-                                   SubscriptionStatus.REVOKED,
-                                   SubscriptionStatus.CANCELLED},
-    SubscriptionStatus.EXPIRED:   {SubscriptionStatus.ACTIVE},
+    SubscriptionStatus.TRIAL: {
+        SubscriptionStatus.ACTIVE,
+        SubscriptionStatus.EXPIRED,
+        SubscriptionStatus.CANCELLED,
+    },
+    SubscriptionStatus.ACTIVE: {
+        SubscriptionStatus.PAST_DUE,
+        SubscriptionStatus.EXPIRED,
+        SubscriptionStatus.CANCELLED,
+        SubscriptionStatus.SUSPENDED,
+    },
+    SubscriptionStatus.PAST_DUE: {
+        SubscriptionStatus.ACTIVE,
+        SubscriptionStatus.SUSPENDED,
+        SubscriptionStatus.EXPIRED,
+        SubscriptionStatus.CANCELLED,
+    },
+    SubscriptionStatus.SUSPENDED: {
+        SubscriptionStatus.ACTIVE,
+        SubscriptionStatus.REVOKED,
+        SubscriptionStatus.CANCELLED,
+    },
+    SubscriptionStatus.EXPIRED: {SubscriptionStatus.ACTIVE},
     SubscriptionStatus.CANCELLED: {SubscriptionStatus.ACTIVE},
-    SubscriptionStatus.REVOKED:   set(),
+    SubscriptionStatus.REVOKED: set(),
 }
 
 
@@ -49,17 +61,17 @@ class SubscriptionTransitionError(Exception):
 
 @dataclass
 class Subscription:
-    sub_id:         str
-    user_id:        str
-    plan_id:        str
-    status:         SubscriptionStatus
-    created_at:     float = field(default_factory=time.time)
-    expires_at:     float = 0.0
-    trial_ends_at:  float = 0.0
-    cancelled_at:   Optional[float] = None
-    dunning_count:  int   = 0
-    license_key:    str   = ""
-    transitions:    List  = field(default_factory=list)
+    sub_id: str
+    user_id: str
+    plan_id: str
+    status: SubscriptionStatus
+    created_at: float = field(default_factory=time.time)
+    expires_at: float = 0.0
+    trial_ends_at: float = 0.0
+    cancelled_at: Optional[float] = None
+    dunning_count: int = 0
+    license_key: str = ""
+    transitions: List = field(default_factory=list)
 
     def transition(self, new_status: SubscriptionStatus, reason: str = "") -> None:
         allowed = _SUB_FSM.get(self.status, set())
@@ -67,12 +79,14 @@ class Subscription:
             raise SubscriptionTransitionError(
                 f"Transition {self.status!r} -> {new_status!r} is not allowed"
             )
-        self.transitions.append({
-            "from":   self.status,
-            "to":     new_status,
-            "ts":     time.time(),
-            "reason": reason,
-        })
+        self.transitions.append(
+            {
+                "from": self.status,
+                "to": new_status,
+                "ts": time.time(),
+                "reason": reason,
+            }
+        )
         self.status = new_status
 
     @property
@@ -96,52 +110,65 @@ class Subscription:
 
 PLANS: Dict[str, Dict] = {
     "trial": {
-        "price_usd":      0,
-        "price_irr":      0,
-        "days":           14,
-        "label":          "Trial",
-        "features":       ["signals_read", "signals_write", "dashboard"],
-        "max_devices":    1,
-        "max_positions":  3,
+        "price_usd": 0,
+        "price_irr": 0,
+        "days": 14,
+        "label": "Trial",
+        "features": ["signals_read", "signals_write", "dashboard"],
+        "max_devices": 1,
+        "max_positions": 3,
     },
     "basic": {
-        "price_usd":      2900,
-        "price_irr":      4_900_000,
-        "days":           30,
-        "label":          "Basic",
-        "features":       ["signals_read", "signals_write", "dashboard", "mt5"],
-        "max_devices":    2,
-        "max_positions":  10,
+        "price_usd": 2900,
+        "price_irr": 4_900_000,
+        "days": 30,
+        "label": "Basic",
+        "features": ["signals_read", "signals_write", "dashboard", "mt5"],
+        "max_devices": 2,
+        "max_positions": 10,
     },
     "pro": {
-        "price_usd":      7900,
-        "price_irr":      12_900_000,
-        "days":           30,
-        "label":          "Pro",
-        "features":       ["signals_read", "signals_write", "dashboard",
-                           "mt5", "ai", "analytics"],
-        "max_devices":    5,
-        "max_positions":  50,
+        "price_usd": 7900,
+        "price_irr": 12_900_000,
+        "days": 30,
+        "label": "Pro",
+        "features": ["signals_read", "signals_write", "dashboard", "mt5", "ai", "analytics"],
+        "max_devices": 5,
+        "max_positions": 50,
     },
     "vip": {
-        "price_usd":      14900,
-        "price_irr":      24_900_000,
-        "days":           30,
-        "label":          "VIP",
-        "features":       ["signals_read", "signals_write", "dashboard",
-                           "mt5", "ai", "analytics", "institutional"],
-        "max_devices":    10,
-        "max_positions":  200,
+        "price_usd": 14900,
+        "price_irr": 24_900_000,
+        "days": 30,
+        "label": "VIP",
+        "features": [
+            "signals_read",
+            "signals_write",
+            "dashboard",
+            "mt5",
+            "ai",
+            "analytics",
+            "institutional",
+        ],
+        "max_devices": 10,
+        "max_positions": 200,
     },
     "annual": {
-        "price_usd":      79900,
-        "price_irr":      129_900_000,
-        "days":           365,
-        "label":          "Annual Pro",
-        "features":       ["signals_read", "signals_write", "dashboard",
-                           "mt5", "ai", "analytics", "institutional"],
-        "max_devices":    10,
-        "max_positions":  500,
+        "price_usd": 79900,
+        "price_irr": 129_900_000,
+        "days": 365,
+        "label": "Annual Pro",
+        "features": [
+            "signals_read",
+            "signals_write",
+            "dashboard",
+            "mt5",
+            "ai",
+            "analytics",
+            "institutional",
+        ],
+        "max_devices": 10,
+        "max_positions": 500,
     },
 }
 
@@ -150,17 +177,17 @@ DUNNING_THRESHOLD = 3
 
 @dataclass
 class Invoice:
-    invoice_id:    str
-    user_id:       str
-    plan_id:       str
-    amount:        int
-    currency:      Currency
-    provider:      ProviderName
-    status:        PaymentStatus
-    checkout_url:  str   = ""
-    created_at:    float = field(default_factory=time.time)
-    confirmed_at:  Optional[float] = None
-    raw:           Dict  = field(default_factory=dict)
+    invoice_id: str
+    user_id: str
+    plan_id: str
+    amount: int
+    currency: Currency
+    provider: ProviderName
+    status: PaymentStatus
+    checkout_url: str = ""
+    created_at: float = field(default_factory=time.time)
+    confirmed_at: Optional[float] = None
+    raw: Dict = field(default_factory=dict)
     idempotency_key: str = ""
 
 
@@ -173,18 +200,18 @@ class BillingEngine:
         on_license_activate: Optional[Callable[[str, str], None]] = None,
         on_subscription_change: Optional[Callable[[Subscription], None]] = None,
     ) -> None:
-        self._provider   = provider
+        self._provider = provider
         self._on_activate = on_license_activate
-        self._on_change   = on_subscription_change
-        self._invoices:      Dict[str, Invoice]      = {}
+        self._on_change = on_subscription_change
+        self._invoices: Dict[str, Invoice] = {}
         self._subscriptions: Dict[str, Subscription] = {}
-        self._idempotency:   Dict[str, str]          = {}
-        self._audit:         List[Dict]              = []
+        self._idempotency: Dict[str, str] = {}
+        self._audit: List[Dict] = []
 
     def checkout(
         self,
-        user_id:  str,
-        plan_id:  str,
+        user_id: str,
+        plan_id: str,
         currency: Currency = Currency.USD,
     ) -> Invoice:
         plan = PLANS.get(plan_id)
@@ -227,8 +254,11 @@ class BillingEngine:
         self._invoices[result.invoice_id] = invoice
         self._idempotency[idem_key] = result.invoice_id
 
-        self._audit_log("CHECKOUT_CREATED", user_id=user_id,
-                        detail=f"plan={plan_id} invoice={result.invoice_id}")
+        self._audit_log(
+            "CHECKOUT_CREATED",
+            user_id=user_id,
+            detail=f"plan={plan_id} invoice={result.invoice_id}",
+        )
 
         if result.status == PaymentStatus.SUCCEEDED:
             self._activate(invoice)
@@ -250,8 +280,9 @@ class BillingEngine:
         if result.status == PaymentStatus.SUCCEEDED:
             invoice.confirmed_at = time.time()
             self._activate(invoice)
-            self._audit_log("PAYMENT_CONFIRMED", user_id=invoice.user_id,
-                            detail=f"invoice={invoice_id}")
+            self._audit_log(
+                "PAYMENT_CONFIRMED", user_id=invoice.user_id, detail=f"invoice={invoice_id}"
+            )
         elif result.status == PaymentStatus.FAILED:
             self._handle_payment_failure(invoice)
         elif result.status == PaymentStatus.REFUNDED:
@@ -268,8 +299,9 @@ class BillingEngine:
         invoice.status = PaymentStatus.SUCCEEDED
         invoice.confirmed_at = time.time()
         self._activate(invoice)
-        self._audit_log("ADMIN_CONFIRMED", user_id=invoice.user_id,
-                        detail=f"invoice={invoice_id} actor={actor}")
+        self._audit_log(
+            "ADMIN_CONFIRMED", user_id=invoice.user_id, detail=f"invoice={invoice_id} actor={actor}"
+        )
         return invoice
 
     def suspend(self, user_id: str, reason: str = "admin_action") -> Subscription:
@@ -313,14 +345,14 @@ class BillingEngine:
 
     def _activate(self, invoice: Invoice) -> None:
         user_id = invoice.user_id
-        plan    = PLANS[invoice.plan_id]
-        now     = time.time()
+        plan = PLANS[invoice.plan_id]
+        now = time.time()
 
         sub = self._subscriptions.get(user_id)
 
         if sub is None:
-            is_trial    = invoice.plan_id == "trial"
-            status      = SubscriptionStatus.TRIAL if is_trial else SubscriptionStatus.ACTIVE
+            is_trial = invoice.plan_id == "trial"
+            status = SubscriptionStatus.TRIAL if is_trial else SubscriptionStatus.ACTIVE
             license_key = f"BOT12-{uuid.uuid4().hex[:16].upper()}"
             sub = Subscription(
                 sub_id=str(uuid.uuid4()),
@@ -342,8 +374,8 @@ class BillingEngine:
                 SubscriptionStatus.SUSPENDED,
             ) and target in _SUB_FSM.get(sub.status, set()):
                 sub.transition(target, f"payment_confirmed invoice={invoice.invoice_id}")
-            sub.plan_id       = invoice.plan_id
-            sub.expires_at    = now + plan["days"] * 86400
+            sub.plan_id = invoice.plan_id
+            sub.expires_at = now + plan["days"] * 86400
             sub.dunning_count = 0
 
         if self._on_activate and sub.license_key:
@@ -357,16 +389,20 @@ class BillingEngine:
             return
 
         sub.dunning_count += 1
-        self._audit_log("PAYMENT_FAILED", user_id=invoice.user_id,
-                        detail=f"dunning={sub.dunning_count}")
+        self._audit_log(
+            "PAYMENT_FAILED", user_id=invoice.user_id, detail=f"dunning={sub.dunning_count}"
+        )
 
         if sub.status == SubscriptionStatus.ACTIVE:
-            sub.transition(SubscriptionStatus.PAST_DUE,
-                           f"payment_failed dunning={sub.dunning_count}")
+            sub.transition(
+                SubscriptionStatus.PAST_DUE, f"payment_failed dunning={sub.dunning_count}"
+            )
         elif sub.status == SubscriptionStatus.PAST_DUE:
             if sub.dunning_count >= DUNNING_THRESHOLD:
-                sub.transition(SubscriptionStatus.SUSPENDED,
-                               f"dunning_threshold_reached count={sub.dunning_count}")
+                sub.transition(
+                    SubscriptionStatus.SUSPENDED,
+                    f"dunning_threshold_reached count={sub.dunning_count}",
+                )
 
         self._notify(sub)
 
@@ -374,8 +410,9 @@ class BillingEngine:
         sub = self._subscriptions.get(invoice.user_id)
         if sub is None:
             return
-        self._audit_log("PAYMENT_REFUNDED", user_id=invoice.user_id,
-                        detail=f"invoice={invoice.invoice_id}")
+        self._audit_log(
+            "PAYMENT_REFUNDED", user_id=invoice.user_id, detail=f"invoice={invoice.invoice_id}"
+        )
         if sub.status == SubscriptionStatus.ACTIVE:
             if SubscriptionStatus.SUSPENDED in _SUB_FSM.get(sub.status, set()):
                 sub.transition(SubscriptionStatus.SUSPENDED, "refund_issued")
@@ -396,9 +433,11 @@ class BillingEngine:
         return f"{user_id}:{plan_id}:{window}"
 
     def _audit_log(self, event: str, user_id: str = "", detail: str = "") -> None:
-        self._audit.append({
-            "event":   event,
-            "user_id": user_id,
-            "detail":  detail,
-            "ts":      time.time(),
-        })
+        self._audit.append(
+            {
+                "event": event,
+                "user_id": user_id,
+                "detail": detail,
+                "ts": time.time(),
+            }
+        )

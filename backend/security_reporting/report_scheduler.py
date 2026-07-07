@@ -3,22 +3,23 @@ backend/security_reporting/report_scheduler.py
 Phase-7 — Automatic Report Scheduler
 Monthly + manual trigger + Telegram notify
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
 # ── Config from env ──────────────────────────────────────────────────────────
-_INTERVAL_H     = int(os.getenv("SECURITY_REPORT_INTERVAL_HOURS", "24"))
-_PERIOD_H       = int(os.getenv("SECURITY_REPORT_PERIOD_HOURS",   "168"))   # 7 days default
-_MONTHLY_DAY    = int(os.getenv("SECURITY_REPORT_MONTHLY_DAY",    "1"))     # 1st of month
-_TG_ENABLED     = os.getenv("SECURITY_REPORT_TELEGRAM", "true").lower() in ("1", "true", "yes")
-_MONTHLY_REPORT = os.getenv("SECURITY_MONTHLY_REPORT",  "true").lower() in ("1", "true", "yes")
+_INTERVAL_H = int(os.getenv("SECURITY_REPORT_INTERVAL_HOURS", "24"))
+_PERIOD_H = int(os.getenv("SECURITY_REPORT_PERIOD_HOURS", "168"))  # 7 days default
+_MONTHLY_DAY = int(os.getenv("SECURITY_REPORT_MONTHLY_DAY", "1"))  # 1st of month
+_TG_ENABLED = os.getenv("SECURITY_REPORT_TELEGRAM", "true").lower() in ("1", "true", "yes")
+_MONTHLY_REPORT = os.getenv("SECURITY_MONTHLY_REPORT", "true").lower() in ("1", "true", "yes")
 
 
 class ReportScheduler:
@@ -32,14 +33,14 @@ class ReportScheduler:
     """
 
     def __init__(self) -> None:
-        self._running:      bool               = False
-        self._task:         Optional[asyncio.Task] = None  # type: ignore[type-arg]
-        self._last_run:     Optional[datetime]  = None
-        self._last_monthly: Optional[datetime]  = None
-        self._report_count: int                = 0
-        self._error_count:  int                = 0
-        self._history:      List[Dict[str, Any]] = []
-        self._lock:         asyncio.Lock        = asyncio.Lock()
+        self._running: bool = False
+        self._task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+        self._last_run: Optional[datetime] = None
+        self._last_monthly: Optional[datetime] = None
+        self._report_count: int = 0
+        self._error_count: int = 0
+        self._history: List[Dict[str, Any]] = []
+        self._lock: asyncio.Lock = asyncio.Lock()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -48,7 +49,9 @@ class ReportScheduler:
         self._running = True
         log.info(
             "ReportScheduler started | interval=%dh | monthly=%s | period=%dh",
-            _INTERVAL_H, _MONTHLY_REPORT, _PERIOD_H,
+            _INTERVAL_H,
+            _MONTHLY_REPORT,
+            _PERIOD_H,
         )
         while self._running:
             try:
@@ -83,14 +86,14 @@ class ReportScheduler:
 
     def stats(self) -> Dict[str, Any]:
         return {
-            "running":        self._running,
-            "last_run":       self._last_run.isoformat()     if self._last_run     else None,
-            "last_monthly":   self._last_monthly.isoformat() if self._last_monthly else None,
-            "report_count":   self._report_count,
-            "error_count":    self._error_count,
+            "running": self._running,
+            "last_run": self._last_run.isoformat() if self._last_run else None,
+            "last_monthly": self._last_monthly.isoformat() if self._last_monthly else None,
+            "report_count": self._report_count,
+            "error_count": self._error_count,
             "interval_hours": _INTERVAL_H,
-            "period_hours":   _PERIOD_H,
-            "history":        self._history[-10:],
+            "period_hours": _PERIOD_H,
+            "history": self._history[-10:],
         }
 
     # ── Internal ──────────────────────────────────────────────────────────────
@@ -118,10 +121,10 @@ class ReportScheduler:
         error: Optional[str] = None
 
         try:
-            from backend.security_reporting.security_report_service import security_report_service
             from backend.security_reporting.report_exporter import report_exporter
+            from backend.security_reporting.security_report_service import security_report_service
 
-            report    = await security_report_service.generate_report(period_hours=period_hours)
+            report = await security_report_service.generate_report(period_hours=period_hours)
             report_id = report.report_id
 
             exports["json"] = report_exporter.export_json(report)
@@ -147,13 +150,13 @@ class ReportScheduler:
 
         duration_s = (datetime.now(timezone.utc) - start).total_seconds()
         run_record: Dict[str, Any] = {
-            "report_id":    report_id,
-            "label":        label,
+            "report_id": report_id,
+            "label": label,
             "period_hours": period_hours,
-            "started_at":   start.isoformat(),
-            "duration_s":   round(duration_s, 2),
-            "exports":      exports,
-            "error":        error,
+            "started_at": start.isoformat(),
+            "duration_s": round(duration_s, 2),
+            "exports": exports,
+            "error": error,
         }
         self._history.append(run_record)
         if len(self._history) > 50:
@@ -163,6 +166,7 @@ class ReportScheduler:
     async def _send_telegram(self, report: Any, label: str) -> None:
         try:
             from backend.telegram.alerts import send_security_report_alert
+
             await send_security_report_alert(report, label)
         except Exception as exc:
             log.debug("Telegram report alert failed: %s", exc)

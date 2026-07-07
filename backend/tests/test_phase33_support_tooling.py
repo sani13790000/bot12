@@ -6,4 +6,3 @@
 #   AccountRecoveryManager, SupportTicketEngine, SupportViewEngine,
 #   SupportAdmin, build_support_system
 # T220: acceptance - full support journey without security bypass
-from core.support_tooling import build_support_system

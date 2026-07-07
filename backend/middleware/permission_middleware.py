@@ -7,16 +7,16 @@ P20-MW-3: Unknown paths → 404 (not permission error)
 P20-MW-4: Escalation attempts → 403 + audit
 P20-MW-5: Blocked/inactive account → 403 on every request
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from ..core.permissions import (
-    AuthContext,
     ENDPOINT_REGISTRY,
+    AuthContext,
     EndpointSpec,
-    P,
     PermissionDeniedError,
     rbac_v2,
 )
@@ -49,13 +49,12 @@ def _match_endpoint(method: str, path: str) -> Optional[EndpointSpec]:
         if ep.path == path:
             return ep
         # Template match: /api/v1/trades/{trade_id}
-        ep_parts   = ep.path.split("/")
+        ep_parts = ep.path.split("/")
         path_parts = path.split("/")
         if len(ep_parts) != len(path_parts):
             continue
         match = all(
-            ep_seg.startswith("{") and ep_seg.endswith("}")
-            or ep_seg == path_seg
+            ep_seg.startswith("{") and ep_seg.endswith("}") or ep_seg == path_seg
             for ep_seg, path_seg in zip(ep_parts, path_parts)
         )
         if match:
@@ -105,8 +104,11 @@ class PermissionEnforcer:
         if not allowed:
             logger.warning(
                 "[PERM-MW] 403 method=%s path=%s perm=%s user=%s role=%s",
-                method, path, ep.permission,
-                ctx.user_id[:8], ctx.role,
+                method,
+                path,
+                ep.permission,
+                ctx.user_id[:8],
+                ctx.role,
             )
             return False, f"missing_permission:{ep.permission}"
 
@@ -121,10 +123,12 @@ enforcer = PermissionEnforcer()
 # Route-level decorator (for FastAPI routes without full Depends chain)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def guard(perm: str):
     """
     Lightweight decorator — validates ctx.has_perm(perm).
     """
+
     def decorator(fn):
         import functools
 
@@ -136,9 +140,9 @@ def guard(perm: str):
                         ctx = arg
                         break
             if ctx is None or not rbac_v2.check(ctx, perm):
-                raise PermissionDeniedError(
-                    f"Permission '{perm}' required"
-                )
+                raise PermissionDeniedError(f"Permission '{perm}' required")
             return fn(*args, ctx=ctx, **kwargs)
+
         return wrapper
+
     return decorator

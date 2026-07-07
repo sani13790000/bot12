@@ -1,13 +1,14 @@
 """Observability API Routes. Phase L fixes L-13/L-14/L-15/L-16."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
-from backend.observability.metrics import metrics_registry
-from backend.observability.alert_manager import alert_manager
-from backend.observability.tracing import tracer
 from backend.core.deps import get_current_user
+from backend.observability.alert_manager import alert_manager
+from backend.observability.metrics import metrics_registry
+from backend.observability.tracing import tracer
 
 router = APIRouter(prefix="/observability", tags=["observability"])
 
@@ -44,5 +45,7 @@ async def get_alert_history(limit: int = 50, _user=Depends(get_current_user)) ->
 
 @router.post("/alerts/test/{rule_name}")
 async def test_alert(rule_name: str, _user=Depends(get_current_user)) -> dict:
-    fired = await alert_manager.fire(rule_name, context={"test": True, "manual": "triggered from API"})
+    fired = await alert_manager.fire(
+        rule_name, context={"test": True, "manual": "triggered from API"}
+    )
     return {"fired": fired, "rule": rule_name}

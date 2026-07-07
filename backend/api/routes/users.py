@@ -7,7 +7,9 @@ U-13: GET /users/settings returns empty {} - FIXED
 U-14: PUT /users/settings accepts arbitrary JSON - FIXED
 U-15: DELETE /users/account missing - GDPR violation - FIXED
 """
+
 from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -21,17 +23,31 @@ from backend.database import db
 logger = get_logger("api.users")
 router = APIRouter()
 
-_PROFILE_SAFE_FIELDS = frozenset({
-    "id", "email", "full_name", "avatar_url",
-    "created_at", "updated_at", "telegram_id",
-})
+_PROFILE_SAFE_FIELDS = frozenset(
+    {
+        "id",
+        "email",
+        "full_name",
+        "avatar_url",
+        "created_at",
+        "updated_at",
+        "telegram_id",
+    }
+)
 _PROFILE_EDITABLE_FIELDS = frozenset({"full_name", "avatar_url", "telegram_id"})
-_SETTINGS_ALLOWED_KEYS = frozenset({
-    "language", "timezone", "notifications_enabled",
-    "telegram_alerts", "email_alerts",
-    "default_lot_size", "default_risk_pct",
-    "theme", "dashboard_layout",
-})
+_SETTINGS_ALLOWED_KEYS = frozenset(
+    {
+        "language",
+        "timezone",
+        "notifications_enabled",
+        "telegram_alerts",
+        "email_alerts",
+        "default_lot_size",
+        "default_risk_pct",
+        "theme",
+        "dashboard_layout",
+    }
+)
 
 
 def _strip_sensitive(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -40,8 +56,8 @@ def _strip_sensitive(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 class UpdateProfileRequest(BaseModel):
-    full_name:   Optional[str] = Field(None, min_length=1, max_length=120)
-    avatar_url:  Optional[str] = Field(None, max_length=500)
+    full_name: Optional[str] = Field(None, min_length=1, max_length=120)
+    avatar_url: Optional[str] = Field(None, max_length=500)
     telegram_id: Optional[str] = Field(None, max_length=50)
 
     @field_validator("full_name")
@@ -51,15 +67,15 @@ class UpdateProfileRequest(BaseModel):
 
 
 class UpdateSettingsRequest(BaseModel):
-    language:              Optional[str]   = None
-    timezone:              Optional[str]   = None
-    notifications_enabled: Optional[bool]  = None
-    telegram_alerts:       Optional[bool]  = None
-    email_alerts:          Optional[bool]  = None
-    default_lot_size:      Optional[float] = Field(None, gt=0.0, le=100.0)
-    default_risk_pct:      Optional[float] = Field(None, gt=0.0, le=10.0)
-    theme:                 Optional[str]   = None
-    dashboard_layout:      Optional[str]   = None
+    language: Optional[str] = None
+    timezone: Optional[str] = None
+    notifications_enabled: Optional[bool] = None
+    telegram_alerts: Optional[bool] = None
+    email_alerts: Optional[bool] = None
+    default_lot_size: Optional[float] = Field(None, gt=0.0, le=100.0)
+    default_risk_pct: Optional[float] = Field(None, gt=0.0, le=10.0)
+    theme: Optional[str] = None
+    dashboard_layout: Optional[str] = None
 
 
 @router.get("/profile")
@@ -75,13 +91,16 @@ async def update_profile(
 ):
     """U-12: only whitelisted editable fields accepted."""
     update_data = {
-        k: v for k, v in request.model_dump(exclude_unset=True).items()
+        k: v
+        for k, v in request.model_dump(exclude_unset=True).items()
         if k in _PROFILE_EDITABLE_FIELDS and v is not None
     }
     if not update_data:
         return {"success": True, "message": "هیچ تغییری اعمال نشد"}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    updated = await db.update("user_profiles", {"id": user.get("id") or user.get("sub")}, update_data)
+    updated = await db.update(
+        "user_profiles", {"id": user.get("id") or user.get("sub")}, update_data
+    )
     logger.info("Profile updated: %s", user.get("id"))
     return {
         "success": True,
@@ -112,7 +131,8 @@ async def update_settings(
     """U-14: only whitelisted keys stored."""
     uid = user.get("id") or user.get("sub")
     update_data = {
-        k: v for k, v in request.model_dump(exclude_unset=True).items()
+        k: v
+        for k, v in request.model_dump(exclude_unset=True).items()
         if k in _SETTINGS_ALLOWED_KEYS and v is not None
     }
     if not update_data:
@@ -131,10 +151,12 @@ async def delete_account(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user")
     try:
         await db.delete("user_settings", {"user_id": uid})
-        await db.delete("signals",       {"user_id": uid})
+        await db.delete("signals", {"user_id": uid})
         await db.delete("user_profiles", {"id": uid})
         logger.info("Account deleted (GDPR): %s", uid)
         return {"success": True, "message": "حساب کاربری حذف شد"}
     except Exception as exc:
         logger.error("Account deletion failed for %s: %s", uid, exc)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Deletion failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Deletion failed"
+        )

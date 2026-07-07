@@ -6,22 +6,26 @@
 نویسنده: MT5 Trading Team
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from ..telegram.rbac import (
-    UserRole, Permission,
-    has_permission, get_role_permissions,
-    get_role_level, get_min_role_for_permission,
-    COMMAND_PERMISSIONS, get_permission_denied_message
-)
 from ..services.rbac_service import RBACService
-
+from ..telegram.rbac import (
+    COMMAND_PERMISSIONS,
+    Permission,
+    UserRole,
+    get_min_role_for_permission,
+    get_permission_denied_message,
+    get_role_level,
+    get_role_permissions,
+    has_permission,
+)
 
 # =====================================================
 # تست‌های نقش‌ها و دسترسی‌ها
 # =====================================================
+
 
 class TestRolesAndPermissions:
     """تست‌های نقش‌ها و دسترسی‌ها"""
@@ -118,6 +122,7 @@ class TestRolesAndPermissions:
 # تست‌های Command Permissions
 # =====================================================
 
+
 class TestCommandPermissions:
     """تست دسترسی‌های command"""
 
@@ -166,6 +171,7 @@ class TestCommandPermissions:
 # تست‌های RBACService
 # =====================================================
 
+
 class TestRBACService:
     """تست سرویس RBAC"""
 
@@ -175,12 +181,8 @@ class TestRBACService:
         service = RBACService()
 
         # Mock دیتابیس
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {
-                "id": "user-123",
-                "role": "trader",
-                "status": "active"
-            }
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = {"id": "user-123", "role": "trader", "status": "active"}
 
             role = await service.get_user_role(12345)
             assert role == UserRole.TRADER
@@ -190,7 +192,7 @@ class TestRBACService:
         """تست دریافت نقش کاربر ناموجود"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = None
 
             role = await service.get_user_role(99999)
@@ -201,19 +203,12 @@ class TestRBACService:
         """تست بررسی دسترسی مجاز"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
-            with patch.object(service, '_check_license', new_callable=AsyncMock) as mock_license:
-                mock_get.return_value = {
-                    "id": "user-123",
-                    "role": "trader",
-                    "status": "active"
-                }
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
+            with patch.object(service, "_check_license", new_callable=AsyncMock) as mock_license:
+                mock_get.return_value = {"id": "user-123", "role": "trader", "status": "active"}
                 mock_license.return_value = {"valid": True, "allowed": True}
 
-                result = await service.check_permission(
-                    12345,
-                    Permission.CLOSE_ALL_TRADES
-                )
+                result = await service.check_permission(12345, Permission.CLOSE_ALL_TRADES)
 
                 assert result.get("allowed") is True
 
@@ -222,13 +217,10 @@ class TestRBACService:
         """تست بررسی دسترسی - عدم ثبت"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = None
 
-            result = await service.check_permission(
-                12345,
-                Permission.CLOSE_ALL_TRADES
-            )
+            result = await service.check_permission(12345, Permission.CLOSE_ALL_TRADES)
 
             assert result.get("allowed") is False
             assert result.get("reason") == "not_registered"
@@ -238,17 +230,14 @@ class TestRBACService:
         """تست بررسی دسترسی - نقش کافی نیست"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = {
                 "id": "user-123",
                 "role": "user",  # user نمی‌تواند close_all کند
-                "status": "active"
+                "status": "active",
             }
 
-            result = await service.check_permission(
-                12345,
-                Permission.CLOSE_ALL_TRADES
-            )
+            result = await service.check_permission(12345, Permission.CLOSE_ALL_TRADES)
 
             assert result.get("allowed") is False
             assert result.get("reason") == "no_permission"
@@ -258,22 +247,19 @@ class TestRBACService:
         """تست تغییر نقش توسط admin"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_role', new_callable=AsyncMock) as mock_role:
-            with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
+        with patch.object(service, "get_user_role", new_callable=AsyncMock) as mock_role:
+            with patch.object(
+                service, "get_user_by_telegram_id", new_callable=AsyncMock
+            ) as mock_get:
                 mock_role.return_value = UserRole.ADMIN
-                mock_get.return_value = {
-                    "id": "target-user",
-                    "role": "user"
-                }
+                mock_get.return_value = {"id": "target-user", "role": "user"}
 
                 # با mock دیتابیس
-                with patch('..database.db.update', new_callable=AsyncMock) as mock_db:
+                with patch("..database.db.update", new_callable=AsyncMock) as mock_db:
                     mock_db.return_value = [{"id": "target-user"}]
 
-                    result = await service.set_user_role(
-                        telegram_user_id=11111,
-                        new_role=UserRole.TRADER,
-                        admin_id=12345
+                    await service.set_user_role(
+                        telegram_user_id=11111, new_role=UserRole.TRADER, admin_id=12345
                     )
 
     @pytest.mark.asyncio
@@ -281,13 +267,11 @@ class TestRBACService:
         """تست جلوگیری از تغییر نقش توسط غیر admin"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_role', new_callable=AsyncMock) as mock_role:
+        with patch.object(service, "get_user_role", new_callable=AsyncMock) as mock_role:
             mock_role.return_value = UserRole.USER  # user نمی‌تواند نقش تغییر دهد
 
             result = await service.set_user_role(
-                telegram_user_id=11111,
-                new_role=UserRole.TRADER,
-                admin_id=12345
+                telegram_user_id=11111, new_role=UserRole.TRADER, admin_id=12345
             )
 
             assert result is False
@@ -296,6 +280,7 @@ class TestRBACService:
 # =====================================================
 # تست‌های Rate Limiting
 # =====================================================
+
 
 class TestRateLimiting:
     """تست محدودیت نرخ"""
@@ -349,6 +334,7 @@ class TestRateLimiting:
 # تست‌های Permission Messages
 # =====================================================
 
+
 class TestPermissionMessages:
     """تست پیام‌های خطای دسترسی"""
 
@@ -363,9 +349,7 @@ class TestPermissionMessages:
     def test_no_permission_message(self):
         """تست پیام عدم دسترسی"""
         message = get_permission_denied_message(
-            "no_permission",
-            role="user",
-            required_role="trader"
+            "no_permission", role="user", required_role="trader"
         )
 
         assert "معامله‌گر" in message or "کاربر" in message
@@ -382,6 +366,7 @@ class TestPermissionMessages:
 # تست‌های Integration
 # =====================================================
 
+
 class TestRBACIntegration:
     """تست‌های یکپارچه RBAC"""
 
@@ -390,17 +375,10 @@ class TestRBACIntegration:
         """تست فلوی command - user نمی‌تواند ببندد"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {
-                "id": "user-123",
-                "role": "user",
-                "status": "active"
-            }
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = {"id": "user-123", "role": "user", "status": "active"}
 
-            check = await service.check_command_permission(
-                12345,
-                "/close_all"
-            )
+            check = await service.check_command_permission(12345, "/close_all")
 
             assert check.get("allowed") is False
 
@@ -409,19 +387,12 @@ class TestRBACIntegration:
         """تست فلوی command - trader می‌تواند ببندد"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
-            with patch.object(service, '_check_license', new_callable=AsyncMock) as mock_license:
-                mock_get.return_value = {
-                    "id": "user-123",
-                    "role": "trader",
-                    "status": "active"
-                }
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
+            with patch.object(service, "_check_license", new_callable=AsyncMock) as mock_license:
+                mock_get.return_value = {"id": "user-123", "role": "trader", "status": "active"}
                 mock_license.return_value = {"valid": True, "allowed": True}
 
-                check = await service.check_command_permission(
-                    12345,
-                    "/close_all"
-                )
+                check = await service.check_command_permission(12345, "/close_all")
 
                 assert check.get("allowed") is True
 
@@ -430,18 +401,11 @@ class TestRBACIntegration:
         """تست فلوی command - admin می‌تواند ربات کنترل کند"""
         service = RBACService()
 
-        with patch.object(service, 'get_user_by_telegram_id', new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {
-                "id": "admin-123",
-                "role": "admin",
-                "status": "active"
-            }
+        with patch.object(service, "get_user_by_telegram_id", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = {"id": "admin-123", "role": "admin", "status": "active"}
 
             # start_bot
-            check = await service.check_command_permission(
-                12345,
-                "/start_bot"
-            )
+            check = await service.check_command_permission(12345, "/start_bot")
 
             assert check.get("allowed") is True
 

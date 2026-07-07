@@ -2,27 +2,29 @@
 tests/test_phase_s.py
 Phase S -- Production Hardening -- 55 unit tests
 """
+
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import hmac
 import json
 import time
 import unittest
-from base64 import b64encode
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def _b64url(b: bytes) -> str:
     import base64
+
     return base64.b64encode(b).rstrip(b"=").replace(b"+", b"-").replace(b"/", b"_").decode()
 
 
 def _make_jwt(payload: dict, secret: str, alg: str = "HS256") -> str:
-    header  = _b64url(json.dumps({"alg": alg, "typ": "JWT"}).encode())
-    body    = _b64url(json.dumps(payload).encode())
+    header = _b64url(json.dumps({"alg": alg, "typ": "JWT"}).encode())
+    body = _b64url(json.dumps(payload).encode())
     signing = f"{header}.{body}".encode("ascii")
-    sig     = hmac.new(secret.encode(), signing, hashlib.sha256).digest()
+    sig = hmac.new(secret.encode(), signing, hashlib.sha256).digest()
     return f"{header}.{body}.{_b64url(sig)}"
 
 
@@ -34,12 +36,14 @@ def run(coro):
 # Auth Hardening (S-9..S-12)
 # ============================================================================
 import sys
+
 sys.path.insert(0, "/home/definable/phase-s")
 from auth_hardening import (
-    verify_hs256_jwt, create_hs256_jwt,
-    TokenRevocationList,
     RefreshTokenStore,
+    TokenRevocationList,
     check_scope,
+    create_hs256_jwt,
+    verify_hs256_jwt,
 )
 
 
@@ -60,8 +64,9 @@ class TestS9JWTVerification(unittest.TestCase):
 
     def test_wrong_algorithm_rejected(self):
         import base64
+
         header = base64.b64encode(b'{"alg":"RS256","typ":"JWT"}').rstrip(b"=").decode()
-        body   = base64.b64encode(b'{"sub":"x"}').rstrip(b"=").decode()
+        body = base64.b64encode(b'{"sub":"x"}').rstrip(b"=").decode()
         result = verify_hs256_jwt(f"{header}.{body}.fakesig", self.SECRET)
         self.assertIsNone(result)
 
@@ -73,6 +78,7 @@ class TestS9JWTVerification(unittest.TestCase):
         token = create_hs256_jwt({"sub": "user1", "role": "user"}, self.SECRET)
         parts = token.split(".")
         import base64
+
         new_payload = base64.b64encode(b'{"sub":"user1","role":"admin"}').rstrip(b"=").decode()
         tampered = f"{parts[0]}.{new_payload}.{parts[2]}"
         self.assertIsNone(verify_hs256_jwt(tampered, self.SECRET))
@@ -151,9 +157,9 @@ class TestS12RefreshRotation(unittest.TestCase):
 # Rate Limit Hardening (S-13..S-16)
 # ============================================================================
 from rate_limit_patch import (
-    extract_real_ip,
-    WebSocketRateLimiter,
     BurstAwareLimiter,
+    WebSocketRateLimiter,
+    extract_real_ip,
 )
 
 
@@ -203,12 +209,14 @@ class TestS16BurstLimiter(unittest.TestCase):
 
     def test_blocks_over_limit(self):
         limiter = BurstAwareLimiter(max_requests=3, window_s=60, burst_multiplier=1.0)
-        for _ in range(3): limiter.is_allowed()
+        for _ in range(3):
+            limiter.is_allowed()
         self.assertFalse(limiter.is_allowed())
 
     def test_remaining_decreases(self):
         limiter = BurstAwareLimiter(max_requests=10, window_s=60)
-        for _ in range(3): limiter.is_allowed()
+        for _ in range(3):
+            limiter.is_allowed()
         self.assertEqual(limiter.remaining(), 7)
 
 
@@ -216,10 +224,10 @@ class TestS16BurstLimiter(unittest.TestCase):
 # Order State Machine Hardening (S-17..S-20)
 # ============================================================================
 from order_state_machine_patch import (
-    SignalIdempotencyGuard,
-    dispatch_callbacks_safe,
     CompletedOrderEvictionIndex,
+    SignalIdempotencyGuard,
     StateMachineMetrics,
+    dispatch_callbacks_safe,
 )
 
 
@@ -252,16 +260,26 @@ class TestS17SignalIdempotency(unittest.TestCase):
 class TestS18CallbackIsolation(unittest.TestCase):
     def test_bad_callback_does_not_block_others(self):
         results = []
-        def good_cb(*_): results.append("good")
-        def bad_cb(*_): raise RuntimeError("boom")
-        def also_good(*_): results.append("also_good")
+
+        def good_cb(*_):
+            results.append("good")
+
+        def bad_cb(*_):
+            raise RuntimeError("boom")
+
+        def also_good(*_):
+            results.append("also_good")
+
         run(dispatch_callbacks_safe([good_cb, bad_cb, also_good], "arg1"))
         self.assertIn("good", results)
         self.assertIn("also_good", results)
 
     def test_async_callback_awaited(self):
         results = []
-        async def async_cb(*_): results.append("async")
+
+        async def async_cb(*_):
+            results.append("async")
+
         run(dispatch_callbacks_safe([async_cb], "arg"))
         self.assertIn("async", results)
 
@@ -325,10 +343,19 @@ class TestS21AuditActions(unittest.TestCase):
 
     def test_all_critical_actions_exist(self):
         required = [
-            "LOGIN", "LOGOUT", "TRADE_OPEN", "TRADE_CLOSE",
-            "SIGNAL_CREATE", "SIGNAL_CREATED", "DECISION_MADE",
-            "RISK_BLOCKED", "ADMIN_ACTION", "SECURITY_EVENT",
-            "CIRCUIT_OPEN", "TOKEN_REVOKED", "RATE_LIMIT_HIT",
+            "LOGIN",
+            "LOGOUT",
+            "TRADE_OPEN",
+            "TRADE_CLOSE",
+            "SIGNAL_CREATE",
+            "SIGNAL_CREATED",
+            "DECISION_MADE",
+            "RISK_BLOCKED",
+            "ADMIN_ACTION",
+            "SECURITY_EVENT",
+            "CIRCUIT_OPEN",
+            "TOKEN_REVOKED",
+            "RATE_LIMIT_HIT",
         ]
         for name in required:
             self.assertTrue(hasattr(AuditAction, name), f"Missing: AuditAction.{name}")
@@ -337,6 +364,7 @@ class TestS21AuditActions(unittest.TestCase):
 class TestS22LogAsync(unittest.TestCase):
     def test_log_async_is_coroutine(self):
         import inspect
+
         svc = AuditServiceV2()
         result = svc.log_async(AuditAction.LOGIN, user_id="u1")
         self.assertTrue(inspect.iscoroutine(result))
@@ -368,6 +396,7 @@ class TestS24ServiceLifecycle(unittest.TestCase):
             await svc.start()
             self.assertIsNotNone(svc._task)
             await svc.stop()
+
         run(_run())
 
     def test_double_start_idempotent(self):
@@ -378,6 +407,7 @@ class TestS24ServiceLifecycle(unittest.TestCase):
             await svc.start()
             self.assertIs(svc._task, task1)
             await svc.stop()
+
         run(_run())
 
 
@@ -385,9 +415,9 @@ class TestS24ServiceLifecycle(unittest.TestCase):
 # DB Connection Hardening (S-1..S-4)
 # ============================================================================
 from connection_patch import (
-    with_retry,
-    run_with_timeout,
     ConnectionHealth,
+    run_with_timeout,
+    with_retry,
 )
 
 

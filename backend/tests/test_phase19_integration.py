@@ -8,25 +8,43 @@ Phase 19 — Final Integration & Smoke Tests
 - Concurrent safety
 - Smoke test suite
 """
-from __future__ import annotations
-import time, uuid, pytest
-from typing import Optional
 
-import sys, os
+from __future__ import annotations
+
+import sys
+import time
+import uuid
+
+import pytest
+
 sys.path.insert(0, "/home/definable/phase19")
 sys.path.insert(0, "/home/definable/phase19/backend")
 
 from core.integration_harness import (
-    E2EFlowSimulator, KillSwitch, KillSwitchActivatedError,
-    License, LicenseState, BillingEngine, SubStatus,
-    SignalService, TradeRegistry, ReconciliationEngine, Position,
-    RegressionGuard, ProductionReadinessGate, ReadinessResult,
-    SmokeTestSuite, AuthContext, make_jwt, verify_jwt, _TEST_SECRET,
+    _TEST_SECRET,
+    AuthContext,
+    BillingEngine,
+    E2EFlowSimulator,
+    KillSwitch,
+    KillSwitchActivatedError,
+    License,
+    LicenseState,
+    Position,
+    ProductionReadinessGate,
+    ReconciliationEngine,
+    RegressionGuard,
+    SignalService,
+    SmokeTestSuite,
+    SubStatus,
+    TradeRegistry,
+    make_jwt,
+    verify_jwt,
 )
 
 
 class TestJWTIntegration:
-    def _sim(self): return E2EFlowSimulator()
+    def _sim(self):
+        return E2EFlowSimulator()
 
     def test_T001_issue_and_verify(self):
         sim = self._sim()
@@ -53,9 +71,11 @@ class TestJWTIntegration:
         assert verify_jwt(tok, _TEST_SECRET) is None
 
     def test_T005_alg_none_rejected(self):
-        import base64, json
+        import base64
+        import json
+
         hdr = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').rstrip(b"=").decode()
-        pld = base64.urlsafe_b64encode(json.dumps({"sub":"u1"}).encode()).rstrip(b"=").decode()
+        pld = base64.urlsafe_b64encode(json.dumps({"sub": "u1"}).encode()).rstrip(b"=").decode()
         tok = f"{hdr}.{pld}."
         assert verify_jwt(tok, _TEST_SECRET) is None
 
@@ -113,7 +133,8 @@ class TestJWTIntegration:
 
 
 class TestBillingIntegration:
-    def _eng(self): return BillingEngine()
+    def _eng(self):
+        return BillingEngine()
 
     def test_T017_checkout_creates_sub(self):
         e = self._eng()
@@ -214,8 +235,12 @@ class TestBillingIntegration:
 
 class TestLicenseLifecycle:
     def _make(self, user_id="u1", max_devices=1) -> License:
-        return License(license_id=f"lic_{uuid.uuid4().hex[:6]}",
-                      user_id=user_id, plan="pro", max_devices=max_devices)
+        return License(
+            license_id=f"lic_{uuid.uuid4().hex[:6]}",
+            user_id=user_id,
+            plan="pro",
+            max_devices=max_devices,
+        )
 
     def test_T033_pending_not_active(self):
         assert not self._make().is_active()
@@ -278,6 +303,7 @@ class TestLicenseLifecycle:
 
     def test_T044_key_hash_not_empty(self):
         import hashlib
+
         lic = self._make()
         lic.key_hash = hashlib.sha256(b"test").hexdigest()
         assert len(lic.key_hash) == 64
@@ -306,7 +332,8 @@ class TestLicenseLifecycle:
 
 
 class TestSignalService:
-    def _svc(self): return SignalService()
+    def _svc(self):
+        return SignalService()
 
     def test_T049_emit_buy_signal(self):
         sig = self._svc().emit("u1", "EURUSD", "BUY")
@@ -387,7 +414,8 @@ class TestSignalService:
 
 
 class TestTradeRegistry:
-    def _reg(self): return TradeRegistry()
+    def _reg(self):
+        return TradeRegistry()
 
     def test_T065_insert_trade(self):
         t = self._reg().insert("u1", "EURUSD", "BUY", 0.1, "idem_001")
@@ -460,19 +488,25 @@ class TestTradeRegistry:
 
     def test_T080_concurrent_idempotency(self):
         import threading
+
         reg = self._reg()
         results = []
+
         def worker():
             t = reg.insert("u1", "EURUSD", "BUY", 0.1, "shared_idem")
             results.append(t.trade_id)
+
         threads = [threading.Thread(target=worker) for _ in range(5)]
-        for th in threads: th.start()
-        for th in threads: th.join()
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join()
         assert len(set(results)) == 1
 
 
 class TestKillSwitch:
-    def _ks(self): return KillSwitch(max_drawdown_pct=10.0, equity_floor_usd=500.0)
+    def _ks(self):
+        return KillSwitch(max_drawdown_pct=10.0, equity_floor_usd=500.0)
 
     def test_T081_inactive_by_default(self):
         assert not self._ks().is_active
@@ -567,18 +601,17 @@ class TestKillSwitch:
 
 
 class TestReconciliation:
-    def _eng(self): return ReconciliationEngine()
+    def _eng(self):
+        return ReconciliationEngine()
 
     def test_T097_clean_reconciliation(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.1, "long")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.1, "long")])
         assert len(mm) == 0
 
     def test_T098_mismatch_detected(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.2, "long")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.2, "long")])
         assert len(mm) == 1 and mm[0]["type"] == "mismatch"
 
     def test_T099_ghost_position_detected(self):
@@ -593,8 +626,7 @@ class TestReconciliation:
 
     def test_T101_side_mismatch_detected(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.1, "short")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.1, "short")])
         assert len(mm) == 1
 
     def test_T102_multiple_symbols(self):
@@ -607,34 +639,30 @@ class TestReconciliation:
 
     def test_T103_history_accumulated(self):
         eng = self._eng()
-        eng.reconcile([Position("EURUSD", 0.1, "long")],
-                      [Position("EURUSD", 0.2, "long")])
-        eng.reconcile([Position("GBPUSD", 0.1, "long")],
-                      [Position("GBPUSD", 0.2, "long")])
+        eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.2, "long")])
+        eng.reconcile([Position("GBPUSD", 0.1, "long")], [Position("GBPUSD", 0.2, "long")])
         assert len(eng.history()) == 2
 
     def test_T104_mismatch_has_symbol(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.2, "long")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.2, "long")])
         assert mm[0]["symbol"] == "EURUSD"
 
     def test_T105_broker_qty_in_mismatch(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.3, "long")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.3, "long")])
         assert abs(mm[0]["broker_qty"] - 0.3) < 0.001
 
     def test_T106_local_qty_in_mismatch(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1, "long")],
-                           [Position("EURUSD", 0.3, "long")])
+        mm = eng.reconcile([Position("EURUSD", 0.1, "long")], [Position("EURUSD", 0.3, "long")])
         assert abs(mm[0]["local_qty"] - 0.1) < 0.001
 
     def test_T107_small_diff_tolerance(self):
         eng = self._eng()
-        mm = eng.reconcile([Position("EURUSD", 0.1000, "long")],
-                           [Position("EURUSD", 0.1005, "long")])
+        mm = eng.reconcile(
+            [Position("EURUSD", 0.1000, "long")], [Position("EURUSD", 0.1005, "long")]
+        )
         assert len(mm) == 0
 
     def test_T108_simulator_reconcile(self):
@@ -690,13 +718,15 @@ class TestProductionReadinessGate:
         assert not self._gate({"HSTS_ENABLED": False}).run().passed
 
     def test_T117_dev_environment_relaxed(self):
-        r = ProductionReadinessGate({
-            "JWT_SECRET_KEY": "A" * 32,
-            "ENVIRONMENT": "development",
-            "SECRETS_MASTER_KEY": "B" * 32,
-            "FIELD_ENCRYPTION_KEY": "C" * 32,
-            "ALLOWED_ORIGINS": "*",
-        }).run()
+        r = ProductionReadinessGate(
+            {
+                "JWT_SECRET_KEY": "A" * 32,
+                "ENVIRONMENT": "development",
+                "SECRETS_MASTER_KEY": "B" * 32,
+                "FIELD_ENCRYPTION_KEY": "C" * 32,
+                "ALLOWED_ORIGINS": "*",
+            }
+        ).run()
         assert r.passed
 
     def test_T118_checks_dict_populated(self):
@@ -721,9 +751,15 @@ class TestE2EFlowSimulator:
         sim.emit_signal(uid, "EURUSD", "BUY")
         sim.insert_trade(uid, "EURUSD", "BUY", 0.1, "idem_001")
         types = sim.event_types()
-        for expected in ["checkout", "webhook", "license_created",
-                         "license_activated", "heartbeat",
-                         "signal_emitted", "trade_inserted"]:
+        for expected in [
+            "checkout",
+            "webhook",
+            "license_created",
+            "license_activated",
+            "heartbeat",
+            "signal_emitted",
+            "trade_inserted",
+        ]:
             assert expected in types
 
     def test_T122_duplicate_signal_logged(self):
@@ -805,7 +841,7 @@ class TestSmokeTestSuite:
         suite = SmokeTestSuite(sim)
         results = suite.run_all()
         failed = [r for r in results if not r.passed]
-        assert not failed, f"Smoke failures: {[r.name+': '+r.error for r in failed]}"
+        assert not failed, f"Smoke failures: {[r.name + ': ' + r.error for r in failed]}"
 
     def test_T134_summary_has_all_fields(self):
         sim = E2EFlowSimulator()

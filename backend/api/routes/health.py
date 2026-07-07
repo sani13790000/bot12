@@ -9,6 +9,7 @@ FIXES APPLIED:
   CB-7:     mt5_ok dict -> .get("ok", False)
   AI-1:     /live endpoint for Docker HEALTHCHECK
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -38,6 +39,7 @@ async def health_check() -> JSONResponse:
 
     try:
         from backend.database.connection import get_db_client
+
         client = await asyncio.wait_for(get_db_client(), timeout=2.0)
         result["database"] = "ok" if client else "degraded"
         if not client:
@@ -48,10 +50,13 @@ async def health_check() -> JSONResponse:
 
     try:
         from backend.execution.mt5_connector import mt5_connector
+
         mt5_result = await asyncio.wait_for(mt5_connector.health_check(), timeout=3.0)
         mt5_ok = mt5_result.get("ok", False) if isinstance(mt5_result, dict) else bool(mt5_result)
         result["mt5_gateway"] = "ok" if mt5_ok else "degraded"
-        result["mt5_mode"] = mt5_result.get("mode", "unknown") if isinstance(mt5_result, dict) else "unknown"
+        result["mt5_mode"] = (
+            mt5_result.get("mode", "unknown") if isinstance(mt5_result, dict) else "unknown"
+        )
         if not mt5_ok:
             errors.append("mt5_gateway")
     except Exception as exc:
@@ -61,6 +66,7 @@ async def health_check() -> JSONResponse:
     # BUG-R4-2 FIX: is_active is @property -- NO parentheses
     try:
         from backend.risk.kill_switch import kill_switch
+
         ks_active = kill_switch.is_active  # was kill_switch.is_active() -> TypeError
         result["kill_switch"] = "ACTIVE" if ks_active else "inactive"
         if ks_active:
@@ -70,6 +76,7 @@ async def health_check() -> JSONResponse:
 
     try:
         from backend.database.redis_client import redis_ping
+
         redis_ok = await asyncio.wait_for(redis_ping(), timeout=1.0)
         result["redis"] = "ok" if redis_ok else "degraded"
         if not redis_ok:
@@ -80,6 +87,7 @@ async def health_check() -> JSONResponse:
 
     try:
         from backend.circuit_breaker import get_breaker_status
+
         result["circuit_breakers"] = get_breaker_status()
     except Exception:
         result["circuit_breakers"] = "unavailable"
@@ -108,6 +116,7 @@ async def readiness() -> JSONResponse:
     checks: Dict[str, str] = {}
     try:
         from backend.database.connection import get_db_client
+
         client = await asyncio.wait_for(get_db_client(), timeout=1.0)
         checks["database"] = "ok" if client else "not_ready"
         if not client:

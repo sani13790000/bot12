@@ -6,6 +6,7 @@ Fixes:
 - BUG-G5: Model versioning with manifest file (best_model.json)
 - NEW: get_best_metadata() returns AUC and n_samples for confidence calculation
 """
+
 from __future__ import annotations
 
 import json
@@ -25,28 +26,29 @@ _MANIFEST_FILE = "best_model.json"
 @dataclass
 class ModelMetadata:
     """Metadata stored alongside each trained model."""
-    symbol:       str
-    trained_at:   str
-    n_samples:    int
-    accuracy:     float
-    precision:    float
-    recall:       float
-    f1:           float
-    auc_roc:      float = 0.60
-    model_path:   str = ""
+
+    symbol: str
+    trained_at: str
+    n_samples: int
+    accuracy: float
+    precision: float
+    recall: float
+    f1: float
+    auc_roc: float = 0.60
+    model_path: str = ""
     feature_names: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "symbol":        self.symbol,
-            "trained_at":    self.trained_at,
-            "n_samples":     self.n_samples,
-            "accuracy":      round(self.accuracy, 4),
-            "precision":     round(self.precision, 4),
-            "recall":        round(self.recall, 4),
-            "f1":            round(self.f1, 4),
-            "auc_roc":       round(self.auc_roc, 4),
-            "model_path":    self.model_path,
+            "symbol": self.symbol,
+            "trained_at": self.trained_at,
+            "n_samples": self.n_samples,
+            "accuracy": round(self.accuracy, 4),
+            "precision": round(self.precision, 4),
+            "recall": round(self.recall, 4),
+            "f1": round(self.f1, 4),
+            "auc_roc": round(self.auc_roc, 4),
+            "model_path": self.model_path,
             "feature_names": self.feature_names,
         }
 
@@ -134,7 +136,11 @@ class ModelManager:
             try:
                 with open(manifest_path, "r") as fh:
                     manifest = json.load(fh)
-                entry = manifest.get(symbol) or manifest.get("default") or next(iter(manifest.values()), None)
+                entry = (
+                    manifest.get(symbol)
+                    or manifest.get("default")
+                    or next(iter(manifest.values()), None)
+                )
                 if entry and entry.get("model_path") and os.path.exists(entry["model_path"]):
                     return self._load_pkl(entry["model_path"])
             except Exception as exc:
@@ -151,7 +157,11 @@ class ModelManager:
         try:
             with open(manifest_path, "r") as fh:
                 manifest = json.load(fh)
-            entry = manifest.get(symbol) or manifest.get("default") or next(iter(manifest.values()), None)
+            entry = (
+                manifest.get(symbol)
+                or manifest.get("default")
+                or next(iter(manifest.values()), None)
+            )
             return ModelMetadata.from_dict(entry) if entry else None
         except Exception as exc:
             logger.warning("[ModelManager] metadata read failed: %s", exc)

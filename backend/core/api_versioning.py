@@ -4,10 +4,10 @@ Phase 26 - API Versioning & Backward Compatibility
 Versioned routes, schema migration, deprecation policy,
 graceful version mismatch handling, audit trail.
 """
+
 from __future__ import annotations
 
 import copy
-import hashlib
 import hmac as _hmac_mod
 import json
 import os
@@ -20,10 +20,10 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class APIVersion(str, Enum):
     V1 = "v1"
@@ -76,6 +76,7 @@ class MigrationStrategy(str, Enum):
 # Errors
 # ---------------------------------------------------------------------------
 
+
 class VersionError(Exception):
     """Base version error."""
 
@@ -86,24 +87,22 @@ class UnknownVersionError(VersionError):
 
 class SunsetVersionError(VersionError):
     """Requested version is sunset (410 Gone)."""
+
     def __init__(self, version: APIVersion, sunset_at: str):
         self.version = version
         self.sunset_at = sunset_at
         super().__init__(
-            f"API {version} was sunset on {sunset_at}. "
-            f"Please upgrade to a supported version."
+            f"API {version} was sunset on {sunset_at}. Please upgrade to a supported version."
         )
 
 
 class VersionMismatchError(VersionError):
     """Client requested version incompatible with server."""
+
     def __init__(self, requested: str, supported: List[str]):
         self.requested = requested
         self.supported = supported
-        super().__init__(
-            f"Version {requested!r} is not supported. "
-            f"Supported: {supported}"
-        )
+        super().__init__(f"Version {requested!r} is not supported. Supported: {supported}")
 
 
 class BreakingChangeError(VersionError):
@@ -125,27 +124,28 @@ SUPPORTED_VERSIONS: Set[APIVersion] = {APIVersion.V1, APIVersion.V2, APIVersion.
 DEPRECATED_VERSIONS: Set[APIVersion] = set()
 
 VERSIONED_ENDPOINTS: Dict[str, Set[APIVersion]] = {
-    "/api/signals":                {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/auth/login":             {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/auth/register":          {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/license/validate":       {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/license/issue":          {APIVersion.V2, APIVersion.V3},
-    "/api/billing/checkout":       {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/billing/webhook":        {APIVersion.V2, APIVersion.V3},
-    "/api/risk/halt":              {APIVersion.V1, APIVersion.V2, APIVersion.V3},
-    "/api/risk/status":            {APIVersion.V2, APIVersion.V3},
-    "/api/ea/config":              {APIVersion.V2, APIVersion.V3},
-    "/api/ea/heartbeat":           {APIVersion.V2, APIVersion.V3},
-    "/api/tenant/settings":        {APIVersion.V3},
-    "/api/audit/trail":            {APIVersion.V3},
-    "/api/feature-flags":          {APIVersion.V3},
-    "/api/artifacts":              {APIVersion.V3},
+    "/api/signals": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/auth/login": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/auth/register": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/license/validate": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/license/issue": {APIVersion.V2, APIVersion.V3},
+    "/api/billing/checkout": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/billing/webhook": {APIVersion.V2, APIVersion.V3},
+    "/api/risk/halt": {APIVersion.V1, APIVersion.V2, APIVersion.V3},
+    "/api/risk/status": {APIVersion.V2, APIVersion.V3},
+    "/api/ea/config": {APIVersion.V2, APIVersion.V3},
+    "/api/ea/heartbeat": {APIVersion.V2, APIVersion.V3},
+    "/api/tenant/settings": {APIVersion.V3},
+    "/api/audit/trail": {APIVersion.V3},
+    "/api/feature-flags": {APIVersion.V3},
+    "/api/artifacts": {APIVersion.V3},
 }
 
 
 # ---------------------------------------------------------------------------
 # Version Policy
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class VersionPolicy:
@@ -189,9 +189,7 @@ class VersionPolicy:
             if self.sunset_at:
                 headers["Sunset"] = self.sunset_at
             if self.successor:
-                headers["Link"] = (
-                    f'</api/{self.successor}/...>; rel="successor-version"'
-                )
+                headers["Link"] = f'</api/{self.successor}/...>; rel="successor-version"'
         return headers
 
 
@@ -223,6 +221,7 @@ DEFAULT_VERSION_POLICIES: Dict[APIVersion, VersionPolicy] = {
 # Schema Field Descriptors
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FieldDescriptor:
     name: str
@@ -244,6 +243,7 @@ class FieldDescriptor:
 # Schema Registry
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VersionedSchema:
     name: str
@@ -255,10 +255,7 @@ class VersionedSchema:
         return [f for f in self.fields if f.is_available_in(version)]
 
     def required_fields_for_version(self, version: APIVersion) -> List[str]:
-        return [
-            f.name for f in self.fields_for_version(version)
-            if f.required
-        ]
+        return [f.name for f in self.fields_for_version(version) if f.required]
 
     def validate(self, data: Dict[str, Any], version: APIVersion) -> List[str]:
         errors: List[str] = []
@@ -357,6 +354,7 @@ VERSIONED_SCHEMAS: Dict[str, VersionedSchema] = {
 # Response Migrator
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class MigrationRule:
     source_version: APIVersion
@@ -375,38 +373,63 @@ class ResponseMigrator:
         self._register_default_rules()
 
     def _register_default_rules(self) -> None:
-        self.register(MigrationRule(
-            source_version=APIVersion.V1,
-            target_version=APIVersion.V2,
-            strategy=MigrationStrategy.FIELD_ADD,
-            add_defaults={"tenant_id": None, "refresh_token": None},
-        ))
-        self.register(MigrationRule(
-            source_version=APIVersion.V2,
-            target_version=APIVersion.V3,
-            strategy=MigrationStrategy.FIELD_ADD,
-            add_defaults={"audit_token": None, "feature_flags": {}, "roles": [], "incident_id": None},
-        ))
-        self.register(MigrationRule(
-            source_version=APIVersion.V3,
-            target_version=APIVersion.V2,
-            strategy=MigrationStrategy.FIELD_REMOVE,
-            remove_fields=["audit_token", "feature_flags", "roles", "incident_id", "audit_chain"],
-        ))
-        self.register(MigrationRule(
-            source_version=APIVersion.V2,
-            target_version=APIVersion.V1,
-            strategy=MigrationStrategy.FIELD_REMOVE,
-            remove_fields=["refresh_token", "tenant_id", "kill_switch_active",
-                           "idempotency_key", "plan_tier"],
-        ))
+        self.register(
+            MigrationRule(
+                source_version=APIVersion.V1,
+                target_version=APIVersion.V2,
+                strategy=MigrationStrategy.FIELD_ADD,
+                add_defaults={"tenant_id": None, "refresh_token": None},
+            )
+        )
+        self.register(
+            MigrationRule(
+                source_version=APIVersion.V2,
+                target_version=APIVersion.V3,
+                strategy=MigrationStrategy.FIELD_ADD,
+                add_defaults={
+                    "audit_token": None,
+                    "feature_flags": {},
+                    "roles": [],
+                    "incident_id": None,
+                },
+            )
+        )
+        self.register(
+            MigrationRule(
+                source_version=APIVersion.V3,
+                target_version=APIVersion.V2,
+                strategy=MigrationStrategy.FIELD_REMOVE,
+                remove_fields=[
+                    "audit_token",
+                    "feature_flags",
+                    "roles",
+                    "incident_id",
+                    "audit_chain",
+                ],
+            )
+        )
+        self.register(
+            MigrationRule(
+                source_version=APIVersion.V2,
+                target_version=APIVersion.V1,
+                strategy=MigrationStrategy.FIELD_REMOVE,
+                remove_fields=[
+                    "refresh_token",
+                    "tenant_id",
+                    "kill_switch_active",
+                    "idempotency_key",
+                    "plan_tier",
+                ],
+            )
+        )
 
     def register(self, rule: MigrationRule) -> None:
         with self._lock:
             self._rules.append(rule)
 
-    def migrate(self, data: Dict[str, Any], from_version: APIVersion,
-                to_version: APIVersion) -> Dict[str, Any]:
+    def migrate(
+        self, data: Dict[str, Any], from_version: APIVersion, to_version: APIVersion
+    ) -> Dict[str, Any]:
         if from_version == to_version:
             return dict(data)
         result = dict(data)
@@ -415,8 +438,9 @@ class ResponseMigrator:
                 return self._apply_rule(result, rule)
         return self._step_migrate(result, from_version, to_version)
 
-    def _step_migrate(self, data: Dict[str, Any], from_v: APIVersion,
-                      to_v: APIVersion) -> Dict[str, Any]:
+    def _step_migrate(
+        self, data: Dict[str, Any], from_v: APIVersion, to_v: APIVersion
+    ) -> Dict[str, Any]:
         versions = list(APIVersion)
         from_idx = versions.index(from_v)
         to_idx = versions.index(to_v)
@@ -451,6 +475,7 @@ class ResponseMigrator:
 # ---------------------------------------------------------------------------
 # Deprecation Notice
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DeprecationNotice:
@@ -493,15 +518,17 @@ class DeprecationNotice:
 # Version Negotiator
 # ---------------------------------------------------------------------------
 
+
 class VersionNegotiator:
     def __init__(self, policies: Optional[Dict[APIVersion, VersionPolicy]] = None) -> None:
         self._policies = (
-            policies if policies is not None
-            else copy.deepcopy(DEFAULT_VERSION_POLICIES)
+            policies if policies is not None else copy.deepcopy(DEFAULT_VERSION_POLICIES)
         )
         self._lock = threading.Lock()
 
-    def negotiate(self, requested: str, endpoint: str = "/") -> Tuple[APIVersion, Optional[DeprecationNotice]]:
+    def negotiate(
+        self, requested: str, endpoint: str = "/"
+    ) -> Tuple[APIVersion, Optional[DeprecationNotice]]:
         try:
             version = APIVersion.from_string(requested)
         except UnknownVersionError:
@@ -532,14 +559,12 @@ class VersionNegotiator:
                 sunset_at=policy.sunset_at,
                 successor_version=policy.successor,
                 successor_endpoint=(
-                    f"/api/{policy.successor}{endpoint}"
-                    if policy.successor else None
+                    f"/api/{policy.successor}{endpoint}" if policy.successor else None
                 ),
             )
         return version, notice
 
-    def sunset_version(self, version: APIVersion, reason: str,
-                       sunset_at: str, actor: str) -> None:
+    def sunset_version(self, version: APIVersion, reason: str, sunset_at: str, actor: str) -> None:
         if not reason or not reason.strip():
             raise MissingReasonError("sunset requires a non-empty reason")
         with self._lock:
@@ -550,9 +575,15 @@ class VersionNegotiator:
             policy.sunset_at = sunset_at
             policy.deprecation_reason = reason
 
-    def deprecate_version(self, version: APIVersion, reason: str,
-                          deprecated_at: str, sunset_at: Optional[str],
-                          actor: str, successor: Optional[APIVersion] = None) -> None:
+    def deprecate_version(
+        self,
+        version: APIVersion,
+        reason: str,
+        deprecated_at: str,
+        sunset_at: Optional[str],
+        actor: str,
+        successor: Optional[APIVersion] = None,
+    ) -> None:
         if not reason or not reason.strip():
             raise MissingReasonError("deprecation requires a non-empty reason")
         with self._lock:
@@ -610,7 +641,8 @@ class VersionAuditChain:
 
     def __init__(self, secret: Optional[bytes] = None) -> None:
         self._secret = (
-            secret if isinstance(secret, bytes)
+            secret
+            if isinstance(secret, bytes)
             else (secret.encode() if secret else _DEFAULT_AUDIT_SECRET)
         )
         self._records: deque = deque(maxlen=self._MAX_RECORDS)
@@ -622,25 +654,46 @@ class VersionAuditChain:
     def _hmac(self, data: bytes) -> str:
         return _hmac_mod.new(self._secret, data, digestmod="sha256").hexdigest()
 
-    def record(self, action: str, version: str, endpoint: str,
-               actor: str = "system", tenant_id: Optional[str] = None,
-               detail: Optional[Dict[str, Any]] = None) -> VersionAuditEntry:
+    def record(
+        self,
+        action: str,
+        version: str,
+        endpoint: str,
+        actor: str = "system",
+        tenant_id: Optional[str] = None,
+        detail: Optional[Dict[str, Any]] = None,
+    ) -> VersionAuditEntry:
         with self._lock:
             entry_id = str(uuid.uuid4())
             ts = time.time()
             det = detail or {}
             canonical = json.dumps(
-                {"entry_id": entry_id, "action": action, "version": version,
-                 "endpoint": endpoint, "actor": actor, "tenant_id": tenant_id,
-                 "detail": det, "ts": ts},
-                sort_keys=True, separators=(",", ":")
+                {
+                    "entry_id": entry_id,
+                    "action": action,
+                    "version": version,
+                    "endpoint": endpoint,
+                    "actor": actor,
+                    "tenant_id": tenant_id,
+                    "detail": det,
+                    "ts": ts,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
             ).encode()
             chain_hash = self._hmac((self._prev_hash + ":").encode() + canonical)
             entry = VersionAuditEntry(
-                entry_id=entry_id, action=action, version=version,
-                endpoint=endpoint, actor=actor, tenant_id=tenant_id,
-                detail=det, ts=ts, seq=self._seq,
-                chain_hash=chain_hash, prev_hash=self._prev_hash,
+                entry_id=entry_id,
+                action=action,
+                version=version,
+                endpoint=endpoint,
+                actor=actor,
+                tenant_id=tenant_id,
+                detail=det,
+                ts=ts,
+                seq=self._seq,
+                chain_hash=chain_hash,
+                prev_hash=self._prev_hash,
             )
             self._records.append(entry)
             self._prev_hash = chain_hash
@@ -657,10 +710,18 @@ class VersionAuditChain:
             if r.prev_hash != prev:
                 return False
             canonical = json.dumps(
-                {"entry_id": r.entry_id, "action": r.action, "version": r.version,
-                 "endpoint": r.endpoint, "actor": r.actor, "tenant_id": r.tenant_id,
-                 "detail": r.detail, "ts": r.ts},
-                sort_keys=True, separators=(",", ":")
+                {
+                    "entry_id": r.entry_id,
+                    "action": r.action,
+                    "version": r.version,
+                    "endpoint": r.endpoint,
+                    "actor": r.actor,
+                    "tenant_id": r.tenant_id,
+                    "detail": r.detail,
+                    "ts": r.ts,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
             ).encode()
             expected = _hmac_mod.new(
                 self._secret, (prev + ":").encode() + canonical, digestmod="sha256"
@@ -670,8 +731,9 @@ class VersionAuditChain:
             prev = r.chain_hash
         return True
 
-    def query(self, action: Optional[str] = None, version: Optional[str] = None,
-              limit: int = 100) -> List[VersionAuditEntry]:
+    def query(
+        self, action: Optional[str] = None, version: Optional[str] = None, limit: int = 100
+    ) -> List[VersionAuditEntry]:
         with self._lock:
             records = list(self._records)
         results = []
@@ -692,6 +754,7 @@ class VersionAuditChain:
 # ---------------------------------------------------------------------------
 # Version Router
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class VersionedRequest:
@@ -720,10 +783,13 @@ class VersionedResponse:
 
 
 class VersionRouter:
-    def __init__(self, negotiator: Optional[VersionNegotiator] = None,
-                 migrator: Optional[ResponseMigrator] = None,
-                 audit: Optional[VersionAuditChain] = None,
-                 canonical_version: APIVersion = APIVersion.V3) -> None:
+    def __init__(
+        self,
+        negotiator: Optional[VersionNegotiator] = None,
+        migrator: Optional[ResponseMigrator] = None,
+        audit: Optional[VersionAuditChain] = None,
+        canonical_version: APIVersion = APIVersion.V3,
+    ) -> None:
         self._negotiator = negotiator or VersionNegotiator()
         self._migrator = migrator or ResponseMigrator()
         self._audit = audit or VersionAuditChain()
@@ -735,29 +801,48 @@ class VersionRouter:
         try:
             version, notice = self._negotiator.negotiate(request.version_str, request.path)
         except SunsetVersionError as e:
-            self._audit.record("sunset_blocked", request.version_str, request.path,
-                               actor=request.client_id, tenant_id=request.tenant_id,
-                               detail={"error": str(e)})
+            self._audit.record(
+                "sunset_blocked",
+                request.version_str,
+                request.path,
+                actor=request.client_id,
+                tenant_id=request.tenant_id,
+                detail={"error": str(e)},
+            )
             return VersionedResponse(
-                status_code=410, version=self._canonical,
+                status_code=410,
+                version=self._canonical,
                 body={"error": "Gone", "message": str(e), "code": "SUNSET"},
                 headers={"X-API-Version": request.version_str},
             )
         except VersionMismatchError as e:
-            self._audit.record("mismatch", request.version_str, request.path,
-                               actor=request.client_id, tenant_id=request.tenant_id,
-                               detail={"supported": e.supported})
+            self._audit.record(
+                "mismatch",
+                request.version_str,
+                request.path,
+                actor=request.client_id,
+                tenant_id=request.tenant_id,
+                detail={"supported": e.supported},
+            )
             return VersionedResponse(
-                status_code=400, version=self._canonical,
-                body={"error": "VersionMismatch", "message": str(e),
-                      "supported_versions": e.supported, "code": "VERSION_MISMATCH"},
-                headers={"X-API-Version": request.version_str,
-                         "X-Supported-Versions": ",".join(e.supported)},
+                status_code=400,
+                version=self._canonical,
+                body={
+                    "error": "VersionMismatch",
+                    "message": str(e),
+                    "supported_versions": e.supported,
+                    "code": "VERSION_MISMATCH",
+                },
+                headers={
+                    "X-API-Version": request.version_str,
+                    "X-Supported-Versions": ",".join(e.supported),
+                },
             )
 
         handler_body = self._call_handler(request.path, version, request)
-        migrated = self._migrator.migrate(handler_body, from_version=self._canonical,
-                                          to_version=version)
+        migrated = self._migrator.migrate(
+            handler_body, from_version=self._canonical, to_version=version
+        )
         headers: Dict[str, str] = {
             "X-API-Version": version.value,
             "X-API-Canonical-Version": self._canonical.value,
@@ -765,28 +850,43 @@ class VersionRouter:
         if notice:
             headers.update(notice.headers())
 
-        self._audit.record("route", version.value, request.path,
-                           actor=request.client_id, tenant_id=request.tenant_id,
-                           detail={"deprecated": notice is not None,
-                                   "migrated": version != self._canonical})
+        self._audit.record(
+            "route",
+            version.value,
+            request.path,
+            actor=request.client_id,
+            tenant_id=request.tenant_id,
+            detail={"deprecated": notice is not None, "migrated": version != self._canonical},
+        )
         return VersionedResponse(
-            status_code=200, version=version, body=migrated,
-            headers=headers, deprecation_notice=notice,
+            status_code=200,
+            version=version,
+            body=migrated,
+            headers=headers,
+            deprecation_notice=notice,
         )
 
-    def register_handler(self, path: str, handler: Callable[[VersionedRequest], Dict[str, Any]]) -> None:
+    def register_handler(
+        self, path: str, handler: Callable[[VersionedRequest], Dict[str, Any]]
+    ) -> None:
         with self._lock:
             self._handlers[path] = handler
 
-    def _call_handler(self, path: str, version: APIVersion,
-                      request: VersionedRequest) -> Dict[str, Any]:
+    def _call_handler(
+        self, path: str, version: APIVersion, request: VersionedRequest
+    ) -> Dict[str, Any]:
         handler = self._handlers.get(path)
         if handler:
             return handler(request)
         return {
-            "status": "ok", "version": version.value, "path": path,
-            "tenant_id": request.tenant_id, "audit_token": str(uuid.uuid4()),
-            "feature_flags": {}, "roles": [], "incident_id": None,
+            "status": "ok",
+            "version": version.value,
+            "path": path,
+            "tenant_id": request.tenant_id,
+            "audit_token": str(uuid.uuid4()),
+            "feature_flags": {},
+            "roles": [],
+            "incident_id": None,
         }
 
     @property
@@ -806,10 +906,15 @@ class VersionRouter:
 # Breaking Change Detector
 # ---------------------------------------------------------------------------
 
+
 class BreakingChangeDetector:
     @staticmethod
-    def compare(old_schema: VersionedSchema, new_schema: VersionedSchema,
-                old_version: APIVersion, new_version: APIVersion) -> List[str]:
+    def compare(
+        old_schema: VersionedSchema,
+        new_schema: VersionedSchema,
+        old_version: APIVersion,
+        new_version: APIVersion,
+    ) -> List[str]:
         issues: List[str] = []
         old_fields = {f.name: f for f in old_schema.fields_for_version(old_version)}
         new_fields = {f.name: f for f in new_schema.fields_for_version(new_version)}
@@ -819,8 +924,12 @@ class BreakingChangeDetector:
         return issues
 
     @staticmethod
-    def assert_compatible(old_schema: VersionedSchema, new_schema: VersionedSchema,
-                          old_version: APIVersion, new_version: APIVersion) -> None:
+    def assert_compatible(
+        old_schema: VersionedSchema,
+        new_schema: VersionedSchema,
+        old_version: APIVersion,
+        new_version: APIVersion,
+    ) -> None:
         issues = BreakingChangeDetector.compare(old_schema, new_schema, old_version, new_version)
         if issues:
             raise BreakingChangeError(f"Breaking changes detected: {issues}")
@@ -830,9 +939,13 @@ class BreakingChangeDetector:
 # Version Registry Admin
 # ---------------------------------------------------------------------------
 
+
 class VersionRegistryAdmin:
-    def __init__(self, negotiator: Optional[VersionNegotiator] = None,
-                 audit: Optional[VersionAuditChain] = None) -> None:
+    def __init__(
+        self,
+        negotiator: Optional[VersionNegotiator] = None,
+        audit: Optional[VersionAuditChain] = None,
+    ) -> None:
         self._negotiator = negotiator or VersionNegotiator()
         self._audit = audit or VersionAuditChain()
 
@@ -856,11 +969,15 @@ class VersionRegistryAdmin:
             "audit_chain_valid": self._audit.verify_chain(),
         }
 
-    def force_sunset(self, version: APIVersion, reason: str,
-                     sunset_at: str, actor: str) -> None:
+    def force_sunset(self, version: APIVersion, reason: str, sunset_at: str, actor: str) -> None:
         self._negotiator.sunset_version(version, reason, sunset_at, actor)
-        self._audit.record("force_sunset", version.value, "*",
-                           actor=actor, detail={"reason": reason, "sunset_at": sunset_at})
+        self._audit.record(
+            "force_sunset",
+            version.value,
+            "*",
+            actor=actor,
+            detail={"reason": reason, "sunset_at": sunset_at},
+        )
 
     def endpoint_matrix(self) -> Dict[str, List[str]]:
         return {

@@ -4,11 +4,12 @@ Backtest Report Generator
 
 Generates branded HTML + JSON performance and risk reports.
 """
+
 from __future__ import annotations
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+
 import json
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from .multi_symbol_engine import MultiSymbolResult
 from .parameter_optimizer import OptimizationResult
@@ -36,14 +37,14 @@ class BacktestReportGenerator:
 
         equity_labels = json.dumps([e["time"][:10] for e in data["equity_curve"]])
         equity_values = json.dumps([e["equity"] for e in data["equity_curve"]])
-        dd_values     = json.dumps([round(e["drawdown_pct"] * 100, 2) for e in data["equity_curve"]])
+        dd_values = json.dumps([round(e["drawdown_pct"] * 100, 2) for e in data["equity_curve"]])
 
         symbol_rows = "".join(
             f"<tr><td>{sym}</td><td>{v['total_trades']}</td>"
-            f"<td>{v['win_rate']*100:.1f}%</td>"
+            f"<td>{v['win_rate'] * 100:.1f}%</td>"
             f"<td>{v['profit_factor']:.2f}</td>"
             f"<td>${v['net_pnl']:,.2f}</td>"
-            f"<td>{v['max_drawdown_pct']*100:.2f}%</td>"
+            f"<td>{v['max_drawdown_pct'] * 100:.2f}%</td>"
             f"<td>{v['sharpe_ratio']:.2f}</td></tr>"
             for sym, v in data["per_symbol"].items()
         )
@@ -72,9 +73,9 @@ class BacktestReportGenerator:
             <div class="section">
               <h2>🎲 Monte Carlo Simulation</h2>
               <div class="metric-grid">
-                <div class="metric-card"><div class="label">Prob Profit</div><div class="value">{mc_result.get("probability_profit", 0)*100:.1f}%</div></div>
-                <div class="metric-card"><div class="label">VaR 95%</div><div class="value">{mc_result.get("var_95", 0)*100:.2f}%</div></div>
-                <div class="metric-card"><div class="label">Worst DD</div><div class="value">{mc_result.get("worst_max_drawdown", 0)*100:.2f}%</div></div>
+                <div class="metric-card"><div class="label">Prob Profit</div><div class="value">{mc_result.get("probability_profit", 0) * 100:.1f}%</div></div>
+                <div class="metric-card"><div class="label">VaR 95%</div><div class="value">{mc_result.get("var_95", 0) * 100:.2f}%</div></div>
+                <div class="metric-card"><div class="label">Worst DD</div><div class="value">{mc_result.get("worst_max_drawdown", 0) * 100:.2f}%</div></div>
                 <div class="metric-card"><div class="label">Simulations</div><div class="value">{mc_result.get("simulations", 1000)}</div></div>
               </div>
             </div>"""
@@ -87,7 +88,7 @@ class BacktestReportGenerator:
               <div class="metric-grid">
                 <div class="metric-card"><div class="label">Result</div><div class="value">{wf_result.get("recommendation", "N/A")}</div></div>
                 <div class="metric-card"><div class="label">Consistency</div><div class="value">{wf_result.get("consistency_score", 0):.1f}/100</div></div>
-                <div class="metric-card"><div class="label">Pass Rate</div><div class="value">{wf_result.get("pass_rate", 0)*100:.0f}%</div></div>
+                <div class="metric-card"><div class="label">Pass Rate</div><div class="value">{wf_result.get("pass_rate", 0) * 100:.0f}%</div></div>
               </div>
             </div>"""
 
@@ -147,16 +148,16 @@ class BacktestReportGenerator:
     <h2>📊 Portfolio Performance</h2>
     <div class="metric-grid">
       <div class="metric-card"><div class="label">Total Trades</div><div class="value">{p["total_trades"]}</div></div>
-      <div class="metric-card"><div class="label">Win Rate</div><div class="value {'green' if p['win_rate'] >= 0.5 else 'red'}">{p["win_rate"]*100:.1f}%</div></div>
-      <div class="metric-card"><div class="label">Net P&L</div><div class="value {'green' if p['net_pnl'] >= 0 else 'red'}">${p["net_pnl"]:,.2f}</div></div>
-      <div class="metric-card"><div class="label">Profit Factor</div><div class="value {'green' if p['profit_factor'] >= 1.5 else 'yellow' if p['profit_factor'] >= 1 else 'red'}">{p["profit_factor"]:.2f}</div></div>
-      <div class="metric-card"><div class="label">Sharpe Ratio</div><div class="value {'green' if p['sharpe_ratio'] >= 1.5 else 'yellow'}">{p["sharpe_ratio"]:.2f}</div></div>
-      <div class="metric-card"><div class="label">Sortino Ratio</div><div class="value {'green' if p['sortino_ratio'] >= 2 else 'yellow'}">{p["sortino_ratio"]:.2f}</div></div>
-      <div class="metric-card"><div class="label">Calmar Ratio</div><div class="value {'green' if p['calmar_ratio'] >= 2 else 'yellow'}">{p["calmar_ratio"]:.2f}</div></div>
-      <div class="metric-card"><div class="label">Max Drawdown</div><div class="value {'red' if p['max_drawdown_pct'] >= 0.15 else 'yellow'}">{p["max_drawdown_pct"]*100:.2f}%</div></div>
+      <div class="metric-card"><div class="label">Win Rate</div><div class="value {"green" if p["win_rate"] >= 0.5 else "red"}">{p["win_rate"] * 100:.1f}%</div></div>
+      <div class="metric-card"><div class="label">Net P&L</div><div class="value {"green" if p["net_pnl"] >= 0 else "red"}">${p["net_pnl"]:,.2f}</div></div>
+      <div class="metric-card"><div class="label">Profit Factor</div><div class="value {"green" if p["profit_factor"] >= 1.5 else "yellow" if p["profit_factor"] >= 1 else "red"}">{p["profit_factor"]:.2f}</div></div>
+      <div class="metric-card"><div class="label">Sharpe Ratio</div><div class="value {"green" if p["sharpe_ratio"] >= 1.5 else "yellow"}">{p["sharpe_ratio"]:.2f}</div></div>
+      <div class="metric-card"><div class="label">Sortino Ratio</div><div class="value {"green" if p["sortino_ratio"] >= 2 else "yellow"}">{p["sortino_ratio"]:.2f}</div></div>
+      <div class="metric-card"><div class="label">Calmar Ratio</div><div class="value {"green" if p["calmar_ratio"] >= 2 else "yellow"}">{p["calmar_ratio"]:.2f}</div></div>
+      <div class="metric-card"><div class="label">Max Drawdown</div><div class="value {"red" if p["max_drawdown_pct"] >= 0.15 else "yellow"}">{p["max_drawdown_pct"] * 100:.2f}%</div></div>
       <div class="metric-card"><div class="label">Recovery Factor</div><div class="value">{p["recovery_factor"]:.2f}</div></div>
-      <div class="metric-card"><div class="label">Expectancy</div><div class="value {'green' if p['expectancy'] >= 0 else 'red'}">${p["expectancy"]:,.2f}</div></div>
-      <div class="metric-card"><div class="label">CAGR</div><div class="value {'green' if p['cagr'] >= 0.10 else 'yellow'}">{p["cagr"]*100:.1f}%</div></div>
+      <div class="metric-card"><div class="label">Expectancy</div><div class="value {"green" if p["expectancy"] >= 0 else "red"}">${p["expectancy"]:,.2f}</div></div>
+      <div class="metric-card"><div class="label">CAGR</div><div class="value {"green" if p["cagr"] >= 0.10 else "yellow"}">{p["cagr"] * 100:.1f}%</div></div>
       <div class="metric-card"><div class="label">Avg Duration</div><div class="value">{p["avg_trade_duration_minutes"]}m</div></div>
     </div>
   </div>

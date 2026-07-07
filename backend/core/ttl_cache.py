@@ -4,6 +4,7 @@ Extracted from the previously duplicated ``_PermCache`` implementations in
 ``core/permissions.py`` and ``core/rbac.py`` (identical logic, differing only
 in default capacity/TTL constants).
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict

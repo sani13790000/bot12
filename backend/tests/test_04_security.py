@@ -3,8 +3,11 @@ Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 تست‌های امنیتی: Kill-Switch، حالات terminal، thread safety، R:R
 """
+
 from __future__ import annotations
+
 import threading
+
 import pytest
 
 
@@ -13,6 +16,7 @@ class TestKillSwitch:
 
     def setup_method(self) -> None:
         from backend.risk.kill_switch import KillSwitch
+
         self.ks = KillSwitch()
 
     def test_initially_inactive(self) -> None:
@@ -24,12 +28,12 @@ class TestKillSwitch:
 
     def test_reason_stored(self) -> None:
         self.ks.activate(reason="daily_loss_exceeded")
-        reason = getattr(self.ks, 'reason', None) or self.ks.get_reason()
+        reason = getattr(self.ks, "reason", None) or self.ks.get_reason()
         assert "daily_loss" in str(reason)
 
     def test_deactivate(self) -> None:
         self.ks.activate(reason="test")
-        if hasattr(self.ks, 'deactivate'):
+        if hasattr(self.ks, "deactivate"):
             self.ks.deactivate()
             assert self.ks.is_active() is False
         else:
@@ -41,6 +45,7 @@ class TestTerminalStates:
 
     def setup_method(self) -> None:
         from backend.execution.order_state_machine import OrderStateMachine
+
         OrderStateMachine._instance = None
         self.osm = OrderStateMachine.get_instance()
 
@@ -80,6 +85,7 @@ class TestThreadSafety:
 
     def test_concurrent_registrations(self) -> None:
         from backend.execution.order_state_machine import OrderStateMachine
+
         OrderStateMachine._instance = None
         osm = OrderStateMachine.get_instance()
 
@@ -96,8 +102,10 @@ class TestThreadSafety:
         mid = len(tickets) // 2
         t1 = threading.Thread(target=register_batch, args=(tickets[:mid],))
         t2 = threading.Thread(target=register_batch, args=(tickets[mid:],))
-        t1.start(); t2.start()
-        t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
         assert not errors
         for t in tickets:
@@ -105,6 +113,7 @@ class TestThreadSafety:
 
     def test_concurrent_transitions(self) -> None:
         from backend.execution.order_state_machine import OrderStateMachine
+
         OrderStateMachine._instance = None
         osm = OrderStateMachine.get_instance()
 
@@ -120,10 +129,11 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=do_transitions, args=(t,))
-                   for t in range(90001, 90011)]
-        for th in threads: th.start()
-        for th in threads: th.join()
+        threads = [threading.Thread(target=do_transitions, args=(t,)) for t in range(90001, 90011)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join()
         assert not errors
 
 
@@ -131,7 +141,7 @@ class TestRiskRewardRatio:
     """نسبت ریسک/سود باید حداقل 1.5 باشد."""
 
     def _check_rr(self, entry, sl, tp, direction, min_rr=1.5):
-        risk   = abs(entry - sl)
+        risk = abs(entry - sl)
         reward = abs(tp - entry)
         if risk == 0:
             return False

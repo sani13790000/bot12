@@ -1,10 +1,12 @@
 """weight_adjuster.py -- Phase P Fix P-6a/b/c/d."""
+
 from __future__ import annotations
+
 import json
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from typing import Dict
-import numpy as np
+
 from ..core.logger import get_logger
 
 logger = get_logger("intelligence.weight_adjuster")
@@ -12,9 +14,11 @@ _MIN_WEIGHT = 0.05
 _MAX_WEIGHT = 0.70
 _MAX_DELTA_PER_CYCLE = 0.05
 
+
 def _to_float(v) -> float:
     """FIX P-6a: safely convert np.float64 to plain float."""
     return float(v)
+
 
 @dataclass
 class IndicatorWeights:
@@ -31,16 +35,28 @@ class IndicatorWeights:
 
     def normalize(self) -> "IndicatorWeights":
         """FIX P-6b: clamp + normalize."""
-        main = [max(_MIN_WEIGHT, min(_MAX_WEIGHT, _to_float(x))) for x in [
-            self.smc_weight, self.price_action_weight, self.htf_alignment_weight,
-            self.session_weight, self.ltf_weight,
-        ]]
+        main = [
+            max(_MIN_WEIGHT, min(_MAX_WEIGHT, _to_float(x)))
+            for x in [
+                self.smc_weight,
+                self.price_action_weight,
+                self.htf_alignment_weight,
+                self.session_weight,
+                self.ltf_weight,
+            ]
+        ]
         total = sum(main) or 1.0
         main = [w / total for w in main]
-        smc_total = _to_float(
-            self.bos_weight + self.order_block_weight +
-            self.fvg_weight + self.liquidity_weight + self.structure_weight
-        ) or 1.0
+        smc_total = (
+            _to_float(
+                self.bos_weight
+                + self.order_block_weight
+                + self.fvg_weight
+                + self.liquidity_weight
+                + self.structure_weight
+            )
+            or 1.0
+        )
         return IndicatorWeights(
             smc_weight=_to_float(main[0]),
             price_action_weight=_to_float(main[1]),

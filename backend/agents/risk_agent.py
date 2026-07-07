@@ -7,6 +7,7 @@ MS-1 Safety Invariants:
   - All risk checks run even if earlier ones already blocked
   - Timeout-safe: each sub-check is independent
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,14 +17,14 @@ from .base_agent import AgentStatus, AgentVote, BaseAgent
 
 logger = logging.getLogger("agents.risk")
 
-_DEFAULT_MAX_PORTFOLIO_RISK  = 5.0
-_DEFAULT_MAX_SPREAD_RATIO    = 2.0
-_DEFAULT_MAX_ATR_MULTIPLIER  = 3.5
-_DEFAULT_MIN_ATR_MULTIPLIER  = 0.25
-_DEFAULT_MAX_DAILY_TRADES    = 10
-_DEFAULT_MAX_DAILY_LOSS_PCT  = 3.0
-_DEFAULT_MAX_CONSEC_LOSSES   = 3
-_DEFAULT_MAX_DRAWDOWN_PCT    = 8.0
+_DEFAULT_MAX_PORTFOLIO_RISK = 5.0
+_DEFAULT_MAX_SPREAD_RATIO = 2.0
+_DEFAULT_MAX_ATR_MULTIPLIER = 3.5
+_DEFAULT_MIN_ATR_MULTIPLIER = 0.25
+_DEFAULT_MAX_DAILY_TRADES = 10
+_DEFAULT_MAX_DAILY_LOSS_PCT = 3.0
+_DEFAULT_MAX_CONSEC_LOSSES = 3
+_DEFAULT_MAX_DRAWDOWN_PCT = 8.0
 
 
 class RiskAgent(BaseAgent):
@@ -46,39 +47,41 @@ class RiskAgent(BaseAgent):
 
     def __init__(
         self,
-        weight:              float = 0.15,
-        enabled:             bool  = True,
-        max_portfolio_risk:  float = _DEFAULT_MAX_PORTFOLIO_RISK,
-        max_spread_ratio:    float = _DEFAULT_MAX_SPREAD_RATIO,
-        max_atr_multiplier:  float = _DEFAULT_MAX_ATR_MULTIPLIER,
-        min_atr_multiplier:  float = _DEFAULT_MIN_ATR_MULTIPLIER,
-        max_daily_trades:    int   = _DEFAULT_MAX_DAILY_TRADES,
-        max_daily_loss_pct:  float = _DEFAULT_MAX_DAILY_LOSS_PCT,
-        max_consec_losses:   int   = _DEFAULT_MAX_CONSEC_LOSSES,
-        max_drawdown_pct:    float = _DEFAULT_MAX_DRAWDOWN_PCT,
+        weight: float = 0.15,
+        enabled: bool = True,
+        max_portfolio_risk: float = _DEFAULT_MAX_PORTFOLIO_RISK,
+        max_spread_ratio: float = _DEFAULT_MAX_SPREAD_RATIO,
+        max_atr_multiplier: float = _DEFAULT_MAX_ATR_MULTIPLIER,
+        min_atr_multiplier: float = _DEFAULT_MIN_ATR_MULTIPLIER,
+        max_daily_trades: int = _DEFAULT_MAX_DAILY_TRADES,
+        max_daily_loss_pct: float = _DEFAULT_MAX_DAILY_LOSS_PCT,
+        max_consec_losses: int = _DEFAULT_MAX_CONSEC_LOSSES,
+        max_drawdown_pct: float = _DEFAULT_MAX_DRAWDOWN_PCT,
     ) -> None:
         super().__init__(name=self._AGENT_NAME, weight=weight, enabled=enabled)
         self.max_portfolio_risk = max_portfolio_risk
-        self.max_spread_ratio   = max_spread_ratio
+        self.max_spread_ratio = max_spread_ratio
         self.max_atr_multiplier = max_atr_multiplier
         self.min_atr_multiplier = min_atr_multiplier
-        self.max_daily_trades   = max_daily_trades
+        self.max_daily_trades = max_daily_trades
         self.max_daily_loss_pct = max_daily_loss_pct
-        self.max_consec_losses  = max_consec_losses
-        self.max_drawdown_pct   = max_drawdown_pct
+        self.max_consec_losses = max_consec_losses
+        self.max_drawdown_pct = max_drawdown_pct
         logger.info(
             "RiskAgent v2 init | max_risk=%.1f%% max_spread=%.1f "
             "max_daily_loss=%.1f%% max_dd=%.1f%%",
-            max_portfolio_risk, max_spread_ratio,
-            max_daily_loss_pct, max_drawdown_pct,
+            max_portfolio_risk,
+            max_spread_ratio,
+            max_daily_loss_pct,
+            max_drawdown_pct,
         )
 
     async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score     = 100.0
-        blocked   = False
-        blocks:   List[str] = []
+        score = 100.0
+        blocked = False
+        blocks: List[str] = []
         warnings: List[str] = []
-        meta:     Dict[str, Any] = {}
+        meta: Dict[str, Any] = {}
 
         # B-6: Circuit Breaker
         if context.get("circuit_breaker_open", False):
@@ -91,7 +94,9 @@ class RiskAgent(BaseAgent):
         meta["portfolio_risk"] = portfolio_risk
         if portfolio_risk >= self.max_portfolio_risk:
             blocked = True
-            blocks.append(f"BLOCKED: Portfolio risk={portfolio_risk:.2f}% >= {self.max_portfolio_risk}%")
+            blocks.append(
+                f"BLOCKED: Portfolio risk={portfolio_risk:.2f}% >= {self.max_portfolio_risk}%"
+            )
         elif portfolio_risk > self.max_portfolio_risk * 0.8:
             score -= 30.0
             warnings.append(f"High portfolio risk={portfolio_risk:.2f}%")
@@ -119,7 +124,7 @@ class RiskAgent(BaseAgent):
 
         # B-3: Daily Trades
         daily_trades = int(context.get("daily_trades_count", 0))
-        max_daily    = int(context.get("max_daily_trades", self.max_daily_trades))
+        max_daily = int(context.get("max_daily_trades", self.max_daily_trades))
         meta["daily_trades"] = daily_trades
         if daily_trades >= max_daily:
             blocked = True

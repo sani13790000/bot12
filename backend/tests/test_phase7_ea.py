@@ -13,17 +13,20 @@ Covers:
   T61-T70: Edge cases + concurrent
   T71-T80: build_release.py integration
 """
-import hashlib, hmac, json, os, sys, time, zipfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
-from datetime import datetime, timezone, timedelta
+
+import hashlib
+import hmac
+import json
+import os
 import threading
+import time
 import uuid
-
-import pytest
-
+import zipfile
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict, Optional, Set
+from unittest.mock import MagicMock
 
 # ═════════════════════════════════════════════════════════════════════════════
 # SELF-CONTAINED STUBS
@@ -33,6 +36,7 @@ LICENSE_SECRET = b"test-license-secret-32-bytes-xxx"
 _REVOKED: Set[str] = set()
 _DEVICES: Dict[str, Set[str]] = {}
 _FEATURE_FLAGS: Dict[str, bool] = {}
+
 
 @dataclass
 class LicenseResponse:
@@ -50,7 +54,8 @@ class LicenseResponse:
         self.signature = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
 
     def verify(self, secret: bytes) -> bool:
-        if not self.signature: return False
+        if not self.signature:
+            return False
         payload = f"{self.license_key}:{self.user_id}:{self.plan}:{self.expires_at.isoformat()}:{self.nonce}"
         expected = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.signature, expected)
@@ -137,15 +142,25 @@ class LicenseChecker:
         return self._active
 
 
-def make_license(plan="starter", expires_days=30, max_devices=1, features=None,
-                 revoked=False, expired=False, secret=LICENSE_SECRET) -> LicenseResponse:
+def make_license(
+    plan="starter",
+    expires_days=30,
+    max_devices=1,
+    features=None,
+    revoked=False,
+    expired=False,
+    secret=LICENSE_SECRET,
+) -> LicenseResponse:
     key = f"LIC-{uuid.uuid4().hex[:8].upper()}"
-    expires = datetime.now(timezone.utc) + timedelta(
-        days=-1 if expired else expires_days)
+    expires = datetime.now(timezone.utc) + timedelta(days=-1 if expired else expires_days)
     resp = LicenseResponse(
-        license_key=key, user_id=f"user-{uuid.uuid4().hex[:6]}",
-        plan=plan, expires_at=expires, max_devices=max_devices,
-        features=features or {})
+        license_key=key,
+        user_id=f"user-{uuid.uuid4().hex[:6]}",
+        plan=plan,
+        expires_at=expires,
+        max_devices=max_devices,
+        features=features or {},
+    )
     resp.sign(secret)
     if revoked:
         _REVOKED.add(key)
@@ -160,20 +175,22 @@ class ReleaseManifest:
     signature: str = ""
 
     def canonical(self) -> str:
-        data = {k: v for k, v in self.__dict__.items() if k != 'signature'}
+        data = {k: v for k, v in self.__dict__.items() if k != "signature"}
         return json.dumps(data, sort_keys=True)
 
     def sign(self, secret: bytes) -> None:
         self.signature = hmac.new(secret, self.canonical().encode(), hashlib.sha256).hexdigest()
 
     def verify(self, secret: bytes) -> bool:
-        if not self.signature: return False
+        if not self.signature:
+            return False
         expected = hmac.new(secret, self.canonical().encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(self.signature, expected)
 
 
-SOURCE_EXTENSIONS = {'.mq5', '.mqh', '.py', '.ts', '.js', '.go', '.rs'}
-DANGEROUS_NAMES = {'.env', '.env.local', '.env.production'}
+SOURCE_EXTENSIONS = {".mq5", ".mqh", ".py", ".ts", ".js", ".go", ".rs"}
+DANGEROUS_NAMES = {".env", ".env.local", ".env.production"}
+
 
 def verify_no_source_leak(zip_path: str) -> bool:
     try:
@@ -183,36 +200,38 @@ def verify_no_source_leak(zip_path: str) -> bool:
                 basename = Path(name).name.lower()
                 if ext in SOURCE_EXTENSIONS:
                     return False
-                if basename in DANGEROUS_NAMES or basename.startswith('.env'):
+                if basename in DANGEROUS_NAMES or basename.startswith(".env"):
                     return False
         return True
     except Exception:
         return False
 
 
-def generate_download_token(license_key: str, version: str, secret: bytes,
-                            ttl_seconds: int = 3600) -> str:
+def generate_download_token(
+    license_key: str, version: str, secret: bytes, ttl_seconds: int = 3600
+) -> str:
     nonce = os.urandom(8).hex()
     expires = int(time.time()) + ttl_seconds
     payload = f"{license_key}:{version}:{expires}:{nonce}"
     sig = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
     import base64
+
     token_data = json.dumps({"p": payload, "s": sig})
     return base64.urlsafe_b64encode(token_data.encode()).decode()
 
 
-def verify_download_token(token: str, secret: bytes, license_key: str,
-                          version: str) -> bool:
+def verify_download_token(token: str, secret: bytes, license_key: str, version: str) -> bool:
     try:
         import base64
+
         token_data = json.loads(base64.urlsafe_b64decode(token.encode()).decode())
-        payload = token_data['p']
-        sig = token_data['s']
+        payload = token_data["p"]
+        sig = token_data["s"]
         expected = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
             return False
-        parts = payload.split(':')
-        lk, ver, expires, nonce = parts[0], parts[1], int(parts[2]), parts[3]
+        parts = payload.split(":")
+        lk, ver, expires, _nonce = parts[0], parts[1], int(parts[2]), parts[3]
         if lk != license_key or ver != version:
             return False
         if time.time() > expires:
@@ -226,10 +245,11 @@ def verify_download_token(token: str, secret: bytes, license_key: str,
 # T01-T10: License fail-closed
 # ═════════════════════════════════════════════════════════════════════════════
 
-class TestLicenseFailClosed:
 
+class TestLicenseFailClosed:
     def setup_method(self):
-        _REVOKED.clear(); _DEVICES.clear()
+        _REVOKED.clear()
+        _DEVICES.clear()
 
     def test_T01_valid_license_initializes(self):
         lc = LicenseChecker()
@@ -292,10 +312,11 @@ class TestLicenseFailClosed:
 
 # T11-T20: Heartbeat
 
-class TestHeartbeat:
 
+class TestHeartbeat:
     def setup_method(self):
-        _REVOKED.clear(); _DEVICES.clear()
+        _REVOKED.clear()
+        _DEVICES.clear()
 
     def test_T11_heartbeat_ok_after_init(self):
         lc = LicenseChecker()
@@ -367,18 +388,20 @@ class TestHeartbeat:
 
 # T21-T30: Signed response + nonce/anti-replay
 
-class TestSignedResponseAntiReplay:
 
+class TestSignedResponseAntiReplay:
     def test_T21_signature_verifies_correctly(self):
         lic = make_license()
         assert lic.verify(LICENSE_SECRET) is True
 
     def test_T22_tampered_key_fails_verify(self):
-        lic = make_license(); lic.license_key = "TAMPERED"
+        lic = make_license()
+        lic.license_key = "TAMPERED"
         assert lic.verify(LICENSE_SECRET) is False
 
     def test_T23_tampered_user_fails_verify(self):
-        lic = make_license(); lic.user_id = "hacker"
+        lic = make_license()
+        lic.user_id = "hacker"
         assert lic.verify(LICENSE_SECRET) is False
 
     def test_T24_wrong_secret_fails_verify(self):
@@ -386,23 +409,30 @@ class TestSignedResponseAntiReplay:
         assert lic.verify(b"wrong-secret-32-bytes-padded-xx!") is False
 
     def test_T25_empty_signature_fails(self):
-        lic = make_license(); lic.signature = ""
+        lic = make_license()
+        lic.signature = ""
         assert lic.verify(LICENSE_SECRET) is False
 
     def test_T26_nonce_replay_blocked(self):
-        _DEVICES.clear(); _REVOKED.clear()
+        _DEVICES.clear()
+        _REVOKED.clear()
         lc = LicenseChecker()
         lic = make_license()
         lc.on_init(lic, "device-1")
         # Same nonce -> replay blocked
         lic2 = LicenseResponse(
-            license_key=lic.license_key, user_id=lic.user_id,
-            plan=lic.plan, expires_at=lic.expires_at, nonce=lic.nonce)
+            license_key=lic.license_key,
+            user_id=lic.user_id,
+            plan=lic.plan,
+            expires_at=lic.expires_at,
+            nonce=lic.nonce,
+        )
         lic2.sign(LICENSE_SECRET)
         assert lc.on_init(lic2, "device-2") is False
 
     def test_T27_different_nonce_passes(self):
-        _DEVICES.clear(); _REVOKED.clear()
+        _DEVICES.clear()
+        _REVOKED.clear()
         lc = LicenseChecker()
         lic1 = make_license(max_devices=2)
         lic2 = make_license(max_devices=2)
@@ -417,10 +447,11 @@ class TestSignedResponseAntiReplay:
     def test_T29_canonical_excludes_signature(self):
         lic = make_license()
         canonical = lic.canonical()
-        assert 'signature' not in canonical
+        assert "signature" not in canonical
 
     def test_T30_heartbeat_nonce_replay_blocked(self):
-        _DEVICES.clear(); _REVOKED.clear()
+        _DEVICES.clear()
+        _REVOKED.clear()
         lc = LicenseChecker()
         lic = make_license()
         lc.on_init(lic, "device-1")
@@ -431,38 +462,41 @@ class TestSignedResponseAntiReplay:
 
 # T31-T40: Source protection + release artifact
 
-class TestSourceProtection:
 
+class TestSourceProtection:
     def test_T31_release_manifest_signs_and_verifies(self):
-        m = ReleaseManifest(version="3.20", build_ts="2026-01-01T00:00:00Z",
-                           files={"MT5TradingEA.ex5": "abc123"})
+        m = ReleaseManifest(
+            version="3.20", build_ts="2026-01-01T00:00:00Z", files={"MT5TradingEA.ex5": "abc123"}
+        )
         m.sign(LICENSE_SECRET)
         assert m.verify(LICENSE_SECRET) is True
 
     def test_T32_tampered_version_fails(self):
-        m = ReleaseManifest(version="3.20", build_ts="2026-01-01T00:00:00Z",
-                           files={"MT5TradingEA.ex5": "abc123"})
+        m = ReleaseManifest(
+            version="3.20", build_ts="2026-01-01T00:00:00Z", files={"MT5TradingEA.ex5": "abc123"}
+        )
         m.sign(LICENSE_SECRET)
         m.version = "3.99"
         assert m.verify(LICENSE_SECRET) is False
 
     def test_T33_tampered_files_fails(self):
-        m = ReleaseManifest(version="3.20", build_ts="2026-01-01T00:00:00Z",
-                           files={"MT5TradingEA.ex5": "abc123"})
+        m = ReleaseManifest(
+            version="3.20", build_ts="2026-01-01T00:00:00Z", files={"MT5TradingEA.ex5": "abc123"}
+        )
         m.sign(LICENSE_SECRET)
         m.files["MT5TradingEA.ex5"] = "tampered"
         assert m.verify(LICENSE_SECRET) is False
 
     def test_T34_zip_with_mq5_source_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("MT5TradingEA.mq5", "// source code")
             zf.writestr("MT5TradingEA.ex5", b"\x00" * 100)
         assert verify_no_source_leak(str(z)) is False
 
     def test_T35_zip_with_only_ex5_passes(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("MT5TradingEA.ex5", b"\x00" * 100)
             zf.writestr("README.md", "# EA Installation")
             zf.writestr("CHECKSUMS.txt", "sha256...")
@@ -470,13 +504,13 @@ class TestSourceProtection:
 
     def test_T36_zip_with_env_file_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr(".env", "SECRET_KEY=abc")
         assert verify_no_source_leak(str(z)) is False
 
     def test_T37_zip_with_py_source_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("backend/main.py", "# python source")
         assert verify_no_source_leak(str(z)) is False
 
@@ -495,13 +529,15 @@ class TestSourceProtection:
 
 # T41-T50: Device ID + deactivation
 
-class TestDeviceManagement:
 
+class TestDeviceManagement:
     def setup_method(self):
-        _REVOKED.clear(); _DEVICES.clear()
+        _REVOKED.clear()
+        _DEVICES.clear()
 
     def test_T41_single_device_limit(self):
-        lc1 = LicenseChecker(); lc2 = LicenseChecker()
+        lc1 = LicenseChecker()
+        lc2 = LicenseChecker()
         lic = make_license(max_devices=1)
         assert lc1.on_init(lic, "device-1") is True
         assert lc2.on_init(lic, "device-2") is False  # limit hit
@@ -532,8 +568,10 @@ class TestDeviceManagement:
         assert lc2.on_init(lic2, "device-1") is True
 
     def test_T45_deactivate_sets_inactive(self):
-        lc = LicenseChecker(); lic = make_license()
-        lc.on_init(lic, "device-1"); lc.deactivate("device-1")
+        lc = LicenseChecker()
+        lic = make_license()
+        lc.on_init(lic, "device-1")
+        lc.deactivate("device-1")
         assert not lc.is_active
 
     def test_T46_deactivate_without_license_false(self):
@@ -541,38 +579,46 @@ class TestDeviceManagement:
         assert lc.deactivate("device-1") is False
 
     def test_T47_device_id_tracked_in_global(self):
-        lc = LicenseChecker(); lic = make_license()
+        lc = LicenseChecker()
+        lic = make_license()
         lc.on_init(lic, "unique-device-xyz")
         assert "unique-device-xyz" in _DEVICES.get(lic.license_key, set())
 
     def test_T48_device_not_added_on_failure(self):
-        lc = LicenseChecker(); lic = make_license(revoked=True)
+        lc = LicenseChecker()
+        lic = make_license(revoked=True)
         lc.on_init(lic, "device-bad")
         assert "device-bad" not in _DEVICES.get(lic.license_key, set())
 
     def test_T49_concurrent_device_registration(self):
         lic = make_license(max_devices=2)
         results = []
+
         def try_init(dev_id):
             lc = LicenseChecker()
             results.append(lc.on_init(lic, dev_id))
+
         threads = [threading.Thread(target=try_init, args=(f"dev-{i}",)) for i in range(5)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         # At most 2 should succeed
         assert sum(results) <= 2
 
     def test_T50_device_id_format_any_string(self):
-        lc = LicenseChecker(); lic = make_license()
+        lc = LicenseChecker()
+        lic = make_license()
         assert lc.on_init(lic, "MT5-12345-EURUSD-01") is True
 
 
 # T51-T60: Feature gates
 
-class TestFeatureGates:
 
+class TestFeatureGates:
     def setup_method(self):
-        _REVOKED.clear(); _DEVICES.clear()
+        _REVOKED.clear()
+        _DEVICES.clear()
 
     def test_T51_feature_enabled_when_set(self):
         lc = LicenseChecker()
@@ -642,10 +688,11 @@ class TestFeatureGates:
 
 # T61-T70: Edge cases + concurrent
 
-class TestEdgeCasesAndConcurrent:
 
+class TestEdgeCasesAndConcurrent:
     def setup_method(self):
-        _REVOKED.clear(); _DEVICES.clear()
+        _REVOKED.clear()
+        _DEVICES.clear()
 
     def test_T61_multiple_checkers_same_license(self):
         lic = make_license(max_devices=3)
@@ -692,27 +739,34 @@ class TestEdgeCasesAndConcurrent:
         lic = make_license()
         lc.on_init(lic, "device-1")
         results = []
+
         def hb():
             results.append(lc.heartbeat())
+
         threads = [threading.Thread(target=hb) for _ in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert all(results)  # all should succeed
 
     def test_T70_no_source_in_zip_with_mqh(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("include/Config.mqh", "// header")
         assert verify_no_source_leak(str(z)) is False
 
 
 # T71-T80: build_release.py integration
 
-class TestBuildReleaseIntegration:
 
+class TestBuildReleaseIntegration:
     def test_T71_manifest_canonical_is_deterministic(self):
-        m = ReleaseManifest(version="3.20", build_ts="2026-01-01T00:00:00Z",
-                           files={"a.ex5": "hash1", "b.ex5": "hash2"})
+        m = ReleaseManifest(
+            version="3.20",
+            build_ts="2026-01-01T00:00:00Z",
+            files={"a.ex5": "hash1", "b.ex5": "hash2"},
+        )
         assert m.canonical() == m.canonical()
 
     def test_T72_manifest_signature_64_chars(self):
@@ -733,27 +787,29 @@ class TestBuildReleaseIntegration:
 
     def test_T75_zip_dashboard_allowed(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("dashboard.exe", b"\x00" * 100)
             zf.writestr("README.md", "install guide")
         assert verify_no_source_leak(str(z)) is True
 
     def test_T76_zip_ts_source_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("frontend/app.ts", "// typescript")
         assert verify_no_source_leak(str(z)) is False
 
     def test_T77_zip_go_source_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr("backend/main.go", "package main")
         assert verify_no_source_leak(str(z)) is False
 
     def test_T78_manifest_includes_checksums(self):
         m = ReleaseManifest(
-            version="3.20", build_ts="2026-01-01T00:00:00Z",
-            files={"MT5TradingEA.ex5": "a" * 64, "CHECKSUMS.txt": "b" * 64})
+            version="3.20",
+            build_ts="2026-01-01T00:00:00Z",
+            files={"MT5TradingEA.ex5": "a" * 64, "CHECKSUMS.txt": "b" * 64},
+        )
         canonical = m.canonical()
         assert "MT5TradingEA.ex5" in canonical
 
@@ -765,6 +821,6 @@ class TestBuildReleaseIntegration:
 
     def test_T80_zip_dotenv_production_fails(self, tmp_path):
         z = tmp_path / "release.zip"
-        with zipfile.ZipFile(z, 'w') as zf:
+        with zipfile.ZipFile(z, "w") as zf:
             zf.writestr(".env.production", "DB_PASSWORD=secret")
         assert verify_no_source_leak(str(z)) is False

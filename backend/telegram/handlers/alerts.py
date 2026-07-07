@@ -10,6 +10,7 @@ Registered commands
 - /alerts on|off – enable / disable alerts for this chat
 - /setalerts     – configure alert severity filter
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,27 +24,24 @@ router = Router()
 MAX_ALERTS = 20
 
 SEVERITY_EMOJI: dict[str, str] = {
-    "info":     "ℹ️",
-    "warning":  "⚠️",
-    "error":    "🔥",
+    "info": "ℹ️",
+    "warning": "⚠️",
+    "error": "🔥",
     "critical": "😨",
 }
 
 
 # ── Formatter helpers ────────────────────────────────────────────── #
 
+
 def _format_alert(alert: dict) -> str:
     """Render a single alert dict as Telegram Markdown."""
     severity = alert.get("severity", "info")
-    emoji    = SEVERITY_EMOJI.get(severity, "ℹ️")
+    emoji = SEVERITY_EMOJI.get(severity, "ℹ️")
     category = alert.get("category", "system").upper()
-    message  = alert.get("message", "(no message)")
-    ts       = alert.get("created_at", "")[:19].replace("T", " ")
-    return (
-        f"{emoji} *[{severity.upper()}]* `{category}`\n"
-        f"{message}\n"
-        f"_🕐 {ts} UTC_"
-    )
+    message = alert.get("message", "(no message)")
+    ts = alert.get("created_at", "")[:19].replace("T", " ")
+    return f"{emoji} *[{severity.upper()}]* `{category}`\n{message}\n_🕐 {ts} UTC_"
 
 
 def _format_alert_list(alerts: list[dict]) -> str:
@@ -55,6 +53,7 @@ def _format_alert_list(alerts: list[dict]) -> str:
 
 
 # ── Command handlers ─────────────────────────────────────────────── #
+
 
 @router.message(Command("alerts"))
 async def cmd_alerts(message: types.Message) -> None:
@@ -68,7 +67,7 @@ async def cmd_alerts(message: types.Message) -> None:
     """
     try:
         args = (message.text or "").split()[1:]
-        arg  = args[0].lower() if args else ""
+        arg = args[0].lower() if args else ""
 
         if arg == "on":
             await message.answer("✅ اشتراک هشدارهای زنده فعال شد.")
@@ -82,7 +81,7 @@ async def cmd_alerts(message: types.Message) -> None:
         limit = min(limit, MAX_ALERTS)
 
         alerts = await _fetch_recent_alerts(limit)
-        text   = _format_alert_list(alerts)
+        text = _format_alert_list(alerts)
         await message.answer(text, parse_mode="Markdown")
 
     except Exception as exc:
@@ -104,8 +103,7 @@ async def cmd_setalerts(message: types.Message) -> None:
         args = (message.text or "").split()[1:]
         if not args:
             await message.answer(
-                "⚠️ استفاده: `/setalerts warning`\n"
-                "*سطح‌ها:* info | warning | error | critical",
+                "⚠️ استفاده: `/setalerts warning`\n*سطح‌ها:* info | warning | error | critical",
                 parse_mode="Markdown",
             )
             return
@@ -130,6 +128,7 @@ async def cmd_setalerts(message: types.Message) -> None:
 
 # ── Live-push helper (called by the alert service) ─────────────── #
 
+
 async def push_alert(bot: object, chat_id: int, alert: dict) -> None:
     """Push a single alert to a Telegram chat."""
     text = _format_alert(alert)
@@ -145,10 +144,12 @@ async def push_alert(bot: object, chat_id: int, alert: dict) -> None:
 
 # ── Data access ──────────────────────────────────────────────────── #
 
+
 async def _fetch_recent_alerts(limit: int = 5) -> list[dict]:
     """Fetch recent alerts from the database (best-effort)."""
     try:
         from backend.database.client import db_client
+
         rows = await db_client.select(
             "alerts",
             limit=limit,

@@ -2,7 +2,9 @@
 backend/core/secret_store.py
 Galaxy Vast AI -- Encrypted Secret Store (AES-256-GCM)
 """
+
 from __future__ import annotations
+
 import base64
 import hashlib
 import logging
@@ -13,6 +15,7 @@ logger = logging.getLogger(__name__)
 MASTER_KEY_ENV = "MT5_MASTER_KEY"
 _GCM_NONCE_LEN = 12
 
+
 def _get_master_key() -> bytes:
     raw = os.getenv(MASTER_KEY_ENV, "")
     if not raw:
@@ -20,12 +23,15 @@ def _get_master_key() -> bytes:
         raw = "insecure-default-key-change-in-production"
     return hashlib.sha256(raw.encode()).digest()
 
+
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
     _HAS_CRYPTO = True
 except ImportError:
     _HAS_CRYPTO = False
     logger.warning("cryptography not installed -- SecretStore disabled")
+
 
 class SecretStore:
     """AES-256-GCM secret store."""
@@ -52,5 +58,6 @@ class SecretStore:
         """Re-encrypt a DEK under a new master key."""
         dek_plaintext = self.decrypt(encrypted_dek)
         return SecretStore(master_key=new_master_key).encrypt(dek_plaintext)
+
 
 secret_store = SecretStore()

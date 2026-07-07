@@ -1,9 +1,10 @@
 """Start / Welcome handler."""
+
 from __future__ import annotations
 
 from aiogram import Router
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import Message
 
 from backend.telegram.keyboards import main_menu_keyboard
 

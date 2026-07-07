@@ -4,19 +4,17 @@
 ÙÙÛØ³ÙØ¯Ù: MT5 Trading Team
 """
 
-from aiogram import Dispatcher, types, F
+import os
+
+import httpx
+from aiogram import Dispatcher, F, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-import httpx
 
-from ..keyboards import (
-    get_analysis_keyboard,
-    get_timeframe_keyboard
-)
-from ..utils import format_analysis_result
-from ....core.logger import get_logger
 from ....core.config import settings
-import os
+from ....core.logger import get_logger
+from ..keyboards import get_analysis_keyboard, get_timeframe_keyboard
+from ..utils import format_analysis_result
 
 # آدرس API از متغیر محیطی (برای Docker: http://api:8000، برای dev: http://localhost:8000)
 _API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
@@ -26,6 +24,7 @@ logger = get_logger("telegram.handlers.analysis")
 
 class AnalysisState(StatesGroup):
     """ÙØ¶Ø¹ÛØªâÙØ§Û ØªØ­ÙÛÙ"""
+
     waiting_symbol = State()
     waiting_timeframe = State()
     in_progress = State()
@@ -39,10 +38,9 @@ def register_analysis_handlers(dp: Dispatcher):
         """ÙÙØ§ÛØ´ ÙÙÙÛ ØªØ­ÙÛÙ"""
         await state.set_state(AnalysisState.waiting_symbol)
         await message.answer(
-            "ð <b>Ø§ÙØªØ®Ø§Ø¨ ÙÙØ§Ø¯</b>\n\n"
-            "ÙÙØ§Ø¯ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
+            "ð <b>Ø§ÙØªØ®Ø§Ø¨ ÙÙØ§Ø¯</b>\n\nÙÙØ§Ø¯ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_analysis_keyboard(),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
 
     @dp.callback_query(F.data.startswith("analyze_"))
@@ -53,10 +51,9 @@ def register_analysis_handlers(dp: Dispatcher):
         await state.set_state(AnalysisState.waiting_timeframe)
 
         await callback.message.edit_text(
-            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\n"
-            "â° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
+            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\nâ° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_timeframe_keyboard(),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -68,7 +65,7 @@ def register_analysis_handlers(dp: Dispatcher):
             "ð <b>ÙÙØ§Ø¯ Ø³ÙØ§Ø±Ø´Û</b>\n\n"
             "ÙÙØ§Ø¯ ÙÙØ±Ø¯ ÙØ¸Ø± Ø±Ø§ ÙØ§Ø±Ø¯ Ú©ÙÛØ¯:\n"
             "ÙØ«Ø§Ù: EURUSD, GBPUSD, XAUUSD",
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         await callback.answer()
 
@@ -79,10 +76,9 @@ def register_analysis_handlers(dp: Dispatcher):
         await state.update_data(symbol=symbol)
 
         await message.answer(
-            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\n"
-            "â° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
+            f"ð ÙÙØ§Ø¯: <b>{symbol}</b>\n\nâ° ØªØ§ÛÙâÙØ±ÛÙ Ø±Ø§ Ø§ÙØªØ®Ø§Ø¨ Ú©ÙÛØ¯:",
             reply_markup=get_timeframe_keyboard(),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         await state.set_state(AnalysisState.waiting_timeframe)
 
@@ -94,10 +90,8 @@ def register_analysis_handlers(dp: Dispatcher):
         symbol = data.get("symbol")
 
         await callback.message.edit_text(
-            f"ð <b>Ø¯Ø± Ø­Ø§Ù ØªØ­ÙÛÙ...</b>\n\n"
-            f"ÙÙØ§Ø¯: {symbol}\n"
-            f"ØªØ§ÛÙâÙØ±ÛÙ: {timeframe}",
-            parse_mode="HTML"
+            f"ð <b>Ø¯Ø± Ø­Ø§Ù ØªØ­ÙÛÙ...</b>\n\nÙÙØ§Ø¯: {symbol}\nØªØ§ÛÙâÙØ±ÛÙ: {timeframe}",
+            parse_mode="HTML",
         )
 
         try:
@@ -105,25 +99,18 @@ def register_analysis_handlers(dp: Dispatcher):
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{settings.API_BASE_URL}/api/analysis/full",
-                    params={
-                        "symbol": symbol,
-                        "timeframe": timeframe
-                    },
-                    timeout=30.0
+                    params={"symbol": symbol, "timeframe": timeframe},
+                    timeout=30.0,
                 )
 
             if response.status_code == 200:
                 result = response.json()
                 analysis_text = format_analysis_result(result)
-                await callback.message.edit_text(
-                    analysis_text,
-                    parse_mode="HTML"
-                )
+                await callback.message.edit_text(analysis_text, parse_mode="HTML")
             else:
                 await callback.message.edit_text(
-                    "â <b>Ø®Ø·Ø§ Ø¯Ø± ØªØ­ÙÛÙ</b>\n\n"
-                    "ÙØ·ÙØ§Ù Ø¯ÙØ¨Ø§Ø±Ù ØªÙØ§Ø´ Ú©ÙÛØ¯.",
-                    parse_mode="HTML"
+                    "â <b>Ø®Ø·Ø§ Ø¯Ø± ØªØ­ÙÛÙ</b>\n\nÙØ·ÙØ§Ù Ø¯ÙØ¨Ø§Ø±Ù ØªÙØ§Ø´ Ú©ÙÛØ¯.",
+                    parse_mode="HTML",
                 )
 
         except Exception as e:
@@ -131,7 +118,7 @@ def register_analysis_handlers(dp: Dispatcher):
             await callback.message.edit_text(
                 "â <b>Ø®Ø·Ø§ Ø¯Ø± Ø§Ø±ØªØ¨Ø§Ø· Ø¨Ø§ Ø³Ø±ÙØ±</b>\n\n"
                 "ÙØ·ÙØ§Ù Ø¯ÙØ¨Ø§Ø±Ù ØªÙØ§Ø´ Ú©ÙÛØ¯.",
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
 
         await state.clear()

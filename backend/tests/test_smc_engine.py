@@ -6,28 +6,26 @@
 نویسنده: MT5 Trading Team
 """
 
-import pytest
-import numpy as np
-from unittest.mock import patch, MagicMock
 from datetime import datetime
 
-from backend.analysis.smc_engine import (
-    MarketStructureAnalyzer,
-    LiquidityAnalyzer,
-    OrderBlockAnalyzer,
-    FVGAnalyzer,
-    KillZoneAnalyzer,
-    SMCResult,
-    SwingLevel,
-    StructureEvent,
-    BlockZone,
-    FVGZone,
-)
+import numpy as np
 
+from backend.analysis.smc_engine import (
+    BlockZone,
+    FVGAnalyzer,
+    FVGZone,
+    KillZoneAnalyzer,
+    LiquidityAnalyzer,
+    MarketStructureAnalyzer,
+    OrderBlockAnalyzer,
+    StructureEvent,
+    SwingLevel,
+)
 
 # =====================================================
 # Helper: ساخت داده کندل تستی
 # =====================================================
+
 
 def make_candles(n=100, base=1.1000, trend="up", volatility=0.0010):
     """ساخت آرایه کندل‌های تستی"""
@@ -79,6 +77,7 @@ def make_market_data(n=100, trend="up"):
 # =====================================================
 # تست MarketStructureAnalyzer
 # =====================================================
+
 
 class TestMarketStructureAnalyzer:
     """تست تحلیل ساختار بازار"""
@@ -143,7 +142,7 @@ class TestMarketStructureAnalyzer:
         }
         # باید gracefully handle کند
         try:
-            result = analyzer.analyze(data)
+            analyzer.analyze(data)
             # نتیجه می‌تواند None یا default باشد
         except (ValueError, IndexError, KeyError):
             pass  # این exception‌ها قابل قبول هستند
@@ -170,6 +169,7 @@ class TestMarketStructureAnalyzer:
 # =====================================================
 # تست LiquidityAnalyzer
 # =====================================================
+
 
 class TestLiquidityAnalyzer:
     """تست تحلیل نقدینگی"""
@@ -206,6 +206,7 @@ class TestLiquidityAnalyzer:
 # =====================================================
 # تست OrderBlockAnalyzer
 # =====================================================
+
 
 class TestOrderBlockAnalyzer:
     """تست تحلیل Order Block"""
@@ -250,6 +251,7 @@ class TestOrderBlockAnalyzer:
 # تست FVGAnalyzer
 # =====================================================
 
+
 class TestFVGAnalyzer:
     """تست تحلیل Fair Value Gap"""
 
@@ -292,6 +294,7 @@ class TestFVGAnalyzer:
 # تست KillZoneAnalyzer
 # =====================================================
 
+
 class TestKillZoneAnalyzer:
     """تست تحلیل Kill Zone"""
 
@@ -329,17 +332,14 @@ class TestKillZoneAnalyzer:
 # تست dataclass‌ها
 # =====================================================
 
+
 class TestSMCDataClasses:
     """تست ساختارهای داده SMC"""
 
     def test_swing_level_creation(self):
         """تست ایجاد SwingLevel"""
         swing = SwingLevel(
-            price=1.1000,
-            index=10,
-            is_high=True,
-            strength=0.8,
-            timestamp=datetime.utcnow()
+            price=1.1000, index=10, is_high=True, strength=0.8, timestamp=datetime.utcnow()
         )
         assert swing.price == 1.1000
         assert swing.is_high is True
@@ -352,7 +352,7 @@ class TestSMCDataClasses:
             direction="bullish",
             price=1.1000,
             index=20,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
         assert event.event_type == "BOS"
         assert event.direction == "bullish"
@@ -360,25 +360,14 @@ class TestSMCDataClasses:
     def test_block_zone_creation(self):
         """تست ایجاد BlockZone"""
         block = BlockZone(
-            zone_type="bullish_ob",
-            high=1.1020,
-            low=1.1000,
-            index=15,
-            strength=0.75,
-            is_valid=True
+            zone_type="bullish_ob", high=1.1020, low=1.1000, index=15, strength=0.75, is_valid=True
         )
         assert block.high > block.low
         assert block.is_valid is True
 
     def test_fvg_zone_creation(self):
         """تست ایجاد FVGZone"""
-        fvg = FVGZone(
-            zone_type="bullish_fvg",
-            high=1.1015,
-            low=1.1005,
-            index=25,
-            is_filled=False
-        )
+        fvg = FVGZone(zone_type="bullish_fvg", high=1.1015, low=1.1005, index=25, is_filled=False)
         assert fvg.high > fvg.low
         assert fvg.is_filled is False
 
@@ -386,6 +375,7 @@ class TestSMCDataClasses:
 # =====================================================
 # تست یکپارچه SMC
 # =====================================================
+
 
 class TestSMCIntegration:
     """تست یکپارچه تمام اجزای SMC"""

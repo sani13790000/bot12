@@ -19,29 +19,31 @@ FIXES APPLIED:
   BUG-R5-2:  balance=input.free_margin (semantically wrong) — now uses input.balance (total balance)
   AI-NEW-1:  Gate 5 was numbered twice (5 & 5), Gate 5.5 for MarginGate — renumbered correctly
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 log = logging.getLogger(__name__)
 
 
 # ── Input / Output DTOs ──────────────────────────────────────────────────────
 
+
 @dataclass
 class RiskInput:
     symbol: str
-    direction: str           # "BUY" | "SELL"
-    volume: float            # requested lot size
+    direction: str  # "BUY" | "SELL"
+    volume: float  # requested lot size
     entry_price: float
-    sl_price: Optional[float]  = None
-    tp_price: Optional[float]  = None
+    sl_price: Optional[float] = None
+    tp_price: Optional[float] = None
     # Account state — caller must populate all three
-    equity:      float = 0.0  # current equity
-    balance:     float = 0.0  # total account balance (NOT free_margin!)
+    equity: float = 0.0  # current equity
+    balance: float = 0.0  # total account balance (NOT free_margin!)
     free_margin: float = 0.0  # available margin for new trades
     used_margin: float = 0.0  # margin already used by open positions
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -51,17 +53,19 @@ class RiskInput:
 class RiskResult:
     approved: bool
     approved_volume: float = 0.0
-    reject_gate:    Optional[str] = None
-    reject_reason:  Optional[str] = None
-    gate_details:   Dict[str, Any] = field(default_factory=dict)
+    reject_gate: Optional[str] = None
+    reject_reason: Optional[str] = None
+    gate_details: Dict[str, Any] = field(default_factory=dict)
 
 
 # ── Gate helpers ─────────────────────────────────────────────────────────────
+
 
 def _try_import(module_path: str, class_name: str) -> Optional[Any]:
     """Return class or None — never raises."""
     try:
         import importlib
+
         mod = importlib.import_module(module_path)
         return getattr(mod, class_name, None)
     except Exception:
@@ -69,6 +73,7 @@ def _try_import(module_path: str, class_name: str) -> Optional[Any]:
 
 
 # ── Orchestrator ─────────────────────────────────────────────────────────────
+
 
 class RiskOrchestrator:
     """
@@ -84,6 +89,7 @@ class RiskOrchestrator:
         if self._margin_gate is None:
             try:
                 from backend.risk.margin_gate import MarginGate
+
                 self._margin_gate = MarginGate()
             except Exception:
                 pass
@@ -99,6 +105,7 @@ class RiskOrchestrator:
         # ── GATE 1: KillSwitch (FAIL-CLOSED) ────────────────────────────────
         try:
             from backend.risk.kill_switch import get_kill_switch
+
             ks = get_kill_switch()  # BUG-R4-3 FIX: use singleton, not KillSwitch()
             # BUG-R5-2 FIX: balance= is total account balance, NOT free_margin
             await ks.check(equity=inp.equity, balance=inp.balance)
@@ -119,9 +126,7 @@ class RiskOrchestrator:
         if NewsFilterClass is not None:
             try:
                 nf = NewsFilterClass()
-                result = await asyncio.wait_for(
-                    nf.check(inp.symbol, inp.direction), timeout=2.0
-                )
+                result = await asyncio.wait_for(nf.check(inp.symbol, inp.direction), timeout=2.0)
                 details["gate_2_news_filter"] = getattr(result, "reason", str(result))
                 if hasattr(result, "approved") and not result.approved:
                     return RiskResult(
@@ -180,9 +185,7 @@ class RiskOrchestrator:
             details["gate_4_session_filter"] = "skipped (not installed)"
 
         # ── GATE 5: CorrelationFilter ────────────────────────────────────────
-        CorrelationFilterClass = _try_import(
-            "backend.risk.correlation_filter", "CorrelationFilter"
-        )
+        CorrelationFilterClass = _try_import("backend.risk.correlation_filter", "CorrelationFilter")
         if CorrelationFilterClass is not None:
             try:
                 cf = CorrelationFilterClass()
@@ -205,9 +208,7 @@ class RiskOrchestrator:
             details["gate_5_correlation"] = "skipped (not installed)"
 
         # ── GATE 6: ExposureControl ──────────────────────────────────────────
-        ExposureControlClass = _try_import(
-            "backend.risk.exposure_control", "ExposureControl"
-        )
+        ExposureControlClass = _try_import("backend.risk.exposure_control", "ExposureControl")
         if ExposureControlClass is not None:
             try:
                 ec = ExposureControlClass()
@@ -297,7 +298,10 @@ class RiskOrchestrator:
 
         log.info(
             "[RiskOrchestrator] APPROVED %s %s %.2f lots @ %.5f",
-            inp.direction, inp.symbol, approved_volume, inp.entry_price,
+            inp.direction,
+            inp.symbol,
+            approved_volume,
+            inp.entry_price,
         )
         return RiskResult(
             approved=True,

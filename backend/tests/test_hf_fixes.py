@@ -8,37 +8,52 @@ HF-5: Order Journal (9 tests)
 
 Total: 40 tests
 """
+
 import asyncio
-import math
+
 import pytest
 
 # ============================================================================
 # HF-1: Circuit Breaker
 # ============================================================================
 from backend.circuit_breaker import (
-    CircuitBreaker, BreakerConfig, State, CircuitOpenError,
-    halt_trading, resume_trading, is_trading_halted,
+    BreakerConfig,
+    CircuitBreaker,
+    CircuitOpenError,
+    State,
+    is_trading_halted,
+    resume_trading,
 )
 
 
 @pytest.mark.asyncio
 async def test_cb_opens_after_threshold():
-    cb = CircuitBreaker("t1", BreakerConfig(failure_threshold=5, failure_window_s=60.0, recovery_timeout_s=999.0))
+    cb = CircuitBreaker(
+        "t1", BreakerConfig(failure_threshold=5, failure_window_s=60.0, recovery_timeout_s=999.0)
+    )
     for _ in range(5):
-        try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-        except (ValueError, CircuitOpenError): pass
+        try:
+            await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+        except (ValueError, CircuitOpenError):
+            pass
     assert cb.stats.state == State.OPEN
 
 
 @pytest.mark.asyncio
 async def test_cb_window_expiry():
-    cb = CircuitBreaker("t2", BreakerConfig(failure_threshold=3, failure_window_s=0.05, recovery_timeout_s=999.0))
+    cb = CircuitBreaker(
+        "t2", BreakerConfig(failure_threshold=3, failure_window_s=0.05, recovery_timeout_s=999.0)
+    )
     for _ in range(2):
-        try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-        except (ValueError, CircuitOpenError): pass
+        try:
+            await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+        except (ValueError, CircuitOpenError):
+            pass
     await asyncio.sleep(0.1)
-    try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except (ValueError, CircuitOpenError): pass
+    try:
+        await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+    except (ValueError, CircuitOpenError):
+        pass
     assert cb.stats.state == State.CLOSED
 
 
@@ -47,28 +62,44 @@ async def test_cb_global_halt():
     await resume_trading()
     cb = CircuitBreaker("t3", BreakerConfig(failure_threshold=2, failure_window_s=60.0))
     for _ in range(2):
-        try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-        except (ValueError, CircuitOpenError): pass
+        try:
+            await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+        except (ValueError, CircuitOpenError):
+            pass
     assert is_trading_halted()
     await resume_trading()
 
 
 @pytest.mark.asyncio
 async def test_cb_rejects_when_open():
-    cb = CircuitBreaker("t4", BreakerConfig(failure_threshold=1, failure_window_s=60.0, recovery_timeout_s=999.0))
-    try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except (ValueError, CircuitOpenError): pass
-    with pytest.raises(CircuitOpenError): await cb.call(lambda: "ok")
+    cb = CircuitBreaker(
+        "t4", BreakerConfig(failure_threshold=1, failure_window_s=60.0, recovery_timeout_s=999.0)
+    )
+    try:
+        await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+    except (ValueError, CircuitOpenError):
+        pass
+    with pytest.raises(CircuitOpenError):
+        await cb.call(lambda: "ok")
 
 
 @pytest.mark.asyncio
 async def test_cb_half_open_recovery():
-    cb = CircuitBreaker("t5", BreakerConfig(failure_threshold=1, failure_window_s=60.0, recovery_timeout_s=0.05, success_threshold=1))
-    try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except (ValueError, CircuitOpenError): pass
+    cb = CircuitBreaker(
+        "t5",
+        BreakerConfig(
+            failure_threshold=1, failure_window_s=60.0, recovery_timeout_s=0.05, success_threshold=1
+        ),
+    )
+    try:
+        await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+    except (ValueError, CircuitOpenError):
+        pass
     await asyncio.sleep(0.1)
-    try: await cb.call(lambda: "success")
-    except CircuitOpenError: pass
+    try:
+        await cb.call(lambda: "success")
+    except CircuitOpenError:
+        pass
     assert cb.stats.state in (State.HALF_OPEN, State.CLOSED)
 
 
@@ -77,8 +108,10 @@ async def test_cb_callback_fired():
     changes = []
     cb = CircuitBreaker("t6", BreakerConfig(failure_threshold=1, failure_window_s=60.0))
     cb.on_state_change(lambda name, old, new: changes.append((old, new)))
-    try: await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
-    except (ValueError, CircuitOpenError): pass
+    try:
+        await cb.call(lambda: (_ for _ in ()).throw(ValueError("x")))
+    except (ValueError, CircuitOpenError):
+        pass
     await asyncio.sleep(0.01)
     assert any(n == State.OPEN for _, n in changes)
 
@@ -115,12 +148,15 @@ async def test_corr_rolling():
 
 @pytest.mark.asyncio
 async def test_corr_anti_correlated():
-    import random; random.seed(42)
+    import random
+
+    random.seed(42)
     engine = RollingCorrelationEngine(window=50, cache_ttl=0.0)
     price_up = price_dn = 1.1
     for _ in range(60):
         c = random.gauss(0, 0.003)
-        price_up *= (1 + c); price_dn *= (1 - c)
+        price_up *= 1 + c
+        price_dn *= 1 - c
         await engine.add_price_tick("UP", price_up)
         await engine.add_price_tick("DN", price_dn)
     corr = await engine.get_correlation("UP", "DN")
@@ -144,12 +180,14 @@ async def test_corr_matrix():
     engine = RollingCorrelationEngine()
     syms = ["EURUSD", "GBPUSD", "XAUUSD"]
     matrix = await engine.portfolio_correlation_matrix(syms)
-    for s in syms: assert matrix[s][s] == 1.0
+    for s in syms:
+        assert matrix[s][s] == 1.0
 
 
 @pytest.mark.asyncio
 async def test_corr_canonical_symmetric():
     from backend.institutional.correlation_engine import _canonical
+
     assert _canonical("GBPUSD", "EURUSD") == _canonical("EURUSD", "GBPUSD")
 
 
@@ -172,20 +210,23 @@ from backend.risk.lot_sizing import LotSizer, LotSizingConfig, UnknownSymbolErro
 
 @pytest.mark.asyncio
 async def test_pip_eurusd():
-    s = LotSizer(); val, src = await s.get_pip_value("EURUSD")
+    s = LotSizer()
+    val, src = await s.get_pip_value("EURUSD")
     assert val == 10.0 and src == "static_table"
 
 
 @pytest.mark.asyncio
 async def test_pip_xauusd_corrected():
-    s = LotSizer(); val, _ = await s.get_pip_value("XAUUSD")
+    s = LotSizer()
+    val, _ = await s.get_pip_value("XAUUSD")
     assert val == 1.0
 
 
 @pytest.mark.asyncio
 async def test_pip_unknown_raises():
     s = LotSizer()
-    with pytest.raises(UnknownSymbolError): await s.get_pip_value("ZZZNEW999")
+    with pytest.raises(UnknownSymbolError):
+        await s.get_pip_value("ZZZNEW999")
 
 
 @pytest.mark.asyncio
@@ -228,23 +269,33 @@ async def test_pip_cached():
 # ============================================================================
 # HF-4: Position Reconciliation Before Retry
 # ============================================================================
-from backend.execution.position_reconciliation import PositionReconciliation, OrphanStatus
+from backend.execution.position_reconciliation import PositionReconciliation
 
 
 class _FakeMT5:
-    def __init__(self, positions=None): self._pos = positions or []
+    def __init__(self, positions=None):
+        self._pos = positions or []
+
     def positions_get_sync(self, ticket=None, symbol=None):
-        if ticket is not None: return [p for p in self._pos if p.ticket == ticket]
-        if symbol is not None: return [p for p in self._pos if p.symbol == symbol]
+        if ticket is not None:
+            return [p for p in self._pos if p.ticket == ticket]
+        if symbol is not None:
+            return [p for p in self._pos if p.symbol == symbol]
         return self._pos
+
     def close_position_sync(self, ticket):
-        self._pos = [p for p in self._pos if p.ticket != ticket]; return True
+        self._pos = [p for p in self._pos if p.ticket != ticket]
+        return True
 
 
 class _FakePos:
     def __init__(self, ticket, symbol, typ=0, volume=0.1, price=1.1, profit=10.0):
-        self.ticket=ticket; self.symbol=symbol; self.type=typ
-        self.volume=volume; self.price_open=price; self.profit=profit
+        self.ticket = ticket
+        self.symbol = symbol
+        self.type = typ
+        self.volume = volume
+        self.price_open = price
+        self.profit = profit
 
 
 @pytest.mark.asyncio
@@ -275,7 +326,10 @@ async def test_check_no_dup():
 async def test_db_failure_no_autoclose():
     mt5 = _FakeMT5([_FakePos(1, "XAUUSD")])
     r = PositionReconciliation(mt5=mt5)
-    async def bad_db(): raise RuntimeError("DB down")
+
+    async def bad_db():
+        raise RuntimeError("DB down")
+
     r.set_db_callback(bad_db)
     result = await r.run_once()
     assert result.db_failure and len(mt5.positions_get_sync()) == 1
@@ -285,7 +339,10 @@ async def test_db_failure_no_autoclose():
 async def test_orphan_detected():
     mt5 = _FakeMT5([_FakePos(2, "GBPUSD")])
     r = PositionReconciliation(mt5=mt5)
-    async def empty_db(): return []
+
+    async def empty_db():
+        return []
+
     r.set_db_callback(empty_db)
     result = await r.run_once()
     assert len(result.orphan_mt5) == 1 and result.orphan_mt5[0].ticket == 2
@@ -295,7 +352,8 @@ async def test_orphan_detected():
 async def test_interval_clamped():
     r = PositionReconciliation(interval_seconds=1)
     assert r._interval == 5
-    r.set_interval(9999); assert r._interval == 300
+    r.set_interval(9999)
+    assert r._interval == 300
 
 
 @pytest.mark.asyncio
@@ -308,7 +366,7 @@ async def test_auto_close_ignored():
 # ============================================================================
 # HF-5: Order Journal
 # ============================================================================
-from backend.execution.order_journal import OrderJournal, JournalEventType
+from backend.execution.order_journal import JournalEventType, OrderJournal
 
 
 @pytest.mark.asyncio
@@ -327,7 +385,12 @@ async def test_journal_full_lifecycle():
     await j.record_fill("o2", 1.2702, 0.5, slippage_pips=0.2, latency_ms=120.0)
     await j.record_close("o2", 1.28, pnl_usd=50.0, reason="tp")
     rec = await j.get_order("o2")
-    assert rec and rec.final_state == "closed" and rec.pnl_usd == 50.0 and rec.total_latency_ms is not None
+    assert (
+        rec
+        and rec.final_state == "closed"
+        and rec.pnl_usd == 50.0
+        and rec.total_latency_ms is not None
+    )
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,7 @@ FIXES (Phase L):
 - L-3: consecutive_failures never reset on success (was missing healthy=True branch)
 - L-4: last_check stored time.time() float; callers expected ISO string
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -75,9 +76,7 @@ class ConnectionPoolMonitor:
                 consecutive_failures=0,
             )
         except Exception as exc:
-            self._status["consecutive_failures"] = (
-                self._status.get("consecutive_failures", 0) + 1
-            )
+            self._status["consecutive_failures"] = self._status.get("consecutive_failures", 0) + 1
             self._status["healthy"] = False
             self._status["last_check"] = datetime.now(timezone.utc).isoformat()
             logger.warning("Pool monitor ping failed: %s", exc)

@@ -6,19 +6,16 @@
 نویسنده: MT5 Trading Team
 """
 
-from aiogram import Dispatcher, types, F
+from aiogram import Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 
-from ..keyboards import get_main_keyboard
-from ..utils import format_welcome_message
-from ..auth import (
-    require_permission, require_role, rate_limit,
-    Permission, UserRole
-)
-from ..rbac_service import rbac_service
 from ....core.logger import get_logger
-from ....services.audit_service import audit_service, AuditAction
+from ....services.audit_service import AuditAction, audit_service
+from ..auth import rate_limit
+from ..keyboards import get_main_keyboard
+from ..rbac_service import rbac_service
+from ..utils import format_welcome_message
 
 logger = get_logger("telegram.handlers.start")
 
@@ -46,8 +43,7 @@ def register_start_handlers(dp: Dispatcher):
         if not user:
             # ثبت کاربر جدید
             result = await rbac_service.register_telegram_user(
-                telegram_user_id=user_id,
-                telegram_username=username
+                telegram_user_id=user_id, telegram_username=username
             )
 
             if result.get("success"):
@@ -55,7 +51,7 @@ def register_start_handlers(dp: Dispatcher):
                 await audit_service.log(
                     action=AuditAction.LOGIN,
                     user_id=result.get("user", {}).get("id"),
-                    details={"new_user": True, "telegram_username": username}
+                    details={"new_user": True, "telegram_username": username},
                 )
             else:
                 logger.error(f"خطا در ثبت کاربر جدید: {result}")
@@ -64,9 +60,7 @@ def register_start_handlers(dp: Dispatcher):
 
         # نمایش پیام خوش‌آمدگویی
         await message.answer(
-            format_welcome_message(username),
-            reply_markup=get_main_keyboard(),
-            parse_mode="HTML"
+            format_welcome_message(username), reply_markup=get_main_keyboard(), parse_mode="HTML"
         )
 
     @dp.message(Command("help"))
@@ -146,9 +140,8 @@ def register_start_handlers(dp: Dispatcher):
 
         if not user:
             await message.answer(
-                "⚠️ شما در سیستم ثبت نشده‌اید.\n\n"
-                "لطفاً ابتدا در داشبورد ثبت‌نام کنید.",
-                parse_mode="HTML"
+                "⚠️ شما در سیستم ثبت نشده‌اید.\n\nلطفاً ابتدا در داشبورد ثبت‌نام کنید.",
+                parse_mode="HTML",
             )
             return
 
@@ -159,7 +152,7 @@ def register_start_handlers(dp: Dispatcher):
             "user": "کاربر عادی",
             "trader": "معامله‌گر",
             "admin": "مدیر",
-            "super_admin": "مدیر کل"
+            "super_admin": "مدیر کل",
         }
 
         status_text = f"""
@@ -185,10 +178,7 @@ def register_start_handlers(dp: Dispatcher):
         user = await rbac_service.get_user_by_telegram_id(user_id)
 
         if not user:
-            await message.answer(
-                "⚠️ برای مشاهده موجودی باید ثبت‌نام کنید.",
-                parse_mode="HTML"
-            )
+            await message.answer("⚠️ برای مشاهده موجودی باید ثبت‌نام کنید.", parse_mode="HTML")
             return
 
         # در حالت واقعی باید از API دریافت شود
@@ -212,12 +202,8 @@ def register_start_handlers(dp: Dispatcher):
     async def back_to_main(callback: types.CallbackQuery, state: FSMContext):
         """بازگشت به منوی اصلی"""
         await state.clear()
-        await callback.message.edit_text(
-            "🏠 <b>منوی اصلی</b>",
-            parse_mode="HTML"
-        )
+        await callback.message.edit_text("🏠 <b>منوی اصلی</b>", parse_mode="HTML")
         await callback.message.answer(
-            "چه کاری می‌خواهید انجام کنید؟",
-            reply_markup=get_main_keyboard()
+            "چه کاری می‌خواهید انجام کنید؟", reply_markup=get_main_keyboard()
         )
         await callback.answer()

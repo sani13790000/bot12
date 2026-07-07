@@ -2,27 +2,28 @@
 Galaxy Vast AI Trading Platform
 PerformanceReportGenerator -- Institutional HTML backtest report
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 
 @dataclass
 class PerformanceMetrics:
-    total_trades:    int   = 0
-    winning_trades:  int   = 0
-    losing_trades:   int   = 0
-    win_rate:        float = 0.0
-    profit_factor:   float = 0.0
-    total_pnl:       float = 0.0
-    max_drawdown:    float = 0.0
-    sharpe_ratio:    float = 0.0
-    avg_trade:       float = 0.0
-    best_trade:      float = 0.0
-    worst_trade:     float = 0.0
-    avg_hold_time:   float = 0.0
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    win_rate: float = 0.0
+    profit_factor: float = 0.0
+    total_pnl: float = 0.0
+    max_drawdown: float = 0.0
+    sharpe_ratio: float = 0.0
+    avg_trade: float = 0.0
+    best_trade: float = 0.0
+    worst_trade: float = 0.0
+    avg_hold_time: float = 0.0
 
 
 class PerformanceReportGenerator:
@@ -39,7 +40,6 @@ class PerformanceReportGenerator:
         equity_curve: Optional[list[float]] = None,
     ) -> str:
         """Generate a full HTML performance report."""
-        equity_data = equity_curve or []
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -74,11 +74,11 @@ class PerformanceReportGenerator:
 
     def to_dict(self, metrics: PerformanceMetrics) -> dict:
         return {
-            "total_trades":   metrics.total_trades,
-            "win_rate":       round(metrics.win_rate, 4),
-            "profit_factor":  round(metrics.profit_factor, 4),
-            "total_pnl":      round(metrics.total_pnl, 2),
-            "max_drawdown":   round(metrics.max_drawdown, 4),
-            "sharpe_ratio":   round(metrics.sharpe_ratio, 4),
-            "generated_at":   self._generated_at,
+            "total_trades": metrics.total_trades,
+            "win_rate": round(metrics.win_rate, 4),
+            "profit_factor": round(metrics.profit_factor, 4),
+            "total_pnl": round(metrics.total_pnl, 2),
+            "max_drawdown": round(metrics.max_drawdown, 4),
+            "sharpe_ratio": round(metrics.sharpe_ratio, 4),
+            "generated_at": self._generated_at,
         }

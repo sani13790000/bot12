@@ -1,17 +1,16 @@
 """
 تست‌های ModelManager
 """
+
 from __future__ import annotations
+
 import os
-import json
 import pickle
 import tempfile
-import pytest
 from collections import OrderedDict
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
 
 
 # ─── Stubs ───────────────────────────────────────────────────────────────────
@@ -69,19 +68,24 @@ class ModelManager:
         self._staleness_hours = self.DEFAULT_STALENESS_HOURS
         self._initialized = True
 
-    def save_model(self, result: TrainingResult, symbol: str,
-                   n_samples: int, win_rate: float) -> ModelMetadata:
+    def save_model(
+        self, result: TrainingResult, symbol: str, n_samples: int, win_rate: float
+    ) -> ModelMetadata:
         version = self._next_version(symbol)
         model_id = f"model_{symbol}_v{version}"
         file_path = os.path.join(self.MODELS_DIR, f"{model_id}.pkl")
         with open(file_path, "wb") as f:
             pickle.dump(result.model, f)
         meta = ModelMetadata(
-            model_id=model_id, symbol=symbol, version=version,
+            model_id=model_id,
+            symbol=symbol,
+            version=version,
             file_path=file_path,
             trained_at=datetime.now(timezone.utc).isoformat(),
-            auc_roc=result.auc_roc, accuracy=result.accuracy,
-            f1_score=result.f1_score, n_samples=n_samples,
+            auc_roc=result.auc_roc,
+            accuracy=result.accuracy,
+            f1_score=result.f1_score,
+            n_samples=n_samples,
             win_rate=win_rate,
         )
         if symbol not in self._metadata:
@@ -159,14 +163,14 @@ class ModelManager:
             return
         best = max(models, key=lambda m: m.auc_roc)
         for m in models:
-            m.is_best = (m.model_id == best.model_id)
+            m.is_best = m.model_id == best.model_id
 
     def _cleanup_old_models(self, symbol: str) -> None:
         models = self._metadata.get(symbol, [])
         if len(models) <= self.MAX_MODELS_PER_SYMBOL:
             return
         sorted_m = sorted(models, key=lambda m: m.trained_at)
-        to_delete = sorted_m[:len(models) - self.MAX_MODELS_PER_SYMBOL]
+        to_delete = sorted_m[: len(models) - self.MAX_MODELS_PER_SYMBOL]
         for m in to_delete:
             if not m.is_best and os.path.exists(m.file_path):
                 os.remove(m.file_path)
@@ -180,8 +184,9 @@ class ModelManager:
 
 
 def _make_result(auc=0.75) -> TrainingResult:
-    from sklearn.ensemble import GradientBoostingClassifier
     import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+
     clf = GradientBoostingClassifier(n_estimators=3, random_state=42)
     X = np.random.rand(50, 5)
     y = (X[:, 0] > 0.5).astype(int)
@@ -191,8 +196,8 @@ def _make_result(auc=0.75) -> TrainingResult:
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestModelManagerSave:
 
+class TestModelManagerSave:
     def test_save_creates_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mm = ModelManager(models_dir=tmpdir, metadata_file=os.path.join(tmpdir, "meta.json"))
@@ -227,7 +232,6 @@ class TestModelManagerSave:
 
 
 class TestModelManagerLoad:
-
     def test_load_returns_model(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mm = ModelManager(models_dir=tmpdir, metadata_file=os.path.join(tmpdir, "meta.json"))
@@ -259,7 +263,6 @@ class TestModelManagerLoad:
 
 
 class TestModelManagerLRU:
-
     def test_lru_eviction_at_max(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             mm = ModelManager(models_dir=tmpdir, metadata_file=os.path.join(tmpdir, "meta.json"))
@@ -273,8 +276,13 @@ class TestModelManagerLRU:
         with tempfile.TemporaryDirectory() as tmpdir:
             mm = ModelManager(models_dir=tmpdir, metadata_file=os.path.join(tmpdir, "meta.json"))
             info = mm.get_staleness_info()
-            for k in ("cached_models", "cache_size", "max_cache_size",
-                      "staleness_hours", "models_detail"):
+            for k in (
+                "cached_models",
+                "cache_size",
+                "max_cache_size",
+                "staleness_hours",
+                "models_detail",
+            ):
                 assert k in info
 
     def test_list_models_all(self):

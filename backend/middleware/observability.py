@@ -1,4 +1,5 @@
 """Observability middleware. Phase L fixes L-9/L-10/L-11/L-12."""
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +22,7 @@ _REQUEST_LATENCY = None
 _HAS_PROMETHEUS = False
 
 try:
-    from prometheus_client import Counter, Histogram, REGISTRY
+    from prometheus_client import REGISTRY, Counter, Histogram
 
     def _get_or_create(cls, name, desc, labels, **kwargs):
         try:
@@ -30,12 +31,18 @@ try:
             return REGISTRY._names_to_collectors.get(name)
 
     _REQUEST_COUNT = _get_or_create(
-        Counter, "gv_mw_http_requests_total",
-        "Total HTTP requests (middleware)", ["method", "path", "status"])
+        Counter,
+        "gv_mw_http_requests_total",
+        "Total HTTP requests (middleware)",
+        ["method", "path", "status"],
+    )
     _REQUEST_LATENCY = _get_or_create(
-        Histogram, "gv_mw_http_request_duration_seconds",
-        "HTTP request latency (middleware)", ["method", "path"],
-        buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0))
+        Histogram,
+        "gv_mw_http_request_duration_seconds",
+        "HTTP request latency (middleware)",
+        ["method", "path"],
+        buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0),
+    )
     _HAS_PROMETHEUS = True
 except ImportError:
     pass
@@ -75,10 +82,11 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             normalised = _normalise_path(request.url.path)
             if _HAS_PROMETHEUS and _REQUEST_COUNT and _REQUEST_LATENCY:
                 _REQUEST_COUNT.labels(
-                    method=request.method, path=normalised, status=str(status_code)).inc()
-                _REQUEST_LATENCY.labels(
-                    method=request.method, path=normalised).observe(elapsed)
+                    method=request.method, path=normalised, status=str(status_code)
+                ).inc()
+                _REQUEST_LATENCY.labels(method=request.method, path=normalised).observe(elapsed)
             log_fn = logger.warning if elapsed > _SLOW_REQUEST_THRESHOLD_S else logger.info
-            log_fn("%s %s %d %.3fs cid=%s",
-                   request.method, request.url.path, status_code, elapsed, cid)
+            log_fn(
+                "%s %s %d %.3fs cid=%s", request.method, request.url.path, status_code, elapsed, cid
+            )
         return response

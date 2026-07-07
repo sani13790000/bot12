@@ -7,11 +7,11 @@ PHASE1-MERGE U-1..U-5 from trade_service_patch.py:
   U-4: get_trade_history date range filter
   U-5: idempotency lookup scoped to user_id to prevent cross-user info leak
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -29,32 +29,39 @@ def compute_statistics(trades: List[Dict[str, Any]]) -> Dict[str, Any]:
     """U-1 FIX: profit_factor + no ZeroDivisionError on empty/loss-only."""
     if not trades:
         return {
-            "total_trades": 0, "win_rate": 0.0, "total_pnl": 0.0,
-            "gross_profit": 0.0, "gross_loss": 0.0, "profit_factor": 0.0,
-            "avg_win": 0.0, "avg_loss": 0.0, "largest_win": 0.0, "largest_loss": 0.0,
+            "total_trades": 0,
+            "win_rate": 0.0,
+            "total_pnl": 0.0,
+            "gross_profit": 0.0,
+            "gross_loss": 0.0,
+            "profit_factor": 0.0,
+            "avg_win": 0.0,
+            "avg_loss": 0.0,
+            "largest_win": 0.0,
+            "largest_loss": 0.0,
         }
     closed = [t for t in trades if t.get("status") == "closed"]
-    total  = len(closed)
+    total = len(closed)
     if total == 0:
         return compute_statistics([])
 
-    pnls        = [float(t.get("pnl_usd", 0.0)) for t in closed]
-    winners     = [p for p in pnls if p > 0]
-    losers      = [p for p in pnls if p < 0]
+    pnls = [float(t.get("pnl_usd", 0.0)) for t in closed]
+    winners = [p for p in pnls if p > 0]
+    losers = [p for p in pnls if p < 0]
     gross_profit = sum(winners)
-    gross_loss   = abs(sum(losers))
+    gross_loss = abs(sum(losers))
 
     return {
-        "total_trades":  total,
-        "win_rate":      _safe_div(len(winners), total),
-        "total_pnl":     sum(pnls),
-        "gross_profit":  gross_profit,
-        "gross_loss":    gross_loss,
+        "total_trades": total,
+        "win_rate": _safe_div(len(winners), total),
+        "total_pnl": sum(pnls),
+        "gross_profit": gross_profit,
+        "gross_loss": gross_loss,
         "profit_factor": _safe_div(gross_profit, gross_loss),
-        "avg_win":       _safe_div(sum(winners), len(winners)) if winners else 0.0,
-        "avg_loss":      _safe_div(sum(losers),  len(losers))  if losers  else 0.0,
-        "largest_win":   max(winners) if winners else 0.0,
-        "largest_loss":  min(losers)  if losers  else 0.0,
+        "avg_win": _safe_div(sum(winners), len(winners)) if winners else 0.0,
+        "avg_loss": _safe_div(sum(losers), len(losers)) if losers else 0.0,
+        "largest_win": max(winners) if winners else 0.0,
+        "largest_loss": min(losers) if losers else 0.0,
     }
 
 
@@ -67,9 +74,10 @@ async def notify_equity_protection(
     """U-2 FIX: Pass pnl to EquityProtectionEngine after trade close."""
     try:
         from backend.risk.equity_protection import get_equity_protection_engine
+
         ep = await get_equity_protection_engine()
         await ep.update_equity(new_equity, new_balance)
-    except Exception as exc:
+    except Exception:
         logger.debug("equity protection notify failed", exc_info=True)
 
 
@@ -146,17 +154,17 @@ class TradeService:
             return existing
 
         trade: Dict[str, Any] = {
-            "id":          str(uuid4()),
-            "user_id":     user_id,
-            "signal_id":   signal_id,
-            "symbol":      symbol.upper().strip(),
-            "direction":   direction,
-            "lot_size":    lot_size,
+            "id": str(uuid4()),
+            "user_id": user_id,
+            "signal_id": signal_id,
+            "symbol": symbol.upper().strip(),
+            "direction": direction,
+            "lot_size": lot_size,
             "entry_price": entry_price,
-            "sl":          sl,
-            "tp":          tp,
-            "status":      "open",
-            "created_at":  datetime.now(timezone.utc).isoformat(),
+            "sl": sl,
+            "tp": tp,
+            "status": "open",
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await self._db.insert("trades", trade)
         return trade
@@ -169,10 +177,10 @@ class TradeService:
         pnl_usd: float,
     ) -> Dict[str, Any]:
         update: Dict[str, Any] = {
-            "status":     "closed",
+            "status": "closed",
             "close_price": close_price,
-            "pnl_usd":     pnl_usd,
-            "closed_at":   datetime.now(timezone.utc).isoformat(),
+            "pnl_usd": pnl_usd,
+            "closed_at": datetime.now(timezone.utc).isoformat(),
         }
         await self._db.update("trades", {"id": trade_id, "user_id": user_id}, update)
         # U-2: notify equity protection

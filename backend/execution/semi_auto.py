@@ -5,12 +5,11 @@ Galaxy Vast AI — Semi-Automatic Trade Execution Handler
 Receives confirmed signals from the Telegram bot and executes them
 through the MT5 connector with full risk checks.
 """
+
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -19,21 +18,22 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SemiAutoSignal:
     """Signal approved by the trader for semi-auto execution."""
-    signal_id:        str
-    symbol:           str
-    action:           str          # "buy" | "sell"
-    entry_price:      float
-    stop_loss:        float
-    take_profit_1:    float
-    take_profit_2:    float
-    lot_size:         float
-    risk_percent:     float
-    rr_ratio:         float
+
+    signal_id: str
+    symbol: str
+    action: str  # "buy" | "sell"
+    entry_price: float
+    stop_loss: float
+    take_profit_1: float
+    take_profit_2: float
+    lot_size: float
+    risk_percent: float
+    rr_ratio: float
     confidence_score: float
-    market_context:   str          = ""
-    remaining_seconds: int         = 60
-    approved_by:      Optional[str] = None
-    approved_at:      Optional[str] = None
+    market_context: str = ""
+    remaining_seconds: int = 60
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
 
 
 class SemiAutoHandler:
@@ -47,13 +47,13 @@ class SemiAutoHandler:
 
     def __init__(
         self,
-        connector:     Any = None,
-        risk_manager:  Any = None,
+        connector: Any = None,
+        risk_manager: Any = None,
         state_machine: Any = None,
     ) -> None:
-        self._connector    = connector
-        self._risk         = risk_manager
-        self._sm           = state_machine
+        self._connector = connector
+        self._risk = risk_manager
+        self._sm = state_machine
 
     # ------------------------------------------------------------------ #
     # Public
@@ -66,17 +66,23 @@ class SemiAutoHandler:
         """
         logger.info(
             "[SemiAuto] executing signal %s %s %s lot=%.2f",
-            signal.signal_id, signal.symbol, signal.action, signal.lot_size,
+            signal.signal_id,
+            signal.symbol,
+            signal.action,
+            signal.lot_size,
         )
 
         # 1. Risk pre-flight
         if self._risk:
-            risk_result = await self._risk.check({
-                "symbol":       signal.symbol,
-                "direction":    signal.action,
-                "lot_size":     signal.lot_size,
-                "risk_percent": signal.risk_percent,
-            }, {})
+            risk_result = await self._risk.check(
+                {
+                    "symbol": signal.symbol,
+                    "direction": signal.action,
+                    "lot_size": signal.lot_size,
+                    "risk_percent": signal.risk_percent,
+                },
+                {},
+            )
             if not risk_result.get("approved"):
                 reason = risk_result.get("reason", "risk check failed")
                 logger.warning("[SemiAuto] risk blocked %s: %s", signal.signal_id, reason)
@@ -89,13 +95,13 @@ class SemiAutoHandler:
         try:
             order_type = "ORDER_TYPE_BUY" if signal.action == "buy" else "ORDER_TYPE_SELL"
             result = await self._connector.place_order(
-                symbol     = signal.symbol,
-                order_type = order_type,
-                volume     = signal.lot_size,
-                price      = signal.entry_price,
-                sl         = signal.stop_loss,
-                tp         = signal.take_profit_1,
-                comment    = f"semi_auto:{signal.signal_id[:8]}",
+                symbol=signal.symbol,
+                order_type=order_type,
+                volume=signal.lot_size,
+                price=signal.entry_price,
+                sl=signal.stop_loss,
+                tp=signal.take_profit_1,
+                comment=f"semi_auto:{signal.signal_id[:8]}",
             )
             ticket = result.get("ticket")
             logger.info("[SemiAuto] placed ticket=%s for %s", ticket, signal.signal_id)

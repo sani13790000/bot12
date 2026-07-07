@@ -1,13 +1,16 @@
 """
 تست‌های VotingEngine
 """
+
 from __future__ import annotations
+
 import asyncio
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
 
 
 class AgentStatus(str, Enum):
@@ -33,18 +36,18 @@ class AgentResult:
     error: str = ""
 
 
-def make_agent(name="agent", weight=0.5, score=70.0,
-               direction="BUY", status="OK", enabled=True):
+def make_agent(name="agent", weight=0.5, score=70.0, direction="BUY", status="OK", enabled=True):
     agent = MagicMock()
     agent.name = name
     agent.weight = weight
     agent.enabled = enabled
     vote = AgentVote(
-        score=score, confidence=80.0,
-        direction=direction, status=AgentStatus(status), reason="ok"
+        score=score, confidence=80.0, direction=direction, status=AgentStatus(status), reason="ok"
     )
+
     async def run(ctx):
         return AgentResult(agent_name=name, vote=vote, elapsed_ms=1.0)
+
     agent.run = run
     return agent
 
@@ -95,8 +98,9 @@ class VoteResult:
 class VotingEngine:
     """Inline test copy — mirrors backend/agents/voting_engine.py."""
 
-    def __init__(self, agents, min_score_threshold=65.0,
-                 min_confidence_threshold=50.0, run_parallel=True):
+    def __init__(
+        self, agents, min_score_threshold=65.0, min_confidence_threshold=50.0, run_parallel=True
+    ):
         self._agents = agents
         self._min_score_threshold = min_score_threshold
         self._min_confidence_threshold = min_confidence_threshold
@@ -131,21 +135,26 @@ class VotingEngine:
         return {a.name: a.weight for a in self._agents}
 
     async def _run_parallel_safe(self, context):
-        import asyncio
         tasks = [self._run_agent_safe(a, context) for a in self._agents]
         raw = await asyncio.gather(*tasks, return_exceptions=True)
         results = []
         for i, item in enumerate(raw):
             if isinstance(item, BaseException):
                 name = self._agents[i].name if i < len(self._agents) else f"Agent[{i}]"
-                results.append(AgentResult(
-                    agent_name=name,
-                    vote=AgentVote(score=50.0, confidence=0.0,
-                                   direction="NEUTRAL",
-                                   status=AgentStatus.ERROR,
-                                   reason=str(item)),
-                    elapsed_ms=0.0, error=str(item),
-                ))
+                results.append(
+                    AgentResult(
+                        agent_name=name,
+                        vote=AgentVote(
+                            score=50.0,
+                            confidence=0.0,
+                            direction="NEUTRAL",
+                            status=AgentStatus.ERROR,
+                            reason=str(item),
+                        ),
+                        elapsed_ms=0.0,
+                        error=str(item),
+                    )
+                )
             else:
                 results.append(item)
         return results
@@ -163,11 +172,15 @@ class VotingEngine:
         except Exception as exc:
             return AgentResult(
                 agent_name=agent.name,
-                vote=AgentVote(score=50.0, confidence=0.0,
-                               direction="NEUTRAL",
-                               status=AgentStatus.ERROR,
-                               reason=f"Fatal: {exc}"),
-                elapsed_ms=0.0, error=str(exc),
+                vote=AgentVote(
+                    score=50.0,
+                    confidence=0.0,
+                    direction="NEUTRAL",
+                    status=AgentStatus.ERROR,
+                    reason=f"Fatal: {exc}",
+                ),
+                elapsed_ms=0.0,
+                error=str(exc),
             )
 
     def _aggregate(self, results):
@@ -175,9 +188,12 @@ class VotingEngine:
         for r in results:
             if r.vote.status == AgentStatus.ERROR and r.vote.score == 0.0:
                 return VoteResult(
-                    decision=VoteDecision.BLOCKED, weighted_score=0.0,
-                    confidence=0.0, direction="BLOCKED",
-                    agent_results=results, blocked_by=r.agent_name,
+                    decision=VoteDecision.BLOCKED,
+                    weighted_score=0.0,
+                    confidence=0.0,
+                    direction="BLOCKED",
+                    agent_results=results,
+                    blocked_by=r.agent_name,
                     reasons=[f"Blocked by {r.agent_name}: {r.vote.reason}"],
                 )
         total_weight = 0.0
@@ -192,9 +208,9 @@ class VotingEngine:
                 continue
             if r.vote.status == AgentStatus.ERROR:
                 w *= 0.5
-            weighted_sum  += r.vote.score * w
+            weighted_sum += r.vote.score * w
             weighted_conf += r.vote.confidence * w
-            total_weight  += w
+            total_weight += w
             d = (r.vote.direction or "NEUTRAL").upper()
             if d not in direction_votes:
                 d = "NEUTRAL"
@@ -211,31 +227,37 @@ class VotingEngine:
         direction = max(direction_votes, key=lambda d: direction_votes[d])
         if ws >= self._min_score_threshold and wc >= self._min_confidence_threshold:
             decision = (
-                VoteDecision.BUY if direction == "BUY" else
-                VoteDecision.SELL if direction == "SELL" else
-                VoteDecision.NO_TRADE
+                VoteDecision.BUY
+                if direction == "BUY"
+                else VoteDecision.SELL
+                if direction == "SELL"
+                else VoteDecision.NO_TRADE
             )
         else:
             decision = VoteDecision.NO_TRADE
             reasons.append(f"Threshold not met: score={ws:.1f}/{self._min_score_threshold}")
         return VoteResult(
-            decision=decision, weighted_score=ws, confidence=wc,
-            direction=direction, agent_results=results, reasons=reasons,
+            decision=decision,
+            weighted_score=ws,
+            confidence=wc,
+            direction=direction,
+            agent_results=results,
+            reasons=reasons,
             metadata={"direction_votes": direction_votes, "total_weight": round(total_weight, 4)},
         )
 
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestVotingEngineBasic:
 
+class TestVotingEngineBasic:
     @pytest.mark.asyncio
     async def test_buy_signal_above_threshold(self):
         agents = [
-            make_agent("smc",    weight=0.3, score=80.0, direction="BUY"),
-            make_agent("pa",     weight=0.3, score=75.0, direction="BUY"),
-            make_agent("risk",   weight=0.2, score=70.0, direction="BUY"),
-            make_agent("news",   weight=0.2, score=68.0, direction="BUY"),
+            make_agent("smc", weight=0.3, score=80.0, direction="BUY"),
+            make_agent("pa", weight=0.3, score=75.0, direction="BUY"),
+            make_agent("risk", weight=0.2, score=70.0, direction="BUY"),
+            make_agent("news", weight=0.2, score=68.0, direction="BUY"),
         ]
         engine = VotingEngine(agents, min_score_threshold=65.0, min_confidence_threshold=50.0)
         result = await engine.vote({})
@@ -246,7 +268,7 @@ class TestVotingEngineBasic:
     @pytest.mark.asyncio
     async def test_sell_signal(self):
         agents = [
-            make_agent("smc",  weight=0.5, score=80.0, direction="SELL"),
+            make_agent("smc", weight=0.5, score=80.0, direction="SELL"),
             make_agent("risk", weight=0.5, score=75.0, direction="SELL"),
         ]
         engine = VotingEngine(agents)
@@ -256,7 +278,7 @@ class TestVotingEngineBasic:
     @pytest.mark.asyncio
     async def test_no_trade_below_threshold(self):
         agents = [
-            make_agent("smc",  weight=0.5, score=40.0, direction="BUY"),
+            make_agent("smc", weight=0.5, score=40.0, direction="BUY"),
             make_agent("risk", weight=0.5, score=35.0, direction="BUY"),
         ]
         engine = VotingEngine(agents, min_score_threshold=65.0)
@@ -269,12 +291,17 @@ class TestVotingEngineBasic:
         async def crash_run(ctx):
             return AgentResult(
                 agent_name="risk_guard",
-                vote=AgentVote(score=0.0, confidence=0.0,
-                               direction="NEUTRAL",
-                               status=AgentStatus.ERROR,
-                               reason="Max drawdown exceeded"),
-                elapsed_ms=0.0, error="Max drawdown exceeded",
+                vote=AgentVote(
+                    score=0.0,
+                    confidence=0.0,
+                    direction="NEUTRAL",
+                    status=AgentStatus.ERROR,
+                    reason="Max drawdown exceeded",
+                ),
+                elapsed_ms=0.0,
+                error="Max drawdown exceeded",
             )
+
         blocker = MagicMock()
         blocker.name = "risk_guard"
         blocker.weight = 0.2
@@ -288,8 +315,10 @@ class TestVotingEngineBasic:
     @pytest.mark.asyncio
     async def test_error_agent_does_not_crash_engine(self):
         """اگر یک agent exception دهد، بقیه باید ادامه دهند."""
+
         async def raise_run(ctx):
             raise RuntimeError("agent exploded")
+
         bad = MagicMock()
         bad.name = "bad_agent"
         bad.weight = 0.3
@@ -316,7 +345,6 @@ class TestVotingEngineBasic:
 
 
 class TestVotingEngineWeights:
-
     def test_get_weights(self):
         agents = [
             make_agent("a", weight=0.4),
@@ -353,15 +381,22 @@ class TestVotingEngineWeights:
 
 
 class TestVoteResultDict:
-
     @pytest.mark.asyncio
     async def test_to_dict_keys(self):
         agents = [make_agent("a", weight=1.0, score=70.0, direction="BUY")]
         engine = VotingEngine(agents)
         result = await engine.vote({})
         d = result.to_dict()
-        for key in ("decision", "weighted_score", "confidence", "direction",
-                    "blocked_by", "reasons", "elapsed_ms", "agents"):
+        for key in (
+            "decision",
+            "weighted_score",
+            "confidence",
+            "direction",
+            "blocked_by",
+            "reasons",
+            "elapsed_ms",
+            "agents",
+        ):
             assert key in d, f"Key '{key}' missing from to_dict()"
 
     @pytest.mark.asyncio

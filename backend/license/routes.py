@@ -13,10 +13,13 @@ madul: backend/license/routes.py
 """
 
 from __future__ import annotations
+
 import logging
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+
 from backend.core.deps_v2 import AuthContext, get_auth_context
 from backend.license.engine import LicenseEngine, LicenseStatus
 
@@ -27,36 +30,35 @@ _engine = LicenseEngine()
 
 class ActivateRequest(BaseModel):
     license_key: str = Field(..., min_length=10)
-    device_id:   str = Field(..., min_length=8)
+    device_id: str = Field(..., min_length=8)
     device_name: str = Field(..., max_length=64)
 
 
 class HeartbeatRequest(BaseModel):
     device_id: str = Field(..., min_length=8)
-    nonce:     str = Field(..., min_length=16)
+    nonce: str = Field(..., min_length=16)
 
 
 class LicenseStatusResponse(BaseModel):
-    license_id:     str
-    plan:           str
-    state:          str
-    expires_at:     str
+    license_id: str
+    plan: str
+    state: str
+    expires_at: str
     devices_active: int
-    device_limit:   int
-    is_valid:       bool
+    device_limit: int
+    is_valid: bool
     days_remaining: Optional[int]
 
 
 class ActivateResponse(BaseModel):
     license_id: str
-    plan:       str
+    plan: str
     expires_at: str
-    device_id:  str
-    token:      str
+    device_id: str
+    token: str
 
 
-@router.post("/activate", response_model=ActivateResponse,
-             status_code=status.HTTP_201_CREATED)
+@router.post("/activate", response_model=ActivateResponse, status_code=status.HTTP_201_CREATED)
 async def activate_license(
     body: ActivateRequest,
     ctx: AuthContext = Depends(get_auth_context),
@@ -64,8 +66,10 @@ async def activate_license(
     """Ø¡Ø¹Ó½Ø¼`Ù°Ø³Ó¹ Ù„Ø§ÙŠÙ–Ø«Ö•`e 4ßŽ ØªÓŒØ«Ø¨ Ø¯Ø³ØªØ¯."""
     try:
         result = await _engine.activate(
-            user_id=ctx.user_id, license_key=body.license_key,
-            device_id=body.device_id, device_name=body.device_name,
+            user_id=ctx.user_id,
+            license_key=body.license_key,
+            device_id=body.device_id,
+            device_name=body.device_name,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -84,8 +88,7 @@ async def heartbeat(
 ) -> None:
     """Ø¥Ù’Ø§Ù„ heartbeat Ø¯ÙˆÙ’Ù….â€"""
     try:
-        await _engine.heartbeat(user_id=ctx.user_id,
-                                 device_id=body.device_id, nonce=body.nonce)
+        await _engine.heartbeat(user_id=ctx.user_id, device_id=body.device_id, nonce=body.nonce)
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc))
     except ValueError as exc:
@@ -101,8 +104,11 @@ async def get_license_status(
     if info is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ù½Ø§ÙŠÙ–Ø«Ö•`7ØªÙ… YŠÙœ")
     return LicenseStatusResponse(
-        license_id=info["license_id"], plan=info["plan"], state=info["state"],
-        expires_at=info["expires_at"], devices_active=info["devices_active"],
+        license_id=info["license_id"],
+        plan=info["plan"],
+        state=info["state"],
+        expires_at=info["expires_at"],
+        devices_active=info["devices_active"],
         device_limit=info["device_limit"],
         is_valid=info["state"] == LicenseStatus.ACTIVE.value,
         days_remaining=info.get("days_remaining"),

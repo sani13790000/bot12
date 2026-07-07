@@ -3,6 +3,7 @@ ML Agent — Phase A Fix
 BUG-ML: MLAgent always returned NO_TRADE because ml_engine was never injected.
         Now accepts engine at __init__ and is properly wired in lifespan().
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,7 @@ class MLAgent:
     """
 
     name: str = "MLAgent"
-    weight: float = 1.5    # Higher weight than base agents (model-based)
+    weight: float = 1.5  # Higher weight than base agents (model-based)
 
     def __init__(
         self,
@@ -73,6 +74,7 @@ class MLAgent:
 
         try:
             import numpy as np
+
             features = self._extract_features(context)
 
             if len(features) < self._min_features:
@@ -108,8 +110,7 @@ class MLAgent:
                 )
 
             logger.debug(
-                "[MLAgent] signal=%s confidence=%.3f reason=%s",
-                signal, confidence, reason
+                "[MLAgent] signal=%s confidence=%.3f reason=%s", signal, confidence, reason
             )
             return {
                 "signal": signal,
@@ -146,9 +147,18 @@ class MLAgent:
         Must match the feature order used during training (DatasetBuilder._feature_cols).
         """
         feature_keys = [
-            "rsi", "macd", "macd_signal", "bb_upper", "bb_lower",
-            "atr", "volume_ratio", "spread", "session_hour",
-            "day_of_week", "smc_score", "pa_score",
+            "rsi",
+            "macd",
+            "macd_signal",
+            "bb_upper",
+            "bb_lower",
+            "atr",
+            "volume_ratio",
+            "spread",
+            "session_hour",
+            "day_of_week",
+            "smc_score",
+            "pa_score",
         ]
         features = []
         for key in feature_keys:

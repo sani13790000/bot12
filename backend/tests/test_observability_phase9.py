@@ -2,20 +2,23 @@
 faz 9 - Observability Test Suite
 42 test: metrics, logger, alert_manager, tracing, middleware
 """
+
 from __future__ import annotations
 
 import asyncio
-import pytest
-import time
 
-from backend.observability.metrics import MetricsRegistry, Counter, Gauge, Histogram
+import pytest
+
+from backend.observability.alert_manager import AlertManager, AlertRule, AlertSeverity
+from backend.observability.metrics import Counter, Gauge, Histogram, MetricsRegistry
 from backend.observability.structured_logger import (
-    StructuredLogger, get_logger, set_request_context, get_request_id, get_trace_id
+    StructuredLogger,
+    get_logger,
+    get_request_id,
+    get_trace_id,
+    set_request_context,
 )
-from backend.observability.alert_manager import (
-    AlertManager, AlertRule, AlertSeverity
-)
-from backend.observability.tracing import Tracer, Span
+from backend.observability.tracing import Tracer
 
 
 # ============================================================
@@ -152,10 +155,7 @@ class TestAlertManager:
 
     @pytest.mark.asyncio
     async def test_fire_known_rule(self):
-        fired = await self.manager.fire(
-            "circuit_breaker_open",
-            context={"service": "db"}
-        )
+        fired = await self.manager.fire("circuit_breaker_open", context={"service": "db"})
         assert fired is True
 
     @pytest.mark.asyncio
@@ -179,10 +179,7 @@ class TestAlertManager:
 
     @pytest.mark.asyncio
     async def test_history_stored(self):
-        await self.manager.fire(
-            "ml_drift_high",
-            context={"symbol": "XAUUSD", "score": 0.75}
-        )
+        await self.manager.fire("ml_drift_high", context={"symbol": "XAUUSD", "score": 0.75})
         history = self.manager.get_history()
         assert len(history) >= 1
 
@@ -209,10 +206,7 @@ class TestAlertManager:
             messages.append(msg)
 
         self.manager.register_telegram(fake_telegram)
-        await self.manager.fire(
-            "mt5_disconnected",
-            context={"reason": "timeout"}
-        )
+        await self.manager.fire("mt5_disconnected", context={"reason": "timeout"})
         assert len(messages) == 1
         assert "MT5" in messages[0]
 

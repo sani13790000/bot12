@@ -12,6 +12,7 @@ ORPHAN positions:
   - MT5 darad -- OSM nami danad
   - action: sabht dar OSM ya alarm be
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class MismatchType(StrEnum):
-    GHOST  = "GHOST"    # OSM open — MT5 uadarad
-    ORPHAN = "ORPHAN"   # MT5 open — OSM nami danad
+    GHOST = "GHOST"  # OSM open — MT5 uadarad
+    ORPHAN = "ORPHAN"  # MT5 open — OSM nami danad
 
 
 @dataclass
@@ -55,8 +56,8 @@ class PositionReconciler:
 
     def __init__(
         self,
-        connector:    Any = None,
-        osm:          Any = None,
+        connector: Any = None,
+        osm: Any = None,
         auto_close_ghosts: bool = True,
         auto_register_orphans: bool = True,
     ) -> None:
@@ -72,10 +73,10 @@ class PositionReconciler:
             mt5_tickets = await self._get_mt5_open_tickets()
             osm_tickets = await self._get_osm_open_tickets()
 
-            ghosts  = osm_tickets - mt5_tickets
+            ghosts = osm_tickets - mt5_tickets
             orphans = mt5_tickets - osm_tickets
 
-            result.ghosts  = len(ghosts)
+            result.ghosts = len(ghosts)
             result.orphans = len(orphans)
 
             for ticket in ghosts:
@@ -108,7 +109,9 @@ class PositionReconciler:
                         result.actions_taken += 1
                     except Exception as exc:
                         pass
-                        logger.error("[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc)
+                        logger.error(
+                            "[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc
+                        )
 
         except Exception as exc:
             logger.error("[reconciler] run() failed: %s", exc)

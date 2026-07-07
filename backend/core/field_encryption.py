@@ -8,6 +8,7 @@ P11-FE-3: Format: "enc:v1:<base64(nonce+ct+tag)>" — قابل تشخیص
 P11-FE-4: Transparent encrypt/decrypt در Pydantic validators
 P11-FE-5: Key rotation — decrypt با old key، encrypt با new key
 """
+
 from __future__ import annotations
 
 import base64
@@ -18,9 +19,9 @@ import secrets
 import struct
 from typing import Optional
 
-_PREFIX  = "enc:v1:"
-_NONCE   = 12
-_TAG     = 16
+_PREFIX = "enc:v1:"
+_NONCE = 12
+_TAG = 16
 _KEY_LEN = 32
 
 
@@ -48,6 +49,7 @@ class FieldEncryption:
             jwt = os.environ.get("JWT_SECRET_KEY", "dev-insecure")
             key = hashlib.sha256(jwt.encode()).digest()
             import logging
+
             logging.getLogger(__name__).warning(
                 "P11-FE-WARN: FIELD_ENCRYPTION_KEY not set — using derived dev key. "
                 "Set FIELD_ENCRYPTION_KEY in production!"
@@ -72,7 +74,7 @@ class FieldEncryption:
         """Decrypt 'enc:v1:...' → plaintext. Passthrough for unencrypted values."""
         if not value or not value.startswith(_PREFIX):
             return value  # passthrough
-        raw = base64.b64decode(value[len(_PREFIX):])
+        raw = base64.b64decode(value[len(_PREFIX) :])
         return self._raw_decrypt(raw).decode()
 
     def is_encrypted(self, value: str) -> bool:
@@ -91,6 +93,7 @@ class FieldEncryption:
         """AES-256-GCM or fallback HMAC-SIV encrypt. Returns nonce+ct+tag."""
         try:
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
             nonce = secrets.token_bytes(_NONCE)
             ct_tag = AESGCM(self._key).encrypt(nonce, plaintext, None)
             return nonce + ct_tag
@@ -109,6 +112,7 @@ class FieldEncryption:
             raise ValueError("Encrypted field too short")
         try:
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
             nonce, ct_tag = data[:_NONCE], data[_NONCE:]
             try:
                 return AESGCM(self._key).decrypt(nonce, ct_tag, None)
@@ -117,9 +121,9 @@ class FieldEncryption:
         except ImportError:
             pass
         nonce = data[:_NONCE]
-        ct    = data[_NONCE:-_TAG]
-        tag   = data[-_TAG:]
-        mac   = hmac.new(self._key, nonce + ct, hashlib.sha256).digest()[:_TAG]
+        ct = data[_NONCE:-_TAG]
+        tag = data[-_TAG:]
+        mac = hmac.new(self._key, nonce + ct, hashlib.sha256).digest()[:_TAG]
         if not hmac.compare_digest(mac, tag):
             raise ValueError("Field decryption failed — data tampered or wrong key")
         ks = self._keystream(nonce, len(ct))
@@ -128,9 +132,7 @@ class FieldEncryption:
     def _keystream(self, nonce: bytes, length: int) -> bytes:
         out, ctr = b"", 0
         while len(out) < length:
-            out += hmac.new(
-                self._key, nonce + struct.pack(">Q", ctr), hashlib.sha256
-            ).digest()
+            out += hmac.new(self._key, nonce + struct.pack(">Q", ctr), hashlib.sha256).digest()
             ctr += 1
         return out[:length]
 

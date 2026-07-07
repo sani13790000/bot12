@@ -9,12 +9,13 @@ Production Hardening tests:
 - TRUSTED_HOSTS works
 - Redis fallback to in-memory works
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -40,8 +41,8 @@ def dev_env(monkeypatch):
 
 class TestConfigValidation:
     def test_jwt_secret_too_short_raises(self):
-        import importlib
         import backend.core.config_v11 as cfg
+
         original = cfg.Settings.JWT_SECRET
         try:
             cfg.Settings.JWT_SECRET = "short"
@@ -51,14 +52,15 @@ class TestConfigValidation:
             cfg.Settings.JWT_SECRET = original
 
     def test_jwt_secret_auto_generated_in_dev(self, dev_env):
-        import importlib
         import backend.core.config_v11 as cfg
+
         cfg.Settings.JWT_SECRET = ""
         cfg.Settings.validate()
         assert len(cfg.Settings.JWT_SECRET) >= 32
 
     def test_allowed_origins_alias(self):
         import backend.core.config_v11 as cfg
+
         s = cfg.Settings()
         s.CORS_ORIGINS = ["https://app.example.com"]
         assert s.ALLOWED_ORIGINS == ["https://app.example.com"]
@@ -93,6 +95,7 @@ class TestSecurityHeaders:
     def test_security_headers_dict_exists(self):
         try:
             from backend.middleware.security_hardened import _SECURITY_HEADERS
+
             for header in self.REQUIRED_HEADERS:
                 assert header in _SECURITY_HEADERS, f"Missing: {header}"
         except ImportError:
@@ -101,6 +104,7 @@ class TestSecurityHeaders:
     def test_csp_no_unsafe_eval(self):
         try:
             from backend.middleware.security_hardened import _SECURITY_HEADERS
+
             csp = _SECURITY_HEADERS.get("Content-Security-Policy", "")
             assert "unsafe-eval" not in csp
         except ImportError:
@@ -109,8 +113,10 @@ class TestSecurityHeaders:
     def test_hsts_max_age_sufficient(self):
         try:
             from backend.middleware.security_hardened import _SECURITY_HEADERS
+
             hsts = _SECURITY_HEADERS.get("Strict-Transport-Security", "")
             import re
+
             match = re.search(r"max-age=(\d+)", hsts)
             if match:
                 assert int(match.group(1)) >= 31536000
@@ -122,20 +128,21 @@ class TestRateLimiting:
     def test_rate_limit_module_importable(self):
         try:
             import backend.middleware.rate_limit as rl
+
             assert hasattr(rl, "RateLimitMiddleware")
         except ImportError:
             pytest.skip("rate_limit not available")
 
     def test_no_module_level_asyncio_lock(self):
         import inspect
+
         try:
-            import backend.middleware.rate_limit as rl
             import re
+
+            import backend.middleware.rate_limit as rl
+
             source = inspect.getsource(rl)
-            module_level_lock = re.findall(
-                r"^_\w+\s*=\s*asyncio\.Lock\(\)",
-                source, re.MULTILINE
-            )
+            module_level_lock = re.findall(r"^_\w+\s*=\s*asyncio\.Lock\(\)", source, re.MULTILINE)
             assert len(module_level_lock) == 0
         except ImportError:
             pytest.skip("rate_limit not available")
@@ -143,6 +150,7 @@ class TestRateLimiting:
     def test_redis_fallback_to_memory(self):
         try:
             import backend.middleware.rate_limit as rl
+
             assert hasattr(rl, "_redis_client")
         except ImportError:
             pytest.skip("rate_limit not available")
@@ -151,6 +159,7 @@ class TestRateLimiting:
     async def test_rate_limiter_get_instance(self):
         try:
             from backend.middleware.rate_limit import get_rate_limiter
+
             rl = await get_rate_limiter()
             assert rl is not None
         except ImportError:
@@ -161,6 +170,7 @@ class TestHealthEndpoint:
     @pytest.mark.asyncio
     async def test_liveness_always_200(self):
         from backend.api.routes.health import liveness
+
         result = await liveness()
         assert result["status"] == "alive"
 
@@ -169,8 +179,10 @@ class TestHealthEndpoint:
         with patch("backend.database.connection.db") as mock_db:
             mock_db.ping = AsyncMock(side_effect=Exception("timeout"))
             from backend.api.routes.health import readiness
+
             response = await readiness()
             import json
+
             result = json.loads(response.body)
             assert not result["ready"]
             assert response.status_code == 503
@@ -187,8 +199,10 @@ class TestHealthEndpoint:
             mock_mt5.demo = True
             mock_ks.is_active.return_value = False
             from backend.api.routes.health import health
+
             response = await health()
             import json
+
             result = json.loads(response.body)
             assert result["status"] == "degraded"
             assert response.status_code == 503
@@ -198,6 +212,7 @@ class TestGracefulDrain:
     @pytest.mark.asyncio
     async def test_drain_completes_when_no_requests(self):
         from backend.api.main import GracefulDrain
+
         drain = GracefulDrain(drain_timeout=1.0)
         start = time.monotonic()
         await drain.drain()
@@ -207,6 +222,7 @@ class TestGracefulDrain:
     @pytest.mark.asyncio
     async def test_drain_waits_for_in_flight(self):
         from backend.api.main import GracefulDrain
+
         drain = GracefulDrain(drain_timeout=2.0)
         await drain.enter()
 
@@ -223,6 +239,7 @@ class TestGracefulDrain:
 
     def test_sigterm_handler_no_crash(self):
         from backend.api.main import GracefulDrain
+
         drain = GracefulDrain()
         drain.register_sigterm()
 
@@ -231,6 +248,7 @@ class TestPrometheusMetrics:
     def test_metrics_module_importable(self):
         try:
             import backend.observability.metrics as m
+
             assert hasattr(m, "record_trade")
             assert hasattr(m, "record_signal")
         except ImportError:
@@ -239,6 +257,7 @@ class TestPrometheusMetrics:
     def test_record_trade_no_crash_without_prometheus(self):
         try:
             from backend.observability.metrics import record_trade
+
             record_trade(symbol="EURUSD", direction="BUY", pnl=10.0)
         except ImportError:
             pytest.skip("metrics not available")

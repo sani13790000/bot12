@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
-from .trade_memory import TradeContext, TradeOutcome, MarketCondition
 from ..core.logger import get_logger
+from .trade_memory import MarketCondition, TradeContext, TradeOutcome
 
 logger = get_logger("intelligence.failure_analyzer")
 
@@ -32,15 +32,16 @@ class FailureType(str, Enum):
     نوع شکست معامله.
     VALID_LOSS یعنی معامله درست بوده اما بازار موافقت نکرده.
     """
-    VALID_LOSS = "VALID_LOSS"                       # زیان معتبر — اشتباه نیست
-    LOW_CONFIDENCE_ENTRY = "LOW_CONFIDENCE_ENTRY"   # ورود با امتیاز پایین
-    BAD_SESSION = "BAD_SESSION"                     # ورود خارج از سشن مناسب
-    HIGH_SPREAD = "HIGH_SPREAD"                     # اسپرد بیش از حد
-    NO_HTF_ALIGNMENT = "NO_HTF_ALIGNMENT"           # عدم هم‌راستایی HTF
-    NEWS_IGNORED = "NEWS_IGNORED"                   # خبر مهم نادیده گرفته شد
-    NO_LIQUIDITY_SWEEP = "NO_LIQUIDITY_SWEEP"       # ورود بدون sweep نقدینگی
-    POOR_ORDER_BLOCK = "POOR_ORDER_BLOCK"           # کیفیت پایین Order Block
-    HIGH_PORTFOLIO_RISK = "HIGH_PORTFOLIO_RISK"     # ریسک کل پرتفولیو بالا
+
+    VALID_LOSS = "VALID_LOSS"  # زیان معتبر — اشتباه نیست
+    LOW_CONFIDENCE_ENTRY = "LOW_CONFIDENCE_ENTRY"  # ورود با امتیاز پایین
+    BAD_SESSION = "BAD_SESSION"  # ورود خارج از سشن مناسب
+    HIGH_SPREAD = "HIGH_SPREAD"  # اسپرد بیش از حد
+    NO_HTF_ALIGNMENT = "NO_HTF_ALIGNMENT"  # عدم هم‌راستایی HTF
+    NEWS_IGNORED = "NEWS_IGNORED"  # خبر مهم نادیده گرفته شد
+    NO_LIQUIDITY_SWEEP = "NO_LIQUIDITY_SWEEP"  # ورود بدون sweep نقدینگی
+    POOR_ORDER_BLOCK = "POOR_ORDER_BLOCK"  # کیفیت پایین Order Block
+    HIGH_PORTFOLIO_RISK = "HIGH_PORTFOLIO_RISK"  # ریسک کل پرتفولیو بالا
     WRONG_MARKET_CONDITION = "WRONG_MARKET_CONDITION"  # شرایط نامناسب بازار
     CONSECUTIVE_LOSS_IGNORED = "CONSECUTIVE_LOSS_IGNORED"  # نادیده گرفتن زیان‌های متوالی
 
@@ -50,12 +51,13 @@ class FailureReport:
     """
     گزارش کامل تحلیل شکست یک معامله.
     """
+
     trade_id: str
     symbol: str
     outcome: TradeOutcome
 
     # تشخیص اصلی
-    is_valid_loss: bool = True              # آیا زیان معتبر است (نه اشتباه)
+    is_valid_loss: bool = True  # آیا زیان معتبر است (نه اشتباه)
     failure_types: List[FailureType] = field(default_factory=list)
     rule_violations: List[str] = field(default_factory=list)
 
@@ -65,7 +67,7 @@ class FailureReport:
     # جزئیات تحلیل
     confidence_at_entry: float = 0.0
     htf_alignment_at_entry: float = 0.0
-    spread_ratio: float = 0.0             # spread / ATR
+    spread_ratio: float = 0.0  # spread / ATR
     portfolio_risk_at_entry: float = 0.0
 
     # توصیه‌ها
@@ -79,13 +81,13 @@ class FailureReport:
         """شدت شکست"""
         violations = len(self.rule_violations)
         if violations == 0:
-            return "NONE"       # زیان معتبر
+            return "NONE"  # زیان معتبر
         elif violations == 1:
-            return "LOW"        # یک نقض جزئی
+            return "LOW"  # یک نقض جزئی
         elif violations <= 3:
-            return "MEDIUM"     # چند نقض
+            return "MEDIUM"  # چند نقض
         else:
-            return "HIGH"       # نقض‌های متعدد
+            return "HIGH"  # نقض‌های متعدد
 
 
 class FailureAnalyzer:
@@ -189,9 +191,7 @@ class FailureAnalyzer:
                 reports.append(self.analyze(trade))
         return reports
 
-    def get_violation_frequency(
-        self, reports: List[FailureReport]
-    ) -> Dict[FailureType, float]:
+    def get_violation_frequency(self, reports: List[FailureReport]) -> Dict[FailureType, float]:
         """
         محاسبه فراوانی هر نوع نقض در مجموعه گزارش‌ها.
 
@@ -224,9 +224,7 @@ class FailureAnalyzer:
         """بررسی سشن معاملاتی"""
         if trade.session.value in self.INVALID_SESSIONS:
             report.failure_types.append(FailureType.BAD_SESSION)
-            report.rule_violations.append(
-                f"ورود در سشن نامناسب: {trade.session.value}"
-            )
+            report.rule_violations.append(f"ورود در سشن نامناسب: {trade.session.value}")
 
     def _check_spread(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی اسپرد هنگام ورود"""
@@ -252,9 +250,7 @@ class FailureAnalyzer:
             report.failure_types.append(FailureType.NEWS_IGNORED)
             report.rule_violations.append("ورود هنگام خبر مهم اقتصادی")
 
-    def _check_liquidity_sweep(
-        self, trade: TradeContext, report: FailureReport
-    ) -> None:
+    def _check_liquidity_sweep(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی اینکه آیا liquidity قبل از ورود جاروب شد"""
         if not trade.smc.liquidity_swept and trade.smc.structure_score > 0.6:
             # فقط اگر ساختار قوی بود و sweep نداشتیم
@@ -263,9 +259,7 @@ class FailureAnalyzer:
                 "ورود بدون sweep نقدینگی قبلی — ریسک manipulation بالاتر است"
             )
 
-    def _check_order_block_quality(
-        self, trade: TradeContext, report: FailureReport
-    ) -> None:
+    def _check_order_block_quality(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی کیفیت Order Block"""
         if (
             trade.smc.order_block_quality > 0
@@ -277,9 +271,7 @@ class FailureAnalyzer:
                 f"زیر حداقل {self.MIN_ORDER_BLOCK_QUALITY}"
             )
 
-    def _check_portfolio_risk(
-        self, trade: TradeContext, report: FailureReport
-    ) -> None:
+    def _check_portfolio_risk(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی ریسک کل پرتفولیو"""
         if trade.risk.portfolio_risk_at_entry > self.MAX_PORTFOLIO_RISK:
             report.failure_types.append(FailureType.HIGH_PORTFOLIO_RISK)
@@ -288,9 +280,7 @@ class FailureAnalyzer:
                 f"بیشتر از حداکثر {self.MAX_PORTFOLIO_RISK}٪"
             )
 
-    def _check_market_condition(
-        self, trade: TradeContext, report: FailureReport
-    ) -> None:
+    def _check_market_condition(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی شرایط بازار"""
         bad_conditions = {MarketCondition.HIGH_VOLATILITY, MarketCondition.POST_NEWS}
         if trade.market_condition in bad_conditions:
@@ -299,15 +289,12 @@ class FailureAnalyzer:
                 f"ورود در شرایط نامناسب بازار: {trade.market_condition.value}"
             )
 
-    def _check_consecutive_losses(
-        self, trade: TradeContext, report: FailureReport
-    ) -> None:
+    def _check_consecutive_losses(self, trade: TradeContext, report: FailureReport) -> None:
         """بررسی زیان‌های متوالی"""
         if trade.previous_consecutive_losses >= self.MAX_CONSECUTIVE_LOSSES:
             report.failure_types.append(FailureType.CONSECUTIVE_LOSS_IGNORED)
             report.rule_violations.append(
-                f"{trade.previous_consecutive_losses} زیان متوالی — "
-                "باید trading pause می‌شد"
+                f"{trade.previous_consecutive_losses} زیان متوالی — باید trading pause می‌شد"
             )
 
     def _calculate_entry_quality(self, trade: TradeContext) -> float:
@@ -331,8 +318,7 @@ class FailureAnalyzer:
 
         # Price Action (20٪ وزن)
         pa_score = (
-            trade.price_action.pattern_quality * 0.6
-            + trade.price_action.rejection_strength * 0.4
+            trade.price_action.pattern_quality * 0.6 + trade.price_action.rejection_strength * 0.4
         )
         score += pa_score * 20
 
@@ -340,9 +326,7 @@ class FailureAnalyzer:
         risk_score = 1.0
         if trade.risk.portfolio_risk_at_entry > self.MAX_PORTFOLIO_RISK:
             risk_score *= 0.5
-        if report_spread_ratio := (
-            trade.risk.spread_at_entry / max(trade.risk.atr_at_entry, 1e-9)
-        ):
+        if report_spread_ratio := (trade.risk.spread_at_entry / max(trade.risk.atr_at_entry, 1e-9)):
             risk_score *= max(0.3, 1.0 - report_spread_ratio)
         score += risk_score * 20
 
@@ -358,10 +342,7 @@ class FailureAnalyzer:
             )
         else:
             violations_text = " | ".join(report.rule_violations[:3])
-            return (
-                f"نقض قوانین ({len(report.rule_violations)} مورد): "
-                f"{violations_text}"
-            )
+            return f"نقض قوانین ({len(report.rule_violations)} مورد): {violations_text}"
 
     def _generate_recommendations(self, report: FailureReport) -> List[str]:
         """تولید توصیه‌های عملی"""

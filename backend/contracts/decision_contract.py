@@ -102,7 +102,6 @@ REASON_CODES = {
     "PA_BULLISH_PIN_BAR": "الگوی Pin Bar صعودی",
     "PA_BULLISH_FAKEY": "الگوی Fakey صعودی",
     "PA_SUPPORT_HOLD": "سطوح حمایتی حفظ شد",
-
     # مثبت - فروش
     "SMC_BEARISH_BOS": "BOS نزولی تشکیل شد",
     "SMC_BEARISH_CHOCH": "CHOCH نزولی تشکیل شد",
@@ -114,12 +113,10 @@ REASON_CODES = {
     "PA_BEARISH_PIN_BAR": "الگوی Pin Bar نزولی",
     "PA_BEARISH_FAKEY": "الگوی Fakey نزولی",
     "PA_RESISTANCE_HOLD": "سطوح مقاومتی حفظ شد",
-
     # سشن و همسویی
     "KILLZONE_ACTIVE": "Kill Zone فعال است",
     "SESSION_ALIGNMENT": "همسویی سشن معاملاتی",
     "MTF_ALIGNMENT": "همسویی چند تایم‌فریم",
-
     # منفی - عدم معامله
     "CONFLICT_SIGNALS": "تعارض بین سیگنال‌ها",
     "LOW_QUALITY": "کیفیت سیگنال پایین",
@@ -128,13 +125,12 @@ REASON_CODES = {
     "OUTSIDE_KILLZONE": "خارج از Kill Zone",
     "HIGH_VOLATILITY": "نوسان بالا",
     "LOW_LIQUIDITY": "نقدینگی پایین",
-
     # بلاک
     "LICENSE_BLOCKED": "لایسنس نامعتبر",
     "SYMBOL_BLOCKED": "نماد مجاز نیست",
     "RISK_BLOCKED": "ریسک از حد مجاز بیشتر",
     "MAX_TRADES_REACHED": "حداکثر معاملات رسید",
-    "COOLDOWN_ACTIVE": "دوره cooldown فعال"
+    "COOLDOWN_ACTIVE": "دوره cooldown فعال",
 }
 
 # =====================================================
@@ -151,7 +147,7 @@ BLOCK_REASONS = {
     "MAX_POSITIONS_REACHED": "حداکثر پوزیشن‌های باز رسید",
     "MAX_TRADES_REACHED": "حداکثر معاملات روزانه رسید",
     "COOLDOWN_PERIOD": "دوره cooldown فعال است",
-    "INSUFFICIENT_MARGIN": "مارجین کافی نیست"
+    "INSUFFICIENT_MARGIN": "مارجین کافی نیست",
 }
 
 # =====================================================

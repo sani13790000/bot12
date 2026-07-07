@@ -8,12 +8,12 @@ Performance improvements in this version:
   * _equity_history: deque(maxlen=10_000) caps memory
   * SB3Env.obs_size: computed dynamically from env.observation_space.shape
 """
+
 from __future__ import annotations
 
 import logging
-import math
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -45,13 +45,14 @@ ACTION_SELL = 2
 
 @dataclass
 class Position:
-    direction: int   # ACTION_BUY or ACTION_SELL
+    direction: int  # ACTION_BUY or ACTION_SELL
     entry_price: float
     lot_size: float
     open_step: int
 
 
 # ── Incremental math helpers ────────────────────────────────
+
 
 def _ema_alpha(period: int) -> float:
     """EMA smoothing factor."""
@@ -64,6 +65,7 @@ def _ema_step(prev_ema: float, price: float, alpha: float) -> float:
 
 
 # ── Trading environment ─────────────────────────────────────
+
 
 class TradingEnv:
     """
@@ -105,8 +107,8 @@ class TradingEnv:
         self._ema9: float = 0.0
         self._ema21: float = 0.0
         self._ema50: float = 0.0
-        self._macd_ema_fast: float = 0.0   # EMA(12)
-        self._macd_ema_slow: float = 0.0   # EMA(26)
+        self._macd_ema_fast: float = 0.0  # EMA(12)
+        self._macd_ema_slow: float = 0.0  # EMA(26)
         self._macd_signal_ema: float = 0.0  # EMA(9) of MACD line
         self._prev_gains: deque[float] = deque(maxlen=14)
         self._prev_losses: deque[float] = deque(maxlen=14)
@@ -173,9 +175,7 @@ class TradingEnv:
             self._macd_ema_fast = _ema_step(self._macd_ema_fast, p, af)
             self._macd_ema_slow = _ema_step(self._macd_ema_slow, p, as_)
             macd_line = self._macd_ema_fast - self._macd_ema_slow
-            self._macd_signal_ema = _ema_step(
-                self._macd_signal_ema, macd_line, as9
-            )
+            self._macd_signal_ema = _ema_step(self._macd_signal_ema, macd_line, as9)
 
         # RSI seed
         gains, losses = [], []
@@ -189,9 +189,7 @@ class TradingEnv:
 
     # ─ Step ───────────────────────────────────────────
 
-    def step(
-        self, action: int
-    ) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
         if self._step >= min(self._max_steps, len(self._closes) - 1):
             return self._get_observation(), 0.0, True, {}
 
@@ -273,24 +271,22 @@ class TradingEnv:
         if self._position:
             pos_direction = 1.0 if self._position.direction == ACTION_BUY else -1.0
             pos_pnl = self._calc_unrealized_pnl() / (self._initial_balance + 1e-10)
-            pos_duration = (self._step - self._position.open_step) / (
-                self._max_steps + 1e-10
-            )
+            pos_duration = (self._step - self._position.open_step) / (self._max_steps + 1e-10)
 
         obs = np.array(
             [
-                price / norm,                          # 0 normalized price (always 1.0)
-                self._ema9 / norm,                     # 1 EMA9
-                self._ema21 / norm,                    # 2 EMA21
-                self._ema50 / norm,                    # 3 EMA50
-                rsi,                                   # 4 RSI
-                macd_norm,                             # 5 MACD line
-                macd_signal_norm,                      # 6 MACD signal
+                price / norm,  # 0 normalized price (always 1.0)
+                self._ema9 / norm,  # 1 EMA9
+                self._ema21 / norm,  # 2 EMA21
+                self._ema50 / norm,  # 3 EMA50
+                rsi,  # 4 RSI
+                macd_norm,  # 5 MACD line
+                macd_signal_norm,  # 6 MACD signal
                 self._equity / (self._initial_balance + 1e-10),  # 7 equity ratio
-                self._step / (self._max_steps + 1e-10),          # 8 progress
-                pos_direction,                         # 9 position direction
-                pos_pnl,                               # 10 unrealized PnL
-                pos_duration,                          # 11 position duration
+                self._step / (self._max_steps + 1e-10),  # 8 progress
+                pos_direction,  # 9 position direction
+                pos_pnl,  # 10 unrealized PnL
+                pos_duration,  # 11 position duration
             ],
             dtype=np.float32,
         )
@@ -301,9 +297,7 @@ class TradingEnv:
 
     # ─ Action ───────────────────────────────────────────
 
-    def _apply_action(
-        self, action: int, price: float
-    ) -> float:
+    def _apply_action(self, action: int, price: float) -> float:
         spread = self._cfg["spread"]
         reward = 0.0
 
@@ -355,13 +349,15 @@ class TradingEnv:
         else:
             pnl = (self._position.entry_price - exit_price) * self._position.lot_size * lot
         self._balance += pnl
-        self._trade_log.append({
-            "direction": self._position.direction,
-            "entry_price": self._position.entry_price,
-            "exit_price": exit_price,
-            "pnl": pnl,
-            "duration": self._step - self._position.open_step,
-        })
+        self._trade_log.append(
+            {
+                "direction": self._position.direction,
+                "entry_price": self._position.entry_price,
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "duration": self._step - self._position.open_step,
+            }
+        )
         self._position = None
         return float(pnl)
 
@@ -452,9 +448,7 @@ try:
             obs = self._env.reset()
             return obs, {}
 
-        def step(
-            self, action: int
-        ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
             obs, reward, terminated, info = self._env.step(action)
             return obs, reward, terminated, False, info
 

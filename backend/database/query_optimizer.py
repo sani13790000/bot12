@@ -6,6 +6,7 @@ FIXES (Phase L):
 - L-7: get_stats_summary() returned raw list; callers expected list of dicts
 - L-8: No async wrapper → called with `await` in connection_health → TypeError
 """
+
 from __future__ import annotations
 
 import time

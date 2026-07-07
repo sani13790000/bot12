@@ -1,17 +1,17 @@
 """
 تست‌های NewsAgent
 """
+
 from __future__ import annotations
-import asyncio
-import pytest
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
-
 
 # ─── NewsImpact و NewsEvent stubs ─────────────────────────────────────────────────
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import pytest
 
 
 class NewsImpact(str, Enum):
@@ -49,7 +49,7 @@ class NewsCache:
 class NewsAgent:
     HIGH_IMPACT_CURRENCIES = {"USD", "XAU", "EUR", "GBP", "JPY"}
     WINDOW_MINUTES_BEFORE = 30
-    WINDOW_MINUTES_AFTER  = 60
+    WINDOW_MINUTES_AFTER = 60
 
     def __init__(self):
         self._cache = NewsCache()
@@ -76,8 +76,7 @@ class NewsAgent:
             "status": "OK",
             "reason": f"News score={score:.0f}",
             "high_impact_events": [
-                n for n in context.get("upcoming_news", [])
-                if n.get("impact") == "High"
+                n for n in context.get("upcoming_news", []) if n.get("impact") == "High"
             ],
             "fetched_from_api": False,
         }
@@ -85,8 +84,8 @@ class NewsAgent:
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestNewsCache:
 
+class TestNewsCache:
     def test_invalid_before_fetch(self):
         cache = NewsCache()
         assert cache.is_valid() is False
@@ -97,13 +96,13 @@ class TestNewsCache:
 
     def test_invalid_after_ttl(self):
         from datetime import timedelta
+
         old = datetime.now(timezone.utc) - timedelta(minutes=20)
         cache = NewsCache(fetched_at=old, ttl_minutes=15)
         assert cache.is_valid() is False
 
 
 class TestNewsAgent:
-
     @pytest.mark.asyncio
     async def test_no_news_returns_90(self):
         agent = NewsAgent()
@@ -113,33 +112,21 @@ class TestNewsAgent:
     @pytest.mark.asyncio
     async def test_high_impact_news_reduces_score(self):
         agent = NewsAgent()
-        ctx = {
-            "upcoming_news": [
-                {"title": "NFP", "impact": "High", "currency": "USD"}
-            ]
-        }
+        ctx = {"upcoming_news": [{"title": "NFP", "impact": "High", "currency": "USD"}]}
         result = await agent.analyze(ctx)
         assert result["score"] <= 30.0
 
     @pytest.mark.asyncio
     async def test_medium_impact_reduces_score(self):
         agent = NewsAgent()
-        ctx = {
-            "upcoming_news": [
-                {"title": "CPI", "impact": "Medium", "currency": "USD"}
-            ]
-        }
+        ctx = {"upcoming_news": [{"title": "CPI", "impact": "Medium", "currency": "USD"}]}
         result = await agent.analyze(ctx)
         assert result["score"] <= 60.0
 
     @pytest.mark.asyncio
     async def test_low_impact_no_effect(self):
         agent = NewsAgent()
-        ctx = {
-            "upcoming_news": [
-                {"title": "Minor", "impact": "Low", "currency": "USD"}
-            ]
-        }
+        ctx = {"upcoming_news": [{"title": "Minor", "impact": "Low", "currency": "USD"}]}
         result = await agent.analyze(ctx)
         assert result["score"] == 90.0
 
@@ -149,7 +136,7 @@ class TestNewsAgent:
         ctx = {
             "upcoming_news": [
                 {"title": "CPI", "impact": "Medium", "currency": "USD"},
-                {"title": "NFP", "impact": "High",   "currency": "USD"},
+                {"title": "NFP", "impact": "High", "currency": "USD"},
             ]
         }
         result = await agent.analyze(ctx)
@@ -167,9 +154,9 @@ class TestNewsAgent:
         agent = NewsAgent()
         ctx = {
             "upcoming_news": [
-                {"title": "NFP",  "impact": "High",   "currency": "USD"},
-                {"title": "ISM",  "impact": "Medium", "currency": "USD"},
-                {"title": "FOMC", "impact": "High",   "currency": "USD"},
+                {"title": "NFP", "impact": "High", "currency": "USD"},
+                {"title": "ISM", "impact": "Medium", "currency": "USD"},
+                {"title": "FOMC", "impact": "High", "currency": "USD"},
             ]
         }
         result = await agent.analyze(ctx)
@@ -184,7 +171,6 @@ class TestNewsAgent:
 
 
 class TestNewsImpact:
-
     def test_impact_values(self):
         assert NewsImpact.HIGH.value == "High"
         assert NewsImpact.MEDIUM.value == "Medium"

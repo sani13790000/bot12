@@ -20,6 +20,7 @@ Sec fixes retained:
   - stats() exposes secret_configured bool
   - LICENSE_REPLAY_WINDOW_SECONDS configurable
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -139,9 +140,11 @@ class LicenseEngine:
           2. except RuntimeError → asyncio.run() (sync context)
           3. هر exception → None (فایل-باز شدن برای DB check)
         """
+
         async def _db_check():
             try:
                 from backend.database.connection import get_db_client
+
                 client = await get_db_client()
                 resp = (
                     client.table("license_keys")
@@ -159,9 +162,11 @@ class LicenseEngine:
                 expires_at = row.get("expires_at")
                 if expires_at:
                     from datetime import datetime
+
                     try:
                         exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
                         from datetime import timezone
+
                         if exp < datetime.now(timezone.utc):
                             return False
                     except Exception as exc:
@@ -175,7 +180,6 @@ class LicenseEngine:
         try:
             try:
                 loop = asyncio.get_running_loop()
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(_db_check(), loop)
                 return future.result(timeout=3.0)
             except RuntimeError:
@@ -188,9 +192,9 @@ class LicenseEngine:
         """Stats برای /health/ready endpoint."""
         return {
             "secret_configured": self._secret_configured,
-            "production":        self._production,
+            "production": self._production,
             "replay_window_sec": _REPLAY_WINDOW,
-            "seen_nonces":       len(_seen_nonces),
+            "seen_nonces": len(_seen_nonces),
         }
 
 

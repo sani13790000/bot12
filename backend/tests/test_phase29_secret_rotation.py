@@ -3,26 +3,53 @@ test_phase29_secret_rotation.py
 Phase 29 -- Secure Secrets Rotation & Key Lifecycle
 208 tests: T001-T208
 """
+
 from __future__ import annotations
-import hashlib, hmac, json, os, sys, threading, time, uuid
+
+import os
+import sys
+import threading
+import time
+import uuid
+
 sys.path.insert(0, "/home/definable/phase29")
 import pytest
+
 from backend.core.secret_rotation import (
-    KeyType, KeyStatus, RotationTrigger, AuditAction, REQUIRES_REASON,
-    COMPROMISE_RUNBOOK,
-    SecretRotationError, KeyNotFoundError, KeyRevokedError, KeyExpiredError,
-    MissingReasonError, PolicyViolationError, CompromiseResponseError,
-    RotationPolicy, KeyVersion, AuditEntry, CompromiseReport,
-    SecretAuditChain, KeyMaterialGenerator, KeySelfAuth,
-    KeyStore, RotationPolicyEngine, KeyLifecycleManager,
-    CompromiseResponseManager, RotationScheduler, GracePeriodExtender,
-    SecretRotationAdmin, build_secret_rotation_system,
     _POLICY_DEFAULTS,
+    COMPROMISE_RUNBOOK,
+    REQUIRES_REASON,
+    AuditAction,
+    AuditEntry,
+    CompromiseReport,
+    CompromiseResponseError,
+    CompromiseResponseManager,
+    GracePeriodExtender,
+    KeyExpiredError,
+    KeyLifecycleManager,
+    KeyMaterialGenerator,
+    KeyNotFoundError,
+    KeyRevokedError,
+    KeySelfAuth,
+    KeyStatus,
+    KeyStore,
+    KeyType,
+    KeyVersion,
+    MissingReasonError,
+    PolicyViolationError,
+    RotationPolicy,
+    RotationPolicyEngine,
+    RotationScheduler,
+    RotationTrigger,
+    SecretAuditChain,
+    SecretRotationError,
+    build_secret_rotation_system,
 )
 
 
 def fresh() -> KeyLifecycleManager:
     return KeyLifecycleManager(master_secret=b"test-master-p29")
+
 
 def full_system():
     return build_secret_rotation_system(b"test-master-p29")
@@ -36,24 +63,24 @@ class TestEnumsAndDefaults:
         assert len(KeyType) == 10
 
     def test_T002_key_status_values(self):
-        assert {s.value for s in KeyStatus} == {"active","grace","revoked","expired","pending"}
+        assert {s.value for s in KeyStatus} == {"active", "grace", "revoked", "expired", "pending"}
 
     def test_T003_rotation_trigger_values(self):
         vals = {t.value for t in RotationTrigger}
         assert "scheduled" in vals and "compromise" in vals and "bootstrap" in vals
 
     def test_T004_audit_action_values(self):
-        assert AuditAction.KEY_ROTATED.value  == "key.rotated"
-        assert AuditAction.KEY_REVOKED.value  == "key.revoked"
+        assert AuditAction.KEY_ROTATED.value == "key.rotated"
+        assert AuditAction.KEY_REVOKED.value == "key.revoked"
         assert AuditAction.EMERGENCY_ROT.value == "key.emergency_rotation"
         assert AuditAction.COMPROMISE_ACK.value == "key.compromise_ack"
 
     def test_T005_requires_reason_set(self):
-        assert AuditAction.KEY_REVOKED    in REQUIRES_REASON
+        assert AuditAction.KEY_REVOKED in REQUIRES_REASON
         assert AuditAction.COMPROMISE_ACK in REQUIRES_REASON
-        assert AuditAction.EMERGENCY_ROT  in REQUIRES_REASON
-        assert AuditAction.KEY_EXPIRED    in REQUIRES_REASON
-        assert AuditAction.KEY_GENERATED  not in REQUIRES_REASON
+        assert AuditAction.EMERGENCY_ROT in REQUIRES_REASON
+        assert AuditAction.KEY_EXPIRED in REQUIRES_REASON
+        assert AuditAction.KEY_GENERATED not in REQUIRES_REASON
 
     def test_T006_policy_defaults_all_types(self):
         for kt in KeyType:
@@ -62,8 +89,8 @@ class TestEnumsAndDefaults:
     def test_T007_jwt_policy(self):
         p = RotationPolicy.default_for(KeyType.JWT_SIGNING)
         assert p.max_age_days == 30
-        assert p.grace_days   == 7
-        assert p.auto_rotate  is True
+        assert p.grace_days == 7
+        assert p.auto_rotate is True
 
     def test_T008_kek_no_auto_rotate(self):
         p = RotationPolicy.default_for(KeyType.ENCRYPTION_KEK)
@@ -93,10 +120,18 @@ class TestEnumsAndDefaults:
 
     def test_T014_key_status_usable_new(self):
         kv = KeyVersion(
-            key_id="x", key_type=KeyType.JWT_SIGNING, version=1,
-            status=KeyStatus.ACTIVE, created_at=0.0,
-            activated_at=0.0, expires_at=None, rotated_at=None,
-            revoked_at=None, use_count=0, tenant_id=None, _raw=b"x"
+            key_id="x",
+            key_type=KeyType.JWT_SIGNING,
+            version=1,
+            status=KeyStatus.ACTIVE,
+            created_at=0.0,
+            activated_at=0.0,
+            expires_at=None,
+            rotated_at=None,
+            revoked_at=None,
+            use_count=0,
+            tenant_id=None,
+            _raw=b"x",
         )
         assert kv.is_usable_for_new is True
         kv.status = KeyStatus.GRACE
@@ -182,14 +217,18 @@ class TestSecretAuditChain:
     def test_T028_concurrent_records(self):
         chain = SecretAuditChain(b"s")
         errors = []
+
         def worker():
             try:
                 chain.record(AuditAction.KEY_GENERATED, str(uuid.uuid4()), "jwt_signing", 1, "a")
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker) for _ in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert not errors
         assert chain.total == 20
 
@@ -220,8 +259,20 @@ class TestSecretAuditChain:
 class TestKeyStore:
     def test_T033_add_and_get(self):
         store = KeyStore()
-        kv = KeyVersion("id1", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        time.time(), time.time(), None, None, None, 0, None, b"raw")
+        kv = KeyVersion(
+            "id1",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            time.time(),
+            time.time(),
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"raw",
+        )
         store.add(kv)
         assert store.get("id1") is kv
 
@@ -232,17 +283,21 @@ class TestKeyStore:
 
     def test_T035_list_by_type(self):
         store = KeyStore()
-        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, None, b"")
-        kv2 = KeyVersion("b", KeyType.JWT_REFRESH, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, None, b"")
-        store.add(kv1); store.add(kv2)
+        kv1 = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
+        kv2 = KeyVersion(
+            "b", KeyType.JWT_REFRESH, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
+        store.add(kv1)
+        store.add(kv2)
         assert store.list_by_type(KeyType.JWT_SIGNING) == [kv1]
 
     def test_T036_active_key(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         store.add(kv)
         assert store.active_key(KeyType.JWT_SIGNING) is kv
 
@@ -253,16 +308,18 @@ class TestKeyStore:
 
     def test_T038_update_status(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         store.add(kv)
         store.update_status("a", KeyStatus.GRACE)
         assert store.get("a").status == KeyStatus.GRACE
 
     def test_T039_increment_use(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         store.add(kv)
         count = store.increment_use("a")
         assert count == 1
@@ -270,35 +327,41 @@ class TestKeyStore:
 
     def test_T040_usable_keys_active_and_grace(self):
         store = KeyStore()
-        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, None, b"")
-        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 2, KeyStatus.GRACE,
-                         0, 0, None, None, None, 0, None, b"")
-        kv3 = KeyVersion("c", KeyType.JWT_SIGNING, 3, KeyStatus.REVOKED,
-                         0, 0, None, None, None, 0, None, b"")
-        for kv in (kv1,kv2,kv3): store.add(kv)
+        kv1 = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
+        kv2 = KeyVersion(
+            "b", KeyType.JWT_SIGNING, 2, KeyStatus.GRACE, 0, 0, None, None, None, 0, None, b""
+        )
+        kv3 = KeyVersion(
+            "c", KeyType.JWT_SIGNING, 3, KeyStatus.REVOKED, 0, 0, None, None, None, 0, None, b""
+        )
+        for kv in (kv1, kv2, kv3):
+            store.add(kv)
         usable = store.usable_keys(KeyType.JWT_SIGNING)
         assert len(usable) == 2
         assert kv3 not in usable
 
     def test_T041_tenant_isolation(self):
         store = KeyStore()
-        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, "t1", b"")
-        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, "t2", b"")
-        store.add(kv1); store.add(kv2)
+        kv1 = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, "t1", b""
+        )
+        kv2 = KeyVersion(
+            "b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, "t2", b""
+        )
+        store.add(kv1)
+        store.add(kv2)
         assert store.active_key(KeyType.JWT_SIGNING, tenant_id="t1") is kv1
         assert store.active_key(KeyType.JWT_SIGNING, tenant_id="t2") is kv2
 
     def test_T042_version_filter(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 3, KeyStatus.GRACE,
-                        0, 0, None, None, None, 0, None, b"")
-        store.add(kv)
-        found = next(
-            (k for k in store.list_by_type(KeyType.JWT_SIGNING) if k.version == 3), None
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 3, KeyStatus.GRACE, 0, 0, None, None, None, 0, None, b""
         )
+        store.add(kv)
+        found = next((k for k in store.list_by_type(KeyType.JWT_SIGNING) if k.version == 3), None)
         assert found is kv
 
     def test_T043_version_not_found(self):
@@ -309,67 +372,128 @@ class TestKeyStore:
     def test_T044_concurrent_add(self):
         store = KeyStore()
         errors = []
+
         def worker(i):
             try:
-                kv = KeyVersion(str(i), KeyType.JWT_SIGNING, i, KeyStatus.PENDING,
-                                0, None, None, None, None, 0, None, b"")
+                kv = KeyVersion(
+                    str(i),
+                    KeyType.JWT_SIGNING,
+                    i,
+                    KeyStatus.PENDING,
+                    0,
+                    None,
+                    None,
+                    None,
+                    None,
+                    0,
+                    None,
+                    b"",
+                )
                 store.add(kv)
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(20)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert not errors
 
     def test_T045_all_keys(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         store.add(kv)
         assert kv in store.all_keys()
 
     def test_T046_status_filter(self):
         store = KeyStore()
-        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b"")
-        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 2, KeyStatus.REVOKED, 0, 0, None, None, None, 0, None, b"")
-        store.add(kv1); store.add(kv2)
+        kv1 = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
+        kv2 = KeyVersion(
+            "b", KeyType.JWT_SIGNING, 2, KeyStatus.REVOKED, 0, 0, None, None, None, 0, None, b""
+        )
+        store.add(kv1)
+        store.add(kv2)
         active = store.all_keys(status=KeyStatus.ACTIVE)
         assert kv1 in active and kv2 not in active
 
     def test_T047_safe_dict_no_raw(self):
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"sensitive")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            0,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"sensitive",
+        )
         d = kv.safe_dict()
         assert "_raw" not in d
         assert "sensitive" not in str(d)
 
     def test_T048_usable_for_verify_grace(self):
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE, 0, 0, None, None, None, 0, None, b""
+        )
         assert kv.is_usable_for_verify is True
 
 
 class TestRotationPolicyEngine:
     def test_T049_no_rotation_needed_fresh(self):
         eng = RotationPolicyEngine()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, time.time(), None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            time.time(),
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         assert eng.needs_rotation(kv) is False
 
     def test_T050_rotation_needed_old(self):
         eng = RotationPolicyEngine()
         old_ts = time.time() - 31 * 86400
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, old_ts, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, old_ts, None, None, None, 0, None, b""
+        )
         assert eng.needs_rotation(kv) is True
 
     def test_T051_rotation_by_max_uses(self):
         eng = RotationPolicyEngine()
-        policy = RotationPolicy(KeyType.ENCRYPTION_DEK, max_age_days=365,
-                                grace_days=30, max_uses=100, auto_rotate=True)
+        policy = RotationPolicy(
+            KeyType.ENCRYPTION_DEK, max_age_days=365, grace_days=30, max_uses=100, auto_rotate=True
+        )
         eng.set_policy(KeyType.ENCRYPTION_DEK, policy)
-        kv = KeyVersion("a", KeyType.ENCRYPTION_DEK, 1, KeyStatus.ACTIVE,
-                        0, time.time(), None, None, None, 101, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.ENCRYPTION_DEK,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            time.time(),
+            None,
+            None,
+            None,
+            101,
+            None,
+            b"",
+        )
         assert eng.needs_rotation(kv) is True
 
     def test_T052_custom_policy(self):
@@ -377,33 +501,82 @@ class TestRotationPolicyEngine:
         policy = RotationPolicy(KeyType.JWT_SIGNING, max_age_days=1, grace_days=0, auto_rotate=True)
         eng.set_policy(KeyType.JWT_SIGNING, policy)
         old_ts = time.time() - 2 * 86400
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, old_ts, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, old_ts, None, None, None, 0, None, b""
+        )
         assert eng.needs_rotation(kv) is True
 
     def test_T053_grace_not_expired(self):
         eng = RotationPolicyEngine()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
-                        0, 0, time.time() + 3600, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.GRACE,
+            0,
+            0,
+            time.time() + 3600,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         assert eng.is_grace_expired(kv) is False
 
     def test_T054_grace_expired(self):
         eng = RotationPolicyEngine()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.GRACE,
-                        0, 0, time.time() - 1, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.GRACE,
+            0,
+            0,
+            time.time() - 1,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         assert eng.is_grace_expired(kv) is True
 
     def test_T055_due_soon(self):
         eng = RotationPolicyEngine()
         activated_at = time.time() - (30 * 86400 - 3600)
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, activated_at, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            activated_at,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         assert eng.due_soon(kv, warn_seconds=86400) is True
 
     def test_T056_not_due_soon(self):
         eng = RotationPolicyEngine()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, time.time(), None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            time.time(),
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         assert eng.due_soon(kv) is False
 
     def test_T057_tenant_policy_override(self):
@@ -538,13 +711,17 @@ class TestKeyLifecycleManager:
         lm.generate_key(KeyType.JWT_SIGNING, activate=True)
         lm.generate_key(KeyType.JWT_REFRESH, activate=True)
         jwt_keys = lm.list_by_type(KeyType.JWT_SIGNING)
-        assert all((k.key_type == KeyType.JWT_SIGNING or
-                    (hasattr(k.key_type,'value') and k.key_type.value == "jwt_signing"))
-                   for k in jwt_keys)
+        assert all(
+            (
+                k.key_type == KeyType.JWT_SIGNING
+                or (hasattr(k.key_type, "value") and k.key_type.value == "jwt_signing")
+            )
+            for k in jwt_keys
+        )
 
     def test_T078_usable_keys(self):
         lm = fresh()
-        kv = lm.generate_key(KeyType.JWT_SIGNING, activate=True)
+        lm.generate_key(KeyType.JWT_SIGNING, activate=True)
         lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="rotation")
         usable = lm.usable_keys(KeyType.JWT_SIGNING)
         assert len(usable) == 2
@@ -560,14 +737,18 @@ class TestKeyLifecycleManager:
     def test_T080_concurrent_generate(self):
         lm = fresh()
         errors = []
+
         def worker():
             try:
                 lm.generate_key(KeyType.JWT_SIGNING, activate=True)
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert not errors
 
 
@@ -675,8 +856,20 @@ class TestSchedulerAndExtender:
     def test_T094_scan_due_soon(self):
         lm = fresh()
         activated_at = time.time() - (30 * 86400 - 3600)
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, activated_at, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            activated_at,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         lm._store.add(kv)
         sched = RotationScheduler(lm)
         due_soon = sched.scan_due_soon(warn_seconds=86400)
@@ -685,8 +878,20 @@ class TestSchedulerAndExtender:
     def test_T095_auto_rotate_all(self):
         lm = fresh()
         activated_at = time.time() - 31 * 86400
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, activated_at, None, None, None, 0, None, b"raw")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            activated_at,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"raw",
+        )
         kv.signature = KeySelfAuth(b"test-master-p29").sign(kv)
         lm._store.add(kv)
         sched = RotationScheduler(lm)
@@ -760,8 +965,9 @@ class TestSecretRotationAdmin:
         lm, sched, comp, ext, admin = full_system()
         for kt in [KeyType.JWT_SIGNING, KeyType.JWT_REFRESH]:
             lm.generate_key(kt, activate=True)
-        result = admin.bulk_rotate([KeyType.JWT_SIGNING, KeyType.JWT_REFRESH],
-                                   "admin", reason="quarterly rotation")
+        result = admin.bulk_rotate(
+            [KeyType.JWT_SIGNING, KeyType.JWT_REFRESH], "admin", reason="quarterly rotation"
+        )
         assert len(result) == 2
 
     def test_T105_key_audit_trail(self):
@@ -912,14 +1118,18 @@ class TestIntegrationFlows:
         lm = fresh()
         lm.generate_key(KeyType.JWT_SIGNING, activate=True)
         errors = []
+
         def worker():
             try:
                 lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="concurrent test")
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker) for _ in range(5)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert lm._audit.verify_chain() is True
 
     def test_T134_scheduler_full_flow(self):
@@ -995,16 +1205,33 @@ class TestEdgeCases:
 
 class TestAdditionalCoverage:
     def test_T145_audit_entry_dataclass(self):
-        e = AuditEntry(seq=1, action="key.generated", key_id="k", key_type="jwt_signing",
-                       version=1, actor="a", tenant_id=None, reason=None, detail={},
-                       ts=time.time(), prev_hash="ph", chain_hash="ch")
+        e = AuditEntry(
+            seq=1,
+            action="key.generated",
+            key_id="k",
+            key_type="jwt_signing",
+            version=1,
+            actor="a",
+            tenant_id=None,
+            reason=None,
+            detail={},
+            ts=time.time(),
+            prev_hash="ph",
+            chain_hash="ch",
+        )
         assert e.seq == 1
         assert e.chain_hash == "ch"
 
     def test_T146_compromise_report_dataclass(self):
-        r = CompromiseReport(report_id="r", key_id="k", key_type="jwt_signing",
-                             version=1, reported_by="sec", reported_at=time.time(),
-                             reason="breach")
+        r = CompromiseReport(
+            report_id="r",
+            key_id="k",
+            key_type="jwt_signing",
+            version=1,
+            reported_by="sec",
+            reported_at=time.time(),
+            reason="breach",
+        )
         assert r.resolved is False
         assert r.new_key_id is None
 
@@ -1015,16 +1242,18 @@ class TestAdditionalCoverage:
 
     def test_T148_key_self_auth_sign_verify(self):
         auth = KeySelfAuth(b"master")
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"raw")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b"raw"
+        )
         sig = auth.sign(kv)
         kv.signature = sig
         assert auth.verify(kv) is True
 
     def test_T149_key_self_auth_tampered(self):
         auth = KeySelfAuth(b"master")
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"raw")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b"raw"
+        )
         kv.signature = auth.sign(kv)
         kv.version = 99
         assert auth.verify(kv) is False
@@ -1105,14 +1334,27 @@ class TestAdditionalCoverage:
         assert all(e.key_type == "jwt_signing" for e in res)
 
     def test_T167_key_version_safe_dict_has_key_id(self):
-        kv = KeyVersion("abc", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"secret")
+        kv = KeyVersion(
+            "abc",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            0,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"secret",
+        )
         d = kv.safe_dict()
         assert d["key_id"] == "abc"
 
     def test_T168_rotation_trigger_bootstrap(self):
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         assert kv.rotation_trigger == RotationTrigger.BOOTSTRAP
 
     def test_T169_compromise_runbook_has_post_mortem(self):
@@ -1127,20 +1369,25 @@ class TestAdditionalCoverage:
         for i in range(50):
             chain.record(AuditAction.KEY_GENERATED, f"k{i}", "jwt_signing", i, "a")
         errors = []
+
         def worker():
             try:
                 assert chain.verify_chain() is True
             except Exception as e:
                 errors.append(e)
+
         threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads: t.start()
-        for t in threads: t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
         assert not errors
 
     def test_T172_key_store_revoked_at_set(self):
         store = KeyStore()
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, None, b""
+        )
         store.add(kv)
         store.update_status("a", KeyStatus.REVOKED)
         assert store.get("a").revoked_at is not None
@@ -1177,7 +1424,7 @@ class TestAdditionalCoverage:
     def test_T177_policy_max_age_dek(self):
         p = RotationPolicy.default_for(KeyType.ENCRYPTION_DEK)
         assert p.max_age_days == 90
-        assert p.grace_days  == 30
+        assert p.grace_days == 30
 
     def test_T178_key_type_all_have_policies(self):
         for kt in KeyType:
@@ -1187,13 +1434,26 @@ class TestAdditionalCoverage:
     def test_T179_rotate_trigger_propagated(self):
         lm = fresh()
         lm.generate_key(KeyType.JWT_SIGNING, activate=True)
-        _, new = lm.rotate_key(KeyType.JWT_SIGNING, "admin", reason="manual",
-                               trigger=RotationTrigger.COMPROMISE)
+        _, new = lm.rotate_key(
+            KeyType.JWT_SIGNING, "admin", reason="manual", trigger=RotationTrigger.COMPROMISE
+        )
         assert new.rotation_trigger == RotationTrigger.COMPROMISE
 
     def test_T180_key_version_repr_hides_raw(self):
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, 0, None, None, None, 0, None, b"secret-bytes")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            0,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"secret-bytes",
+        )
         r = repr(kv)
         assert "secret-bytes" not in r
 
@@ -1236,12 +1496,25 @@ class TestAdditionalCoverage:
 
     def test_T187_policy_engine_no_auto_rotate(self):
         lm = fresh()
-        policy = RotationPolicy(KeyType.ENCRYPTION_KEK, max_age_days=1,
-                                grace_days=0, auto_rotate=False)
+        policy = RotationPolicy(
+            KeyType.ENCRYPTION_KEK, max_age_days=1, grace_days=0, auto_rotate=False
+        )
         lm.set_policy(KeyType.ENCRYPTION_KEK, policy)
         old_ts = time.time() - 10 * 86400
-        kv = KeyVersion("a", KeyType.ENCRYPTION_KEK, 1, KeyStatus.ACTIVE,
-                        0, old_ts, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.ENCRYPTION_KEK,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            old_ts,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         lm._store.add(kv)
         assert not lm.needs_rotation(kv)
 
@@ -1253,11 +1526,14 @@ class TestAdditionalCoverage:
 
     def test_T189_key_store_all_keys_tenant_filter(self):
         store = KeyStore()
-        kv1 = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, "t1", b"")
-        kv2 = KeyVersion("b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                         0, 0, None, None, None, 0, "t2", b"")
-        store.add(kv1); store.add(kv2)
+        kv1 = KeyVersion(
+            "a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, "t1", b""
+        )
+        kv2 = KeyVersion(
+            "b", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE, 0, 0, None, None, None, 0, "t2", b""
+        )
+        store.add(kv1)
+        store.add(kv2)
         t1_keys = store.all_keys(tenant_id="t1")
         assert kv1 in t1_keys and kv2 not in t1_keys
 
@@ -1278,8 +1554,9 @@ class TestAdditionalCoverage:
 
     def test_T193_key_version_is_usable_for_new_only_active(self):
         for status in [KeyStatus.GRACE, KeyStatus.REVOKED, KeyStatus.EXPIRED, KeyStatus.PENDING]:
-            kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, status,
-                            0, 0, None, None, None, 0, None, b"")
+            kv = KeyVersion(
+                "a", KeyType.JWT_SIGNING, 1, status, 0, 0, None, None, None, 0, None, b""
+            )
             assert kv.is_usable_for_new is False
 
     def test_T194_revoke_reason_stored(self):
@@ -1317,8 +1594,20 @@ class TestAdditionalCoverage:
     def test_T198_admin_health_check_detects_issue(self):
         lm, sched, comp, ext, admin = full_system()
         activated_at = time.time() - 31 * 86400
-        kv = KeyVersion("a", KeyType.JWT_SIGNING, 1, KeyStatus.ACTIVE,
-                        0, activated_at, None, None, None, 0, None, b"")
+        kv = KeyVersion(
+            "a",
+            KeyType.JWT_SIGNING,
+            1,
+            KeyStatus.ACTIVE,
+            0,
+            activated_at,
+            None,
+            None,
+            None,
+            0,
+            None,
+            b"",
+        )
         lm._store.add(kv)
         h = admin.health_check()
         assert h["healthy"] is False

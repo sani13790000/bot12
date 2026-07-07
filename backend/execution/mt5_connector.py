@@ -5,29 +5,34 @@ BUG-R5-6: get_positions() added
 BUG-R6-8: _connected=False on network failure in _get/_post
 BUG-Y2:   _create_connector() silent fallback → logger.critical added
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 # ── Exceptions ────────────────────────────────────────────────────────────────
 
+
 class MT5Error(Exception):
     """General MT5 gateway error."""
 
+
 class MT5RequoteError(MT5Error):
     """Broker requote — caller may retry with new price."""
+
 
 class MT5NotConnectedError(MT5Error):
     """Connector has not been connected yet."""
 
 
 # ── Data Classes ──────────────────────────────────────────────────────────────
+
 
 @dataclass
 class OrderResult:
@@ -59,7 +64,7 @@ class SymbolInfo:
 class Position:
     ticket: int
     symbol: str
-    direction: str          # "BUY" | "SELL"
+    direction: str  # "BUY" | "SELL"
     volume: float
     open_price: float
     sl: Optional[float]
@@ -69,6 +74,7 @@ class Position:
 
 
 # ── MT5 Connector ─────────────────────────────────────────────────────────────
+
 
 class MT5Connector:
     """Async HTTP bridge to the MQL5 MT5 gateway service."""
@@ -95,10 +101,16 @@ class MT5Connector:
                 "MT5Connector is not connected — call await connect() first."
             )
 
-    async def _request(self, method: str, path: str, *,
-                       params: Optional[Dict] = None,
-                       payload: Optional[Dict] = None) -> Dict:
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Dict] = None,
+        payload: Optional[Dict] = None,
+    ) -> Dict:
         import aiohttp
+
         url = f"{self._base_url}{path}"
         headers = {"X-API-Key": self._api_key} if self._api_key else {}
         kwargs: Dict[str, Any] = {
@@ -132,8 +144,9 @@ class MT5Connector:
         try:
             await self._get("/health")
             self._connected = True
-            logger.info("[MT5Connector] Connected to gateway at %s (demo=%s)",
-                        self._base_url, self.demo)
+            logger.info(
+                "[MT5Connector] Connected to gateway at %s (demo=%s)", self._base_url, self.demo
+            )
             return True
         except MT5Error as exc:
             self._connected = False
@@ -173,7 +186,9 @@ class MT5Connector:
 
     async def get_candles(self, symbol: str, timeframe: str, count: int = 500) -> List[Dict]:
         self._require_connected()
-        return await self._get("/candles", params={"symbol": symbol, "timeframe": timeframe, "count": count})
+        return await self._get(
+            "/candles", params={"symbol": symbol, "timeframe": timeframe, "count": count}
+        )
 
     async def place_order(
         self,
@@ -218,29 +233,34 @@ class MT5Connector:
         tp: Optional[float] = None,
     ) -> Dict:
         self._require_connected()
-        return await self._post("/position/modify", {
-            "ticket": ticket,
-            "sl": sl,
-            "tp": tp,
-            "demo": self.demo,
-        })
+        return await self._post(
+            "/position/modify",
+            {
+                "ticket": ticket,
+                "sl": sl,
+                "tp": tp,
+                "demo": self.demo,
+            },
+        )
 
     async def get_positions(self) -> List[Position]:
         self._require_connected()
         data = await self._get("/positions")
         positions = []
         for p in data.get("positions", []):
-            positions.append(Position(
-                ticket=p.get("ticket", 0),
-                symbol=p.get("symbol", ""),
-                direction=p.get("direction", "BUY"),
-                volume=p.get("volume", 0.0),
-                open_price=p.get("open_price", 0.0),
-                sl=p.get("sl"),
-                tp=p.get("tp"),
-                profit=p.get("profit", 0.0),
-                comment=p.get("comment", ""),
-            ))
+            positions.append(
+                Position(
+                    ticket=p.get("ticket", 0),
+                    symbol=p.get("symbol", ""),
+                    direction=p.get("direction", "BUY"),
+                    volume=p.get("volume", 0.0),
+                    open_price=p.get("open_price", 0.0),
+                    sl=p.get("sl"),
+                    tp=p.get("tp"),
+                    profit=p.get("profit", 0.0),
+                    comment=p.get("comment", ""),
+                )
+            )
         return positions
 
     async def get_history(self, from_ts: int, to_ts: int) -> List[Dict]:
@@ -250,13 +270,13 @@ class MT5Connector:
     async def calculate_margin(self, symbol: str, lot_size: float, direction: str) -> float:
         self._require_connected()
         data = await self._get(
-            "/margin/calc",
-            params={"symbol": symbol, "volume": lot_size, "type": direction.upper()}
+            "/margin/calc", params={"symbol": symbol, "volume": lot_size, "type": direction.upper()}
         )
         return float(data.get("margin", 0.0))
 
 
 # ── Module-level singleton ─────────────────────────────────────────────────────
+
 
 def _create_connector() -> MT5Connector:
     """
@@ -265,6 +285,7 @@ def _create_connector() -> MT5Connector:
     """
     try:
         from backend.core.config import get_settings
+
         s = get_settings()
         return MT5Connector(
             base_url=getattr(s, "MT5_GATEWAY_URL", "http://mt5-gateway:5000"),

@@ -15,23 +15,18 @@
 """
 
 import os
-from typing import Optional
-from datetime import datetime
 
-from aiogram import Router, F
-from aiogram.types import (
-    Message, CallbackQuery,
-    InlineKeyboardMarkup, InlineKeyboardButton
-)
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from ..auth import require_permission, require_role
-from ..rbac import Permission, UserRole, ROLE_NAMES_FA, get_role_level
-from ...services.rbac_service import rbac_service
-from ...services.audit_service import audit_service, AuditAction
 from ...core.logger import get_logger
+from ...services.audit_service import AuditAction, audit_service
+from ...services.rbac_service import rbac_service
+from ..auth import require_permission
+from ..rbac import ROLE_NAMES_FA, Permission, UserRole
 
 logger = get_logger("telegram.handlers.admin_users")
 
@@ -44,8 +39,10 @@ _API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 # States برای FSM
 # ═══════════════════════════════════════════════════════════════
 
+
 class AddUserStates(StatesGroup):
     """حالت‌های FSM برای اضافه کردن کاربر"""
+
     waiting_for_chat_id = State()
     waiting_for_role = State()
     waiting_for_confirm = State()
@@ -53,12 +50,14 @@ class AddUserStates(StatesGroup):
 
 class RemoveUserStates(StatesGroup):
     """حالت‌های FSM برای حذف کاربر"""
+
     waiting_for_chat_id = State()
     waiting_for_confirm = State()
 
 
 class ChangeRoleStates(StatesGroup):
     """حالت‌های FSM برای تغییر نقش"""
+
     waiting_for_chat_id = State()
     waiting_for_new_role = State()
     waiting_for_confirm = State()
@@ -67,6 +66,7 @@ class ChangeRoleStates(StatesGroup):
 # ═══════════════════════════════════════════════════════════════
 # Keyboards
 # ═══════════════════════════════════════════════════════════════
+
 
 def _role_selection_keyboard(prefix: str = "setrole") -> InlineKeyboardMarkup:
     """کیبورد انتخاب نقش"""
@@ -81,10 +81,9 @@ def _role_selection_keyboard(prefix: str = "setrole") -> InlineKeyboardMarkup:
     ]
     row = []
     for i, role in enumerate(roles_to_show):
-        row.append(InlineKeyboardButton(
-            text=ROLE_NAMES_FA[role],
-            callback_data=f"{prefix}:{role.value}"
-        ))
+        row.append(
+            InlineKeyboardButton(text=ROLE_NAMES_FA[role], callback_data=f"{prefix}:{role.value}")
+        )
         if len(row) == 2:
             buttons.append(row)
             row = []
@@ -96,12 +95,14 @@ def _role_selection_keyboard(prefix: str = "setrole") -> InlineKeyboardMarkup:
 
 def _confirm_keyboard(action: str, data: str) -> InlineKeyboardMarkup:
     """کیبورد تأیید عملیات"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ تأیید", callback_data=f"confirm:{action}:{data}"),
-            InlineKeyboardButton(text="❌ لغو", callback_data=f"cancel:{action}")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ تأیید", callback_data=f"confirm:{action}:{data}"),
+                InlineKeyboardButton(text="❌ لغو", callback_data=f"cancel:{action}"),
+            ]
         ]
-    ])
+    )
 
 
 def _users_page_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
@@ -109,10 +110,10 @@ def _users_page_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
     buttons = []
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton(text="◀️ قبلی", callback_data=f"users_page:{page-1}"))
-    nav.append(InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop"))
+        nav.append(InlineKeyboardButton(text="◀️ قبلی", callback_data=f"users_page:{page - 1}"))
+    nav.append(InlineKeyboardButton(text=f"{page + 1}/{total_pages}", callback_data="noop"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton(text="بعدی ▶️", callback_data=f"users_page:{page+1}"))
+        nav.append(InlineKeyboardButton(text="بعدی ▶️", callback_data=f"users_page:{page + 1}"))
     if nav:
         buttons.append(nav)
     buttons.append([InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="users_page:0")])
@@ -122,6 +123,7 @@ def _users_page_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
 # ═══════════════════════════════════════════════════════════════
 # /users — لیست کاربران
 # ═══════════════════════════════════════════════════════════════
+
 
 @router.message(Command("users"))
 @require_permission(Permission.VIEW_ALL_USERS)
@@ -151,10 +153,10 @@ async def _send_users_list(message: Message, page: int = 0, edit: bool = False):
         total_pages = max(1, (total + per_page - 1) // per_page)
         page = min(page, total_pages - 1)
         start = page * per_page
-        page_users = users[start:start + per_page]
+        page_users = users[start : start + per_page]
 
         lines = [
-            f"👥 <b>لیست کاربران</b> — صفحه {page+1}/{total_pages}",
+            f"👥 <b>لیست کاربران</b> — صفحه {page + 1}/{total_pages}",
             f"📊 مجموع: {total} کاربر\n",
         ]
         for u in page_users:
@@ -183,6 +185,7 @@ async def _send_users_list(message: Message, page: int = 0, edit: bool = False):
 # /add_user — اضافه کردن کاربر
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.message(Command("add_user"))
 @require_permission(Permission.ADD_USER)
 async def cmd_add_user(message: Message, state: FSMContext):
@@ -196,7 +199,7 @@ async def cmd_add_user(message: Message, state: FSMContext):
         "Chat ID تلگرام کاربر را وارد کنید:\n"
         "<i>مثال: 123456789</i>\n\n"
         "برای لغو: /cancel",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
@@ -212,10 +215,9 @@ async def add_user_get_id(message: Message, state: FSMContext):
     await state.update_data(new_chat_id=chat_id)
     await state.set_state(AddUserStates.waiting_for_role)
     await message.answer(
-        f"✅ Chat ID: <code>{chat_id}</code>\n\n"
-        "نقش کاربر را انتخاب کنید:",
+        f"✅ Chat ID: <code>{chat_id}</code>\n\nنقش کاربر را انتخاب کنید:",
         parse_mode="HTML",
-        reply_markup=_role_selection_keyboard("adduserrole")
+        reply_markup=_role_selection_keyboard("adduserrole"),
     )
 
 
@@ -247,7 +249,7 @@ async def add_user_select_role(callback: CallbackQuery, state: FSMContext):
         f"👤 نقش: {role_fa}\n\n"
         f"آیا مطمئن هستید؟",
         parse_mode="HTML",
-        reply_markup=_confirm_keyboard("add_user", f"{new_chat_id}:{role_val}")
+        reply_markup=_confirm_keyboard("add_user", f"{new_chat_id}:{role_val}"),
     )
     await callback.answer()
 
@@ -261,22 +263,17 @@ async def add_user_confirm(callback: CallbackQuery, state: FSMContext):
     role = UserRole(role_val)
 
     try:
-        await rbac_service.add_user(
-            telegram_id=chat_id,
-            role=role,
-            added_by=callback.from_user.id
-        )
+        await rbac_service.add_user(telegram_id=chat_id, role=role, added_by=callback.from_user.id)
         await audit_service.log(
             action=AuditAction.USER_ADDED,
             performed_by=callback.from_user.id,
             target_user=chat_id,
-            details={"role": role_val}
+            details={"role": role_val},
         )
         role_fa = ROLE_NAMES_FA[role]
         await callback.message.edit_text(
-            f"✅ <b>کاربر اضافه شد</b>\n\n"
-            f"🆔 <code>{chat_id}</code> با نقش {role_fa} اضافه شد.",
-            parse_mode="HTML"
+            f"✅ <b>کاربر اضافه شد</b>\n\n🆔 <code>{chat_id}</code> با نقش {role_fa} اضافه شد.",
+            parse_mode="HTML",
         )
         logger.info(f"کاربر {chat_id} با نقش {role_val} توسط {callback.from_user.id} اضافه شد")
     except Exception as e:
@@ -291,6 +288,7 @@ async def add_user_confirm(callback: CallbackQuery, state: FSMContext):
 # /remove_user — حذف کاربر
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.message(Command("remove_user"))
 @require_permission(Permission.REMOVE_USER)
 async def cmd_remove_user(message: Message, state: FSMContext):
@@ -300,10 +298,7 @@ async def cmd_remove_user(message: Message, state: FSMContext):
     """
     await state.set_state(RemoveUserStates.waiting_for_chat_id)
     await message.answer(
-        "🗑 <b>حذف کاربر</b>\n\n"
-        "Chat ID کاربر را وارد کنید:\n"
-        "برای لغو: /cancel",
-        parse_mode="HTML"
+        "🗑 <b>حذف کاربر</b>\n\nChat ID کاربر را وارد کنید:\nبرای لغو: /cancel", parse_mode="HTML"
     )
 
 
@@ -333,7 +328,7 @@ async def remove_user_get_id(message: Message, state: FSMContext):
             f"📛 نام: {user.get('username', 'بدون نام')}\n\n"
             f"این عملیات برگشت‌پذیر نیست!",
             parse_mode="HTML",
-            reply_markup=_confirm_keyboard("remove_user", str(chat_id))
+            reply_markup=_confirm_keyboard("remove_user", str(chat_id)),
         )
     except Exception as e:
         logger.error(f"خطا در بررسی کاربر {chat_id}: {e}", exc_info=True)
@@ -346,19 +341,15 @@ async def remove_user_confirm(callback: CallbackQuery, state: FSMContext):
     """تأیید نهایی حذف کاربر"""
     chat_id = int(callback.data.split(":", 2)[2])
     try:
-        await rbac_service.remove_user(
-            telegram_id=chat_id,
-            removed_by=callback.from_user.id
-        )
+        await rbac_service.remove_user(telegram_id=chat_id, removed_by=callback.from_user.id)
         await audit_service.log(
             action=AuditAction.USER_REMOVED,
             performed_by=callback.from_user.id,
             target_user=chat_id,
-            details={}
+            details={},
         )
         await callback.message.edit_text(
-            f"✅ کاربر <code>{chat_id}</code> حذف شد.",
-            parse_mode="HTML"
+            f"✅ کاربر <code>{chat_id}</code> حذف شد.", parse_mode="HTML"
         )
         logger.info(f"کاربر {chat_id} توسط {callback.from_user.id} حذف شد")
     except Exception as e:
@@ -373,6 +364,7 @@ async def remove_user_confirm(callback: CallbackQuery, state: FSMContext):
 # /set_role — تغییر نقش کاربر
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.message(Command("set_role"))
 @require_permission(Permission.CHANGE_USER_ROLE)
 async def cmd_set_role(message: Message, state: FSMContext):
@@ -382,10 +374,8 @@ async def cmd_set_role(message: Message, state: FSMContext):
     """
     await state.set_state(ChangeRoleStates.waiting_for_chat_id)
     await message.answer(
-        "🔄 <b>تغییر نقش کاربر</b>\n\n"
-        "Chat ID کاربر را وارد کنید:\n"
-        "برای لغو: /cancel",
-        parse_mode="HTML"
+        "🔄 <b>تغییر نقش کاربر</b>\n\nChat ID کاربر را وارد کنید:\nبرای لغو: /cancel",
+        parse_mode="HTML",
     )
 
 
@@ -414,7 +404,7 @@ async def set_role_get_id(message: Message, state: FSMContext):
             f"نقش فعلی: {current_role_fa}\n\n"
             f"نقش جدید را انتخاب کنید:",
             parse_mode="HTML",
-            reply_markup=_role_selection_keyboard("changerole")
+            reply_markup=_role_selection_keyboard("changerole"),
         )
     except Exception as e:
         logger.error(f"خطا در بررسی کاربر {chat_id}: {e}", exc_info=True)
@@ -452,7 +442,7 @@ async def set_role_select(callback: CallbackQuery, state: FSMContext):
         f"به: {new_role_fa}\n\n"
         f"آیا مطمئن هستید؟",
         parse_mode="HTML",
-        reply_markup=_confirm_keyboard("set_role", f"{chat_id}:{role_val}")
+        reply_markup=_confirm_keyboard("set_role", f"{chat_id}:{role_val}"),
     )
     await callback.answer()
 
@@ -470,22 +460,21 @@ async def set_role_confirm(callback: CallbackQuery, state: FSMContext):
         old_role = old_user.get("role", "user") if old_user else "unknown"
 
         await rbac_service.update_user_role(
-            telegram_id=chat_id,
-            new_role=new_role,
-            changed_by=callback.from_user.id
+            telegram_id=chat_id, new_role=new_role, changed_by=callback.from_user.id
         )
         await audit_service.log(
             action=AuditAction.USER_ROLE_CHANGED,
             performed_by=callback.from_user.id,
             target_user=chat_id,
-            details={"old_role": old_role, "new_role": role_val}
+            details={"old_role": old_role, "new_role": role_val},
         )
         new_role_fa = ROLE_NAMES_FA[new_role]
         await callback.message.edit_text(
-            f"✅ نقش کاربر <code>{chat_id}</code> به {new_role_fa} تغییر یافت.",
-            parse_mode="HTML"
+            f"✅ نقش کاربر <code>{chat_id}</code> به {new_role_fa} تغییر یافت.", parse_mode="HTML"
         )
-        logger.info(f"نقش کاربر {chat_id} از {old_role} به {role_val} توسط {callback.from_user.id} تغییر یافت")
+        logger.info(
+            f"نقش کاربر {chat_id} از {old_role} به {role_val} توسط {callback.from_user.id} تغییر یافت"
+        )
     except Exception as e:
         logger.error(f"خطا در تغییر نقش کاربر {chat_id}: {e}", exc_info=True)
         await callback.message.edit_text(f"❌ خطا: {str(e)}")
@@ -497,6 +486,7 @@ async def set_role_confirm(callback: CallbackQuery, state: FSMContext):
 # ═══════════════════════════════════════════════════════════════
 # /cancel — لغو عملیات جاری
 # ═══════════════════════════════════════════════════════════════
+
 
 @router.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext):
@@ -512,6 +502,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
 # ═══════════════════════════════════════════════════════════════
 # Callback: لغو از inline keyboard
 # ═══════════════════════════════════════════════════════════════
+
 
 @router.callback_query(F.data.startswith("cancel:"))
 async def cb_cancel(callback: CallbackQuery, state: FSMContext):

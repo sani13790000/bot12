@@ -13,7 +13,7 @@ faz I:
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,10 @@ class ProductionHardening:
     ]
 
     def __init__(self) -> None:
-        self.errors     = []
-        self.warnings   = []
-        self.app_env    = os.getenv("APP_ENV", "development")
-        self.is_prod    = self.app_env == "production"
+        self.errors = []
+        self.warnings = []
+        self.app_env = os.getenv("APP_ENV", "development")
+        self.is_prod = self.app_env == "production"
 
     def run_all_checks(self) -> Dict[str, Any]:
         """Run all production hardening checks."""
@@ -54,13 +54,17 @@ class ProductionHardening:
         self._check_gateway_key()
 
         status = "fail" if self.errors else "warn" if self.warnings else "pass"
-        logger.info("ProductionHardening: %s (errors=%d warnings=%d)",
-                    status, len(self.errors), len(self.warnings))
+        logger.info(
+            "ProductionHardening: %s (errors=%d warnings=%d)",
+            status,
+            len(self.errors),
+            len(self.warnings),
+        )
         return {
-            "status":    status,
-            "errors":    self.errors,
-            "warnings":  self.warnings,
-            "env":       self.app_env,
+            "status": status,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "env": self.app_env,
         }
 
     def _check_secrets(self) -> None:
@@ -69,7 +73,7 @@ class ProductionHardening:
             if not val:
                 self.errors.append(f"Missing critical env var: {key}")
             elif len(val) < 16:
-                self.warnings.append(f"{ky} is too short (<16 chars)")
+                self.warnings.append(f"{key} is too short (<16 chars)")
 
     def _check_debug_mode(self) -> None:
         debug = os.getenv("DEBUG", "").lower()

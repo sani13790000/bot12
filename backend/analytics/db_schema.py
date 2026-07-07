@@ -109,6 +109,6 @@ FROM analytics_trades
 WHERE status = 'CLOSED'
 GROUP BY DATE(close_time)
 ORDER BY trade_date DESC;
-""";
+"""
 
 __all__ = ["ANALYTICS_SQL"]

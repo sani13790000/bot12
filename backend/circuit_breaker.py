@@ -3,6 +3,7 @@
 A5-FIX: Race condition in lazy Lock init resolved via double-checked locking.
 A2-FIX: get_mt5_breaker(), get_circuit_breaker(), get_breaker_status() added.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,7 +25,7 @@ async def _get_halt_lock() -> asyncio.Lock:
     global _HALT_LOCK
     if _HALT_LOCK is None:
         async with _BOOTSTRAP_LOCK:
-            if _HALT_LOCK is None:        # double-checked
+            if _HALT_LOCK is None:  # double-checked
                 _HALT_LOCK = asyncio.Lock()
     return _HALT_LOCK
 
@@ -33,7 +34,7 @@ async def _get_registry_lock() -> asyncio.Lock:
     global _REGISTRY_LOCK
     if _REGISTRY_LOCK is None:
         async with _BOOTSTRAP_LOCK:
-            if _REGISTRY_LOCK is None:    # double-checked
+            if _REGISTRY_LOCK is None:  # double-checked
                 _REGISTRY_LOCK = asyncio.Lock()
     return _REGISTRY_LOCK
 
@@ -82,44 +83,46 @@ def get_breaker_status() -> Dict[str, Any]:
     return {name: cb.status() for name, cb in _REGISTRY.items()}
 
 
-async def get_circuit_breaker(name: str, config: Optional["BreakerConfig"] = None) -> "CircuitBreaker":
+async def get_circuit_breaker(
+    name: str, config: Optional["BreakerConfig"] = None
+) -> "CircuitBreaker":
     """A2-FIX: alias used by main.py lifespan pre-warm."""
     return await get_breaker(name, config)
 
 
 class BreakerState(str, Enum):
-    CLOSED    = "closed"
-    OPEN      = "open"
+    CLOSED = "closed"
+    OPEN = "open"
     HALF_OPEN = "half_open"
 
 
 class CircuitOpenError(Exception):
     def __init__(self, name: str, state: BreakerState, reason: str = "") -> None:
-        self.name   = name
-        self.state  = state
+        self.name = name
+        self.state = state
         self.reason = reason
         super().__init__(f"Circuit '{name}' is {state.value}: {reason}")
 
 
 @dataclass
 class BreakerConfig:
-    failure_threshold:    int   = 5
-    failure_window_s:     float = 60.0
-    recovery_timeout_s:   float = 30.0
-    success_threshold:    int   = 2
-    half_open_max_calls:  int   = 3
-    timeout_s:            float = 0.0
+    failure_threshold: int = 5
+    failure_window_s: float = 60.0
+    recovery_timeout_s: float = 30.0
+    success_threshold: int = 2
+    half_open_max_calls: int = 3
+    timeout_s: float = 0.0
 
 
 @dataclass
 class BreakerStats:
-    state:               BreakerState = BreakerState.CLOSED
-    failure_times:       List[float]  = field(default_factory=list)
-    successes:           int          = 0
-    half_open_calls:     int          = 0
-    opened_at:           Optional[float] = None
-    half_open_entered:   Optional[float] = None
-    last_failure_reason: str             = ""
+    state: BreakerState = BreakerState.CLOSED
+    failure_times: List[float] = field(default_factory=list)
+    successes: int = 0
+    half_open_calls: int = 0
+    opened_at: Optional[float] = None
+    half_open_entered: Optional[float] = None
+    last_failure_reason: str = ""
 
     def record_success(self) -> None:
         if self.state == BreakerState.CLOSED:
@@ -141,15 +144,19 @@ class BreakerStats:
 class CircuitBreaker:
     """Async circuit breaker CLOSED → OPEN → HALF_OPEN FSM."""
 
-    def __init__(self, name: str, config: Optional[BreakerConfig] = None,
-                 alert_callback: Optional[Callable] = None) -> None:
-        self.name   = name
+    def __init__(
+        self,
+        name: str,
+        config: Optional[BreakerConfig] = None,
+        alert_callback: Optional[Callable] = None,
+    ) -> None:
+        self.name = name
         self.config = config or BreakerConfig()
         self._stats = BreakerStats()
-        self._lock  = asyncio.Lock()
+        self._lock = asyncio.Lock()
         self._alert = alert_callback
-        self._on_open:      List[Callable] = []
-        self._on_close:     List[Callable] = []
+        self._on_open: List[Callable] = []
+        self._on_close: List[Callable] = []
         self._on_half_open: List[Callable] = []
 
     async def can_execute(self) -> bool:
@@ -178,8 +185,10 @@ class CircuitBreaker:
         if state == BreakerState.CLOSED:
             return True
         if state == BreakerState.OPEN:
-            if (self._stats.opened_at is not None
-                    and now - self._stats.opened_at >= self.config.recovery_timeout_s):
+            if (
+                self._stats.opened_at is not None
+                and now - self._stats.opened_at >= self.config.recovery_timeout_s
+            ):
                 await self._transition(BreakerState.HALF_OPEN)
                 return True
             return False
@@ -193,22 +202,22 @@ class CircuitBreaker:
         old = self._stats.state
         self._stats.state = new_state
         if new_state == BreakerState.OPEN:
-            self._stats.opened_at        = now
-            self._stats.successes        = 0
-            self._stats.half_open_calls  = 0
+            self._stats.opened_at = now
+            self._stats.successes = 0
+            self._stats.half_open_calls = 0
             logger.error("[CB:%s] OPEN — %s", self.name, self._stats.last_failure_reason)
             await self._fire_callbacks(self._on_open)
         elif new_state == BreakerState.HALF_OPEN:
             self._stats.half_open_entered = now
-            self._stats.half_open_calls   = 0
-            self._stats.successes         = 0
+            self._stats.half_open_calls = 0
+            self._stats.successes = 0
             logger.warning("[CB:%s] HALF_OPEN", self.name)
             await self._fire_callbacks(self._on_half_open)
         elif new_state == BreakerState.CLOSED:
-            self._stats.opened_at         = None
+            self._stats.opened_at = None
             self._stats.half_open_entered = None
-            self._stats.successes         = 0
-            self._stats.half_open_calls   = 0
+            self._stats.successes = 0
+            self._stats.half_open_calls = 0
             logger.info("[CB:%s] CLOSED (recovered)", self.name)
             await self._fire_callbacks(self._on_close)
         if self._alert:
@@ -228,13 +237,13 @@ class CircuitBreaker:
 
     def status(self) -> Dict[str, Any]:
         return {
-            "name":    self.name,
-            "state":   self._stats.state.value,
+            "name": self.name,
+            "state": self._stats.state.value,
             "failures": self._stats.failure_count(self.config.failure_window_s),
             "last_failure_reason": self._stats.last_failure_reason,
             "config": {
                 "threshold": self.config.failure_threshold,
-                "window_s":  self.config.failure_window_s,
+                "window_s": self.config.failure_window_s,
                 "recovery_s": self.config.recovery_timeout_s,
             },
         }

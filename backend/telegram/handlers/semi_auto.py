@@ -19,6 +19,7 @@ Commands
 /semiauto on|off   – enable / disable semi-auto mode
 /pending           – list pending approval signals
 """
+
 from __future__ import annotations
 
 import logging
@@ -37,6 +38,7 @@ _semi_auto_enabled: bool = False
 
 # ── Semi-auto mode toggle ───────────────────────────────────────────── #
 
+
 @router.message(Command("semiauto"))
 async def cmd_semiauto(message: types.Message) -> None:
     """
@@ -47,13 +49,12 @@ async def cmd_semiauto(message: types.Message) -> None:
     global _semi_auto_enabled  # noqa: PLW0603
     try:
         args = (message.text or "").split()[1:]
-        arg  = args[0].lower() if args else ""
+        arg = args[0].lower() if args else ""
 
         if arg == "on":
             _semi_auto_enabled = True
             await message.answer(
-                "✅ حالت نیمه‌خودکار *فعال* شد.\n"
-                "سیگنال‌ها برای تأیید ارسال می‌شوند.",
+                "✅ حالت نیمه‌خودکار *فعال* شد.\nسیگنال‌ها برای تأیید ارسال می‌شوند.",
                 parse_mode="Markdown",
             )
         elif arg == "off":
@@ -65,8 +66,7 @@ async def cmd_semiauto(message: types.Message) -> None:
         else:
             state = "✅ فعال" if _semi_auto_enabled else "❌ غیرفعال"
             await message.answer(
-                f"🤖 حالت نیمه‌خودکار: {state}\n"
-                "*استفاده:* `/semiauto on` | `/semiauto off`",
+                f"🤖 حالت نیمه‌خودکار: {state}\n*استفاده:* `/semiauto on` | `/semiauto off`",
                 parse_mode="Markdown",
             )
     except Exception as exc:
@@ -90,12 +90,10 @@ async def cmd_pending(message: types.Message) -> None:
             "",
         ]
         for sig_id, sig in list(_pending_signals.items())[:10]:
-            symbol    = sig.get("symbol", "?")
+            symbol = sig.get("symbol", "?")
             direction = sig.get("direction", "?")
-            conf      = sig.get("confidence", 0.0) * 100
-            lines.append(
-                f"• `{sig_id[:8]}` — *{symbol}* {direction} `{conf:.0f}%`"
-            )
+            conf = sig.get("confidence", 0.0) * 100
+            lines.append(f"• `{sig_id[:8]}` — *{symbol}* {direction} `{conf:.0f}%`")
 
         await message.answer("\n".join(lines), parse_mode="Markdown")
 
@@ -104,6 +102,7 @@ async def cmd_pending(message: types.Message) -> None:
 
 
 # ── Signal push (called by the signal dispatcher) ───────────────── #
+
 
 async def push_signal_for_approval(
     bot: object,
@@ -123,12 +122,12 @@ async def push_signal_for_approval(
 
         _pending_signals[signal_id] = signal
 
-        symbol    = signal.get("symbol", "?")
+        symbol = signal.get("symbol", "?")
         direction = signal.get("direction", "?")
-        conf      = signal.get("confidence", 0.0) * 100
-        entry     = signal.get("entry_price")
-        sl        = signal.get("sl_price")
-        tp        = signal.get("tp_price")
+        conf = signal.get("confidence", 0.0) * 100
+        entry = signal.get("entry_price")
+        sl = signal.get("sl_price")
+        tp = signal.get("tp_price")
 
         lines = [
             f"⚡ *سیگنال جدید — {symbol}*",
@@ -142,10 +141,14 @@ async def push_signal_for_approval(
         if tp:
             lines.append(f"🏁 TP: `{tp:.5f}`")
 
-        keyboard = InlineKeyboardMarkup([[  # type: ignore[call-arg]
-            InlineKeyboardButton("✅ تأیید", callback_data=f"approve:{signal_id}"),
-            InlineKeyboardButton("❌ رد",   callback_data=f"reject:{signal_id}"),
-        ]])
+        keyboard = InlineKeyboardMarkup(
+            [
+                [  # type: ignore[call-arg]
+                    InlineKeyboardButton("✅ تأیید", callback_data=f"approve:{signal_id}"),
+                    InlineKeyboardButton("❌ رد", callback_data=f"reject:{signal_id}"),
+                ]
+            ]
+        )
 
         await bot.send_message(  # type: ignore[attr-defined]
             chat_id=chat_id,
@@ -159,6 +162,7 @@ async def push_signal_for_approval(
 
 
 # ── Inline keyboard callback ──────────────────────────────────────────────── #
+
 
 @router.callback_query(F.data.startswith("approve:") | F.data.startswith("reject:"))
 async def callback_signal_decision(query: types.CallbackQuery) -> None:
@@ -178,9 +182,7 @@ async def callback_signal_decision(query: types.CallbackQuery) -> None:
         signal = _pending_signals.pop(signal_id, None)
 
         if signal is None:
-            await query.edit_message_text(
-                "⚠️ سیگنال یافت نشد (شاید منقضی شده)."
-            )
+            await query.edit_message_text("⚠️ سیگنال یافت نشد (شاید منقضی شده).")
             return
 
         if action == "approve":
@@ -204,15 +206,16 @@ async def _execute_signal(signal: dict) -> None:
     """Forward an approved signal to the ExecutionService."""
     try:
         from backend.execution.execution_service import TradeSignal, execution_service
+
         ts = TradeSignal(
-            symbol     = signal.get("symbol", "EURUSD"),
-            direction  = signal.get("direction", "BUY"),
-            volume     = signal.get("volume", 0.01),
-            entry      = signal.get("entry_price"),
-            sl         = signal.get("sl_price"),
-            tp         = signal.get("tp_price"),
-            confidence = signal.get("confidence", 0.0),
-            strategy   = "semi_auto",
+            symbol=signal.get("symbol", "EURUSD"),
+            direction=signal.get("direction", "BUY"),
+            volume=signal.get("volume", 0.01),
+            entry=signal.get("entry_price"),
+            sl=signal.get("sl_price"),
+            tp=signal.get("tp_price"),
+            confidence=signal.get("confidence", 0.0),
+            strategy="semi_auto",
         )
         result = await execution_service.execute(ts)
         if not result.success:

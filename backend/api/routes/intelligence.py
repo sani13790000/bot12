@@ -2,25 +2,26 @@
 Galaxy Vast AI Trading Platform
 backend/api/routes/intelligence.py -- Machine Learning Intelligence Routes
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.deps import get_current_user, get_db
+from backend.core.deps import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Intelligence"])
 
 
 class PredictRequest(BaseModel):
-    symbol:    str
+    symbol: str
     timeframe: str = "H1"
-    features:  Dict[str, Any] = Field(default_factory=dict)
+    features: Dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/predict")
@@ -31,6 +32,7 @@ async def predict(
     """Run ML prediction for a given symbol."""
     try:
         from backend.ml.predictor import MLPredictor
+
         predictor = MLPredictor()
         result = await predictor.predict(
             symbol=body.symbol,
@@ -50,6 +52,7 @@ async def list_models(
     """List available ML models and their status."""
     try:
         from backend.ml.model_registry import ModelRegistry
+
         registry = ModelRegistry()
         models = await registry.list_models()
         return {"ok": True, "models": models}

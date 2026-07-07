@@ -2,42 +2,39 @@ from __future__ import annotations
 
 import logging
 import time
-import uuid
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional
 
-_log = logging.getLogger('core.tenant')
+_log = logging.getLogger("core.tenant")
 
-_tenant_ctx: ContextVar[Optional['TenantContext']] = ContextVar(
-    '_tenant_ctx', default=None
-)
+_tenant_ctx: ContextVar[Optional["TenantContext"]] = ContextVar("_tenant_ctx", default=None)
 
 
 class TenantPlan(str, Enum):
-    TRIAL   = 'trial'
-    BASIC   = 'basic'
-    PRO     = 'pro'
-    VIP     = 'vip'
-    ANNUAL  = 'annual'
+    TRIAL = "trial"
+    BASIC = "basic"
+    PRO = "pro"
+    VIP = "vip"
+    ANNUAL = "annual"
 
 
 @dataclass
 class TenantLimits:
-    max_devices:      int = 1
-    max_signals_day:  int = 100
-    max_bots:         int = 1
-    max_users:        int = 1
+    max_devices: int = 1
+    max_signals_day: int = 100
+    max_bots: int = 1
+    max_users: int = 1
     api_rate_per_min: int = 30
 
     @staticmethod
-    def for_plan(plan) -> 'TenantLimits':
+    def for_plan(plan) -> "TenantLimits":
         _MAP = {
-            TenantPlan.TRIAL:  TenantLimits(1,   50,  1, 1, 20),
-            TenantPlan.BASIC:  TenantLimits(2,  200,  1, 3, 60),
-            TenantPlan.PRO:    TenantLimits(5,  500,  3, 5, 120),
-            TenantPlan.VIP:    TenantLimits(10, 2000, 5, 10, 300),
+            TenantPlan.TRIAL: TenantLimits(1, 50, 1, 1, 20),
+            TenantPlan.BASIC: TenantLimits(2, 200, 1, 3, 60),
+            TenantPlan.PRO: TenantLimits(5, 500, 3, 5, 120),
+            TenantPlan.VIP: TenantLimits(10, 2000, 5, 10, 300),
             TenantPlan.ANNUAL: TenantLimits(10, 2000, 5, 10, 300),
         }
         return _MAP.get(plan, TenantLimits())
@@ -45,9 +42,9 @@ class TenantLimits:
 
 @dataclass
 class TenantContext:
-    tenant_id:  str
-    plan:       TenantPlan = TenantPlan.TRIAL
-    is_active:  bool = True
+    tenant_id: str
+    plan: TenantPlan = TenantPlan.TRIAL
+    is_active: bool = True
     created_at: float = field(default_factory=time.time)
 
     @property
@@ -59,8 +56,7 @@ class TenantContext:
 
 
 class TenantScope:
-    def __init__(self, tenant_id: str, plan: TenantPlan = TenantPlan.TRIAL,
-                 is_active: bool = True):
+    def __init__(self, tenant_id: str, plan: TenantPlan = TenantPlan.TRIAL, is_active: bool = True):
         self._ctx = TenantContext(tenant_id=tenant_id, plan=plan, is_active=is_active)
         self._token: Optional[Token] = None
 
@@ -86,17 +82,18 @@ def get_current_tenant() -> Optional[TenantContext]:
 def require_tenant() -> TenantContext:
     t = _tenant_ctx.get()
     if t is None:
-        raise RuntimeError('No tenant context — TenantMiddleware not applied')
+        raise RuntimeError("No tenant context — TenantMiddleware not applied")
     return t
 
 
 class TenantRegistry:
     def __init__(self):
         self._tenants: Dict[str, TenantContext] = {}
-        self._audit:   List[Dict[str, Any]] = []
+        self._audit: List[Dict[str, Any]] = []
 
-    def register(self, tenant_id: str, plan: TenantPlan = TenantPlan.TRIAL,
-                 is_active: bool = True) -> TenantContext:
+    def register(
+        self, tenant_id: str, plan: TenantPlan = TenantPlan.TRIAL, is_active: bool = True
+    ) -> TenantContext:
         ctx = TenantContext(tenant_id=tenant_id, plan=plan, is_active=is_active)
         self._tenants[tenant_id] = ctx
         return ctx
@@ -109,11 +106,14 @@ class TenantRegistry:
         if not t:
             return False
         self._tenants[tenant_id] = TenantContext(
-            tenant_id=t.tenant_id, plan=t.plan, is_active=False,
+            tenant_id=t.tenant_id,
+            plan=t.plan,
+            is_active=False,
             created_at=t.created_at,
         )
-        self._audit.append({'action': 'suspend', 'tenant_id': tenant_id,
-                            'actor': actor, 'ts': time.time()})
+        self._audit.append(
+            {"action": "suspend", "tenant_id": tenant_id, "actor": actor, "ts": time.time()}
+        )
         return True
 
     def reactivate(self, tenant_id: str, actor: str) -> bool:
@@ -121,11 +121,14 @@ class TenantRegistry:
         if not t:
             return False
         self._tenants[tenant_id] = TenantContext(
-            tenant_id=t.tenant_id, plan=t.plan, is_active=True,
+            tenant_id=t.tenant_id,
+            plan=t.plan,
+            is_active=True,
             created_at=t.created_at,
         )
-        self._audit.append({'action': 'reactivate', 'tenant_id': tenant_id,
-                            'actor': actor, 'ts': time.time()})
+        self._audit.append(
+            {"action": "reactivate", "tenant_id": tenant_id, "actor": actor, "ts": time.time()}
+        )
         return True
 
     def audit_log(self) -> List[Dict[str, Any]]:
@@ -155,23 +158,23 @@ def assert_tenant_access(
     actor_tenant_id: str,
     actor_role: str,
     actor_id: str,
-    resource_label: str = 'resource',
+    resource_label: str = "resource",
     audit_callbacks: Optional[List[Callable]] = None,
 ) -> bool:
     if resource_tenant_id == actor_tenant_id:
         return True
-    admin_roles = {'admin', 'super_admin'}
+    admin_roles = {"admin", "super_admin"}
     if actor_role in admin_roles:
         entry = {
-            'type':            'cross_tenant_access',
-            'resource_tenant': resource_tenant_id,
-            'actor_tenant':    actor_tenant_id,
-            'actor_id':        actor_id,
-            'actor_role':      actor_role,
-            'resource':        resource_label,
-            'ts':              time.time(),
+            "type": "cross_tenant_access",
+            "resource_tenant": resource_tenant_id,
+            "actor_tenant": actor_tenant_id,
+            "actor_id": actor_id,
+            "actor_role": actor_role,
+            "resource": resource_label,
+            "ts": time.time(),
         }
-        _log.warning('cross-tenant access granted', extra=entry)
+        _log.warning("cross-tenant access granted", extra=entry)
         _registry._audit.append(entry)
         if audit_callbacks:
             for cb in audit_callbacks:
@@ -180,10 +183,14 @@ def assert_tenant_access(
                 except Exception:
                     pass
         return True
-    _log.error('cross-tenant boundary violation',
-               extra={'actor_tenant': actor_tenant_id,
-                      'resource_tenant': resource_tenant_id,
-                      'actor_id': actor_id})
+    _log.error(
+        "cross-tenant boundary violation",
+        extra={
+            "actor_tenant": actor_tenant_id,
+            "resource_tenant": resource_tenant_id,
+            "actor_id": actor_id,
+        },
+    )
     raise CrossTenantAccessError(
         f"Tenant '{actor_tenant_id}' cannot access {resource_label} "
         f"belonging to tenant '{resource_tenant_id}'"

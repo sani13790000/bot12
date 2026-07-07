@@ -2,7 +2,9 @@
 Phase 8 — Connection Health (updated)
 Bridge: imports pool_monitor and query_optimizer for /health endpoint.
 """
+
 from __future__ import annotations
+
 from typing import Any, Dict
 
 

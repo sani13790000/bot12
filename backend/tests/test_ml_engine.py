@@ -1,18 +1,14 @@
 """
 تست‌های MLEngine
 """
+
 from __future__ import annotations
-import os
-import pickle
-import tempfile
+
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import Any, Dict
 
 import numpy as np
-import pytest
 
 
 # ─── stubs برای test (بدون import از backend) ───────────────────────────────
@@ -97,8 +93,8 @@ def _make_prediction(models, feature_names, features):
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestMLPrediction:
 
+class TestMLPrediction:
     def test_should_trade_above_threshold(self):
         p = MLPrediction(
             success_probability=0.65,
@@ -142,7 +138,6 @@ class TestMLPrediction:
 
 
 class TestTrainingResult:
-
     def test_summary_format(self):
         tr = TrainingResult(
             model_type=ModelType.OVERALL,
@@ -193,7 +188,6 @@ class TestTrainingResult:
 
 
 class TestMLInference:
-
     def test_no_model_returns_neutral(self, ml_features):
         pred = _make_prediction({}, [], ml_features)
         assert pred.success_probability == 0.5
@@ -202,6 +196,7 @@ class TestMLInference:
     def test_inference_with_sklearn_stub(self, ml_features):
         from sklearn.ensemble import GradientBoostingClassifier
         from sklearn.preprocessing import StandardScaler
+
         feature_names = list(ml_features.keys())
         X = np.array([[ml_features[f] for f in feature_names]] * 60)
         y = np.array([1, 0] * 30)
@@ -209,9 +204,7 @@ class TestMLInference:
         scaler = StandardScaler()
         X_s = scaler.fit_transform(X)
         clf.fit(X_s, y)
-        models = {
-            ModelType.OVERALL: {"model": clf, "scaler": scaler}
-        }
+        models = {ModelType.OVERALL: {"model": clf, "scaler": scaler}}
         pred = _make_prediction(models, feature_names, ml_features)
         assert 0.0 <= pred.success_probability <= 1.0
         assert pred.is_reliable is True
@@ -220,6 +213,7 @@ class TestMLInference:
     def test_inference_probability_range(self, ml_features):
         from sklearn.ensemble import GradientBoostingClassifier
         from sklearn.preprocessing import StandardScaler
+
         feature_names = list(ml_features.keys())
         X = np.random.rand(100, len(feature_names))
         y = (X[:, 0] > 0.5).astype(int)
@@ -234,7 +228,6 @@ class TestMLInference:
 
 
 class TestMinSamples:
-
     def test_min_samples_constant(self):
         assert MIN_SAMPLES == 30
 

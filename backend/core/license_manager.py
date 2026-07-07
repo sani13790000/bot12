@@ -2,13 +2,12 @@
 Phase 10 — License Manager
 Enforces user subscription tiers and feature access.
 """
+
 from __future__ import annotations
 
-import os
-import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, Set
 
 from backend.observability import get_logger
 
@@ -68,8 +67,17 @@ _PLAN_LIMITS: Dict[PlanTier, PlanLimits] = {
         can_use_research=True,
         can_use_mt5=True,
         can_export_data=True,
-        features={"signals_read", "signals_write", "dashboard", "research",
-                  "analytics", "ml", "mt5", "export", "agents"},
+        features={
+            "signals_read",
+            "signals_write",
+            "dashboard",
+            "research",
+            "analytics",
+            "ml",
+            "mt5",
+            "export",
+            "agents",
+        },
     ),
     PlanTier.ENTERPRISE: PlanLimits(
         tier=PlanTier.ENTERPRISE,
@@ -102,6 +110,7 @@ _usage_date: Dict[str, str] = {}
 
 def _today() -> str:
     from datetime import date
+
     return str(date.today())
 
 

@@ -13,10 +13,16 @@ GET  /api/v1/security-ai/anomalies
 POST /api/v1/security-ai/block/{ip}
 DELETE /api/v1/security-ai/block/{ip}
 """
+
 from __future__ import annotations
-import asyncio, ipaddress, logging, time
+
+import asyncio
+import ipaddress
+import logging
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
@@ -39,14 +45,18 @@ class AnalyzeEventRequest(BaseModel):
     @field_validator("ip_address")
     @classmethod
     def validate_ip(cls, v: str) -> str:
-        try: ipaddress.ip_address(v); return v
-        except ValueError: raise ValueError(f"Invalid IP: {v}")
+        try:
+            ipaddress.ip_address(v)
+            return v
+        except ValueError:
+            raise ValueError(f"Invalid IP: {v}")
 
     @field_validator("event_type")
     @classmethod
     def validate_event_type(cls, v: str) -> str:
         allowed = {"api_request", "login_attempt", "trade_activity", "session_anomaly", "websocket"}
-        if v not in allowed: raise ValueError(f"event_type must be one of {allowed}")
+        if v not in allowed:
+            raise ValueError(f"event_type must be one of {allowed}")
         return v
 
 
@@ -58,13 +68,16 @@ class BlockIPRequest(BaseModel):
 async def _get_agent():
     try:
         from backend.agents.security_ai_agent import get_security_agent
+
         return await get_security_agent()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Security AI agent unavailable: {exc}")
 
+
 async def _get_engine():
     try:
         from backend.agents.security_score_engine import get_security_score_engine
+
         return await get_security_score_engine()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Security Score Engine unavailable: {exc}")
@@ -72,24 +85,37 @@ async def _get_engine():
 
 @router.get("/status", summary="Security AI Agent status")
 async def get_agent_status(agent=Depends(_get_agent)) -> Dict[str, Any]:
-    return {"status": "running", "stats": agent.stats(), "timestamp": datetime.now(timezone.utc).isoformat()}
+    return {
+        "status": "running",
+        "stats": agent.stats(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.post("/analyze", summary="Analyze a security event")
 async def analyze_event(req: AnalyzeEventRequest, agent=Depends(_get_agent)) -> Dict[str, Any]:
     try:
-        from backend.agents.security_ai_agent import SecurityEvent, EventType
+        from backend.agents.security_ai_agent import EventType, SecurityEvent
+
         event = SecurityEvent(
-            event_type=EventType(req.event_type), ip_address=req.ip_address,
-            user_id=req.user_id, endpoint=req.endpoint, method=req.method,
-            status_code=req.status_code, response_time_ms=req.response_time_ms,
-            payload_size=req.payload_size, extra=req.extra,
+            event_type=EventType(req.event_type),
+            ip_address=req.ip_address,
+            user_id=req.user_id,
+            endpoint=req.endpoint,
+            method=req.method,
+            status_code=req.status_code,
+            response_time_ms=req.response_time_ms,
+            payload_size=req.payload_size,
+            extra=req.extra,
         )
         result = await agent.analyze_event(event)
         return {
-            "is_anomaly": result.is_anomaly, "score": result.score,
-            "risk_level": result.risk_level.value, "confidence": result.confidence,
-            "explanation": result.explanation, "self_heal_action": result.self_heal_action,
+            "is_anomaly": result.is_anomaly,
+            "score": result.score,
+            "risk_level": result.risk_level.value,
+            "confidence": result.confidence,
+            "explanation": result.explanation,
+            "self_heal_action": result.self_heal_action,
         }
     except Exception as exc:
         logger.error("analyze_event error: %s", exc)
@@ -99,13 +125,18 @@ async def analyze_event(req: AnalyzeEventRequest, agent=Depends(_get_agent)) -> 
 @router.post("/retrain", summary="Trigger manual model retraining")
 async def retrain_model(agent=Depends(_get_agent)) -> Dict[str, Any]:
     success = await agent.retrain_model()
-    return {"success": success, "message": "Model retrained" if success else "Not enough training data", "stats": agent.stats()}
+    return {
+        "success": success,
+        "message": "Model retrained" if success else "Not enough training data",
+        "stats": agent.stats(),
+    }
 
 
 @router.get("/score", summary="Current security score")
 async def get_security_score(engine=Depends(_get_engine)) -> Dict[str, Any]:
     report = engine.get_last_report()
-    if report is None: report = await engine.compute_score()
+    if report is None:
+        report = await engine.compute_score()
     return engine.to_json(report)
 
 
@@ -135,34 +166,60 @@ async def list_anomalies(
 ) -> Dict[str, Any]:
     try:
         from backend.database.connection import get_db_client
+
         db = await get_db_client()
         since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        query = (db.table("security_ai_analysis").select("*")
-            .eq("is_anomaly", True).gte("created_at", since)
+        query = (
+            db.table("security_ai_analysis")
+            .select("*")
+            .eq("is_anomaly", True)
+            .gte("created_at", since)
             .order("created_at", desc=True)
-            .range((page - 1) * page_size, page * page_size - 1))
-        if risk_level: query = query.eq("risk_level", risk_level)
+            .range((page - 1) * page_size, page * page_size - 1)
+        )
+        if risk_level:
+            query = query.eq("risk_level", risk_level)
         result = await asyncio.get_running_loop().run_in_executor(None, lambda: query.execute())
-        return {"page": page, "page_size": page_size, "data": result.data or [], "agent_stats": agent.stats()}
+        return {
+            "page": page,
+            "page_size": page_size,
+            "data": result.data or [],
+            "agent_stats": agent.stats(),
+        }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/block/{ip}", summary="Manually block IP")
 async def block_ip(ip: str, req: BlockIPRequest) -> Dict[str, Any]:
-    try: ipaddress.ip_address(ip)
-    except ValueError: raise HTTPException(status_code=400, detail=f"Invalid IP: {ip}")
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid IP: {ip}")
     try:
         from backend.agents.security_ai_agent import get_security_agent
         from backend.database.connection import get_db_client
-        db = await get_db_client(); agent = await get_security_agent()
+
+        db = await get_db_client()
+        agent = await get_security_agent()
         unblock_at = datetime.now(timezone.utc) + timedelta(hours=req.duration_hours)
         agent._healer._blocked_ips[ip] = time.monotonic() + req.duration_hours * 3600
-        await asyncio.get_running_loop().run_in_executor(None, lambda:
-            db.table("security_blocked_ips").upsert({
-                "ip_address": ip, "reason": req.reason, "blocked_by": "manual_admin",
-                "unblock_at": unblock_at.isoformat(), "is_active": True,
-            }).execute())
+        await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: (
+                db.table("security_blocked_ips")
+                .upsert(
+                    {
+                        "ip_address": ip,
+                        "reason": req.reason,
+                        "blocked_by": "manual_admin",
+                        "unblock_at": unblock_at.isoformat(),
+                        "is_active": True,
+                    }
+                )
+                .execute()
+            ),
+        )
         return {"success": True, "ip": ip, "unblock_at": unblock_at.isoformat()}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -170,15 +227,26 @@ async def block_ip(ip: str, req: BlockIPRequest) -> Dict[str, Any]:
 
 @router.delete("/block/{ip}", summary="Unblock IP")
 async def unblock_ip(ip: str) -> Dict[str, Any]:
-    try: ipaddress.ip_address(ip)
-    except ValueError: raise HTTPException(status_code=400, detail=f"Invalid IP: {ip}")
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid IP: {ip}")
     try:
         from backend.agents.security_ai_agent import get_security_agent
         from backend.database.connection import get_db_client
-        db = await get_db_client(); agent = await get_security_agent()
+
+        db = await get_db_client()
+        agent = await get_security_agent()
         agent._healer._blocked_ips.pop(ip, None)
-        await asyncio.get_running_loop().run_in_executor(None, lambda:
-            db.table("security_blocked_ips").update({"is_active": False}).eq("ip_address", ip).execute())
+        await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: (
+                db.table("security_blocked_ips")
+                .update({"is_active": False})
+                .eq("ip_address", ip)
+                .execute()
+            ),
+        )
         return {"success": True, "ip": ip, "status": "unblocked"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

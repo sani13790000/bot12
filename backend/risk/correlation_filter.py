@@ -8,15 +8,16 @@ Fixes:
             format args — ContextualLogger only accepts msg + **kwargs.
             All logger calls converted to keyword-arg style.
 """
+
 from __future__ import annotations
 
 import asyncio
 import math
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Deque, Dict, List, Optional, Tuple
-from collections import deque
 
 from ..core.logger import get_logger
 
@@ -24,7 +25,7 @@ logger = get_logger("risk.correlation_filter")
 
 
 class FailMode(str, Enum):
-    FAIL_OPEN   = "fail_open"
+    FAIL_OPEN = "fail_open"
     FAIL_CLOSED = "fail_closed"
 
 
@@ -57,10 +58,11 @@ _STATIC_CORRELATION_TABLE: Dict[Tuple[str, str], float] = {
 
 # ─── Rolling engine ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class _PriceWindow:
-    window:     int
-    returns:    Deque[float] = field(default_factory=deque)
+    window: int
+    returns: Deque[float] = field(default_factory=deque)
     last_price: Optional[float] = None
 
     def add_price(self, price: float) -> None:
@@ -82,15 +84,15 @@ class _PriceWindow:
 @dataclass
 class _CacheEntry:
     correlation: float
-    timestamp:   float
+    timestamp: float
 
 
 class RollingCorrelationEngine:
     def __init__(self, window: int = 50, cache_ttl: float = 60.0):
-        self._window:    int = window
+        self._window: int = window
         self._cache_ttl: float = cache_ttl
-        self._windows:   Dict[str, _PriceWindow]            = {}
-        self._cache:     Dict[Tuple[str, str], _CacheEntry] = {}
+        self._windows: Dict[str, _PriceWindow] = {}
+        self._cache: Dict[Tuple[str, str], _CacheEntry] = {}
         self._lock = asyncio.Lock()
 
     async def add_price(self, symbol: str, price: float) -> None:
@@ -113,8 +115,7 @@ class RollingCorrelationEngine:
                 return entry.correlation
             win_a = self._windows.get(key[0])
             win_b = self._windows.get(key[1])
-            if (win_a is None or win_b is None
-                    or not win_a.ready or not win_b.ready):
+            if win_a is None or win_b is None or not win_a.ready or not win_b.ready:
                 return None
             corr = _pearson(win_a.as_list(), win_b.as_list())
             self._cache[key] = _CacheEntry(correlation=corr, timestamp=time.monotonic())
@@ -128,13 +129,12 @@ class RollingCorrelationEngine:
             now = time.monotonic()
             return {
                 "tracked_symbols": len(self._windows),
-                "cache_entries":   len(self._cache),
+                "cache_entries": len(self._cache),
                 "cache_live": sum(
-                    1 for e in self._cache.values()
-                    if now - e.timestamp < self._cache_ttl
+                    1 for e in self._cache.values() if now - e.timestamp < self._cache_ttl
                 ),
                 "window_size": self._window,
-                "cache_ttl":   self._cache_ttl,
+                "cache_ttl": self._cache_ttl,
             }
 
 
@@ -146,39 +146,41 @@ def _pearson(x: List[float], y: List[float]) -> float:
     mx = sum(x) / n
     my = sum(y) / n
     num = sum((x[i] - mx) * (y[i] - my) for i in range(n))
-    dx  = math.sqrt(sum((v - mx) ** 2 for v in x))
-    dy  = math.sqrt(sum((v - my) ** 2 for v in y))
+    dx = math.sqrt(sum((v - mx) ** 2 for v in x))
+    dy = math.sqrt(sum((v - my) ** 2 for v in y))
     return round(num / (dx * dy), 4) if dx * dy > 0 else 0.0
 
 
 # ─── Config & types ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class CorrelationFilterConfig:
-    max_correlated_exposure:       float    = 0.80
-    correlation_penalty_threshold: float    = 0.60
-    window:                        int      = 50
-    cache_ttl:                     float    = 60.0
+    max_correlated_exposure: float = 0.80
+    correlation_penalty_threshold: float = 0.60
+    window: int = 50
+    cache_ttl: float = 60.0
     fail_mode: FailMode = FailMode.FAIL_CLOSED
 
 
 @dataclass
 class CorrPosition:
-    symbol:       str
-    direction:    str
+    symbol: str
+    direction: str
     risk_percent: float
 
 
 @dataclass
 class CorrelationResult:
-    can_trade:         bool
-    risk_multiplier:   float
+    can_trade: bool
+    risk_multiplier: float
     correlation_score: float
-    reason:            str
-    source:            str
+    reason: str
+    source: str
 
 
 # ─── Filter ───────────────────────────────────────────────────────────────────
+
 
 class CorrelationFilter:
     """
@@ -191,10 +193,10 @@ class CorrelationFilter:
 
     def __init__(
         self,
-        config:    Optional[CorrelationFilterConfig] = None,
+        config: Optional[CorrelationFilterConfig] = None,
         fail_mode: Optional[FailMode] = None,
     ):
-        self.config  = config or CorrelationFilterConfig()
+        self.config = config or CorrelationFilterConfig()
         self._engine = RollingCorrelationEngine(
             window=self.config.window, cache_ttl=self.config.cache_ttl
         )
@@ -208,9 +210,9 @@ class CorrelationFilter:
 
     async def check(
         self,
-        new_symbol:        str,
-        new_direction:     str,
-        open_positions:    List[CorrPosition],
+        new_symbol: str,
+        new_direction: str,
+        open_positions: List[CorrPosition],
         base_risk_percent: float,
     ) -> CorrelationResult:
         try:
@@ -228,13 +230,15 @@ class CorrelationFilter:
             )
             if self._fail_mode is FailMode.FAIL_CLOSED:
                 return CorrelationResult(
-                    can_trade=False, risk_multiplier=0.0,
+                    can_trade=False,
+                    risk_multiplier=0.0,
                     correlation_score=0.0,
                     reason=f"FAIL_CLOSED:CORRELATION_GATE_ERROR:{type(exc).__name__}",
                     source="error",
                 )
             return CorrelationResult(
-                can_trade=True, risk_multiplier=1.0,
+                can_trade=True,
+                risk_multiplier=1.0,
                 correlation_score=0.0,
                 reason=f"FAIL_OPEN:CORRELATION_GATE_ERROR:{type(exc).__name__}",
                 source="error",
@@ -242,25 +246,33 @@ class CorrelationFilter:
 
     async def _check_inner(
         self,
-        new_symbol:        str,
-        new_direction:     str,
-        open_positions:    List[CorrPosition],
+        new_symbol: str,
+        new_direction: str,
+        open_positions: List[CorrPosition],
         base_risk_percent: float,
     ) -> CorrelationResult:
         if not open_positions:
             return CorrelationResult(
-                can_trade=True, risk_multiplier=1.0,
-                correlation_score=0.0, reason="", source="none",
+                can_trade=True,
+                risk_multiplier=1.0,
+                correlation_score=0.0,
+                reason="",
+                source="none",
             )
-        max_corr = 0.0; max_pair = ""; net_exposure = 0.0; source = "none"
+        max_corr = 0.0
+        max_pair = ""
+        net_exposure = 0.0
+        source = "none"
         for pos in open_positions:
             corr, src = await self._get_correlation(new_symbol, pos.symbol)
             if corr is None:
                 continue
             direction_factor = 1.0 if new_direction == pos.direction else -1.0
-            net_exposure    += corr * direction_factor * pos.risk_percent
+            net_exposure += corr * direction_factor * pos.risk_percent
             if abs(corr) > abs(max_corr):
-                max_corr = corr; max_pair = pos.symbol; source = src
+                max_corr = corr
+                max_pair = pos.symbol
+                source = src
         abs_net = abs(net_exposure)
         # STRESS-4: keyword-arg logger style
         logger.debug(
@@ -271,19 +283,27 @@ class CorrelationFilter:
         )
         if abs_net >= self.config.max_correlated_exposure:
             return CorrelationResult(
-                can_trade=False, risk_multiplier=0.0, correlation_score=abs_net,
+                can_trade=False,
+                risk_multiplier=0.0,
+                correlation_score=abs_net,
                 reason=f"Correlated exposure {abs_net:.2f}>={self.config.max_correlated_exposure} (pair:{max_pair} corr={max_corr:.2f})",
                 source=source,
             )
         if abs_net >= self.config.correlation_penalty_threshold:
-            penalty    = 1.0 - (abs_net - self.config.correlation_penalty_threshold) / (self.config.max_correlated_exposure - self.config.correlation_penalty_threshold)
+            penalty = 1.0 - (abs_net - self.config.correlation_penalty_threshold) / (
+                self.config.max_correlated_exposure - self.config.correlation_penalty_threshold
+            )
             multiplier = round(max(0.3, penalty), 2)
             return CorrelationResult(
-                can_trade=True, risk_multiplier=multiplier, correlation_score=abs_net,
+                can_trade=True,
+                risk_multiplier=multiplier,
+                correlation_score=abs_net,
                 reason=f"Correlation penalty: net={abs_net:.2f} mult={multiplier}",
                 source=source,
             )
-        return CorrelationResult(can_trade=True, risk_multiplier=1.0, correlation_score=abs_net, reason="", source=source)
+        return CorrelationResult(
+            can_trade=True, risk_multiplier=1.0, correlation_score=abs_net, reason="", source=source
+        )
 
     async def _get_correlation(self, sym_a: str, sym_b: str) -> Tuple[Optional[float], str]:
         try:
@@ -302,7 +322,9 @@ class CorrelationFilter:
             return 1.0
         return _STATIC_CORRELATION_TABLE.get(_canonical(sym_a, sym_b))
 
-    async def portfolio_correlation_matrix(self, symbols: List[str]) -> Dict[Tuple[str, str], float]:
+    async def portfolio_correlation_matrix(
+        self, symbols: List[str]
+    ) -> Dict[Tuple[str, str], float]:
         matrix: Dict[Tuple[str, str], float] = {}
         for i, a in enumerate(symbols):
             for b in symbols[i:]:

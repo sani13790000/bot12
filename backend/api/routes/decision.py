@@ -6,16 +6,16 @@ Endpointهای مربوط به تصمیم‌گیری و سیگنال‌ها.
 نویسنده: MT5 Trading Team
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, Field
-from datetime import datetime
+from typing import Any, Dict, Optional
 
-from ...core.logger import get_logger
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+
 from ...core.exceptions import LicenseError
+from ...core.logger import get_logger
 from ...services.decision_service import decision_service
-from ...services.signal_service import signal_service
 from ...services.license_service import license_service
+from ...services.signal_service import signal_service
 from .auth import get_current_user
 
 logger = get_logger("api.decision")
@@ -26,8 +26,10 @@ router = APIRouter()
 # مدل‌های Pydantic
 # =====================================================
 
+
 class MarketDataRequest(BaseModel):
     """درخواست داده بازار"""
+
     symbol: str = Field(..., description="نماد معاملاتی")
     timeframe: str = Field(default="H1", description="تایم‌فریم")
 
@@ -64,6 +66,7 @@ class MarketDataRequest(BaseModel):
 
 class DecisionResponse(BaseModel):
     """پاسخ تصمیم"""
+
     success: bool
     data: Dict[str, Any]
 
@@ -72,11 +75,10 @@ class DecisionResponse(BaseModel):
 # Endpoints
 # =====================================================
 
+
 @router.post("/request", response_model=DecisionResponse)
 async def request_decision(
-    request: Request,
-    data: MarketDataRequest,
-    user: dict = Depends(get_current_user)
+    request: Request, data: MarketDataRequest, user: dict = Depends(get_current_user)
 ):
     """
     درخواست تصمیم‌گیری جدید
@@ -100,10 +102,7 @@ async def request_decision(
         license_key = user_license.get("license_key")
         has_feature = await license_service.has_feature(license_key, "auto_trading")
         if not has_feature:
-            raise HTTPException(
-                status_code=403,
-                detail="دسترسی به ویژگی معاملات خودکار مجاز نیست"
-            )
+            raise HTTPException(status_code=403, detail="دسترسی به ویژگی معاملات خودکار مجاز نیست")
 
     # استخراج IP
     ip_address = request.client.host if request.client else None
@@ -116,7 +115,7 @@ async def request_decision(
             "is_valid": user_license.get("status") == "active",
             "is_expired": False,
             "license_type": user_license.get("license_type"),
-            "allowed_features": user_license.get("features", [])
+            "allowed_features": user_license.get("features", []),
         }
 
     # درخواست تصمیم
@@ -127,13 +126,10 @@ async def request_decision(
             market_data=market_data,
             user_id=user.get("id"),
             user_settings=user.get("settings", {}),
-            ip_address=ip_address
+            ip_address=ip_address,
         )
 
-        return {
-            "success": True,
-            "data": result
-        }
+        return {"success": True, "data": result}
 
     except LicenseError as e:
         raise HTTPException(status_code=403, detail=str(e))
@@ -146,7 +142,7 @@ async def request_decision(
 async def get_latest_decisions(
     symbol: Optional[str] = Query(None),
     limit: int = Query(default=10, le=50),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     دریافت آخرین تصمیم‌ها
@@ -154,47 +150,33 @@ async def get_latest_decisions(
     آخرین تصمیم‌های تولید شده برای کاربر را برمی‌گرداند.
     """
     decisions = await decision_service.get_latest_decision(
-        user_id=user.get("id"),
-        symbol=symbol,
-        limit=limit
+        user_id=user.get("id"), symbol=symbol, limit=limit
     )
 
-    return {
-        "success": True,
-        "data": {
-            "decisions": decisions,
-            "count": len(decisions)
-        }
-    }
+    return {"success": True, "data": {"decisions": decisions, "count": len(decisions)}}
 
 
 @router.get("/{decision_id}")
-async def get_decision(
-    decision_id: str,
-    user: dict = Depends(get_current_user)
-):
+async def get_decision(decision_id: str, user: dict = Depends(get_current_user)):
     """
     دریافت یک تصمیم خاص
 
     جزئیات یک تصمیم خاص را برمی‌گرداند.
     """
     decision = await decision_service.get_decision_by_id(
-        decision_id=decision_id,
-        user_id=user.get("id")
+        decision_id=decision_id, user_id=user.get("id")
     )
 
     if not decision:
         raise HTTPException(status_code=404, detail="تصمیم یافت نشد")
 
-    return {
-        "success": True,
-        "data": decision
-    }
+    return {"success": True, "data": decision}
 
 
 # =====================================================
 # Signal Endpoints
 # =====================================================
+
 
 @router.get("/signals/")
 async def list_signals(
@@ -204,7 +186,7 @@ async def list_signals(
     min_score: Optional[int] = Query(None),
     limit: int = Query(default=50, le=100),
     offset: int = Query(default=0),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     لیست سیگنال‌ها
@@ -222,56 +204,37 @@ async def list_signals(
         direction=direction,
         min_score=min_score,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
-    return {
-        "success": True,
-        "data": result
-    }
+    return {"success": True, "data": result}
 
 
 @router.get("/signals/active")
 async def get_active_signals(
-    limit: int = Query(default=10, le=20),
-    user: dict = Depends(get_current_user)
+    limit: int = Query(default=10, le=20), user: dict = Depends(get_current_user)
 ):
     """
     دریافت سیگنال‌های فعال
 
     سیگنال‌هایی که هنوز منقضی نشده و اجرا نشده‌اند.
     """
-    result = await signal_service.get_active_signals(
-        user_id=user.get("id"),
-        limit=limit
-    )
+    result = await signal_service.get_active_signals(user_id=user.get("id"), limit=limit)
 
-    return {
-        "success": True,
-        "data": result
-    }
+    return {"success": True, "data": result}
 
 
 @router.get("/signals/{signal_id}")
-async def get_signal(
-    signal_id: str,
-    user: dict = Depends(get_current_user)
-):
+async def get_signal(signal_id: str, user: dict = Depends(get_current_user)):
     """
     جزئیات یک سیگنال
     """
-    signal = await signal_service.get_signal(
-        signal_id=signal_id,
-        user_id=user.get("id")
-    )
+    signal = await signal_service.get_signal(signal_id=signal_id, user_id=user.get("id"))
 
     if not signal:
         raise HTTPException(status_code=404, detail="سیگنال یافت نشد")
 
-    return {
-        "success": True,
-        "data": signal
-    }
+    return {"success": True, "data": signal}
 
 
 @router.post("/signals/{signal_id}/execute")
@@ -279,7 +242,7 @@ async def mark_signal_executed(
     signal_id: str,
     execution_price: float,
     execution_type: str = "manual",
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     علامت‌گذاری سیگنال به عنوان اجرا شده
@@ -288,35 +251,24 @@ async def mark_signal_executed(
         signal_id=signal_id,
         user_id=user.get("id"),
         execution_price=execution_price,
-        execution_type=execution_type
+        execution_type=execution_type,
     )
 
     if not result:
         raise HTTPException(status_code=404, detail="سیگنال یافت نشد")
 
-    return {
-        "success": True,
-        "message": "سیگنال به عنوان اجرا شده علامت‌گذاری شد",
-        "data": result
-    }
+    return {"success": True, "message": "سیگنال به عنوان اجرا شده علامت‌گذاری شد", "data": result}
 
 
 @router.get("/signals/stats/summary")
 async def get_signal_stats(
-    days: int = Query(default=30, le=90),
-    user: dict = Depends(get_current_user)
+    days: int = Query(default=30, le=90), user: dict = Depends(get_current_user)
 ):
     """
     آمار سیگنال‌ها
 
     آمار و عملکرد سیگنال‌ها در بازه مشخص.
     """
-    stats = await signal_service.get_signal_stats(
-        user_id=user.get("id"),
-        days=days
-    )
+    stats = await signal_service.get_signal_stats(user_id=user.get("id"), days=days)
 
-    return {
-        "success": True,
-        "data": stats
-    }
+    return {"success": True, "data": stats}

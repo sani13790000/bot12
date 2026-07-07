@@ -2,6 +2,7 @@
 Galaxy Vast AI Trading Platform
 RiskReportGenerator -- Institutional Risk Report Generator
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,16 +12,16 @@ from typing import Any, Optional
 
 @dataclass
 class RiskMetrics:
-    max_drawdown_pct:  float = 0.0
-    var_95:            float = 0.0
-    cvar_95:           float = 0.0
-    sharpe_ratio:      float = 0.0
-    sortino_ratio:     float = 0.0
-    calmar_ratio:      float = 0.0
-    beta:              float = 0.0
-    correlation:       float = 0.0
-    exposure_pct:      float = 0.0
-    margin_usage_pct:  float = 0.0
+    max_drawdown_pct: float = 0.0
+    var_95: float = 0.0
+    cvar_95: float = 0.0
+    sharpe_ratio: float = 0.0
+    sortino_ratio: float = 0.0
+    calmar_ratio: float = 0.0
+    beta: float = 0.0
+    correlation: float = 0.0
+    exposure_pct: float = 0.0
+    margin_usage_pct: float = 0.0
 
 
 class RiskReportGenerator:
@@ -76,9 +77,9 @@ class RiskReportGenerator:
     def to_dict(self, metrics: RiskMetrics) -> dict:
         return {
             "max_drawdown_pct": round(metrics.max_drawdown_pct, 2),
-            "var_95":          round(metrics.var_95, 4),
-            "cvar_95":         round(metrics.cvar_95, 4),
-            "sharpe_ratio":    round(metrics.sharpe_ratio, 4),
-            "sortino_ratio":   round(metrics.sortino_ratio, 4),
-            "generated_at":    self._generated_at,
+            "var_95": round(metrics.var_95, 4),
+            "cvar_95": round(metrics.cvar_95, 4),
+            "sharpe_ratio": round(metrics.sharpe_ratio, 4),
+            "sortino_ratio": round(metrics.sortino_ratio, 4),
+            "generated_at": self._generated_at,
         }

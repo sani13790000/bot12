@@ -1,10 +1,12 @@
 """conftest.py --- Global pytest fixtures for Galaxy Vast AI Trading Platform."""
+
 from __future__ import annotations
 
 import asyncio
-import pytest
 from typing import Any, Dict
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 def pytest_configure(config):
@@ -28,20 +30,29 @@ def mock_broker():
     broker.place_order = AsyncMock(return_value={"ticket": 999001, "price": 1.1050})
     broker.close_position = AsyncMock(return_value=True)
     broker.get_open_positions = AsyncMock(return_value=[])
-    broker.get_account_info = AsyncMock(return_value={
-        "balance": 10_000.0, "equity": 10_050.0,
-        "margin": 200.0, "free_margin": 9_850.0,
-        "profit": 50.0, "leverage": 100,
-    })
-    broker.get_candles = AsyncMock(return_value=[
-        {"time": 1_700_000_000 + i * 3600,
-         "open": 1.1000 + i * 0.0001,
-         "high": 1.1010 + i * 0.0001,
-         "low":  1.0990 + i * 0.0001,
-         "close": 1.1005 + i * 0.0001,
-         "tick_volume": 500 + i}
-        for i in range(200)
-    ])
+    broker.get_account_info = AsyncMock(
+        return_value={
+            "balance": 10_000.0,
+            "equity": 10_050.0,
+            "margin": 200.0,
+            "free_margin": 9_850.0,
+            "profit": 50.0,
+            "leverage": 100,
+        }
+    )
+    broker.get_candles = AsyncMock(
+        return_value=[
+            {
+                "time": 1_700_000_000 + i * 3600,
+                "open": 1.1000 + i * 0.0001,
+                "high": 1.1010 + i * 0.0001,
+                "low": 1.0990 + i * 0.0001,
+                "close": 1.1005 + i * 0.0001,
+                "tick_volume": 500 + i,
+            }
+            for i in range(200)
+        ]
+    )
     broker.health_check = AsyncMock(return_value={"status": "ok", "latency_ms": 12.3})
     return broker
 
@@ -123,10 +134,12 @@ def mock_db():
 @pytest.fixture
 def mock_voting():
     ve = MagicMock()
-    ve.vote = AsyncMock(return_value=MagicMock(
-        approved=True,
-        confidence=0.82,
-        votes=[],
-        to_dict=lambda: {"approved": True, "confidence": 0.82}
-    ))
+    ve.vote = AsyncMock(
+        return_value=MagicMock(
+            approved=True,
+            confidence=0.82,
+            votes=[],
+            to_dict=lambda: {"approved": True, "confidence": 0.82},
+        )
+    )
     return ve

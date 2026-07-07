@@ -10,36 +10,35 @@
 نویسنده: MT5 Trading Team
 """
 
-import pytest
-import numpy as np
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock
-import sys
 import os
+import sys
+from datetime import datetime, timedelta
+
+import numpy as np
+import pytest
 
 # اضافه کردن مسیر پروژه
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from backend.analysis.price_action_engine import (
-    ContextAnalyzer,
-    CandlePatternDetector,
-    PriceStructureAnalyzer,
-    PriceActionEngine,
     CandleData,
+    CandlePatternDetector,
+    ContextAnalyzer,
     MarketContext,
-    PatternAnalysis,
-    StandardPASignal,
     PatternReasonCode,
     PatternStrength,
     PatternType,
-    PriceActionResult
+    PriceActionEngine,
+    PriceActionResult,
+    PriceStructureAnalyzer,
+    StandardPASignal,
 )
-from backend.core.enums import TrendDirection, TradingSession
-
+from backend.core.enums import TradingSession, TrendDirection
 
 # =====================================================
 # Fixtures
 # =====================================================
+
 
 @pytest.fixture
 def sample_ohlc_data():
@@ -59,11 +58,11 @@ def sample_ohlc_data():
     lows = np.minimum(opens, closes) - np.random.rand(n) * 0.001
 
     return {
-        'opens': list(opens),
-        'highs': list(highs),
-        'lows': list(lows),
-        'closes': list(closes),
-        'times': times
+        "opens": list(opens),
+        "highs": list(highs),
+        "lows": list(lows),
+        "closes": list(closes),
+        "times": times,
     }
 
 
@@ -72,12 +71,7 @@ def pin_bar_candle_data():
     """کندل Pin Bar مصنوعی"""
     # Bullish Pin Bar
     return CandleData(
-        index=0,
-        time=datetime.utcnow(),
-        open=1.1005,
-        high=1.1010,
-        low=1.0980,
-        close=1.1003
+        index=0, time=datetime.utcnow(), open=1.1005, high=1.1010, low=1.0980, close=1.1003
     )
 
 
@@ -85,12 +79,7 @@ def pin_bar_candle_data():
 def bearish_pin_bar_data():
     """کندل Bearish Pin Bar مصنوعی"""
     return CandleData(
-        index=0,
-        time=datetime.utcnow(),
-        open=1.1000,
-        high=1.1030,
-        low=1.0998,
-        close=1.1002
+        index=0, time=datetime.utcnow(), open=1.1000, high=1.1030, low=1.0998, close=1.1002
     )
 
 
@@ -113,7 +102,7 @@ def engulfing_candles():
             high=1.1025,
             low=1.1000,
             close=1.1020,  # صعودی بزرگ (engulfing)
-        )
+        ),
     ]
 
 
@@ -128,7 +117,7 @@ def fakey_candles():
             open=1.1000,
             high=1.1025,
             low=1.0980,
-            close=1.1010
+            close=1.1010,
         ),
         # Inside Bar
         CandleData(
@@ -137,7 +126,7 @@ def fakey_candles():
             open=1.1005,
             high=1.1015,
             low=1.0995,
-            close=1.1008
+            close=1.1008,
         ),
         # False Break Candle
         CandleData(
@@ -146,7 +135,7 @@ def fakey_candles():
             open=1.1008,
             high=1.1030,  # Break above inside
             low=1.0990,
-            close=1.1005
+            close=1.1005,
         ),
         # Signal Candle
         CandleData(
@@ -155,8 +144,8 @@ def fakey_candles():
             open=1.1005,
             high=1.1015,
             low=1.0985,
-            close=1.0990  # Close below inside
-        )
+            close=1.0990,  # Close below inside
+        ),
     ]
 
 
@@ -200,19 +189,12 @@ def smc_context():
                 "high": 1.1010,
                 "low": 1.0990,
                 "mid": 1.1000,
-                "score": 8
+                "score": 8,
             }
         ],
-        "active_fvgs": [
-            {
-                "fvg_type": "bullish_fvg",
-                "high": 1.1005,
-                "low": 1.0995,
-                "mid": 1.1000
-            }
-        ],
+        "active_fvgs": [{"fvg_type": "bullish_fvg", "high": 1.1005, "low": 1.0995, "mid": 1.1000}],
         "premium_discount": "discount",
-        "last_event_type": "choch"
+        "last_event_type": "choch",
     }
 
 
@@ -220,18 +202,14 @@ def smc_context():
 # تست‌های CandleData
 # =====================================================
 
+
 class TestCandleData:
     """تست‌های ساختار CandleData"""
 
     def test_candle_data_creation(self):
         """تست ایجاد CandleData"""
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1000,
-            high=1.1010,
-            low=1.0990,
-            close=1.1005
+            index=0, time=datetime.utcnow(), open=1.1000, high=1.1010, low=1.0990, close=1.1005
         )
 
         assert candle.index == 0
@@ -241,12 +219,7 @@ class TestCandleData:
     def test_candle_calculations(self):
         """تست محاسبات خودکار کندل"""
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1000,
-            high=1.1010,
-            low=1.0990,
-            close=1.1005
+            index=0, time=datetime.utcnow(), open=1.1000, high=1.1010, low=1.0990, close=1.1005
         )
 
         # Post-init calculations
@@ -259,12 +232,7 @@ class TestCandleData:
     def test_bearish_candle(self):
         """تست کندل نزولی"""
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1010,
-            high=1.1015,
-            low=1.0990,
-            close=1.0995
+            index=0, time=datetime.utcnow(), open=1.1010, high=1.1015, low=1.0990, close=1.0995
         )
 
         assert candle.is_bullish is False
@@ -274,6 +242,7 @@ class TestCandleData:
 # =====================================================
 # تست‌های ContextAnalyzer
 # =====================================================
+
 
 class TestContextAnalyzer:
     """تست‌های تحلیلگر Context"""
@@ -291,18 +260,15 @@ class TestContextAnalyzer:
 
         candles = [
             {
-                'open': sample_ohlc_data['opens'][i],
-                'high': sample_ohlc_data['highs'][i],
-                'low': sample_ohlc_data['lows'][i],
-                'close': sample_ohlc_data['closes'][i]
+                "open": sample_ohlc_data["opens"][i],
+                "high": sample_ohlc_data["highs"][i],
+                "low": sample_ohlc_data["lows"][i],
+                "close": sample_ohlc_data["closes"][i],
             }
-            for i in range(len(sample_ohlc_data['opens']))
+            for i in range(len(sample_ohlc_data["opens"]))
         ]
 
-        context = analyzer.analyze(
-            candles,
-            sample_ohlc_data['times']
-        )
+        context = analyzer.analyze(candles, sample_ohlc_data["times"])
 
         assert isinstance(context, MarketContext)
         assert context.atr > 0
@@ -314,24 +280,21 @@ class TestContextAnalyzer:
 
         candles = [
             {
-                'open': sample_ohlc_data['opens'][i],
-                'high': sample_ohlc_data['highs'][i],
-                'low': sample_ohlc_data['lows'][i],
-                'close': sample_ohlc_data['closes'][i]
+                "open": sample_ohlc_data["opens"][i],
+                "high": sample_ohlc_data["highs"][i],
+                "low": sample_ohlc_data["lows"][i],
+                "close": sample_ohlc_data["closes"][i],
             }
-            for i in range(len(sample_ohlc_data['opens']))
+            for i in range(len(sample_ohlc_data["opens"]))
         ]
 
-        context = analyzer.analyze(
-            candles,
-            sample_ohlc_data['times']
-        )
+        context = analyzer.analyze(candles, sample_ohlc_data["times"])
 
         # روند باید تشخیص داده شده باشد
         assert context.trend in (
             TrendDirection.BULLISH,
             TrendDirection.BEARISH,
-            TrendDirection.NEUTRAL
+            TrendDirection.NEUTRAL,
         )
         assert 0 <= context.trend_strength <= 100
 
@@ -342,8 +305,8 @@ class TestContextAnalyzer:
         # London session (8-17 UTC)
         london_time = datetime.utcnow().replace(hour=10, minute=0)
 
-        candles = [{'open': 1.1, 'high': 1.1, 'low': 1.1, 'close': 1.1} for _ in range(30)]
-        times = [london_time - timedelta(minutes=i*15) for i in range(30)]
+        candles = [{"open": 1.1, "high": 1.1, "low": 1.1, "close": 1.1} for _ in range(30)]
+        times = [london_time - timedelta(minutes=i * 15) for i in range(30)]
 
         context = analyzer.analyze(candles, times)
 
@@ -352,7 +315,7 @@ class TestContextAnalyzer:
             TradingSession.LONDON,
             TradingSession.NEW_YORK,
             TradingSession.TOKYO,
-            TradingSession.SYDNEY
+            TradingSession.SYDNEY,
         )
 
     def test_smc_context_extraction(self, sample_ohlc_data, smc_context):
@@ -361,19 +324,15 @@ class TestContextAnalyzer:
 
         candles = [
             {
-                'open': sample_ohlc_data['opens'][i],
-                'high': sample_ohlc_data['highs'][i],
-                'low': sample_ohlc_data['lows'][i],
-                'close': sample_ohlc_data['closes'][i]
+                "open": sample_ohlc_data["opens"][i],
+                "high": sample_ohlc_data["highs"][i],
+                "low": sample_ohlc_data["lows"][i],
+                "close": sample_ohlc_data["closes"][i],
             }
-            for i in range(len(sample_ohlc_data['opens']))
+            for i in range(len(sample_ohlc_data["opens"]))
         ]
 
-        context = analyzer.analyze(
-            candles,
-            sample_ohlc_data['times'],
-            smc_context
-        )
+        context = analyzer.analyze(candles, sample_ohlc_data["times"], smc_context)
 
         assert context.liquidity_swept is True
         assert len(context.active_blocks) > 0
@@ -384,6 +343,7 @@ class TestContextAnalyzer:
 # =====================================================
 # تست‌های Pin Bar
 # =====================================================
+
 
 class TestPinBarDetection:
     """تست‌های تشخیص Pin Bar"""
@@ -443,12 +403,7 @@ class TestPinBarDetection:
 
         # کندل معمولی
         normal_candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1000,
-            high=1.1010,
-            low=1.0990,
-            close=1.1005
+            index=0, time=datetime.utcnow(), open=1.1000, high=1.1010, low=1.0990, close=1.1005
         )
 
         analysis = detector.detect_pin_bar([normal_candle], basic_context)
@@ -459,6 +414,7 @@ class TestPinBarDetection:
 # =====================================================
 # تست‌های Engulfing
 # =====================================================
+
 
 class TestEngulfingDetection:
     """تست‌های تشخیص Engulfing"""
@@ -495,7 +451,7 @@ class TestEngulfingDetection:
                 open=1.1000,  # صعودی کوچک
                 high=1.1010,
                 low=1.0995,
-                close=1.1008
+                close=1.1008,
             ),
             CandleData(
                 index=1,
@@ -503,8 +459,8 @@ class TestEngulfingDetection:
                 open=1.1005,
                 high=1.1008,
                 low=1.0980,
-                close=1.0985  # نزولی بزرگ (engulfing)
-            )
+                close=1.0985,  # نزولی بزرگ (engulfing)
+            ),
         ]
 
         analysis = detector.detect_engulfing(candles, basic_context)
@@ -524,16 +480,11 @@ class TestEngulfingDetection:
                 open=1.1000,
                 high=1.1010,
                 low=1.0990,
-                close=1.1005
+                close=1.1005,
             ),
             CandleData(
-                index=1,
-                time=datetime.utcnow(),
-                open=1.1005,
-                high=1.1015,
-                low=1.1000,
-                close=1.1010
-            )
+                index=1, time=datetime.utcnow(), open=1.1005, high=1.1015, low=1.1000, close=1.1010
+            ),
         ]
 
         analysis = detector.detect_engulfing(candles, basic_context)
@@ -545,6 +496,7 @@ class TestEngulfingDetection:
 # =====================================================
 # تست‌های Fakey
 # =====================================================
+
 
 class TestFakeyDetection:
     """تست‌های تشخیص Fakey"""
@@ -562,7 +514,7 @@ class TestFakeyDetection:
                 open=1.1000,
                 high=1.1025,
                 low=1.0980,
-                close=1.1010
+                close=1.1010,
             ),
             # Inside Bar
             CandleData(
@@ -571,7 +523,7 @@ class TestFakeyDetection:
                 open=1.1005,
                 high=1.1015,
                 low=1.0995,
-                close=1.1008
+                close=1.1008,
             ),
             # False Break Down
             CandleData(
@@ -580,7 +532,7 @@ class TestFakeyDetection:
                 open=1.1008,
                 high=1.1010,
                 low=1.0970,  # Break below inside
-                close=1.0990
+                close=1.0990,
             ),
             # Signal Candle (bullish return)
             CandleData(
@@ -589,8 +541,8 @@ class TestFakeyDetection:
                 open=1.0995,
                 high=1.1015,
                 low=1.0990,
-                close=1.1010  # Close back inside
-            )
+                close=1.1010,  # Close back inside
+            ),
         ]
 
         analysis = detector.detect_fakey(candles, basic_context)
@@ -621,7 +573,7 @@ class TestFakeyDetection:
                 open=1.1000,
                 high=1.1025,
                 low=1.0980,
-                close=1.1010
+                close=1.1010,
             ),
             CandleData(
                 index=1,
@@ -629,7 +581,7 @@ class TestFakeyDetection:
                 open=1.1005,
                 high=1.1030,  # Outside mother
                 low=1.0970,
-                close=1.1015
+                close=1.1015,
             ),
             CandleData(
                 index=2,
@@ -637,16 +589,11 @@ class TestFakeyDetection:
                 open=1.1015,
                 high=1.1020,
                 low=1.1000,
-                close=1.1010
+                close=1.1010,
             ),
             CandleData(
-                index=3,
-                time=datetime.utcnow(),
-                open=1.1010,
-                high=1.1015,
-                low=1.1000,
-                close=1.1005
-            )
+                index=3, time=datetime.utcnow(), open=1.1010, high=1.1015, low=1.1000, close=1.1005
+            ),
         ]
 
         analysis = detector.detect_fakey(candles, basic_context)
@@ -658,6 +605,7 @@ class TestFakeyDetection:
 # =====================================================
 # تست‌های Inside/Outside Bar
 # =====================================================
+
 
 class TestInsideOutsideBar:
     """تست‌های تشخیص Inside و Outside Bar"""
@@ -673,16 +621,16 @@ class TestInsideOutsideBar:
                 open=1.1000,
                 high=1.1020,
                 low=1.0980,
-                close=1.1010
+                close=1.1010,
             ),
             CandleData(
                 index=1,
                 time=datetime.utcnow(),
                 open=1.1005,
                 high=1.1015,  # داخل mother
-                low=1.0990,   # داخل mother
-                close=1.1008
-            )
+                low=1.0990,  # داخل mother
+                close=1.1008,
+            ),
         ]
 
         analysis = detector.detect_inside_bar(candles, basic_context)
@@ -703,16 +651,16 @@ class TestInsideOutsideBar:
                 open=1.1000,
                 high=1.1015,
                 low=1.0990,
-                close=1.1010
+                close=1.1010,
             ),
             CandleData(
                 index=1,
                 time=datetime.utcnow(),
                 open=1.1005,
                 high=1.1020,  # خارج از mother
-                low=1.0980,   # خارج از mother
-                close=1.1015
-            )
+                low=1.0980,  # خارج از mother
+                close=1.1015,
+            ),
         ]
 
         analysis = detector.detect_outside_bar(candles, basic_context)
@@ -732,16 +680,11 @@ class TestInsideOutsideBar:
                 open=1.1000,
                 high=1.1030,
                 low=1.0970,
-                close=1.1015
+                close=1.1015,
             ),
             CandleData(
-                index=1,
-                time=datetime.utcnow(),
-                open=1.1008,
-                high=1.1010,
-                low=1.1005,
-                close=1.1009
-            )
+                index=1, time=datetime.utcnow(), open=1.1008, high=1.1010, low=1.1005, close=1.1009
+            ),
         ]
 
         analysis = detector.detect_inside_bar(candles, basic_context)
@@ -755,6 +698,7 @@ class TestInsideOutsideBar:
 # =====================================================
 # تست‌های Doji
 # =====================================================
+
 
 class TestDojiDetection:
     """تست‌های تشخیص Doji"""
@@ -770,7 +714,7 @@ class TestDojiDetection:
             open=1.1000,
             high=1.1015,
             low=1.0985,
-            close=1.1001  # تقریباً برابر با open
+            close=1.1001,  # تقریباً برابر با open
         )
 
         analysis = detector.detect_doji([candle], basic_context)
@@ -788,12 +732,7 @@ class TestDojiDetection:
         basic_context.atr = 0.0020
 
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1000,
-            high=1.1015,
-            low=1.0985,
-            close=1.1001
+            index=0, time=datetime.utcnow(), open=1.1000, high=1.1015, low=1.0985, close=1.1001
         )
 
         analysis = detector.detect_doji([candle], basic_context)
@@ -806,6 +745,7 @@ class TestDojiDetection:
 # =====================================================
 # تست‌های Star Patterns
 # =====================================================
+
 
 class TestStarPatterns:
     """تست‌های تشخیص Morning/Evening Star"""
@@ -821,7 +761,7 @@ class TestStarPatterns:
                 open=1.1010,
                 high=1.1015,
                 low=1.0990,
-                close=1.0995  # نزولی
+                close=1.0995,  # نزولی
             ),
             CandleData(
                 index=1,
@@ -829,7 +769,7 @@ class TestStarPatterns:
                 open=1.0995,
                 high=1.1000,
                 low=1.0990,
-                close=1.0997  # کوچک
+                close=1.0997,  # کوچک
             ),
             CandleData(
                 index=2,
@@ -837,8 +777,8 @@ class TestStarPatterns:
                 open=1.0997,
                 high=1.1015,
                 low=1.0995,
-                close=1.1010  # صعودی بزرگ
-            )
+                close=1.1010,  # صعودی بزرگ
+            ),
         ]
 
         analysis = detector.detect_star_pattern(candles, basic_context)
@@ -859,7 +799,7 @@ class TestStarPatterns:
                 open=1.0990,
                 high=1.1010,
                 low=1.0985,
-                close=1.1005  # صعودی
+                close=1.1005,  # صعودی
             ),
             CandleData(
                 index=1,
@@ -867,7 +807,7 @@ class TestStarPatterns:
                 open=1.1005,
                 high=1.1010,
                 low=1.1000,
-                close=1.1003  # کوچک
+                close=1.1003,  # کوچک
             ),
             CandleData(
                 index=2,
@@ -875,8 +815,8 @@ class TestStarPatterns:
                 open=1.1003,
                 high=1.1005,
                 low=1.0980,
-                close=1.0985  # نزولی بزرگ
-            )
+                close=1.0985,  # نزولی بزرگ
+            ),
         ]
 
         analysis = detector.detect_star_pattern(candles, basic_context)
@@ -889,6 +829,7 @@ class TestStarPatterns:
 # =====================================================
 # تست‌های Three Soldiers/Crows
 # =====================================================
+
 
 class TestThreePattern:
     """تست‌های تشخیص Three Soldiers/Crows"""
@@ -904,7 +845,7 @@ class TestThreePattern:
                 open=1.0990,
                 high=1.1005,
                 low=1.0985,
-                close=1.1000  # صعودی 1
+                close=1.1000,  # صعودی 1
             ),
             CandleData(
                 index=1,
@@ -912,7 +853,7 @@ class TestThreePattern:
                 open=1.1000,
                 high=1.1010,
                 low=1.0995,
-                close=1.1008  # صعودی 2
+                close=1.1008,  # صعودی 2
             ),
             CandleData(
                 index=2,
@@ -920,8 +861,8 @@ class TestThreePattern:
                 open=1.1008,
                 high=1.1020,
                 low=1.1005,
-                close=1.1015  # صعودی 3
-            )
+                close=1.1015,  # صعودی 3
+            ),
         ]
 
         analysis = detector.detect_three_soldiers_crows(candles, basic_context)
@@ -941,7 +882,7 @@ class TestThreePattern:
                 open=1.1010,
                 high=1.1015,
                 low=1.0995,
-                close=1.1000  # نزولی 1
+                close=1.1000,  # نزولی 1
             ),
             CandleData(
                 index=1,
@@ -949,7 +890,7 @@ class TestThreePattern:
                 open=1.1000,
                 high=1.1005,
                 low=1.0990,
-                close=1.0992  # نزولی 2
+                close=1.0992,  # نزولی 2
             ),
             CandleData(
                 index=2,
@@ -957,8 +898,8 @@ class TestThreePattern:
                 open=1.0992,
                 high=1.0995,
                 low=1.0980,
-                close=1.0985  # نزولی 3
-            )
+                close=1.0985,  # نزولی 3
+            ),
         ]
 
         analysis = detector.detect_three_soldiers_crows(candles, basic_context)
@@ -971,6 +912,7 @@ class TestThreePattern:
 # =====================================================
 # تست‌های Price Structure
 # =====================================================
+
 
 class TestPriceStructure:
     """تست‌های تشخیص ساختار قیمت"""
@@ -988,18 +930,13 @@ class TestPriceStructure:
                 open=1.1000 - 0.0005 * np.sin(i),
                 high=1.1005 - 0.0005 * np.sin(i),
                 low=1.0995 - 0.0005 * np.sin(i),
-                close=1.1000 - 0.0005 * np.sin(i)
+                close=1.1000 - 0.0005 * np.sin(i),
             )
             candles.append(candle)
 
         # آخرین کندل break بالا
         candles[-1] = CandleData(
-            index=24,
-            time=datetime.utcnow(),
-            open=1.1005,
-            high=1.1080,
-            low=1.1000,
-            close=1.1075
+            index=24, time=datetime.utcnow(), open=1.1005, high=1.1080, low=1.1000, close=1.1075
         )
 
         times = [c.time for c in candles]
@@ -1025,7 +962,7 @@ class TestPriceStructure:
                 open=1.1000,
                 high=1.1030,
                 low=1.0970,
-                close=1.1010 + 0.0005 * i
+                close=1.1010 + 0.0005 * i,
             )
             candles.append(candle)
 
@@ -1037,7 +974,7 @@ class TestPriceStructure:
                 open=1.1005,
                 high=1.1010,
                 low=1.1000,
-                close=1.1007
+                close=1.1007,
             )
             candles.append(candle)
 
@@ -1055,6 +992,7 @@ class TestPriceStructure:
 # تست‌های Engine کامل
 # =====================================================
 
+
 class TestPriceActionEngine:
     """تست‌های یکپارچه موتور Price Action"""
 
@@ -1070,11 +1008,7 @@ class TestPriceActionEngine:
         """تست تحلیل کامل"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         assert isinstance(result, PriceActionResult)
         assert result.symbol == "EURUSD"
@@ -1086,12 +1020,7 @@ class TestPriceActionEngine:
         """تست تحلیل با SMC context"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1",
-            smc_context
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1", smc_context)
 
         assert result.context.liquidity_swept is True
         assert len(result.context.active_blocks) > 0
@@ -1100,11 +1029,7 @@ class TestPriceActionEngine:
         """تست تولید سیگنال‌های استاندارد"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         assert isinstance(result.standard_signals, list)
 
@@ -1121,11 +1046,7 @@ class TestPriceActionEngine:
         """تست فیلتر سیگنال‌های ورود"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         entry_signals = result.get_entry_signals(min_confidence=40.0)
 
@@ -1137,11 +1058,7 @@ class TestPriceActionEngine:
         """تست دریافت قوی‌ترین سیگنال"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         strongest = result.get_strongest_signal()
 
@@ -1155,13 +1072,13 @@ class TestPriceActionEngine:
         result = engine.analyze(
             "EURUSD",
             {
-                'opens': [1.1000],
-                'highs': [1.1005],
-                'lows': [1.0995],
-                'closes': [1.1002],
-                'times': [datetime.utcnow()]
+                "opens": [1.1000],
+                "highs": [1.1005],
+                "lows": [1.0995],
+                "closes": [1.1002],
+                "times": [datetime.utcnow()],
             },
-            "H1"
+            "H1",
         )
 
         assert result.total_score == 0
@@ -1171,11 +1088,7 @@ class TestPriceActionEngine:
         """تست استخراج سطوح کلیدی"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         assert "supports" in result.key_levels
         assert "resistances" in result.key_levels
@@ -1184,11 +1097,7 @@ class TestPriceActionEngine:
         """تست سریالایزیشن"""
         engine = PriceActionEngine()
 
-        result = engine.analyze(
-            "EURUSD",
-            sample_ohlc_data,
-            "H1"
-        )
+        result = engine.analyze("EURUSD", sample_ohlc_data, "H1")
 
         serialized = result.to_dict()
 
@@ -1202,6 +1111,7 @@ class TestPriceActionEngine:
 # تست‌های Context Bonuses
 # =====================================================
 
+
 class TestContextBonuses:
     """تست‌های bonuses بر اساس context"""
 
@@ -1211,12 +1121,7 @@ class TestContextBonuses:
 
         # Pin Bar صعودی
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1005,
-            high=1.1010,
-            low=1.0980,
-            close=1.1003
+            index=0, time=datetime.utcnow(), open=1.1005, high=1.1010, low=1.0980, close=1.1003
         )
 
         analysis = detector.detect_pin_bar([candle], bullish_context)
@@ -1234,12 +1139,7 @@ class TestContextBonuses:
 
         # Pin Bar در حمایت
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1005,
-            high=1.1010,
-            low=1.0970,
-            close=1.1003
+            index=0, time=datetime.utcnow(), open=1.1005, high=1.1010, low=1.0970, close=1.1003
         )
 
         analysis = detector.detect_pin_bar([candle], basic_context)
@@ -1256,12 +1156,7 @@ class TestContextBonuses:
         basic_context.is_killzone = True
 
         candle = CandleData(
-            index=0,
-            time=datetime.utcnow(),
-            open=1.1005,
-            high=1.1010,
-            low=1.0980,
-            close=1.1003
+            index=0, time=datetime.utcnow(), open=1.1005, high=1.1010, low=1.0980, close=1.1003
         )
 
         analysis = detector.detect_pin_bar([candle], basic_context)
@@ -1274,6 +1169,7 @@ class TestContextBonuses:
 # =====================================================
 # تست‌های Scoring System
 # =====================================================
+
 
 class TestScoringSystem:
     """تست‌های سیستم امتیازدهی"""
@@ -1311,7 +1207,7 @@ class TestScoringSystem:
                 PatternStrength.WEAK.value,
                 PatternStrength.MODERATE.value,
                 PatternStrength.STRONG.value,
-                PatternStrength.VERY_STRONG.value
+                PatternStrength.VERY_STRONG.value,
             )
 
 

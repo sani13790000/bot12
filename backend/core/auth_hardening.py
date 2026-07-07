@@ -6,6 +6,7 @@ S-11: constant-time comparison via hmac.compare_digest
 S3-FIX: JTIBlocklist delegates to security.py persistent shelve store
 CONFIG-FIX: Uses get_settings() (lazy) instead of module-level settings import
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -13,7 +14,6 @@ import hmac
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 import jwt
 
@@ -29,6 +29,7 @@ def _settings():
 
 # ── JTI Blocklist ───────────────────────────────────────────────────────────────────────
 
+
 class JTIBlocklist:
     """
     S3-FIX: Delegates to security.py which uses persistent shelve storage.
@@ -37,12 +38,14 @@ class JTIBlocklist:
 
     def revoke(self, jti: str, exp: float) -> None:
         from .security import blacklist_token
+
         expires_in = max(0.0, exp - time.time())
         blacklist_token(jti, expires_in)
         logger.debug("JTI revoked: jti=%s", jti[:8])
 
     def is_revoked(self, jti: str) -> bool:
         from .security import is_token_blacklisted
+
         return is_token_blacklisted(jti)
 
     def purge_expired(self) -> int:
@@ -54,13 +57,14 @@ jti_blocklist = JTIBlocklist()
 
 # ── Refresh-token HMAC signing ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class RefreshToken:
-    user_id:  str
-    jti:      str = field(default_factory=lambda: str(uuid.uuid4()))
-    issued:   float = field(default_factory=time.time)
-    expires:  float = 0.0
-    sig:      str   = ""
+    user_id: str
+    jti: str = field(default_factory=lambda: str(uuid.uuid4()))
+    issued: float = field(default_factory=time.time)
+    expires: float = 0.0
+    sig: str = ""
 
     def __post_init__(self) -> None:
         if self.expires == 0.0:
@@ -119,6 +123,7 @@ class RefreshTokenService:
 
 
 # ── Access-token hardening helpers ──────────────────────────────────────────────────────
+
 
 def decode_access_token(token_str: str) -> dict:
     """

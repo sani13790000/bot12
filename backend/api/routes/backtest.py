@@ -4,6 +4,7 @@ BUG-N7 FIX: date_range validation.
 BUG-P2 FIX: max_workers and timeout from settings (not hardcode).
 BUG-AC1 FIX: removed prefix="/backtest" from APIRouter — main.py provides it.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,7 +33,7 @@ class BacktestRequest(BaseModel):
         if start:
             try:
                 dt_start = datetime.fromisoformat(start)
-                dt_end   = datetime.fromisoformat(end_date)
+                dt_end = datetime.fromisoformat(end_date)
                 if dt_end <= dt_start:
                     raise ValueError(f"end_date ({end_date}) must be after start_date ({start})")
             except ValueError as e:
@@ -61,15 +62,18 @@ class BacktestResult(BaseModel):
 async def run_backtest(request: BacktestRequest) -> BacktestResult:
     """Run a backtest for the given symbol and date range."""
     import time
+
     from backend.core.config import get_settings
+
     _s = get_settings()
     t0 = time.monotonic()
     try:
         from backend.services.backtest_engine import BacktestEngine
+
         # BUG-P2: use settings values, cap at user-requested workers
-        max_w   = min(request.max_workers, _s.BACKTEST_MAX_WORKERS)
+        max_w = min(request.max_workers, _s.BACKTEST_MAX_WORKERS)
         timeout = _s.BACKTEST_JOB_TIMEOUT
-        engine  = BacktestEngine(
+        engine = BacktestEngine(
             symbol=request.symbol,
             start_date=request.start_date,
             end_date=request.end_date,
@@ -78,7 +82,7 @@ async def run_backtest(request: BacktestRequest) -> BacktestResult:
             risk_per_trade_pct=request.risk_per_trade_pct,
             max_workers=max_w,
         )
-        result   = await engine.run(timeout=timeout)
+        result = await engine.run(timeout=timeout)
         duration = time.monotonic() - t0
         return BacktestResult(
             symbol=request.symbol,
@@ -103,13 +107,20 @@ async def run_backtest(request: BacktestRequest) -> BacktestResult:
 async def get_backtest_history(limit: int = 20) -> Dict[str, Any]:
     """Get recent backtest results from DB."""
     try:
-        from backend.database.connection import get_db_client
         import asyncio
+
+        from backend.database.connection import get_db_client
+
         db = await get_db_client()
-        r  = await asyncio.wait_for(
+        r = await asyncio.wait_for(
             asyncio.to_thread(
-                lambda: db.table("backtest_results")
-                .select("*").order("created_at", desc=True).limit(limit).execute()
+                lambda: (
+                    db.table("backtest_results")
+                    .select("*")
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
             ),
             timeout=10.0,
         )

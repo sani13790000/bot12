@@ -36,21 +36,21 @@ Covers:
  29.  SymbolThresholds.as_tuple() returns correct 3-tuple
  30.  Two instances are independent
 """
+
 from __future__ import annotations
 
 import pytest
 
 from backend.risk.volatility_filter import (
+    _DEFAULT_SYMBOL_THRESHOLDS,
     SymbolThresholds,
     VolatilityFilter,
     VolatilityFilterConfig,
     VolatilityLevel,
-    _DEFAULT_SYMBOL_THRESHOLDS,
-    _SYMBOL_ALIASES,
 )
 
-
 # -- helpers -----------------------------------------------------------------
+
 
 def _make_filter(symbol_thresholds=None, low=0.5, high=2.0, extreme=3.5):
     cfg = VolatilityFilterConfig(
@@ -73,7 +73,6 @@ def _check(vf, symbol, ratio):
 # 1-2: Default table + unknown fallback
 # ============================================================================
 class TestDefaultTable:
-
     def test_eurusd_defaults(self):
         t = _DEFAULT_SYMBOL_THRESHOLDS["EURUSD"]
         assert (t.low, t.high, t.extreme) == (0.5, 2.0, 3.5)
@@ -95,7 +94,6 @@ class TestDefaultTable:
 # 3: Case-insensitive
 # ============================================================================
 class TestCaseInsensitive:
-
     def test_lowercase_resolves_same_as_uppercase(self):
         vf = _make_filter()
         assert vf.get_thresholds("eurusd") == vf.get_thresholds("EURUSD")
@@ -109,7 +107,6 @@ class TestCaseInsensitive:
 # 4-6: Runtime add / remove
 # ============================================================================
 class TestRuntimeAddRemove:
-
     def test_add_symbol_threshold_overrides(self):
         vf = _make_filter()
         vf.add_symbol_threshold("EURUSD", SymbolThresholds(0.3, 1.5, 2.8))
@@ -135,7 +132,6 @@ class TestRuntimeAddRemove:
 # 7-8: Inspectors
 # ============================================================================
 class TestPublicInspectors:
-
     def test_get_thresholds_xauusd(self):
         assert _make_filter().get_thresholds("XAUUSD") == (0.7, 1.8, 3.0)
 
@@ -155,7 +151,6 @@ class TestPublicInspectors:
 # 9-11: Validation
 # ============================================================================
 class TestSymbolThresholdsValidation:
-
     def test_low_ge_high_raises(self):
         with pytest.raises(ValueError, match="low < high < extreme"):
             SymbolThresholds(low=2.0, high=2.0, extreme=3.5)
@@ -179,7 +174,6 @@ class TestSymbolThresholdsValidation:
 # 12: Partial merge
 # ============================================================================
 class TestPartialConfigMerge:
-
     def test_partial_override_preserves_other_defaults(self):
         vf = _make_filter(symbol_thresholds={"EURUSD": SymbolThresholds(0.4, 1.8, 3.2)})
         assert vf.get_thresholds("EURUSD") == (0.4, 1.8, 3.2)
@@ -191,7 +185,6 @@ class TestPartialConfigMerge:
 # 13-17: Classifications differ by symbol
 # ============================================================================
 class TestThresholdDifferences:
-
     def test_xauusd_extreme_fires_before_eurusd(self):
         vf = _make_filter()
         assert _check(vf, "XAUUSD", 3.1).level == VolatilityLevel.EXTREME
@@ -222,7 +215,6 @@ class TestThresholdDifferences:
 # 18-22: Alias and suffix
 # ============================================================================
 class TestAliasAndSuffixResolution:
-
     def test_gold_alias(self):
         vf = _make_filter()
         assert vf.get_thresholds("GOLD") == vf.get_thresholds("XAUUSD")
@@ -248,7 +240,6 @@ class TestAliasAndSuffixResolution:
 # 23: Unknown fallback
 # ============================================================================
 class TestUnknownFallback:
-
     def test_unknown_uses_config(self):
         vf = _make_filter(low=0.3, high=1.6, extreme=2.9)
         assert vf.get_thresholds("AAPL") == (0.3, 1.6, 2.9)
@@ -258,7 +249,6 @@ class TestUnknownFallback:
 # 24-27: Full check() integration
 # ============================================================================
 class TestFullCheckIntegration:
-
     def test_eurusd_extreme_at_4(self):
         r = _check(_make_filter(), "EURUSD", 4.0)
         assert r.level == VolatilityLevel.EXTREME and r.can_trade is False
@@ -280,7 +270,6 @@ class TestFullCheckIntegration:
 # 28: TypeError
 # ============================================================================
 class TestAddInvalidType:
-
     def test_tuple_raises_type_error(self):
         with pytest.raises(TypeError):
             _make_filter().add_symbol_threshold("EURUSD", (0.5, 2.0, 3.5))
@@ -290,7 +279,6 @@ class TestAddInvalidType:
 # 29: as_tuple
 # ============================================================================
 class TestAsTuple:
-
     def test_values(self):
         assert SymbolThresholds(0.7, 1.8, 3.0).as_tuple() == (0.7, 1.8, 3.0)
 
@@ -299,7 +287,6 @@ class TestAsTuple:
 # 30: Instance independence
 # ============================================================================
 class TestInstanceIndependence:
-
     def test_two_instances_independent(self):
         vf1, vf2 = _make_filter(), _make_filter()
         vf1.add_symbol_threshold("EURUSD", SymbolThresholds(0.1, 0.2, 0.3))

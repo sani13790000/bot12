@@ -1,8 +1,9 @@
 """
 تست‌های TradeMemory
 """
+
 from __future__ import annotations
-import pytest
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -109,16 +110,14 @@ class TradeMemory:
 
     def get_average_rr(self, n: int = 20) -> float:
         recent = self.get_recent(n)
-        closed = [t for t in recent
-                  if t.outcome in (TradeOutcome.WIN, TradeOutcome.LOSS)]
+        closed = [t for t in recent if t.outcome in (TradeOutcome.WIN, TradeOutcome.LOSS)]
         if not closed:
             return 0.0
         return sum(t.realized_rr for t in closed) / len(closed)
 
     def get_win_rate(self, n: int = 20) -> float:
         recent = self.get_recent(n)
-        closed = [t for t in recent
-                  if t.outcome in (TradeOutcome.WIN, TradeOutcome.LOSS)]
+        closed = [t for t in recent if t.outcome in (TradeOutcome.WIN, TradeOutcome.LOSS)]
         if not closed:
             return 0.0
         wins = sum(1 for t in closed if t.outcome == TradeOutcome.WIN)
@@ -135,7 +134,7 @@ class TradeMemory:
 
     def get_stats(self) -> Dict[str, Any]:
         total = len(self._memory)
-        wins  = sum(1 for t in self._memory if t.outcome == TradeOutcome.WIN)
+        wins = sum(1 for t in self._memory if t.outcome == TradeOutcome.WIN)
         losses = sum(1 for t in self._memory if t.outcome == TradeOutcome.LOSS)
         return {
             "total_trades": total,
@@ -160,26 +159,36 @@ class TradeMemory:
 def _make_trade(outcome=TradeOutcome.WIN, pnl_usd=100.0, rr=2.0) -> TradeContext:
     now = datetime.now(timezone.utc)
     return TradeContext(
-        trade_id="t1", signal_id="s1", symbol="XAUUSD",
-        entry_time=now, exit_time=now, duration_minutes=30.0,
-        entry_price=1950.0, exit_price=1960.0 if pnl_usd > 0 else 1940.0,
-        stop_loss=1940.0, take_profit=1970.0,
-        direction="BUY", outcome=outcome,
+        trade_id="t1",
+        signal_id="s1",
+        symbol="XAUUSD",
+        entry_time=now,
+        exit_time=now,
+        duration_minutes=30.0,
+        entry_price=1950.0,
+        exit_price=1960.0 if pnl_usd > 0 else 1940.0,
+        stop_loss=1940.0,
+        take_profit=1970.0,
+        direction="BUY",
+        outcome=outcome,
         pnl_pips=10.0 if pnl_usd > 0 else -10.0,
-        pnl_usd=pnl_usd, realized_rr=rr,
-        confidence_score=75.0, session="LONDON",
+        pnl_usd=pnl_usd,
+        realized_rr=rr,
+        confidence_score=75.0,
+        session="LONDON",
         market_condition="TRENDING",
         smc=SMCContext(order_block_quality=0.8),
         price_action=PAContext(pattern_quality=0.7),
         risk=RiskContext(risk_reward_ratio=rr),
-        news_active=False, previous_consecutive_losses=0,
+        news_active=False,
+        previous_consecutive_losses=0,
     )
 
 
 # ─── Tests ──────────────────────────────────────────────────────────────────
 
-class TestTradeMemoryRecord:
 
+class TestTradeMemoryRecord:
     def test_record_adds_to_memory(self):
         mem = TradeMemory()
         mem.record(_make_trade())
@@ -201,7 +210,6 @@ class TestTradeMemoryRecord:
 
 
 class TestTradeMemoryStats:
-
     def test_win_rate_all_wins(self):
         mem = TradeMemory()
         for _ in range(5):
@@ -238,8 +246,16 @@ class TestTradeMemoryStats:
     def test_stats_keys(self):
         mem = TradeMemory()
         stats = mem.get_stats()
-        for k in ("total_trades", "wins", "losses", "win_rate",
-                  "avg_rr", "consecutive_losses", "memory_usage", "db_available"):
+        for k in (
+            "total_trades",
+            "wins",
+            "losses",
+            "win_rate",
+            "avg_rr",
+            "consecutive_losses",
+            "memory_usage",
+            "db_available",
+        ):
             assert k in stats
 
     def test_stats_empty(self):
@@ -257,13 +273,19 @@ class TestTradeMemoryStats:
 
 
 class TestTradeContextFeatures:
-
     def test_to_ml_features_keys(self):
         t = _make_trade()
         f = t.to_ml_features()
-        for k in ("confidence_score", "rr_ratio", "duration_minutes",
-                  "pnl_pips", "smc_quality", "pa_quality",
-                  "news_active", "consecutive_losses"):
+        for k in (
+            "confidence_score",
+            "rr_ratio",
+            "duration_minutes",
+            "pnl_pips",
+            "smc_quality",
+            "pa_quality",
+            "news_active",
+            "consecutive_losses",
+        ):
             assert k in f
 
     def test_to_dict_keys(self):

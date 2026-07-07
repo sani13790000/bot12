@@ -4,18 +4,19 @@ Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 تست‌های FastAPI endpoints با TestClient.
 """
+
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestAuthEndpoints:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         from fastapi.testclient import TestClient
+
         from backend.api.main import app
+
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_health_check(self) -> None:
@@ -42,18 +43,25 @@ class TestAuthEndpoints:
 
 
 class TestTradesEndpoints:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         from fastapi.testclient import TestClient
+
         from backend.api.main import app
+
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_open_trade_without_auth_401(self) -> None:
-        r = self.client.post("/api/v1/trades/open", json={
-            "symbol": "EURUSD", "direction": "buy",
-            "volume": 0.10, "sl": 1.1000, "tp": 1.1150
-        })
+        r = self.client.post(
+            "/api/v1/trades/open",
+            json={
+                "symbol": "EURUSD",
+                "direction": "buy",
+                "volume": 0.10,
+                "sl": 1.1000,
+                "tp": 1.1150,
+            },
+        )
         assert r.status_code == 401
 
     def test_close_trade_without_auth_401(self) -> None:
@@ -66,11 +74,12 @@ class TestTradesEndpoints:
 
 
 class TestSignalsEndpoints:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         from fastapi.testclient import TestClient
+
         from backend.api.main import app
+
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_list_signals_without_auth_401(self) -> None:
@@ -87,11 +96,12 @@ class TestSignalsEndpoints:
 
 
 class TestAdminEndpoints:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         from fastapi.testclient import TestClient
+
         from backend.api.main import app
+
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_kill_switch_without_auth_401(self) -> None:
@@ -108,11 +118,12 @@ class TestAdminEndpoints:
 
 
 class TestLicenseEndpoints:
-
     @pytest.fixture(autouse=True)
     def setup(self):
         from fastapi.testclient import TestClient
+
         from backend.api.main import app
+
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def test_license_status_without_auth_401(self) -> None:

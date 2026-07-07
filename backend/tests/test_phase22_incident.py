@@ -2,14 +2,18 @@
 test_phase22_incident.py -- PHASE 22: Incident Response & Kill-Switch Operations
 Covers emergency stop, incident logging, and recovery procedures.
 """
+
 from __future__ import annotations
 
 import pytest
-import time
-from unittest.mock import patch, MagicMock
 
 try:
-    from backend.risk.kill_switch import KillSwitch, KillSwitchState, KillSwitchEvent
+    from backend.risk.kill_switch import (  # noqa: F401
+        KillSwitch,
+        KillSwitchEvent,
+        KillSwitchState,
+    )
+
     HAS_KILL_SWITCH = True
 except ImportError:
     HAS_KILL_SWITCH = False

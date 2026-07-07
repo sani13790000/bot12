@@ -4,46 +4,63 @@ Galaxy Vast AI Trading Platform
 Unit Tests — Risk Management System v2
 35 test cases covering all modules
 """
-import pytest
+
 import math
-from unittest.mock import patch, MagicMock
+import os
 
 # ── imports ─────────────────────────────────────────────────────
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+import sys
 
-from backend.risk.lot_sizing import (
-    DynamicLotSizer, LotSizingConfig, LotSizingMethod,
-)
-from backend.risk.equity_protection import (
-    EquityProtectionEngine, EquityProtectionConfig, ProtectionLevel,
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
+from backend.risk.correlation_filter import (
+    CorrelationFilter,
+    CorrelationFilterConfig,
 )
 from backend.risk.correlation_filter import (
-    CorrelationFilter, CorrelationFilterConfig,
     OpenPosition as CorrPosition,
 )
-from backend.risk.volatility_filter import (
-    VolatilityFilter, VolatilityFilterConfig, VolatilityLevel,
+from backend.risk.equity_protection import (
+    EquityProtectionConfig,
+    EquityProtectionEngine,
+    ProtectionLevel,
 )
 from backend.risk.exposure_control import (
-    ExposureControlEngine, ExposureControlConfig, ExposurePosition,
+    ExposureControlConfig,
+    ExposureControlEngine,
+    ExposurePosition,
+)
+from backend.risk.lot_sizing import (
+    DynamicLotSizer,
+    LotSizingConfig,
+    LotSizingMethod,
 )
 from backend.risk.risk_orchestrator import (
-    RiskOrchestrator, RiskInput,
+    RiskInput,
+    RiskOrchestrator,
 )
-
+from backend.risk.volatility_filter import (
+    VolatilityFilter,
+    VolatilityFilterConfig,
+    VolatilityLevel,
+)
 
 # ════════════════════════════════════════════════════════════════
 # 1. DynamicLotSizer
 # ════════════════════════════════════════════════════════════════
 
-class TestDynamicLotSizer:
 
+class TestDynamicLotSizer:
     def setup_method(self):
         self.cfg = LotSizingConfig(
             method=LotSizingMethod.FIXED_PERCENT,
-            risk_percent=1.0, pip_value_usd=10.0,
-            min_lot=0.01, max_lot=5.0, lot_step=0.01,
+            risk_percent=1.0,
+            pip_value_usd=10.0,
+            min_lot=0.01,
+            max_lot=5.0,
+            lot_step=0.01,
         )
         self.sizer = DynamicLotSizer(self.cfg)
 
@@ -55,13 +72,18 @@ class TestDynamicLotSizer:
 
     def test_atr_based_uses_larger_sl(self):
         """ATR-based should use ATR×multiplier when larger than SL."""
-        cfg = LotSizingConfig(method=LotSizingMethod.ATR_BASED,
-                              atr_multiplier=2.0, risk_percent=1.0,
-                              pip_value_usd=10.0, min_lot=0.01, max_lot=5.0)
+        cfg = LotSizingConfig(
+            method=LotSizingMethod.ATR_BASED,
+            atr_multiplier=2.0,
+            risk_percent=1.0,
+            pip_value_usd=10.0,
+            min_lot=0.01,
+            max_lot=5.0,
+        )
         sizer = DynamicLotSizer(cfg)
         result = sizer.calculate(balance=10_000, stop_loss_pips=10, atr_pips=15)
         # adjusted_sl = max(10, 15*2) = 30 pips
-        assert result.lot_size == pytest.approx(10_000*0.01/(30*10), abs=0.01)
+        assert result.lot_size == pytest.approx(10_000 * 0.01 / (30 * 10), abs=0.01)
 
     def test_max_risk_cap_enforced(self):
         """Lot size must never exceed max_risk_percent of balance."""
@@ -80,12 +102,15 @@ class TestDynamicLotSizer:
 
     def test_kelly_criterion(self):
         """Kelly output > 0 with valid win_rate/rr."""
-        cfg = LotSizingConfig(method=LotSizingMethod.KELLY,
-                              kelly_fraction=0.25, pip_value_usd=10.0,
-                              min_lot=0.01, max_lot=5.0)
+        cfg = LotSizingConfig(
+            method=LotSizingMethod.KELLY,
+            kelly_fraction=0.25,
+            pip_value_usd=10.0,
+            min_lot=0.01,
+            max_lot=5.0,
+        )
         sizer = DynamicLotSizer(cfg)
-        result = sizer.calculate(balance=10_000, stop_loss_pips=20,
-                                 win_rate=0.60, avg_rr=2.0)
+        result = sizer.calculate(balance=10_000, stop_loss_pips=20, win_rate=0.60, avg_rr=2.0)
         assert result.lot_size >= cfg.min_lot
 
     def test_zero_balance_returns_min_lot(self):
@@ -95,15 +120,17 @@ class TestDynamicLotSizer:
     def test_lot_step_respected(self):
         result = self.sizer.calculate(balance=10_000, stop_loss_pips=17)
         # Must be multiple of 0.01
-        assert math.isclose(result.lot_size % self.cfg.lot_step, 0.0, abs_tol=1e-9) or                math.isclose(result.lot_size % self.cfg.lot_step, self.cfg.lot_step, abs_tol=1e-9)
+        assert math.isclose(result.lot_size % self.cfg.lot_step, 0.0, abs_tol=1e-9) or math.isclose(
+            result.lot_size % self.cfg.lot_step, self.cfg.lot_step, abs_tol=1e-9
+        )
 
 
 # ════════════════════════════════════════════════════════════════
 # 2. EquityProtectionEngine
 # ════════════════════════════════════════════════════════════════
 
-class TestEquityProtection:
 
+class TestEquityProtection:
     def _engine(self, **kwargs):
         cfg = EquityProtectionConfig(**kwargs)
         e = EquityProtectionEngine(cfg)
@@ -140,7 +167,7 @@ class TestEquityProtection:
         e = self._engine(consecutive_loss_halt_count=5)
         for _ in range(2):
             e.record_trade_result(-100, 9_800)
-        e.record_trade_result(200, 10_000)   # WIN
+        e.record_trade_result(200, 10_000)  # WIN
         assert e.state.consecutive_losses == 0
 
     def test_daily_loss_halt(self):
@@ -166,13 +193,15 @@ class TestEquityProtection:
 # 3. CorrelationFilter
 # ════════════════════════════════════════════════════════════════
 
-class TestCorrelationFilter:
 
+class TestCorrelationFilter:
     def setup_method(self):
-        self.cf = CorrelationFilter(CorrelationFilterConfig(
-            max_correlated_exposure=0.80,
-            correlation_penalty_threshold=0.60,
-        ))
+        self.cf = CorrelationFilter(
+            CorrelationFilterConfig(
+                max_correlated_exposure=0.80,
+                correlation_penalty_threshold=0.60,
+            )
+        )
 
     def test_no_positions_passes(self):
         result = self.cf.check("EURUSD", "BUY", [], 1.0)
@@ -211,16 +240,18 @@ class TestCorrelationFilter:
 # 4. VolatilityFilter
 # ════════════════════════════════════════════════════════════════
 
-class TestVolatilityFilter:
 
+class TestVolatilityFilter:
     def setup_method(self):
-        self.vf = VolatilityFilter(VolatilityFilterConfig(
-            low_atr_ratio=0.5,
-            high_atr_ratio=2.0,
-            extreme_atr_ratio=3.5,
-            max_spread_multiplier=3.0,
-            high_vol_lot_multiplier=0.6,
-        ))
+        self.vf = VolatilityFilter(
+            VolatilityFilterConfig(
+                low_atr_ratio=0.5,
+                high_atr_ratio=2.0,
+                extreme_atr_ratio=3.5,
+                max_spread_multiplier=3.0,
+                high_vol_lot_multiplier=0.6,
+            )
+        )
         self.avg_history = [10.0] * 14  # avg ATR = 10
 
     def test_normal_volatility(self):
@@ -250,9 +281,9 @@ class TestVolatilityFilter:
         assert result.can_trade is False
 
     def test_atr_calculation(self):
-        highs  = [100 + i*0.5 for i in range(20)]
-        lows   = [99  + i*0.5 for i in range(20)]
-        closes = [99.5 + i*0.5 for i in range(20)]
+        highs = [100 + i * 0.5 for i in range(20)]
+        lows = [99 + i * 0.5 for i in range(20)]
+        closes = [99.5 + i * 0.5 for i in range(20)]
         atrs = self.vf.calculate_atr(highs, lows, closes)
         assert len(atrs) > 0
         assert all(a > 0 for a in atrs)
@@ -262,17 +293,19 @@ class TestVolatilityFilter:
 # 5. ExposureControlEngine
 # ════════════════════════════════════════════════════════════════
 
-class TestExposureControl:
 
+class TestExposureControl:
     def setup_method(self):
-        self.engine = ExposureControlEngine(ExposureControlConfig(
-            max_total_exposure_percent=5.0,
-            max_per_symbol_percent=2.0,
-            max_per_currency_percent=3.0,
-            max_simultaneous_trades=5,
-            max_buy_trades=3,
-            max_sell_trades=3,
-        ))
+        self.engine = ExposureControlEngine(
+            ExposureControlConfig(
+                max_total_exposure_percent=5.0,
+                max_per_symbol_percent=2.0,
+                max_per_currency_percent=3.0,
+                max_simultaneous_trades=5,
+                max_buy_trades=3,
+                max_sell_trades=3,
+            )
+        )
 
     def test_empty_positions_passes(self):
         result = self.engine.check("XAUUSD", "BUY", 1.0, [], 10_000)
@@ -288,10 +321,7 @@ class TestExposureControl:
         assert result.can_trade is False
 
     def test_max_simultaneous_trades_blocked(self):
-        positions = [
-            ExposurePosition(f"SYM{i}", "BUY", 0.5, 50)
-            for i in range(5)
-        ]
+        positions = [ExposurePosition(f"SYM{i}", "BUY", 0.5, 50) for i in range(5)]
         result = self.engine.check("XAUUSD", "BUY", 0.5, positions, 10_000)
         assert result.can_trade is False
 
@@ -307,10 +337,7 @@ class TestExposureControl:
         assert isinstance(result.can_trade, bool)
 
     def test_buy_limit_respected(self):
-        positions = [
-            ExposurePosition(f"SYM{i}", "BUY", 0.5, 50)
-            for i in range(3)
-        ]
+        positions = [ExposurePosition(f"SYM{i}", "BUY", 0.5, 50) for i in range(3)]
         result = self.engine.check("XAUUSD", "BUY", 0.5, positions, 10_000)
         assert result.can_trade is False  # max_buy_trades=3 reached
 
@@ -319,17 +346,24 @@ class TestExposureControl:
 # 6. RiskOrchestrator (integration)
 # ════════════════════════════════════════════════════════════════
 
-class TestRiskOrchestrator:
 
+class TestRiskOrchestrator:
     def _make_input(self, **overrides) -> RiskInput:
         defaults = dict(
-            symbol="XAUUSD", direction="BUY",
-            balance=10_000, equity=10_000,
-            stop_loss_pips=20.0, current_atr=10.0,
-            atr_history=[10.0]*14,
-            current_spread=1.0, avg_spread=1.0,
-            open_positions=[], today_trades_count=0,
-            today_pnl_usd=0.0, week_pnl_usd=0.0, month_pnl_usd=0.0,
+            symbol="XAUUSD",
+            direction="BUY",
+            balance=10_000,
+            equity=10_000,
+            stop_loss_pips=20.0,
+            current_atr=10.0,
+            atr_history=[10.0] * 14,
+            current_spread=1.0,
+            avg_spread=1.0,
+            open_positions=[],
+            today_trades_count=0,
+            today_pnl_usd=0.0,
+            week_pnl_usd=0.0,
+            month_pnl_usd=0.0,
         )
         defaults.update(overrides)
         return RiskInput(**defaults)
@@ -344,7 +378,7 @@ class TestRiskOrchestrator:
     def test_extreme_volatility_blocked(self):
         orch = RiskOrchestrator()
         orch._equity.initialize(10_000)
-        inp = self._make_input(current_atr=45.0, atr_history=[10.0]*14)
+        inp = self._make_input(current_atr=45.0, atr_history=[10.0] * 14)
         result = orch.assess(inp)
         assert result.approved is False
         assert result.volatility_ok is False

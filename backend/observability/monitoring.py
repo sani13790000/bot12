@@ -2,6 +2,7 @@
 backend/observability/monitoring.py
 Galaxy Vast AI Trading Platform - Production Monitoring
 """
+
 from __future__ import annotations
 
 import logging
@@ -29,8 +30,9 @@ def init_sentry() -> bool:
         return False
     try:
         import sentry_sdk
-        from sentry_sdk.integrations.fastapi import FastApiIntegration
         from sentry_sdk.integrations.asyncio import AsyncioIntegration
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
         sentry_sdk.init(
             dsn=_SENTRY_DSN,
             environment=_ENV,
@@ -64,6 +66,7 @@ def _before_send_sentry(event: dict, hint: dict) -> Optional[dict]:
 class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         import json
+
         doc = {
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
             "level": record.levelname,
@@ -141,15 +144,16 @@ class ProductionMonitor:
 
     def alert_drawdown(self, drawdown_pct: float) -> None:
         if check_drawdown_alert(drawdown_pct):
-            log.warning("[monitor] DRAWDOWN ALERT: %.2f%% >= %.2f%%",
-                        drawdown_pct, DRAWDOWN_ALERT_PCT)
+            log.warning(
+                "[monitor] DRAWDOWN ALERT: %.2f%% >= %.2f%%", drawdown_pct, DRAWDOWN_ALERT_PCT
+            )
 
     def alert_error_rate(self, error_rate_pct: float) -> None:
         if check_error_rate_alert(error_rate_pct):
-            log.warning("[monitor] ERROR RATE ALERT: %.2f%% >= %.2f%%",
-                        error_rate_pct, ERROR_RATE_ALERT_PCT)
+            log.warning(
+                "[monitor] ERROR RATE ALERT: %.2f%% >= %.2f%%", error_rate_pct, ERROR_RATE_ALERT_PCT
+            )
 
     def alert_latency(self, latency_ms: float) -> None:
         if check_latency_alert(latency_ms):
-            log.warning("[monitor] LATENCY ALERT: %.0fms >= %.0fms",
-                        latency_ms, LATENCY_ALERT_MS)
+            log.warning("[monitor] LATENCY ALERT: %.0fms >= %.0fms", latency_ms, LATENCY_ALERT_MS)

@@ -4,9 +4,10 @@
 نویسنده: MT5 Trading Team
 """
 
-from fastapi import APIRouter, Depends, Query
-from typing import Optional
 from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 
 from ...core.logger import get_logger
 from ...database import db
@@ -17,10 +18,7 @@ router = APIRouter()
 
 
 @router.get("/daily")
-async def daily_report(
-    date: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user)
-):
+async def daily_report(date: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
     """
     گزارش روزانه
 
@@ -36,20 +34,14 @@ async def daily_report(
         report_date = datetime.utcnow().date()
 
     # دریافت آمار
-    stats = await db.select_one("daily_statistics", {
-        "user_id": user["id"],
-        "stat_date": report_date.isoformat()
-    })
+    stats = await db.select_one(
+        "daily_statistics", {"user_id": user["id"], "stat_date": report_date.isoformat()}
+    )
 
     # دریافت معاملات روز
-    next_day = report_date + timedelta(days=1)
+    report_date + timedelta(days=1)
     trades = await db.select_many(
-        "trades",
-        filters={
-            "user_id": user["id"],
-            "status": "closed"
-        },
-        limit=100
+        "trades", filters={"user_id": user["id"], "status": "closed"}, limit=100
     )
 
     # محاسبه اگر آمار ذخیره نشده
@@ -63,9 +55,13 @@ async def daily_report(
             "winning_trades": winning,
             "losing_trades": losing,
             "win_rate": (winning / total * 100) if total > 0 else 0,
-            "gross_profit": sum(t.get("profit_money", 0) for t in trades if t.get("profit_money", 0) > 0),
-            "gross_loss": sum(t.get("profit_money", 0) for t in trades if t.get("profit_money", 0) < 0),
-            "net_profit": sum(t.get("profit_money", 0) or 0 for t in trades)
+            "gross_profit": sum(
+                t.get("profit_money", 0) for t in trades if t.get("profit_money", 0) > 0
+            ),
+            "gross_loss": sum(
+                t.get("profit_money", 0) for t in trades if t.get("profit_money", 0) < 0
+            ),
+            "net_profit": sum(t.get("profit_money", 0) or 0 for t in trades),
         }
 
     return {
@@ -73,8 +69,8 @@ async def daily_report(
         "data": {
             "date": report_date.isoformat(),
             "summary": stats,
-            "trades": trades[:20]  # 20 معامله اخیر
-        }
+            "trades": trades[:20],  # 20 معامله اخیر
+        },
     }
 
 
@@ -102,17 +98,18 @@ async def weekly_report(user: dict = Depends(get_current_user)):
 
     for i in range(7):
         day = week_start + timedelta(days=i)
-        stats = await db.select_one("daily_statistics", {
-            "user_id": user["id"],
-            "stat_date": day.isoformat()
-        })
+        stats = await db.select_one(
+            "daily_statistics", {"user_id": user["id"], "stat_date": day.isoformat()}
+        )
 
         if stats:
-            daily_breakdown.append({
-                "date": day.isoformat(),
-                "trades": stats.get("total_trades", 0),
-                "profit": stats.get("net_profit", 0)
-            })
+            daily_breakdown.append(
+                {
+                    "date": day.isoformat(),
+                    "trades": stats.get("total_trades", 0),
+                    "profit": stats.get("net_profit", 0),
+                }
+            )
             total_trades += stats.get("total_trades", 0)
             total_profit += stats.get("net_profit", 0)
             winning += stats.get("winning_trades", 0)
@@ -120,11 +117,7 @@ async def weekly_report(user: dict = Depends(get_current_user)):
             gross_profit += stats.get("gross_profit", 0)
             gross_loss += stats.get("gross_loss", 0)
         else:
-            daily_breakdown.append({
-                "date": day.isoformat(),
-                "trades": 0,
-                "profit": 0
-            })
+            daily_breakdown.append({"date": day.isoformat(), "trades": 0, "profit": 0})
 
     win_rate = (winning / total_trades * 100) if total_trades > 0 else 0
 
@@ -140,10 +133,10 @@ async def weekly_report(user: dict = Depends(get_current_user)):
                 "win_rate": round(win_rate, 2),
                 "gross_profit": round(gross_profit, 2),
                 "gross_loss": round(gross_loss, 2),
-                "net_profit": round(total_profit, 2)
+                "net_profit": round(total_profit, 2),
             },
-            "daily_breakdown": daily_breakdown
-        }
+            "daily_breakdown": daily_breakdown,
+        },
     }
 
 
@@ -151,7 +144,7 @@ async def weekly_report(user: dict = Depends(get_current_user)):
 async def monthly_report(
     year: int = Query(None),
     month: int = Query(None, ge=1, le=12),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     گزارش ماهانه
@@ -182,10 +175,9 @@ async def monthly_report(
 
     current = month_start
     while current <= month_end:
-        stats = await db.select_one("daily_statistics", {
-            "user_id": user["id"],
-            "stat_date": current.isoformat()
-        })
+        stats = await db.select_one(
+            "daily_statistics", {"user_id": user["id"], "stat_date": current.isoformat()}
+        )
         if stats:
             total_trades += stats.get("total_trades", 0)
             total_profit += stats.get("net_profit", 0)
@@ -204,16 +196,16 @@ async def monthly_report(
                 "winning_trades": winning,
                 "losing_trades": losing,
                 "win_rate": round(win_rate, 2),
-                "net_profit": total_profit
-            }
-        }
+                "net_profit": total_profit,
+            },
+        },
     }
 
 
 @router.get("/performance")
 async def performance_stats(
     period: str = Query(default="month", regex="^(week|month|year|all)$"),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     آمار عملکرد
@@ -227,23 +219,20 @@ async def performance_stats(
     today = datetime.utcnow().date()
 
     if period == "week":
-        start_date = today - timedelta(days=7)
+        today - timedelta(days=7)
     elif period == "month":
-        start_date = today - timedelta(days=30)
+        today - timedelta(days=30)
     elif period == "year":
-        start_date = today - timedelta(days=365)
+        today - timedelta(days=365)
     else:
-        start_date = datetime(2020, 1, 1).date()
+        datetime(2020, 1, 1).date()
 
     # دریافت معاملات
     trades = await db.select_many(
         "trades",
-        filters={
-            "user_id": user["id"],
-            "status": "closed"
-        },
+        filters={"user_id": user["id"], "status": "closed"},
         order_by="closed_at",
-        limit=1000
+        limit=1000,
     )
 
     if not trades:
@@ -256,9 +245,9 @@ async def performance_stats(
                     "win_rate": 0,
                     "profit_factor": 0,
                     "net_profit": 0,
-                    "avg_trade": 0
-                }
-            }
+                    "avg_trade": 0,
+                },
+            },
         }
 
     # محاسبه معیارها
@@ -287,7 +276,7 @@ async def performance_stats(
                 "net_profit": round(total_profit, 2),
                 "avg_trade": round(avg_trade, 2),
                 "gross_profit": round(gross_profit, 2),
-                "gross_loss": round(gross_loss, 2)
-            }
-        }
+                "gross_loss": round(gross_loss, 2),
+            },
+        },
     }

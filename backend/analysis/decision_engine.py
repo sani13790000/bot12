@@ -3,6 +3,7 @@ Decision Engine — Phase A Fix
 ARCH-R6-2: Was standalone — now exposes get_final_signal() for SignalProcessor.
 Integrates SMC + Price Action + ML votes into a weighted final decision.
 """
+
 from __future__ import annotations
 
 import logging
@@ -14,19 +15,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EngineVote:
-    source: str          # "SMC" | "PA" | "ML"
-    signal: str          # "BUY" | "SELL" | "NO_TRADE"
-    confidence: float    # 0.0 – 1.0
+    source: str  # "SMC" | "PA" | "ML"
+    signal: str  # "BUY" | "SELL" | "NO_TRADE"
+    confidence: float  # 0.0 – 1.0
     reason: str = ""
 
 
 @dataclass
 class FinalDecision:
-    signal: str          # "BUY" | "SELL" | "NO_TRADE"
+    signal: str  # "BUY" | "SELL" | "NO_TRADE"
     confidence: float
     votes: list
     reason: str
-    approved: bool       # True if confidence >= min_confidence
+    approved: bool  # True if confidence >= min_confidence
 
 
 class DecisionEngine:
@@ -41,8 +42,8 @@ class DecisionEngine:
     # Weights for each source
     WEIGHTS: Dict[str, float] = {
         "SMC": 1.0,
-        "PA":  1.0,
-        "ML":  1.5,    # ML gets higher weight (data-driven)
+        "PA": 1.0,
+        "ML": 1.5,  # ML gets higher weight (data-driven)
         "NEWS": 0.5,
     }
 
@@ -86,12 +87,14 @@ class DecisionEngine:
             w = self.WEIGHTS.get(vote.source, 1.0)
             scores[vote.signal] = scores.get(vote.signal, 0.0) + w * vote.confidence
             total_weight += w
-            vote_summaries.append({
-                "source": vote.source,
-                "signal": vote.signal,
-                "confidence": vote.confidence,
-                "reason": vote.reason,
-            })
+            vote_summaries.append(
+                {
+                    "source": vote.source,
+                    "signal": vote.signal,
+                    "confidence": vote.confidence,
+                    "reason": vote.reason,
+                }
+            )
 
         if total_weight == 0:
             return FinalDecision(
@@ -123,7 +126,10 @@ class DecisionEngine:
 
         logger.debug(
             "[DecisionEngine] signal=%s confidence=%.3f approved=%s scores=%s",
-            winner, confidence, approved, scores
+            winner,
+            confidence,
+            approved,
+            scores,
         )
 
         return FinalDecision(
@@ -171,16 +177,17 @@ class DecisionEngine:
             if result is None:
                 continue
             try:
-                votes.append(EngineVote(
-                    source=source,
-                    signal=str(result.get("signal", "NO_TRADE")).upper(),
-                    confidence=float(result.get("confidence", 0.0)),
-                    reason=str(result.get("reason", "")),
-                ))
+                votes.append(
+                    EngineVote(
+                        source=source,
+                        signal=str(result.get("signal", "NO_TRADE")).upper(),
+                        confidence=float(result.get("confidence", 0.0)),
+                        reason=str(result.get("reason", "")),
+                    )
+                )
             except (TypeError, ValueError) as exc:
                 logger.warning(
-                    "[DecisionEngine] Could not parse %s result: %s — %s",
-                    source, result, exc
+                    "[DecisionEngine] Could not parse %s result: %s — %s", source, result, exc
                 )
 
         return self.decide(votes)

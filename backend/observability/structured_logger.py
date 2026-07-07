@@ -2,6 +2,7 @@
 faz 9 - Structured JSON Logger
 har log entry: timestamp, level, message, correlation_id, trace_id, context
 """
+
 from __future__ import annotations
 
 import json
@@ -10,7 +11,7 @@ import sys
 import time
 import uuid
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Context variables baraye request tracing
 _request_id: ContextVar[str] = ContextVar("request_id", default="")
@@ -61,10 +62,27 @@ class JSONFormatter(logging.Formatter):
         # Extra fields
         for key, val in record.__dict__.items():
             if key not in (
-                "name", "msg", "args", "levelname", "levelno", "pathname",
-                "filename", "module", "exc_info", "exc_text", "stack_info",
-                "lineno", "funcName", "created", "msecs", "relativeCreated",
-                "thread", "threadName", "processName", "process", "message",
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "message",
                 "taskName",
             ):
                 log_obj[key] = val
@@ -122,9 +140,7 @@ def setup_logging(level: str = "INFO", json_format: bool = True) -> None:
         handler.setFormatter(JSONFormatter())
     else:
         handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-            )
+            logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
         )
 
     root_logger.addHandler(handler)

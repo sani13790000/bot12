@@ -14,6 +14,7 @@ faz R:
            hala dar hame envha log mishavad
   R-FIX-4: corruption dar L58-75 (binary garbage) -> pak shod
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,10 +42,7 @@ class EnvVar:
                 return f"MISSING: {self.name} -- {self.description}"
             return None
         if len(value) < self.min_length:
-            return (
-                f"TOO SHORT: {self.name} -- "
-                f"min {self.min_length} chars (got {len(value)})"
-            )
+            return f"TOO SHORT: {self.name} -- min {self.min_length} chars (got {len(value)})"
         for bad in self.forbidden_values:
             if value.lower() == bad.lower():
                 return f"INSECURE VALUE: {self.name} = '{value}' -- change this!"
@@ -61,29 +59,39 @@ class EnvVar:
 
 REQUIRED_VARS: list[EnvVar] = [
     EnvVar(
-        "JWT_SECRET", required=True, min_length=32,
+        "JWT_SECRET",
+        required=True,
+        min_length=32,
         forbidden_values=("change-me-in-production", "secret", "changeme", "jwt_secret"),
         description="JWT secret key -- min 32 chars",
         sensitive=True,
     ),
     EnvVar(
-        "LICENSE_SECRET", required=True, min_length=32,
+        "LICENSE_SECRET",
+        required=True,
+        min_length=32,
         forbidden_values=("change-me-in-production", "secret", "changeme"),
         description="License HMAC secret -- min 32 chars",
         sensitive=True,
     ),
     EnvVar(
-        "SUPABASE_URL", required=True, min_length=10,
+        "SUPABASE_URL",
+        required=True,
+        min_length=10,
         description="Supabase project URL",
     ),
     EnvVar(
-        "SUPABASE_KEY", required=True, min_length=20,
+        "SUPABASE_KEY",
+        required=True,
+        min_length=20,
         forbidden_values=("your-supabase-anon-key", "changeme"),
         description="Supabase anon/service key",
         sensitive=True,
     ),
     EnvVar(
-        "TELEGRAM_BOT_TOKEN", required=True, min_length=20,
+        "TELEGRAM_BOT_TOKEN",
+        required=True,
+        min_length=20,
         forbidden_values=("CHANGE_ME_bot_token", "changeme"),
         description="Telegram Bot API token",
         sensitive=True,
@@ -93,25 +101,25 @@ REQUIRED_VARS: list[EnvVar] = [
 # R-FIX-1: OPTIONAL_VARS was undefined -> NameError at runtime on L85
 # R-FIX-2: GATEWAY_API_KEY added so startup warns if gateway runs without auth
 OPTIONAL_VARS: list[EnvVar] = [
-    EnvVar("GATEWAY_API_KEY", required=False, min_length=16,
-           description="MT5 Gateway API key -- if empty, gateway runs without auth (dev only)",
-           sensitive=True),
-    EnvVar("MT5_GATEWAY_URL", required=False,
-           description="MT5 Gateway base URL"),
-    EnvVar("MT5_DEMO_MODE", required=False,
-           description="MT5 demo mode: 'false' for live trading, 'true' for demo/CI"),
-    EnvVar("CORS_ORIGINS", required=False,
-           description="Comma-separated allowed CORS origins"),
-    EnvVar("ADMIN_IP_ALLOWLIST", required=False,
-           description="Comma-separated admin IPs"),
-    EnvVar("SENTRY_DSN", required=False,
-           description="Sentry DSN for error tracking"),
-    EnvVar("REDIS_URL", required=False,
-           description="Redis URL for rate limiting"),
-    EnvVar("BCRYPT_ROUNDS", required=False,
-           description="bcrypt work factor (default 12)"),
-    EnvVar("JWT_EXPIRE_MINUTES", required=False,
-           description="JWT expiry in minutes"),
+    EnvVar(
+        "GATEWAY_API_KEY",
+        required=False,
+        min_length=16,
+        description="MT5 Gateway API key -- if empty, gateway runs without auth (dev only)",
+        sensitive=True,
+    ),
+    EnvVar("MT5_GATEWAY_URL", required=False, description="MT5 Gateway base URL"),
+    EnvVar(
+        "MT5_DEMO_MODE",
+        required=False,
+        description="MT5 demo mode: 'false' for live trading, 'true' for demo/CI",
+    ),
+    EnvVar("CORS_ORIGINS", required=False, description="Comma-separated allowed CORS origins"),
+    EnvVar("ADMIN_IP_ALLOWLIST", required=False, description="Comma-separated admin IPs"),
+    EnvVar("SENTRY_DSN", required=False, description="Sentry DSN for error tracking"),
+    EnvVar("REDIS_URL", required=False, description="Redis URL for rate limiting"),
+    EnvVar("BCRYPT_ROUNDS", required=False, description="bcrypt work factor (default 12)"),
+    EnvVar("JWT_EXPIRE_MINUTES", required=False, description="JWT expiry in minutes"),
 ]
 
 
@@ -185,14 +193,10 @@ def _check_production_specifics(errors: list[str], warnings: list[str]) -> None:
             "admin panel accessible from all IPs in production."
         )
     if not os.environ.get("SENTRY_DSN", "").strip():
-        warnings.append(
-            "WARNING: SENTRY_DSN not set -- error tracking disabled in production."
-        )
+        warnings.append("WARNING: SENTRY_DSN not set -- error tracking disabled in production.")
     cors = os.environ.get("CORS_ORIGINS", "")
     if "*" in cors:
-        errors.append(
-            "CORS_ORIGINS contains '*' -- not allowed in production."
-        )
+        errors.append("CORS_ORIGINS contains '*' -- not allowed in production.")
     demo_mode = os.environ.get("MT5_DEMO_MODE", "true").lower()
     if demo_mode in ("true", "1", "yes", "on", ""):
         errors.append(

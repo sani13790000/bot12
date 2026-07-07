@@ -27,6 +27,7 @@ The /metrics endpoint is mounted by the FastAPI app using
 ``prometheus_fastapi_instrumentator`` or the ``/metrics`` route in
 ``backend/api/observability_routes.py``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,7 +41,7 @@ logger = logging.getLogger(__name__)
 # ── Prometheus registry (graceful degradation if not installed) ──────────── #
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, CollectorRegistry
+    from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
     _REGISTRY = CollectorRegistry(auto_describe=True)
 
@@ -111,10 +112,10 @@ except ImportError:
 
 
 def record_trade(
-    symbol:    str,
+    symbol: str,
     direction: str,
-    pnl:       float = 0.0,
-    strategy:  str   = "unknown",
+    pnl: float = 0.0,
+    strategy: str = "unknown",
 ) -> None:
     """
     Increment trade counter and record P&L.

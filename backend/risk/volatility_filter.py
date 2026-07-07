@@ -9,11 +9,12 @@ Fix STRESS-5: check() was async but callers expected sync result.
   - async update_atr() acquires lock to update ATR history
   - async check_async() kept for backward compat
 """
+
 from __future__ import annotations
 
 import asyncio
 import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from ..core.logger import get_logger
@@ -24,28 +25,29 @@ logger = get_logger("risk.volatility_filter")
 try:
     from .news_filter import NewsEvent  # canonical
 except ImportError:
+
     @dataclass
     class NewsEvent:  # type: ignore[no-redef]
-        symbol:    str
-        impact:    str   = "HIGH"
+        symbol: str
+        impact: str = "HIGH"
         timestamp: float = 0.0
 
 
 @dataclass
 class VolatilityConfig:
-    max_atr_multiplier:  float = 3.0
-    min_atr_multiplier:  float = 0.3
-    news_pre_minutes:    int   = 30
-    news_post_minutes:   int   = 15
-    enabled:             bool  = True
+    max_atr_multiplier: float = 3.0
+    min_atr_multiplier: float = 0.3
+    news_pre_minutes: int = 30
+    news_post_minutes: int = 15
+    enabled: bool = True
 
 
 @dataclass
 class VolatilityCheckResult:
-    can_trade:    bool
-    reason:       str   = ""
-    atr_ratio:    float = 1.0
-    news_blocked: bool  = False
+    can_trade: bool
+    reason: str = ""
+    atr_ratio: float = 1.0
+    news_blocked: bool = False
 
 
 class VolatilityFilter:
@@ -59,10 +61,10 @@ class VolatilityFilter:
     """
 
     def __init__(self, config: Optional[VolatilityConfig] = None) -> None:
-        self._cfg          = config or VolatilityConfig()
-        self._news_events: List[NewsEvent]        = []
+        self._cfg = config or VolatilityConfig()
+        self._news_events: List[NewsEvent] = []
         self._atr_history: Dict[str, List[float]] = {}
-        self._lock:        Optional[asyncio.Lock] = None
+        self._lock: Optional[asyncio.Lock] = None
 
     def _get_lock(self) -> asyncio.Lock:
         if self._lock is None:
@@ -105,7 +107,7 @@ class VolatilityFilter:
         hist = list(self._atr_history.get(symbol, []))
 
         if len(hist) >= 10:
-            window     = hist[-20:]
+            window = hist[-20:]
             normal_atr = sum(window) / len(window)
             if normal_atr > 0 and current_atr >= 0:
                 ratio = current_atr / normal_atr

@@ -1,10 +1,10 @@
 """Monte Carlo Simulator — equity path simulation with probability of ruin."""
 
 from __future__ import annotations
-import math
+
 import random
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import List, Optional
 
 
 @dataclass
@@ -15,17 +15,17 @@ class MonteCarloResult:
     # Distribution of final balances
     median_final_balance: float
     mean_final_balance: float
-    percentile_5: float    # worst 5% scenario
+    percentile_5: float  # worst 5% scenario
     percentile_25: float
     percentile_75: float
-    percentile_95: float   # best 5% scenario
+    percentile_95: float  # best 5% scenario
     # Risk metrics
-    probability_of_ruin: float     # % sims ending below ruin_threshold
-    probability_of_profit: float   # % sims with profit
+    probability_of_ruin: float  # % sims ending below ruin_threshold
+    probability_of_profit: float  # % sims with profit
     expected_max_drawdown_pct: float
     # Paths
-    sample_paths: List[List[float]]   # 10 sample equity paths
-    all_final_balances: List[float]   # distribution histogram data
+    sample_paths: List[List[float]]  # 10 sample equity paths
+    all_final_balances: List[float]  # distribution histogram data
     ruin_threshold: float
 
 
@@ -121,11 +121,19 @@ class MonteCarloSimulator:
 
     def _empty(self, initial_balance: float) -> MonteCarloResult:
         return MonteCarloResult(
-            n_simulations=0, n_trades=0, initial_balance=initial_balance,
-            median_final_balance=initial_balance, mean_final_balance=initial_balance,
-            percentile_5=initial_balance, percentile_25=initial_balance,
-            percentile_75=initial_balance, percentile_95=initial_balance,
-            probability_of_ruin=0.0, probability_of_profit=0.0,
-            expected_max_drawdown_pct=0.0, sample_paths=[], all_final_balances=[],
+            n_simulations=0,
+            n_trades=0,
+            initial_balance=initial_balance,
+            median_final_balance=initial_balance,
+            mean_final_balance=initial_balance,
+            percentile_5=initial_balance,
+            percentile_25=initial_balance,
+            percentile_75=initial_balance,
+            percentile_95=initial_balance,
+            probability_of_ruin=0.0,
+            probability_of_profit=0.0,
+            expected_max_drawdown_pct=0.0,
+            sample_paths=[],
+            all_final_balances=[],
             ruin_threshold=initial_balance * 0.5,
         )
