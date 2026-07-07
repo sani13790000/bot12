@@ -1,1 +1,179 @@
-ZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGFzeW5jaW8KaW1wb3J0IGxvZ2dpbmcKaW1wb3J0IG9zCmltcG9ydCB1dWlkCmZyb20gZGF0ZXRpbWUgaW1wb3J0IGRhdGV0aW1lLCB0aW1lZGVsdGEsIHRpbWV6b25lCmZyb20gdHlwaW5nIGltcG9ydCBBbnksIERpY3QsIExpc3QsIE9wdGlvbmFsCgpmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgRGVwZW5kcywgSFRUUEV4Y2VwdGlvbiwgUXVlcnksIHN0YXR1cwpmcm9tIGZhc3RhcGkucmVzcG9uc2VzIGltcG9ydCBGaWxlUmVzcG9uc2UsIEhUTUxSZXNwb25zZSwgSlNPTlJlc3BvbnNlCmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbCwgRmllbGQKCnRyeToKICAgIGZyb20gYmFja2VuZC5zZWN1cml0eV9yZXBvcnRpbmcuc2VjdXJpdHlfc2NvcmVfZW5naW5lIGltcG9ydCBzZWN1cml0eV9zY29yZV9lbmdpbmUKICAgIEhBU19TQ09SRSA9IFRydWUKZXhjZXB0IEltcG9ydEVycm9yOgogICAgSEFTX1NDT1JFID0gRmFsc2UKCnRyeToKICAgIGZyb20gYmFja2VuZC5hZ2VudHMuc2VjdXJpdHlfYWlfYWdlbnQgaW1wb3J0IHNlY3VyaXR5X2FpX2FnZW50CiAgICBIQVNfQUdFTlQgPSBUcnVlCmV4Y2VwdCBJbXBvcnRFcnJvcjoKICAgIEhBU19BR0VOVCA9IEZhbHNlCgp0cnk6CiAgICBmcm9tIGJhY2tlbmQuc2VjdXJpdHlfcmVwb3J0aW5nLnNlY3VyaXR5X3JlcG9ydF9zZXJ2aWNlIGltcG9ydCBTZWN1cml0eVJlcG9ydFNlcnZpY2UKICAgIGZyb20gYmFja2VuZC5zZWN1cml0eV9yZXBvcnRpbmcucmVwb3J0X2V4cG9ydGVyIGltcG9ydCBSZXBvcnRFeHBvcnRlcgogICAgX3JlcG9ydF9zdmMgPSBTZWN1cml0eVJlcG9ydFNlcnZpY2UoKQogICAgX3JlcG9ydF9leHAgPSBSZXBvcnRFeHBvcnRlcigpCiAgICBIQVNfUkVQT1JUUyA9IFRydWUKZXhjZXB0IEltcG9ydEVycm9yOgogICAgSEFTX1JFUE9SVFMgPSBGYWxzZQoKdHJ5OgogICAgZnJvbSBiYWNrZW5kLnNlcnZpY2VzLnRocmVhdF9pbnRlbGxpZ2VuY2Vfc2VydmljZSBpbXBvcnQgdGhyZWF0X2ludGVsX3NlcnZpY2UKICAgIEhBU19USFJFQVQgPSBUcnVlCmV4Y2VwdCBJbXBvcnRFcnJvcjoKICAgIEhBU19USFJFQVQgPSBGYWxzZQoKdHJ5OgogICAgZnJvbSBiYWNrZW5kLmRhdGFiYXNlLmNvbm5lY3Rpb24gaW1wb3J0IGdldF9kYl9jbGllbnQKICAgIEhBU19EQiA9IFRydWUKZXhjZXB0IEltcG9ydEVycm9yOgogICAgSEFTX0RCID0gRmFsc2UKCnRyeToKICAgIGZyb20gYmFja2VuZC5jb3JlLmRlcHMgaW1wb3J0IHJlcXVpcmVfYWRtaW4sIGdldF9jdXJyZW50X3VzZXIKICAgIEhBU19BVVRIID0gVHJ1ZQpleGNlcHQgSW1wb3J0RXJyb3I6CiAgICBhc3luYyBkZWYgcmVxdWlyZV9hZG1pbigpOgogICAgICAgIHJldHVybiBOb25lCiAgICBhc3luYyBkZWYgZ2V0X2N1cnJlbnRfdXNlcigpOgogICAgICAgIHJldHVybiBOb25lCiAgICBIQVNfQVVUSCA9IEZhbHNlCgpsb2cgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKcm91dGVyID0gQVBJUm91dGVyKHRhZ3M9WyJhbmFseXRpY3MiXSkKX1JFUE9SVFNfRElSID0gb3MuZ2V0ZW52KCJTRUNVUKLUWV9SRVBPUlRTX0RJUiIsICIvcmVwb3J0cy9zZWN1cml0eSIpCgoKY2xhc3MgU2VjdXJpdHlNZXRyaWNzUmVzcG9uc2UoQmFzZU1vZGVsKToKICAgIHNlY3VyaXR5X3Njb3JlOiAgICAgICAgICBmbG9hdAogICAgc2NvcmVfbGV2ZWw6ICAgICAgICAgICAgIHN0cgogICAgc2NvcmVfdHJlbmQ6ICAgICAgICAgICAgIHN0cgogICAgc2NvcmVfZGVsdGFfMWg6ICAgICAgICAgIE9wdGlvbmFsW2Zsb2F0XSA9IE5vbmUKICAgIGFub21hbHlfcmF0ZTogICAgICAgICAgICBmbG9hdAogICAgYW5vbWFsaWVzX2xhc3RfMWg6ICAgICAgIGludCAgID0gMAogICAgYW5vbWFsaWVzX2xhc3RfMjRoOiAgICAgIGludCAgID0gMAogICAgY3JpdGljYWxfYW5vbWFsaWVzXzI0aDogIGludCAgID0gMAogICAgYmxvY2tlZF9pcHM6ICAgICAgICAgICAgIGludAogICAgYmxvY2tlZF9pcHNfMjRoOiAgICAgICAgIGludCAgID0gMAogICAgcmVjZW50X3NlY3VyaXR5X2V2ZW50czogIExpc3RbRGljdFtzdHIsIEFueV1dID0gRmllbGQoZGVmYXVsdF9mYWN0b3J5PWxpc3QpCiAgICBmYWlsZWRfbG9naW5zXzFoOiAgICAgICAgaW50ICAgPSAwCiAgICBzdXNwaWNpb3VzX2FjY291bnRzOiAgICAgaW50ICAgPSAwCiAgICB0aHJlYXRfaW50ZWxfaGl0c18yNGg6ICAgaW50ICAgPSAwCiAgICBtb2RlbF90cmFpbmVkOiAgICAgICAgICAgYm9vbCAgPSBGYWxzZQogICAgbW9kZWxfc2FtcGxlczogICAgICAgICAgIGludCAgID0gMAogICAgbGFzdF9yZXRyYWluOiAgICAgICAgICAgIE9wdGlvbmFsW3N0cl0gPSBOb25lCiAgICBnZW5lcmF0ZWRfYXQ6ICAgICAgICAgICAgc3RyICAgPSBGaWVsZCgKICAgICAgICBkZWZhdWx0X2ZhY3Rvcnk9bGFtYmRhOiBkYXRldGltZS5ub3codGltZXpvbmUudXRjKS5pc29mb3JtYXQoKQogICAgKQoKCiMgQlVHLUFJMiBmaXg6IHdhcyBAcm91dGVyLmdldCgiL2FuYWx5dGljcy9zZWN1cml0eS9tZXRyaWNzIikKIyAgIG1haW4ucHkgcmVnaXN0ZXJzIHdpdGggcHJlZml4PSIvYW5hbHl0aWNzIiBzbyBlZmZlY3RpdmUgcGF0aCB3YXM6CiMgICAvYW5hbHl0aWNzL2FuYWx5dGljcy9zZWN1cml0eS9tZXRyaWNzIC0+IDQwNApAcm91dGVyLmdldCgiL3NlY3VyaXR5L21ldHJpY3MiLCByZXNwb25zZV9tb2RlbD1TZWN1cml0eU1ldHJpY3NSZXNwb25zZSwKICAgICAgICAgICAgc3VtbWFyeT0iUGhhc2UtMTE6IFJlYWwtdGltZSBzZWN1cml0eSBtZXRyaWNzIGZvciBkYXNoYm9hcmQiKQphc3luYyBkZWYgZ2V0X3NlY3VyaXR5X21ldHJpY3MoKSAtPiBTZWN1cml0eU1ldHJpY3NSZXNwb25zZToKICAgIHNjb3JlICAgICA9IDc1LjAKICAgIHNjb3JlX2x2bCA9ICJtb2RlcmF0ZSIKICAgIHRyZW5kICAgICA9ICJzdGFibGUiCiAgICBkZWx0YV8xaCAgPSBOb25lCiAgICBtb2RlbF9vayAgPSBGYWxzZQogICAgbW9kZWxfbiAgID0gMAogICAgbGFzdF9ydDogT3B0aW9uYWxbc3RyXSA9IE5vbmUKCiAgICBpZiBIQVNfU0NPUkU6CiAgICAgICAgdHJ5OgogICAgICAgICAgICBzbmFwID0gc2VjdXJpdHlfc2NvcmVfZW5naW5lLmN1cnJlbnRfc3luYygpCiAgICAgICAgICAgIGlmIHNuYXA6CiAgICAgICAgICAgICAgICBzY29yZSAgICAgPSBzbmFwLnNjb3JlCiAgICAgICAgICAgICAgICBzY29yZV9sdmwgPSBzbmFwLmxldmVsLnZhbHVlIGlmIGhhc2F0dHIoc25hcC5sZXZlbCwgInZhbHVlIikgZWxzZSBzdHIoc25hcC5sZXZlbCkKICAgICAgICAgICAgICAgIHRyZW5kICAgICA9IHNuYXAudHJlbmQKICAgICAgICAgICAgICAgIGRlbHRhXzFoICA9IHNuYXAuZGVsdGFfMWgKICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICAgICAgbG9nLndhcm5pbmcoIlthbmFseXRpY3NdIHNlY3VyaXR5X3Njb3JlX2VuZ2luZSB1bmF2YWlsYWJsZTogJXMiLCBleGMpCgogICAgaWYgSEFTX0FHR05UOgogICAgICAgIHRyeToKICAgICAgICAgICAgc3RhdHMgICAgPSBzZWN1cml0eV9haV9hZ2VudC5nZXRfc3RhdHMoKQogICAgICAgICAgICBtb2RlbF9vayA9IHN0YXRzLmdldCgibW9kZWxfdHJhaW5lZCIsIEZhbHNlKQogICAgICAgICAgICBtb2RlbF9uICA9IHN0YXRzLmdldCgidHJhaW5pbmdfc2FtcGxlcyIsIDApCiAgICAgICAgICAgIGxhc3RfcnQgID0gc3RhdHMuZ2V0KCJsYXN0X3JldHJhaW4iKQogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICBsb2cud2FybmluZygiW2FuYWx5dGljc10gc2VjdXJpdHlfYWlfYWdlbnQuZ2V0X3N0YXRzIHVuYXZhaWxhYmxlOiAlcyIsIGV4YykKCiAgICBhbm9tYWxpZXNfMWggID0gMAogICAgYW5vbWFsaWVzXzI0aCA9IDAKICAgIGNyaXRpY2FsXzI0aCAgPSAwCiAgICBibG9ja2VkX25vdyAgID0gMAogICAgYmxvY2tlZF8yNGggICA9IDAKICAgIGZhaWxlZF8xaCAgICAgPSAwCiAgICBzdXNwaWNpb3VzICAgID0gMAogICAgdGhyZWF0X2hpdHMgICA9IDAKICAgIHJlY2VudF9ldmVudHM6IExpc3RbRGljdFtzdHIsIEFueV1dID0gW10KCiAgICBpZiBIQVNfREI6CiAgICAgICAgZGIgID0gZ2V0X2RiX2NsaWVudCgpCiAgICAgICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykKICAgICAgICBoMSAgPSAobm93IC0gdGltZWRlbHRhKGhvdXJzPTEpKS5pc29mb3JtYXQoKQogICAgICAgIGgyNCA9IChub3cgLSB0aW1lZGVsdGEoaG91cnM9MjQpKS5pc29mb3JtYXQoKQoKICAgICAgICBhc3luYyBkZWYgX3EoY29ybyk6CiAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgIHJldHVybiBhd2FpdCBjb3JvCiAgICAgICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgICAgICAgICAgbG9nLndhcm5pbmcoIlthbmFseXRpY3NdIERCIHF1ZXJ5IGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgICAgICAgICByZXR1cm4gTm9uZQoKICAgICAgICByZXN1bHRzID0gYXdhaXQgYXN5bmNpby5nYXRoZXIoCiAgICAgICAgICAgIF9xKGRiLnRhYmxlKCJzZWN1cml0eV9haV9hbmFseXNpcyIpLnNlbGVjdCgiaWQiKS5ndGUoImRldGVjdGVkX2F0IiwgaDEpLmV4ZWN1dGUoKSksCiAgICAgICAgICAgIF9xKGRiLnRhYmxlKCJzZWN1cml0eV9haV9hbmFseXNpcyIpLnNlbGVjdCgiaWQiKS5ndGUoImRldGVjdGVkX2F0IiwgaDI0KS5leGVjdXRlKCkpLAogICAgICAgICAgICBfcShkYi50YWJsZSgic2VjdXJpdHlfYWlfYW5hbHlzaXMiKS5zZWxlY3QoImlkIikuZXEoInNldmVyaXR5IiwgImNyaXRpY2FsIikuZ3RlKCJkZXRlY3RlZF9hdCIsIGgyNCkuZXhlY3V0ZSgpKSwKICAgICAgICAgICAgX3EoZGIudGFibGUoInNlY3VyaXR5X2Jsb2NrZWRfaXBzIikuc2VsZWN0KCJpZCIpLmVxKCJpc19hY3RpdmUiLCBUcnVlKS5leGVjdXRlKCkpLAogICAgICAgICAgICBfcShkYi50YWJsZSgic2VjdXJpdHlfYmxvY2tlZF9pcHMiKS5zZWxlY3QoImlkIikuZ3RlKCJibG9ja2VkX2F0IiwgaDI0KS5leGVjdXRlKCkpLAogICAgICAgICAgICBfcShkYi50YWJsZSgic2VjdXJpdHlfYWlfYW5hbHlzaXMiKS5zZWxlY3QoIioiKS5vcmRlcigiZGV0ZWN0ZWRfYXQiLCBkZXNjPVRydWUpLmxpbWl0KDEwKS5leGVjdXRlKCkpLAogICAgICAgICAgICByZXR1cm5fZXhjZXB0aW9ucz1GYWxzZSwKICAgICAgICApCgogICAgICAgIGlmIHJlc3VsdHNbMF06IGFub21hbGllc18xaCAgPSBsZW4ocmVzdWx0c1swXS5kYXRhIG9yIFtdKQogICAgICAgIGlmIHJlc3VsdHNbMV06IGFub21hbGllc18yNGggPSBsZW4ocmVzdWx0c1sxXS5kYXRhIG9yIFtdKQogICAgICAgIGlmIHJlc3VsdHNbMl06IGNyaXRpY2FsXzI0aCAgPSBsZW4ocmVzdWx0c1syXS5kYXRhIG9yIFtdKQogICAgICAgIGlmIHJlc3VsdHNbM106IGJsb2NrZWRfbm93ICAgPSBsZW4ocmVzdWx0c1szXS5kYXRhIG9yIFtdKQogICAgICAgIGlmIHJlc3VsdHNbNF06IGJsb2NrZWRfMjRoICAgPSBsZW4ocmVzdWx0c1s0XS5kYXRhIG9yIFtdKQogICAgICAgIGlmIHJlc3VsdHNbNV06IHJlY2VudF9ldmVudHMgPSByZXN1bHRzWzVdLmRhdGEgb3IgW10KCiAgICBhbm9tYWx5X3JhdGUgPSBhbm9tYWxpZXNfMWggLyA2MC4wCgogICAgcmV0dXJuIFNlY3VyaXR5TWV0cmljc1Jlc3BvbnNlKAogICAgICAgIHNlY3VyaXR5X3Njb3JlPXNjb3JlLAogICAgICAgIHNjb3JlX2xldmVsPXNjb3JlX2x2bCwKICAgICAgICBzY29yZV90cmVuZD10cmVuZCwKICAgICAgICBzY29yZV9kZWx0YV8xaD1kZWx0YV8xaCwKICAgICAgICBhbm9tYWx5X3JhdGU9cm91bmQoYW5vbWFseV9yYXRlLCA0KSwKICAgICAgICBhbm9tYWxpZXNfbGFzdF8xaD1hbm9tYWxpZXNfMWgsCiAgICAgICAgYW5vbWFsaWVzX2xhc3RfMjRoPWFub21hbGllc18yNGgsCiAgICAgICAgY3JpdGljYWxfYW5vbWFsaWVzXzI0aD1jcml0aWNhbF8yNGgsCiAgICAgICAgYmxvY2tlZF9pcHM9YmxvY2tlZF9ub3csCiAgICAgICAgYmxvY2tlZF9pcHNfMjRoPWJsb2NrZWRfMjRoLAogICAgICAgIHJlY2VudF9zZWN1cml0eV9ldmVudHM9cmVjZW50X2V2ZW50cywKICAgICAgICBmYWlsZWRfbG9naW5zXzFoPWZhaWxlZF8xaCwKICAgICAgICBzdXNwaWNpb3VzX2FjY291bnRzPXN1c3BpY2lvdXMsCiAgICAgICAgdGhyZWF0X2ludGVsX2hpdHNfMjRoPXRocmVhdF9oaXRzLAogICAgICAgIG1vZGVsX3RyYWluZWQ9bW9kZWxfb2ssCiAgICAgICAgbW9kZWxfc2FtcGxlcz1tb2RlbF9uLAogICAgICAgIGxhc3RfcmV0cmFpbj1sYXN0X3J0LAogICAgKQo=
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from pydantic import BaseModel, Field
+
+try:
+    from backend.security_reporting.security_score_engine import security_score_engine
+    HAS_SCORE = True
+except ImportError:
+    HAS_SCORE = False
+
+try:
+    from backend.agents.security_ai_agent import security_ai_agent
+    HAS_AGENT = True
+except ImportError:
+    HAS_AGENT = False
+
+try:
+    from backend.security_reporting.security_report_service import SecurityReportService
+    from backend.security_reporting.report_exporter import ReportExporter
+    _report_svc = SecurityReportService()
+    _report_exp = ReportExporter()
+    HAS_REPORTS = True
+except ImportError:
+    HAS_REPORTS = False
+
+try:
+    from backend.services.threat_intelligence_service import threat_intel_service
+    HAS_THREAT = True
+except ImportError:
+    HAS_THREAT = False
+
+try:
+    from backend.database.connection import get_db_client
+    HAS_DB = True
+except ImportError:
+    HAS_DB = False
+
+try:
+    from backend.core.deps import require_admin, get_current_user
+    HAS_AUTH = True
+except ImportError:
+    async def require_admin():
+        return None
+    async def get_current_user():
+        return None
+    HAS_AUTH = False
+
+log = logging.getLogger(__name__)
+router = APIRouter(tags=["analytics"])
+_REPORTS_DIR = os.getenv("SECURITY_REPORTS_DIR", "/reports/security")
+
+
+class SecurityMetricsResponse(BaseModel):
+    security_score:          float
+    score_level:             str
+    score_trend:             str
+    score_delta_1h:          Optional[float] = None
+    anomaly_rate:            float
+    anomalies_last_1h:       int   = 0
+    anomalies_last_24h:      int   = 0
+    critical_anomalies_24h:  int   = 0
+    blocked_ips:             int
+    blocked_ips_24h:         int   = 0
+    recent_security_events:  List[Dict[str, Any]] = Field(default_factory=list)
+    failed_logins_1h:        int   = 0
+    suspicious_accounts:     int   = 0
+    threat_intel_hits_24h:   int   = 0
+    model_trained:           bool  = False
+    model_samples:           int   = 0
+    last_retrain:            Optional[str] = None
+    generated_at:            str   = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
+
+# BUG-AI2 fix: was @router.get("/analytics/security/metrics")
+#   main.py registers with prefix="/analytics" so effective path was:
+#   /analytics/analytics/security/metrics -> 404
+@router.get("/security/metrics", response_model=SecurityMetricsResponse,
+            summary="Phase-11: Real-time security metrics for dashboard")
+async def get_security_metrics() -> SecurityMetricsResponse:
+    score     = 75.0
+    score_lvl = "moderate"
+    trend     = "stable"
+    delta_1h  = None
+    model_ok  = False
+    model_n   = 0
+    last_rt: Optional[str] = None
+
+    if HAS_SCORE:
+        try:
+            snap = security_score_engine.current_sync()
+            if snap:
+                score     = snap.score
+                score_lvl = snap.level.value if hasattr(snap.level, "value") else str(snap.level)
+                trend     = snap.trend
+                delta_1h  = snap.delta_1h
+        except Exception as exc:
+            log.warning("[analytics] security_score_engine unavailable: %s", exc)
+
+    if HAS_AGGNT:
+        try:
+            stats    = security_ai_agent.get_stats()
+            model_ok = stats.get("model_trained", False)
+            model_n  = stats.get("training_samples", 0)
+            last_rt  = stats.get("last_retrain")
+        except Exception as exc:
+            log.warning("[analytics] security_ai_agent.get_stats unavailable: %s", exc)
+
+    anomalies_1h  = 0
+    anomalies_24h = 0
+    critical_24h  = 0
+    blocked_now   = 0
+    blocked_24h   = 0
+    failed_1h     = 0
+    suspicious    = 0
+    threat_hits   = 0
+    recent_events: List[Dict[str, Any]] = []
+
+    if HAS_DB:
+        db  = get_db_client()
+        now = datetime.now(timezone.utc)
+        h1  = (now - timedelta(hours=1)).isoformat()
+        h24 = (now - timedelta(hours=24)).isoformat()
+
+        async def _q(coro):
+            try:
+                return await coro
+            except Exception as exc:
+                log.warning("[analytics] DB query failed: %s", exc)
+                return None
+
+        results = await asyncio.gather(
+            _q(db.table("security_ai_analysis").select("id").gte("detected_at", h1).execute()),
+            _q(db.table("security_ai_analysis").select("id").gte("detected_at", h24).execute()),
+            _q(db.table("security_ai_analysis").select("id").eq("severity", "critical").gte("detected_at", h24).execute()),
+            _q(db.table("security_blocked_ips").select("id").eq("is_active", True).execute()),
+            _q(db.table("security_blocked_ips").select("id").gte("blocked_at", h24).execute()),
+            _q(db.table("security_ai_analysis").select("*").order("detected_at", desc=True).limit(10).execute()),
+            return_exceptions=False,
+        )
+
+        if results[0]: anomalies_1h  = len(results[0].data or [])
+        if results[1]: anomalies_24h = len(results[1].data or [])
+        if results[2]: critical_24h  = len(results[2].data or [])
+        if results[3]: blocked_now   = len(results[3].data or [])
+        if results[4]: blocked_24h   = len(results[4].data or [])
+        if results[5]: recent_events = results[5].data or []
+
+    anomaly_rate = anomalies_1h / 60.0
+
+    return SecurityMetricsResponse(
+        security_score=score,
+        score_level=score_lvl,
+        score_trend=trend,
+        score_delta_1h=delta_1h,
+        anomaly_rate=round(anomaly_rate, 4),
+        anomalies_last_1h=anomalies_1h,
+        anomalies_last_24h=anomalies_24h,
+        critical_anomalies_24h=critical_24h,
+        blocked_ips=blocked_now,
+        blocked_ips_24h=blocked_24h,
+        recent_security_events=recent_events,
+        failed_logins_1h=failed_1h,
+        suspicious_accounts=suspicious,
+        threat_intel_hits_24h=threat_hits,
+        model_trained=model_ok,
+        model_samples=model_n,
+        last_retrain=last_rt,
+    )

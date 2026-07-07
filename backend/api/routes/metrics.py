@@ -1,1 +1,205 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9tZXRyaWNzLnB5IMOiwoDClCBQaGFzZSBUIEZpeCAoQlVHLVQxKQoKQ3JlYXRlZCBiZWNhdXNlIG1haW4ucHkgaW1wb3J0ZWQgbWV0cmljcy5yb3V0ZXIgYnV0IHRoaXMgZmlsZSBkaWQgbm90IGV4aXN0LgpJbXBvcnRFcnJvciBvbiBzdGFydHVwIMOiwobCkiBhbGwgR3JvdXAtMSBjb3JlIHJvdXRlcyAoYXV0aCwgc2lnbmFscywgdHJhZGVzLAphbmFseXNpcywgYWlfcHJlZGljdGlvbiwgYWRtaW4sIGJhY2t0ZXN0KSBmYWlsZWQgdG8gcmVnaXN0ZXIuCgpFbmRwb2ludHM6CiAgR0VUIC9tZXRyaWNzL3BlcmZvcm1hbmNlICDDosKAwpQgZnVsbCBQZXJmb3JtYW5jZU1ldHJpY3MgZnJvbSBEQiB0cmFkZXMKICBHRVQgL21ldHJpY3MvZXF1aXR5ICAgICAgIMOiwoDClCBlcXVpdHkgY3VydmUgdGltZS1zZXJpZXMKICBHRVQgL21ldHJpY3Mvc2hhcnBlICAgICAgIMOiwoDClCBTaGFycGUgcmF0aW8gd2l0aCBjb25maWd1cmFibGUgdGhyZXNob2xkCiAgR0VUIC9tZXRyaWNzL3N1bW1hcnkgICAgICDDosKAwpQgYWdncmVnYXRlZCBzdW1tYXJ5IGNhcmQgZGF0YQoiIiIKZnJvbSBfX2Z1dHVyZV9fIGltcG9ydCBhbm5vdGF0aW9ucwoKaW1wb3J0IGxvZ2dpbmcKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWVkZWx0YSwgdGltZXpvbmUKZnJvbSB0eXBpbmcgaW1wb3J0IEFueSwgRGljdCwgTGlzdCwgT3B0aW9uYWwKCmZyb20gZmFzdGFwaSBpbXBvcnQgRGVwZW5kcywgQVBJUm91dGVyLCBIVFRQRXhjZXB0aW9uLCBRdWVyeQoKZnJvbSBiYWNrZW5kLmNvcmUuZGVwcyBpbXBvcnQgZ2V0X2N1cnJlbnRfdXNlcgoKbG9nID0gbG9nZ2luZy5nZXRMb2dnZXIoX19uYW1lX18pCnJvdXRlciA9IEFQSVJvdXRlcihkZXBlbmRlbmNpZXM9W0RlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlcildLCB0YWdzPVsiTWV0cmljcyJdKQoKCiMgw6LClMKAw6LClMKAw6LClMKAIGhlbHBlcnMgw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKAw6LClMKACmRlZiBfZ2V0X21ldHJpY3NfZW5naW5lKCk6CiAgICBmcm9tIGJhY2tlbmQuYW5hbHl0aWNzLm1ldHJpY3NfZW5naW5lIGltcG9ydCBNZXRyaWNzRW5naW5lCiAgICByZXR1cm4gTWV0cmljc0VuZ2luZSgpCgoKYXN5bmMgZGVmIF9mZXRjaF90cmFkZV9yZWNvcmRzKGRheXM6IGludCA9IDMwKSAtPiBMaXN0W0FueV06CiAgICAiIiJGZXRjaCBjbG9zZWQgVHJhZGVSZWNvcmQgb2JqZWN0cyBmcm9tIERCIGZvciB0aGUgbGFzdCBgZGF5c2AgZGF5cy4iIiIKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuZGF0YWJhc2UuY29ubmVjdGlvbiBpbXBvcnQgZ2V0X2RiX2NsaWVudAogICAgICAgIGZyb20gYmFja2VuZC5hbmFseXRpY3MubWV0cmljc19lbmdpbmUgaW1wb3J0IFRyYWRlUmVjb3JkCiAgICAgICAgZGIgPSBnZXRfZGJfY2xpZW50KCkKICAgICAgICBzaW5jZSA9IChkYXRldGltZS5ub3codGltZXpvbmUudXRjKSAtIHRpbWVkZWx0YShkYXlzPWRheXMpKS5pc29mb3JtYXQoKQogICAgICAgIHJlc3AgPSAoCiAgICAgICAgICAgIGRiLnRhYmxlKCJ0cmFkZXMiKQogICAgICAgICAgICAuc2VsZWN0KCJwbmxfdXNkLGVudHJ5X3ByaWNlLGV4aXRfcHJpY2Usc3RvcF9sb3NzLHRha2VfcHJvZml0LCIKICAgICAgICAgICAgICAgICAgICAiZGlyZWN0aW9uLG9wZW5lZF9hdCxjbG9zZWRfYXQsc3ltYm9sLGNvbW1pc3Npb24iKQogICAgICAgICAgICAuZXEoInN0YXR1cyIsICJjbG9zZWQiKQogICAgICAgICAgICAuZ3RlKCJjbG9zZWRfYXQiLCBzaW5jZSkKICAgICAgICAgICAgLmV4ZWN1dGUoKQogICAgICAgICkKICAgICAgICByZWNvcmRzOiBMaXN0W1RyYWRlUmVjb3JkXSA9IFtdCiAgICAgICAgZm9yIHJvdyBpbiAocmVzcC5kYXRhIG9yIFtdKToKICAgICAgICAgICAgdHJ5OgogICAgICAgICAgICAgICAgcmVjb3Jkcy5hcHBlbmQoVHJhZGVSZWNvcmQoCiAgICAgICAgICAgICAgICAgICAgcG5sPWZsb2F0KHJvdy5nZXQoInBubF91c2QiLCAwLjApKSwKICAgICAgICAgICAgICAgICAgICBlbnRyeV9wcmljZT1mbG9hdChyb3cuZ2V0KCJlbnRyeV9wcmljZSIsIDAuMCkpLAogICAgICAgICAgICAgICAgICAgIGV4aXRfcHJpY2U9ZmxvYXQocm93LmdldCgiZXhpdF9wcmljZSIsIDAuMCkpLAogICAgICAgICAgICAgICAgICAgIHN0b3BfbG9zcz1mbG9hdChyb3cuZ2V0KCJzdG9wX2xvc3MiLCAwLjApKSwKICAgICAgICAgICAgICAgICAgICB0YWtlX3Byb2ZpdD1mbG9hdChyb3cuZ2V0KCJ0YWtlX3Byb2ZpdCIsIDAuMCkpLAogICAgICAgICAgICAgICAgICAgIGRpcmVjdGlvbj1zdHIocm93LmdldCgiZGlyZWN0aW9uIiwgIkJVWSIpKSwKICAgICAgICAgICAgICAgICAgICBvcGVuZWRfYXQ9ZGF0ZXRpbWUuZnJvbWlzb2Zvcm1hdChyb3dbIm9wZW5lZF9hdCJdKSwKICAgICAgICAgICAgICAgICAgICBjbG9zZWRfYXQ9ZGF0ZXRpbWUuZnJvbWlzb2Zvcm1hdChyb3dbImNsb3NlZF9hdCJdKSwKICAgICAgICAgICAgICAgICAgICBzeW1ib2w9c3RyKHJvdy5nZXQoInN5bWJvbCIsICIiKSksCiAgICAgICAgICAgICAgICAgICAgY29tbWlzc2lvbj1mbG9hdChyb3cuZ2V0KCJjb21taXNzaW9uIiwgMC4wKSksCiAgICAgICAgICAgICAgICApKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uOgogICAgICAgICAgICAgICAgY29udGludWUKICAgICAgICByZXR1cm4gcmVjb3JkcwogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nLndhcm5pbmcoIm1ldHJpY3M6IERCIGZldGNoIGZhaWxlZDogJXMiLCBleGMpCiAgICAgICAgcmV0dXJuIFtdCgoKIyAtLS0tLSBlbmRwb2ludHMgLS0tLS0KCkByb3V0ZXIuZ2V0KCIvcGVyZm9ybWFuY2UiKQphc3luYyBkZWYgZ2V0X3BlcmZvcm1hbmNlKAogICAgZGF5czogaW50ID0gUXVlcnkoZGVmYXVsdD0zMCwgZ2U9MSwgbGU9MzY1LCBkZXNjcmlwdGlvbj0iTG9va2JhY2sgZGF5cyIpLAopIC0+IERpY3Rbc3RyLCBBbnldOgogICAgIiIiQlVHLVQxIEZJWDogRnVsbCBQZXJmb3JtYW5jZU1ldHJpY3MgZnJvbSBEQiBjbG9zZWQgdHJhZGVzLiIiIgogICAgdHJ5OgogICAgICAgIGVuZ2luZSAgPSBfZ2V0X21ldHJpY3NfZW5naW5lKCkKICAgICAgICByZWNvcmRzID0gYXdhaXQgX2ZldGNoX3RyYWRlX3JlY29yZHMoZGF5cz1kYXlzKQogICAgICAgIG1ldHJpY3MgPSBlbmdpbmUuY2FsY3VsYXRlKHJlY29yZHMpCiAgICAgICAgcmV0dXJuIHsKICAgICAgICAgICAgIm9rIjogVHJ1ZSwKICAgICAgICAgICAgImxvb2tiYWNrX2RheXMiOiBkYXlzLAogICAgICAgICAgICAiZGF0YV9zb3VyY2UiOiAibGl2ZV9kYiIgaWYgcmVjb3JkcyBlbHNlICJub19kYXRhIiwKICAgICAgICAgICAgIm1ldHJpY3MiOiB7CiAgICAgICAgICAgICAgICAidG90YWxfdHJhZGVzIjogICAgICAgbWV0cmljcy50b3RhbF90cmFkZXMsCiAgICAgICAgICAgICAgICAid2lubmluZ190cmFkZXMiOiAgICAgbWV0cmljcy53aW5uaW5nX3RyYWRlcywKICAgICAgICAgICAgICAgICJsb3NpbmdfdHJhZGVzIjogICAgICBtZXRyaWNzLmxvc2luZ190cmFkZXMsCiAgICAgICAgICAgICAgICAid2luX3JhdGUiOiAgICAgICAgICAgcm91bmQobWV0cmljcy53aW5fcmF0ZSAqIDEwMCwgMiksCiAgICAgICAgICAgICAgICAiYXZnX3dpbiI6ICAgICAgICAgICAgbWV0cmljcy5hdmdfd2luLAogICAgICAgICAgICAgICAgImF2Z19sb3NzIjogICAgICAgICAgIG1ldHJpY3MuYXZnX2xvc3MsCiAgICAgICAgICAgICAgICAicHJvZml0X2ZhY3RvciI6ICAgICAgbWV0cmljcy5wcm9maXRfZmFjdG9yLAogICAgICAgICAgICAgICAgInRvdGFsX3BubCI6ICAgICAgICAgIG1ldHJpY3MudG90YWxfcG5sLAogICAgICAgICAgICAgICAgIm1heF9kcmF3ZG93biI6ICAgICAgIG1ldHJpY3MubWF4X2RyYXdkb3duLAogICAgICAgICAgICAgICAgIm1heF9kcmF3ZG93bl9wY3QiOiAgIG1ldHJpY3MubWF4X2RyYXdkb3duX3BjdCwKICAgICAgICAgICAgICAgICJzaGFycGVfcmF0aW8iOiAgICAgICBtZXRyaWNzLnNoYXJwZV9yYXRpbywKICAgICAgICAgICAgICAgICJzb3J0aW5vX3JhdGlvIjogICAgICBtZXRyaWNzLnNvcnRpbm9fcmF0aW8sCiAgICAgICAgICAgICAgICAiYXZnX3JyIjogICAgICAgICAgICAgbWV0cmljcy5hdmdfcnIsCiAgICAgICAgICAgICAgICAiZXhwZWN0YW5jeSI6ICAgICAgICAgbWV0cmljcy5leHBlY3RhbmN5LAogICAgICAgICAgICAgICAgImJlc3RfdHJhZGUiOiAgICAgICAgIG1ldHJpY3MuYmVzdF90cmFkZSwKICAgICAgICAgICAgICAgICJ3b3JzdF90cmFkZSI6ICAgICAgICBtZXRyaWNzLndvcnN0X3RyYWRlLAogICAgICAgICAgICAgICAgImF2Z19ob2xkX2hvdXJzIjogICAgIG1ldHJpY3MuYXZnX2hvbGRfaG91cnMsCiAgICAgICAgICAgICAgICAiY29uc2VjdXRpdmVfd2lucyI6ICAgbWV0cmljcy5jb25zZWN1dGl2ZV93aW5zLAogICAgICAgICAgICAgICAgImNvbnNlY3V0aXZlX2xvc3NlcyI6IG1ldHJpY3MuY29uc2VjdXRpdmVfbG9zc2VzLAogICAgICAgICAgICB9LAogICAgICAgIH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZy5lcnJvcigibWV0cmljcy9wZXJmb3JtYW5jZSBlcnJvcjogJXMiLCBleGMpCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZXhjKSkKCgpAcm91dGVyLmdldCgiL2VxdWl0eSIpCmFzeW5jIGRlZiBnZXRfZXF1aXR5X2N1cnZlKAogICAgZGF5czogaW50ID0gUXVlcnkoZGVmYXVsdD0zMCwgZ2U9MSwgbGU9MzY1KSwKKSAtPiBEaWN0W3N0ciwgQW55XToKICAgICIiIkJVRy1UMSBGSVg6IEVxdWl0eSBjdXJ2ZSB0aW1lLXNlcmllcyBmb3IgY2hhcnQgcmVuZGVyaW5nLiIiIgogICAgdHJ5OgogICAgICAgIHJlY29yZHMgPSBhd2FpdCBfZmV0Y2hfdHJhZGVfcmVjb3JkcyhkYXlzPWRheXMpCiAgICAgICAgY3VydmU6IExpc3RbRGljdFtzdHIsIEFueV1dID0gW10KICAgICAgICBlcXVpdHkgPSAwLjAKICAgICAgICBmb3IgcmVjIGluIHJlY29yZHM6CiAgICAgICAgICAgIGVxdWl0eSArPSByZWMucG5sCiAgICAgICAgICAgIGN1cnZlLmFwcGVuZCh7CiAgICAgICAgICAgICAgICAidHMiOiAgICAgcmVjLmNsb3NlZF9hdC5pc29mb3JtYXQoKSwKICAgICAgICAgICAgICAgICJlcXVpdHkiOiByb3VuZChlcXVpdHksIDIpLAogICAgICAgICAgICAgICAgInBubCI6ICAgIHJvdW5kKHJlYy5wbmwsIDIpLAogICAgICAgICAgICAgICAgInN5bWJvbCI6IHJlYy5zeW1ib2wsCiAgICAgICAgICAgIH0pCiAgICAgICAgdG90YWxfcmV0dXJuID0gcm91bmQoCiAgICAgICAgICAgICgoY3VydmVbLTFdWyJlcXVpdHkiXSAtIGN1cnZlWzBdWyJlcXVpdHkiXSkgLyBhYnMoY3VydmVbMF1bImVxdWl0eSJdKSAqIDEwMCkKICAgICAgICAgICAgaWYgbGVuKGN1cnZlKSA+PSAyIGFuZCBjdXJ2ZVswXVsiZXF1aXR5Il0gIT0gMCBlbHNlIDAuMCwKICAgICAgICAgICAgMiwKICAgICAgICApCiAgICAgICAgcmV0dXJuIHsKICAgICAgICAgICAgIm9rIjogVHJ1ZSwKICAgICAgICAgICAgImxvb2tiYWNrX2RheXMiOiBkYXlzLAogICAgICAgICAgICAiZGF0YV9wb2ludHMiOiAgIGxlbihjdXJ2ZSksCiAgICAgICAgICAgICJ0b3RhbF9yZXR1cm4iOiAgdG90YWxfcmV0dXJuLAogICAgICAgICAgICAiY3VydmUiOiAgICAgICAgIGN1cnZlLAogICAgICAgIH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZy5lcnJvcigibWV0cmljcy9lcXVpdHkgZXJyb3I6ICVzIiwgZXhjKQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGV4YykpCgoKQHJvdXRlci5nZXQoIi9zaGFycGUiKQphc3luYyBkZWYgZ2V0X3NoYXJwZSgKICAgIGRheXM6IGludCA9IFF1ZXJ5KGRlZmF1bHQ9MzAsIGdlPTEsIGxlPTM2NSksCikgLT4gRGljdFtzdHIsIEFueV06CiAgICAiIiJCVUctVDEgRklYOiBTaGFycGUgcmF0aW8gd2l0aCBjb25maWd1cmFibGUgdGhyZXNob2xkIChCVUctTzMpLiIiIgogICAgdHJ5OgogICAgICAgIGVuZ2luZSAgPSBfZ2V0X21ldHJpY3NfZW5naW5lKCkKICAgICAgICByZWNvcmRzID0gYXdhaXQgX2ZldGNoX3RyYWRlX3JlY29yZHMoZGF5cz1kYXlzKQogICAgICAgIG1ldHJpY3MgPSBlbmdpbmUuY2FsY3VsYXRlKHJlY29yZHMpCgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLmNvbmZpZyBpbXBvcnQgZ2V0X3NldHRpbmdzCiAgICAgICAgc2V0dGluZ3MgICAgPSBnZXRfc2V0dGluZ3MoKQogICAgICAgIG1pbl90cmFkZXMgID0gZ2V0YXR0cihzZXR0aW5ncywgIk1FVFJJQ1NfTUlOX1RSQURFU19GT1JfU0hBUlBFIiwgMzApCiAgICAgICAgYXZhaWxhYmxlICAgPSBsZW4ocmVjb3JkcykgPj0gbWluX3RyYWRlcwoKICAgICAgICByZXR1cm4gewogICAgICAgICAgICAib2siOiAgICAgICAgICAgIFRydWUsCiAgICAgICAgICAgICJzaGFycGUiOiAgICAgICAgbWV0cmljcy5zaGFycGVfcmF0aW8gaWYgYXZhaWxhYmxlIGVsc2UgMC4wLAogICAgICAgICAgICAic29ydGlubyI6ICAgICAgIG1ldHJpY3Muc29ydGlub19yYXRpbyBpZiBhdmFpbGFibGUgZWxzZSAwLjAsCiAgICAgICAgICAgICJhdmFpbGFibGUiOiAgICAgYXZhaWxhYmxlLAogICAgICAgICAgICAidHJhZGVfY291bnQiOiAgIGxlbihyZWNvcmRzKSwKICAgICAgICAgICAgIm1pbl9yZXF1aXJlZCI6ICBtaW5fdHJhZGVzLAogICAgICAgICAgICAibm90ZSI6ICAgICAgICAgICJsaXZlIiBpZiBhdmFpbGFibGUgZWxzZSAiaW5zdWZmaWNpZW50X2RhdGEiLAogICAgICAgIH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZy5lcnJvcigibWV0cmljcy9zaGFycGUgZXJyb3I6ICVzIiwgZXhjKQogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9c3RyKGV4YykpCgoKQHJvdXRlci5nZXQoIi9zdW1tYXJ5IikKYXN5bmMgZGVmIGdldF9zdW1tYXJ5KAogICAgZGF5czogaW50ID0gUXVlcnkoZGVmYXVsdD0zMCwgZ2U9MSwgbGU9MzY1KSwKKSAtPiBEaWN0W3N0ciwgQW55XToKICAgICIiIkJVRy1UMSBGSVg6IEFnZ3JlZ2F0ZWQgc3VtbWFyeSBjYXJkIGRhdGEgdXNlZCBieSBBbmFseXRpY3NQYWdlLnRzeC4iIiIKICAgIHRyeToKICAgICAgICBlbmdpbmUgID0gX2dldF9tZXRyaWNzX2VuZ2luZSgpCiAgICAgICAgcmVjb3JkcyA9IGF3YWl0IF9mZXRjaF90cmFkZV9yZWNvcmRzKGRheXM9ZGF5cykKICAgICAgICBtZXRyaWNzID0gZW5naW5lLmNhbGN1bGF0ZShyZWNvcmRzKQogICAgICAgIHJldHVybiB7CiAgICAgICAgICAgICJvayI6ICAgICAgICAgICAgVHJ1ZSwKICAgICAgICAgICAgImxvb2tiYWNrX2RheXMiOiBkYXlzLAogICAgICAgICAgICAiZGF0YV9zb3VyY2UiOiAgICJsaXZlX2RiIiBpZiByZWNvcmRzIGVsc2UgIm5vX2RhdGEiLAogICAgICAgICAgICAic3VtbWFyeSI6IHsKICAgICAgICAgICAgICAgICJ0b3RhbF90cmFkZXMiOiAgIG1ldHJpY3MudG90YWxfdHJhZGVzLAogICAgICAgICAgICAgICAgIndpbl9yYXRlIjogICAgICAgcm91bmQobWV0cmljcy53aW5fcmF0ZSAqIDEwMCwgMiksCiAgICAgICAgICAgICAgICAidG90YWxfcG5sIjogICAgICBtZXRyaWNzLnRvdGFsX3BubCwKICAgICAgICAgICAgICAgICJwcm9maXRfZmFjdG9yIjogIG1ldHJpY3MucHJvZml0X2ZhY3RvciwKICAgICAgICAgICAgICAgICJtYXhfZHJhd2Rvd24iOiAgIG1ldHJpY3MubWF4X2RyYXdkb3duLAogICAgICAgICAgICAgICAgInNoYXJwZV9yYXRpbyI6ICAgbWV0cmljcy5zaGFycGVfcmF0aW8sCiAgICAgICAgICAgICAgICAic29ydGlub19yYXRpbyI6ICBtZXRyaWNzLnNvcnRpbm9fcmF0aW8sCiAgICAgICAgICAgICAgICAiZXhwZWN0YW5jeSI6ICAgICBtZXRyaWNzLmV4cGVjdGFuY3ksCiAgICAgICAgICAgICAgICAiYmVzdF90cmFkZSI6ICAgICBtZXRyaWNzLmJlc3RfdHJhZGUsCiAgICAgICAgICAgICAgICAid29yc3RfdHJhZGUiOiAgICBtZXRyaWNzLndvcnN0X3RyYWRlLAogICAgICAgICAgICB9LAogICAgICAgIH0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZy5lcnJvcigibWV0cmljcy9zdW1tYXJ5IGVycm9yOiAlcyIsIGV4YykKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihleGMpKQo=
+"""
+backend/api/routes/metrics.py â Phase T Fix (BUG-T1)
+
+Created because main.py imported metrics.router but this file did not exist.
+ImportError on startup â all Group-1 core routes (auth, signals, trades,
+analysis, ai_prediction, admin, backtest) failed to register.
+
+Endpoints:
+  GET /metrics/performance  â full PerformanceMetrics from DB trades
+  GET /metrics/equity       â equity curve time-series
+  GET /metrics/sharpe       â Sharpe ratio with configurable threshold
+  GET /metrics/summary      â aggregated summary card data
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, APIRouter, HTTPException, Query
+
+from backend.core.deps import get_current_user
+
+log = logging.getLogger(__name__)
+router = APIRouter(dependencies=[Depends(get_current_user)], tags=["Metrics"])
+
+
+# âââ helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+def _get_metrics_engine():
+    from backend.analytics.metrics_engine import MetricsEngine
+    return MetricsEngine()
+
+
+async def _fetch_trade_records(days: int = 30) -> List[Any]:
+    """Fetch closed TradeRecord objects from DB for the last `days` days."""
+    try:
+        from backend.database.connection import get_db_client
+        from backend.analytics.metrics_engine import TradeRecord
+        db = get_db_client()
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        resp = (
+            db.table("trades")
+            .select("pnl_usd,entry_price,exit_price,stop_loss,take_profit,"
+                    "direction,opened_at,closed_at,symbol,commission")
+            .eq("status", "closed")
+            .gte("closed_at", since)
+            .execute()
+        )
+        records: List[TradeRecord] = []
+        for row in (resp.data or []):
+            try:
+                records.append(TradeRecord(
+                    pnl=float(row.get("pnl_usd", 0.0)),
+                    entry_price=float(row.get("entry_price", 0.0)),
+                    exit_price=float(row.get("exit_price", 0.0)),
+                    stop_loss=float(row.get("stop_loss", 0.0)),
+                    take_profit=float(row.get("take_profit", 0.0)),
+                    direction=str(row.get("direction", "BUY")),
+                    opened_at=datetime.fromisoformat(row["opened_at"]),
+                    closed_at=datetime.fromisoformat(row["closed_at"]),
+                    symbol=str(row.get("symbol", "")),
+                    commission=float(row.get("commission", 0.0)),
+                ))
+            except Exception:
+                continue
+        return records
+    except Exception as exc:
+        log.warning("metrics: DB fetch failed: %s", exc)
+        return []
+
+
+# ----- endpoints -----
+
+@router.get("/performance")
+async def get_performance(
+    days: int = Query(default=30, ge=1, le=365, description="Lookback days"),
+) -> Dict[str, Any]:
+    """BUG-T1 FIX: Full PerformanceMetrics from DB closed trades."""
+    try:
+        engine  = _get_metrics_engine()
+        records = await _fetch_trade_records(days=days)
+        metrics = engine.calculate(records)
+        return {
+            "ok": True,
+            "lookback_days": days,
+            "data_source": "live_db" if records else "no_data",
+            "metrics": {
+                "total_trades":       metrics.total_trades,
+                "winning_trades":     metrics.winning_trades,
+                "losing_trades":      metrics.losing_trades,
+                "win_rate":           round(metrics.win_rate * 100, 2),
+                "avg_win":            metrics.avg_win,
+                "avg_loss":           metrics.avg_loss,
+                "profit_factor":      metrics.profit_factor,
+                "total_pnl":          metrics.total_pnl,
+                "max_drawdown":       metrics.max_drawdown,
+                "max_drawdown_pct":   metrics.max_drawdown_pct,
+                "sharpe_ratio":       metrics.sharpe_ratio,
+                "sortino_ratio":      metrics.sortino_ratio,
+                "avg_rr":             metrics.avg_rr,
+                "expectancy":         metrics.expectancy,
+                "best_trade":         metrics.best_trade,
+                "worst_trade":        metrics.worst_trade,
+                "avg_hold_hours":     metrics.avg_hold_hours,
+                "consecutive_wins":   metrics.consecutive_wins,
+                "consecutive_losses": metrics.consecutive_losses,
+            },
+        }
+    except Exception as exc:
+        log.error("metrics/performance error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/equity")
+async def get_equity_curve(
+    days: int = Query(default=30, ge=1, le=365),
+) -> Dict[str, Any]:
+    """BUG-T1 FIX: Equity curve time-series for chart rendering."""
+    try:
+        records = await _fetch_trade_records(days=days)
+        curve: List[Dict[str, Any]] = []
+        equity = 0.0
+        for rec in records:
+            equity += rec.pnl
+            curve.append({
+                "ts":     rec.closed_at.isoformat(),
+                "equity": round(equity, 2),
+                "pnl":    round(rec.pnl, 2),
+                "symbol": rec.symbol,
+            })
+        total_return = round(
+            ((curve[-1]["equity"] - curve[0]["equity"]) / abs(curve[0]["equity"]) * 100)
+            if len(curve) >= 2 and curve[0]["equity"] != 0 else 0.0,
+            2,
+        )
+        return {
+            "ok": True,
+            "lookback_days": days,
+            "data_points":   len(curve),
+            "total_return":  total_return,
+            "curve":         curve,
+        }
+    except Exception as exc:
+        log.error("metrics/equity error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/sharpe")
+async def get_sharpe(
+    days: int = Query(default=30, ge=1, le=365),
+) -> Dict[str, Any]:
+    """BUG-T1 FIX: Sharpe ratio with configurable threshold (BUG-O3)."""
+    try:
+        engine  = _get_metrics_engine()
+        records = await _fetch_trade_records(days=days)
+        metrics = engine.calculate(records)
+
+        from backend.core.config import get_settings
+        settings    = get_settings()
+        min_trades  = getattr(settings, "METRICS_MIN_TRADES_FOR_SHARPE", 30)
+        available   = len(records) >= min_trades
+
+        return {
+            "ok":            True,
+            "sharpe":        metrics.sharpe_ratio if available else 0.0,
+            "sortino":       metrics.sortino_ratio if available else 0.0,
+            "available":     available,
+            "trade_count":   len(records),
+            "min_required":  min_trades,
+            "note":          "live" if available else "insufficient_data",
+        }
+    except Exception as exc:
+        log.error("metrics/sharpe error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/summary")
+async def get_summary(
+    days: int = Query(default=30, ge=1, le=365),
+) -> Dict[str, Any]:
+    """BUG-T1 FIX: Aggregated summary card data used by AnalyticsPage.tsx."""
+    try:
+        engine  = _get_metrics_engine()
+        records = await _fetch_trade_records(days=days)
+        metrics = engine.calculate(records)
+        return {
+            "ok":            True,
+            "lookback_days": days,
+            "data_source":   "live_db" if records else "no_data",
+            "summary": {
+                "total_trades":   metrics.total_trades,
+                "win_rate":       round(metrics.win_rate * 100, 2),
+                "total_pnl":      metrics.total_pnl,
+                "profit_factor":  metrics.profit_factor,
+                "max_drawdown":   metrics.max_drawdown,
+                "sharpe_ratio":   metrics.sharpe_ratio,
+                "sortino_ratio":  metrics.sortino_ratio,
+                "expectancy":     metrics.expectancy,
+                "best_trade":     metrics.best_trade,
+                "worst_trade":    metrics.worst_trade,
+            },
+        }
+    except Exception as exc:
+        log.error("metrics/summary error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))

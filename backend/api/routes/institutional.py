@@ -1,1 +1,72 @@
-IiIiSW5zdGl0dXRpb25hbCBBUEkgcm91dGVzLgpCVUctQUY2IEZJWDogcmVtb3ZlZCBwcmVmaXg9Ii9pbnN0aXR1dGlvbmFsIiAtLSBkb3VibGUgcHJlZml4IHdhcyBjYXVzaW5nIC9pbnN0aXR1dGlvbmFsL2luc3RpdHV0aW9uYWwvKgpOb3c6IHByZWZpeCBwcm92aWRlZCBieSBtYWluLnB5CiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCmZyb20gZmFzdGFwaSBpbXBvcnQgRGVwZW5kcywgQVBJUm91dGVyLCBIVFRQRXhjZXB0aW9uCgpmcm9tIGJhY2tlbmQuY29yZS5kZXBzIGltcG9ydCBnZXRfY3VycmVudF91c2VyCmZyb20gcHlkYW50aWMgaW1wb3J0IEJhc2VNb2RlbCwgRmllbGQKZnJvbSB0eXBpbmcgaW1wb3J0IEFueSwgRGljdCwgTGlzdCwgT3B0aW9uYWwKCnJvdXRlciA9IEFQSVJvdXRlcihkZXBlbmRlbmNpZXM9W0RlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlcildLCB0YWdzPVsiaW5zdGl0dXRpb25hbCJdKQoKCmNsYXNzIEJhY2t0ZXN0UmVxdWVzdChCYXNlTW9kZWwpOgogICAgc3ltYm9sOiBzdHIgPSAiWEFVVVNEIgogICAgdGltZWZyYW1lOiBzdHIgPSAiTTE1IgogICAgaW5pdGlhbF9iYWxhbmNlOiBmbG9hdCA9IDEwXzAwMC4wCiAgICByaXNrX3BjdDogZmxvYXQgPSAxLjAKICAgIHNwcmVhZF9tdWx0aXBsaWVyOiBmbG9hdCA9IDEuMAogICAgc2xpcHBhZ2VfcGlwczogZmxvYXQgPSAwLjUKICAgIHVzZV9jb21taXNzaW9uOiBib29sID0gVHJ1ZQogICAgY2FuZGxlczogTGlzdFtEaWN0W3N0ciwgQW55XV0gPSBGaWVsZChkZWZhdWx0X2ZhY3Rvcnk9bGlzdCkKCgpjbGFzcyBNb250ZUNhcmxvUmVxdWVzdChCYXNlTW9kZWwpOgogICAgdHJhZGVfcG5sczogTGlzdFtmbG9hdF0KICAgIGluaXRpYWxfYmFsYW5jZTogZmxvYXQgPSAxMF8wMDAuMAogICAgbl9zaW11bGF0aW9uczogaW50ID0gMTAwMAogICAgcnVpbl90aHJlc2hvbGRfcGN0OiBmbG9hdCA9IDUwLjAKICAgIHNlZWQ6IE9wdGlvbmFsW2ludF0gPSA0MgoKCkByb3V0ZXIucG9zdCgiL2JhY2t0ZXN0L3J1biIpCmFzeW5jIGRlZiBydW5fYmFja3Rlc3QocmVxOiBCYWNrdGVzdFJlcXVlc3QpOgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5pbnN0aXR1dGlvbmFsLnRpY2tfYmFja3Rlc3QgaW1wb3J0IFRpY2tCYWNrdGVzdEVuZ2luZSwgVGlja0JhY2t0ZXN0Q29uZmlnCiAgICAgICAgY29uZmlnID0gVGlja0JhY2t0ZXN0Q29uZmlnKHN5bWJvbD1yZXEuc3ltYm9sLCB0aW1lZnJhbWU9cmVxLnRpbWVmcmFtZSwgaW5pdGlhbF9iYWxhbmNlPXJlcS5pbml0aWFsX2JhbGFuY2UsIHJpc2tfcGN0X3Blcl90cmFkZT1yZXEucmlza19wY3QsIHNwcmVhZF9tdWx0aXBsaWVyPXJlcS5zcHJlYWRfbXVsdGlwbGllciwgc2xpcHBhZ2VfcGlwcz1yZXEuc2xpcHBhZ2VfcGlwcywgdXNlX2NvbW1pc3Npb249cmVxLnVzZV9jb21taXNzaW9uKQogICAgICAgIGVuZ2luZSA9IFRpY2tCYWNrdGVzdEVuZ2luZShjb25maWcpCiAgICAgICAgaWYgbm90IHJlcS5jYW5kbGVzOiByZXR1cm4geyJtZXNzYWdlIjogIk5vIGNhbmRsZXMgcHJvdmlkZWQuIiwgInN0YXR1cyI6ICJlbXB0eSJ9CiAgICAgICAgZGVmIHNpZ25hbF9mbihjYW5kbGUsIGhpc3RvcnkpOgogICAgICAgICAgICBpZiBsZW4oaGlzdG9yeSkgPCA1MDogcmV0dXJuIE5vbmUKICAgICAgICAgICAgY2xvc2VzID0gW2NbImNsb3NlIl0gZm9yIGMgaW4gaGlzdG9yeV0KICAgICAgICAgICAgZW1hMjAgPSBzdW0oY2xvc2VzWy0yMDpdKSAvIDIwCiAgICAgICAgICAgIGVtYTUwID0gc3VtKGNsb3Nlc1stNTA6XSkgLyA1MAogICAgICAgICAgICBpZiBlbWEyMCA+IGVtYTUwICogMS4wMDE6IHJldHVybiB7ImRpcmVjdGlvbiI6ICJCVVkiLCAic3RvcF9sb3NzIjogY2FuZGxlWyJjbG9zZSJdIC0gY2FuZGxlLmdldCgiYXRyIiwgMTApLCAidGFrZV9wcm9maXQiOiBjYW5kbGVbImNsb3NlIl0gKyBjYW5kbGUuZ2V0KCJhdHIiLCAxMCkgKiAyfQogICAgICAgICAgICBlbGlmIGVtYTIwIDwgZW1hNTAgKiAwLjk5OTogcmV0dXJuIHsiZGlyZWN0aW9uIjogIlNFTEwiLCAic3RvcF9sb3NzIjogY2FuZGxlWyJjbG9zZSJdICsgY2FuZGxlLmdldCgiYXRyIiwgMTApLCAidGFrZV9wcm9maXQiOiBjYW5kbGVbImNsb3NlIl0gLSBjYW5kbGUuZ2V0KCJhdHIiLCAxMCkgKiAyfQogICAgICAgICAgICByZXR1cm4gTm9uZQogICAgICAgIHJlc3VsdCA9IGVuZ2luZS5ydW4ocmVxLmNhbmRsZXMsIHNpZ25hbF9mbikKICAgICAgICByZXR1cm4geyJ0b3RhbF90cmFkZXMiOiByZXN1bHQudG90YWxfdHJhZGVzLCAid2luX3JhdGUiOiByZXN1bHQud2luX3JhdGUsICJwcm9maXRfZmFjdG9yIjogcmVzdWx0LnByb2ZpdF9mYWN0b3IsICJzaGFycGVfcmF0aW8iOiByZXN1bHQuc2hhcnBlX3JhdGlvLCAiZmluYWxfYmFsYW5jZSI6IHJlc3VsdC5maW5hbF9iYWxhbmNlfQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOiByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTUwMCwgZGV0YWlsPXN0cihlKSkKCgpAcm91dGVyLnBvc3QoIi9tb250ZS1jYXJsby9ydW4iKQphc3luYyBkZWYgcnVuX21vbnRlX2NhcmxvKHJlcTogTW9udGVDYXJsb1JlcXVlc3QpOgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5pbnN0aXR1dGlvbmFsLm1vbnRlX2NhcmxvIGltcG9ydCBNb250ZUNhcmxvU2ltdWxhdG9yCiAgICAgICAgc2ltID0gTW9udGVDYXJsb1NpbXVsYXRvcihyZXEubl9zaW11bGF0aW9ucywgcmVxLnJ1aW5fdGhyZXNob2xkX3BjdCwgcmVxLnNlZWQpCiAgICAgICAgcmVzdWx0ID0gc2ltLnJ1bihyZXEudHJhZGVfcG5scywgcmVxLmluaXRpYWxfYmFsYW5jZSkKICAgICAgICByZXR1cm4geyJuX3NpbXVsYXRpb25zIjogcmVzdWx0Lm5fc2ltdWxhdGlvbnMsICJwcm9iYWJpbGl0eV9vZl9ydWluIjogcmVzdWx0LnByb2JhYmlsaXR5X29mX3J1aW4sICJtZWRpYW5fZmluYWxfYmFsYW5jZSI6IHJlc3VsdC5tZWRpYW5fZmluYWxfYmFsYW5jZX0KICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTogcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZSkpCgoKQHJvdXRlci5nZXQoIi9oZWFsdGgiKQphc3luYyBkZWYgaW5zdGl0dXRpb25hbF9oZWFsdGgoKToKICAgIG1vZHVsZXMgPSB7fQogICAgZm9yIG5hbWUsIG1vZF9wYXRoLCBjbHMgaW4gWygibWFya2V0X3JlcGxheSIsICJiYWNrZW5kLmluc3RpdHV0aW9uYWwubWFya2V0X3JlcGxheSIsICJNYXJrZXRSZXBsYXlFbmdpbmUiKSwgKCJ0aWNrX2JhY2t0ZXN0IiwgImJhY2tlbmQuaW5zdGl0dXRpb25hbC50aWNrX2JhY2t0ZXN0IiwgIlRpY2tCYWNrdGVzdEVuZ2luZSIpLCAoIm1vbnRlX2NhcmxvIiwgImJhY2tlbmQuaW5zdGl0dXRpb25hbC5tb250ZV9jYXJsbyIsICJNb250ZUNhcmxvU2ltdWxhdG9yIildOgogICAgICAgIHRyeToKICAgICAgICAgICAgaW1wb3J0IGltcG9ydGxpYjsgbSA9IGltcG9ydGxpYi5pbXBvcnRfbW9kdWxlKG1vZF9wYXRoKTsgZ2V0YXR0cihtLCBjbHMpOyBtb2R1bGVzW25hbWVdID0gIm9rIgogICAgICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTogbW9kdWxlc1tuYW1lXSA9IGYiZXJyb3I6IHtzdHIoZSlbOjYwXX0iCiAgICBhbGxfb2sgPSBhbGwodiA9PSAib2siIGZvciB2IGluIG1vZHVsZXMudmFsdWVzKCkpCiAgICByZXR1cm4geyJzdGF0dXMiOiAiaGVhbHRoeSIgaWYgYWxsX29rIGVsc2UgImRlZ3JhZGVkIiwgIm1vZHVsZXMiOiBtb2R1bGVzfQo=
+"""Institutional API routes.
+BUG-AF6 FIX: removed prefix="/institutional" -- double prefix was causing /institutional/institutional/*
+Now: prefix provided by main.py
+"""
+from __future__ import annotations
+from fastapi import Depends, APIRouter, HTTPException
+
+from backend.core.deps import get_current_user
+from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
+
+router = APIRouter(dependencies=[Depends(get_current_user)], tags=["institutional"])
+
+
+class BacktestRequest(BaseModel):
+    symbol: str = "XAUUSD"
+    timeframe: str = "M15"
+    initial_balance: float = 10_000.0
+    risk_pct: float = 1.0
+    spread_multiplier: float = 1.0
+    slippage_pips: float = 0.5
+    use_commission: bool = True
+    candles: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class MonteCarloRequest(BaseModel):
+    trade_pnls: List[float]
+    initial_balance: float = 10_000.0
+    n_simulations: int = 1000
+    ruin_threshold_pct: float = 50.0
+    seed: Optional[int] = 42
+
+
+@router.post("/backtest/run")
+async def run_backtest(req: BacktestRequest):
+    try:
+        from backend.institutional.tick_backtest import TickBacktestEngine, TickBacktestConfig
+        config = TickBacktestConfig(symbol=req.symbol, timeframe=req.timeframe, initial_balance=req.initial_balance, risk_pct_per_trade=req.risk_pct, spread_multiplier=req.spread_multiplier, slippage_pips=req.slippage_pips, use_commission=req.use_commission)
+        engine = TickBacktestEngine(config)
+        if not req.candles: return {"message": "No candles provided.", "status": "empty"}
+        def signal_fn(candle, history):
+            if len(history) < 50: return None
+            closes = [c["close"] for c in history]
+            ema20 = sum(closes[-20:]) / 20
+            ema50 = sum(closes[-50:]) / 50
+            if ema20 > ema50 * 1.001: return {"direction": "BUY", "stop_loss": candle["close"] - candle.get("atr", 10), "take_profit": candle["close"] + candle.get("atr", 10) * 2}
+            elif ema20 < ema50 * 0.999: return {"direction": "SELL", "stop_loss": candle["close"] + candle.get("atr", 10), "take_profit": candle["close"] - candle.get("atr", 10) * 2}
+            return None
+        result = engine.run(req.candles, signal_fn)
+        return {"total_trades": result.total_trades, "win_rate": result.win_rate, "profit_factor": result.profit_factor, "sharpe_ratio": result.sharpe_ratio, "final_balance": result.final_balance}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/monte-carlo/run")
+async def run_monte_carlo(req: MonteCarloRequest):
+    try:
+        from backend.institutional.monte_carlo import MonteCarloSimulator
+        sim = MonteCarloSimulator(req.n_simulations, req.ruin_threshold_pct, req.seed)
+        result = sim.run(req.trade_pnls, req.initial_balance)
+        return {"n_simulations": result.n_simulations, "probability_of_ruin": result.probability_of_ruin, "median_final_balance": result.median_final_balance}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/health")
+async def institutional_health():
+    modules = {}
+    for name, mod_path, cls in [("market_replay", "backend.institutional.market_replay", "MarketReplayEngine"), ("tick_backtest", "backend.institutional.tick_backtest", "TickBacktestEngine"), ("monte_carlo", "backend.institutional.monte_carlo", "MonteCarloSimulator")]:
+        try:
+            import importlib; m = importlib.import_module(mod_path); getattr(m, cls); modules[name] = "ok"
+        except Exception as e: modules[name] = f"error: {str(e)[:60]}"
+    all_ok = all(v == "ok" for v in modules.values())
+    return {"status": "healthy" if all_ok else "degraded", "modules": modules}

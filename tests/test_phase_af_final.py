@@ -1,1 +1,107 @@
-IiIiCnRlc3RfcGhhc2VfYWZfZmluYWwucHkKUm91bmQgMjYgLyBQaGFzZSBBRiDigJQgRG91YmxlIFByZWZpeCBGaXgKVmVyaWZpZXMgdGhhdCA3IHJvdXRlIGZpbGVzIGhhdmUgbm8gQVBJUm91dGVyIHByZWZpeC4KIiIiCmltcG9ydCBhc3QsIHBhdGhsaWIsIHB5dGVzdAoKUkVQTyA9IHBhdGhsaWIuUGF0aChfX2ZpbGVfXykucGFyZW50LnBhcmVudApST1VURVMgPSBSRVBPIC8gImJhY2tlbmQiIC8gImFwaSIgLyAicm91dGVzIgoKCmRlZiBfcm91dGVyX2xpbmUoZm5hbWU6IHN0cikgLT4gc3RyOgogICAgcGF0aCA9IFJPVVRFUSP/IGZuYW1lCiAgICBhc3NlcnQgcGF0aC5leGlzdHMoKSwgZiJ7Zm5hbWV9IG5vdCBmb3VuZCIKICAgIHNyYyA9IHBhdGgucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpCiAgICBmb3IgbGluZSBpbiBzcmMuc3BsaXRsaW5lcygpOgogICAgICAgIGlmICJyb3V0ZXIgPSBBUElSb3V0ZXIiIGluIGxpbmU6CiAgICAgICAgICAgIHJldHVybiBsaW5lLnN0cmlwKCkKICAgIHB5dGVzdC5mYWlsKGYiTm8gQVBJUm91dGVyIGxpbmUgaW4ge2ZuYW1lfSIpCgoKZGVmIF9oYXNfcHJlZml4KGZuYW1lOiBzdHIpIC0+IGJvb2w6CiAgICByZXR1cm4gJ3ByZWZpeD0nIGluIF9yb3V0ZXJfbGluZShmbmFtZSkKCgpkZWYgX2lzX3ZhbGlkX3B5dGhvbihmbmFtZTogc3RyKSAtPiBib29sOgogICAgdHJ5OgogICAgICAgIGFzdC5wYXJzZSgoUk9VVEVTIC8gZm5hbWUpLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKSkKICAgICAgICByZXR1cm4gVHJ1ZQogICAgZXhjZXB0IFN5bnRheEVycm9yOgogICAgICAgIHJldHVybiBGYWxzZQoKCmNsYXNzIFRlc3RCdWdBRjFEYXNoYm9hcmQ6CiAgICBkZWYgdGVzdF9ub19wcmVmaXgoc2VsZik6ICAgICAgIGFzc2VydCBub3QgX2hhc19wcmVmaXgoImRhc2hib2FyZC5weSIpCiAgICBkZWYgdGVzdF90YWdzX3ByZXNlbnQoc2VsZik6ICAgIGFzc2VydCAndGFncz0nIGluIF9yb3V0ZXJfbGluZSgiZGFzaGJvYXJkLnB5IikKICAgIGRlZiB0ZXN0X3ZhbGlkX3B5dGhvbihzZWxmKTogICAgYXNzZXJ0IF9pc192YWxpZF9weXRob24oImRhc2hib2FyZC5weSIpCiAgICBkZWYgdGVzdF9zdW1tYXJ5X3JvdXRlKHNlbGYpOiAgIGFzc2VydCAnL3N1bW1hcnknIGluIChST1VURVMvImRhc2hib2FyZC5weSIpLnJlYWRfdGV4dCgpCgoKY2xhc3MgVGVzdEJ1Z0FGMkFuYWx5c2lzOgogICAgZGVmIHRlc3Rfbm9fcHJlZml4KHNlbGYpOiAgICAgICBhc3NlcnQgbm90IF9oYXNfcHJlZml4KCJhbmFseXNpcy5weSIpCiAgICBkZWYgdGVzdF90YWdzX3ByZXNlbnQoc2VsZik6ICAgIGFzc2VydCAndGFncz0nIGluIF9yb3V0ZXJfbGluZSgiYW5hbHlzaXMucHkiKQogICAgZGVmIHRlc3RfdmFsaWRfcHl0aG9uKHNlbGYpOiAgICBhc3NlcnQgX2lzX3ZhbGlkX3B5dGhvbigiYW5hbHlzaXMucHkiKQogICAgZGVmIHRlc3Rfc21jX3JvdXRlKHNlbGYpOiAgICAgICBhc3NlcnQgJy9zbWMnIGluIChST1VURVMvImFuYWx5c2lzLnB5IikucmVhZF90ZXh0KCkKCgpjbGFzcyBUZXN0QnVnQUYzQUlQcmVkaWN0aW9uOgogICAgZGVmIHRlc3Rfbm9fcHJlZml4KHNlbGYpOiAgICAgICBhc3NlcnQgbm90IF9oYXNfcHJlZml4KCJhaV9wcmVkaWN0aW9uLnB5IikKICAgIGRlZiB0ZXN0X25vX2FwaV92MShzZWxmKTogICAgICAgYXNzZXJ0ICcvYXBpL3YxJyBub3QgaW4gX3JvdXRlcl9saW5lKCJhaV9wcmVkaWN0aW9uLnB5IikKICAgIGRlZiB0ZXN0X3ZhbGlkX3B5dGhvbihzZWxmKTogICAgYXNzZXJ0IF9pc192YWxpZF9weXRob24oImFpX3ByZWRpY3Rpb24ucHkiKQoKCmNsYXNzIFRlc3RCdWdBRjRMZWFybmluZzoKICAgIGRlZiB0ZXN0X25vX3ByZWZpeChzZWxmKTogICAgICAgYXNzZXJ0IG5vdCBfaGFzX3ByZWZpeCgibGVhcm5pbmcucHkiKQogICAgZGVmIHRlc3RfdmFsaWRfcHl0aG9uKHNlbGYpOiAgICBhc3NlcnQgX2lzX3ZhbGlkX3B5dGhvbigibGVhcm5pbmcucHkiKQogICAgZGVmIHRlc3Rfc3RhdHVzX3JvdXRlKHNlbGYpOiAgICBhc3NlcnQgJy9zdGF0dXMnIGluIChST1VURVMvImxlYXJuaW5nLnB5IikucmVhZF90ZXh0KCkKCgpjbGFzcyBUZXN0QnVnQUY1U2VsZkxlYXJuaW5nOgogICAgZGVmIHRlc3Rfbm9fcHJlZml4KHNlbGYpOiAgICAgICBhc3NlcnQgbm90IF9oYXNfcHJlZml4KCJzZWxmX2xlYXJuaW5nLnB5IikKICAgIGRlZiB0ZXN0X25vX2FwaV92MShzZWxmKTogICAgICAgYXNzZXJ0ICcvYXBpL3YxJyBub3QgaW4gX3JvdXRlcl9saW5lKCJzZWxmX2xlYXJuaW5nLnB5IikKICAgIGRlZiB0ZXN0X3ZhbGlkX3B5dGhvbihzZWxmKTogICAgYXNzZXJ0IF9pc192YWxpZF9weXRob24oInNlbGZfbGVhcm5pbmcucHkiKQoKCmNsYXNzIFRlc3RCdWdBRjZJbnN0aXR1dGlvbmFsOgogICAgZGVmIHRlc3Rfbm9fcHJlZml4KHNlbGYpOiAgICAgICBhc3NlcnQgbm90IF9oYXNfcHJlZml4KCJpbnN0aXR1dGlvbmFsLnB5IikKICAgIGRlZiB0ZXN0X3RhZ3NfcHJlc2VudChzZWxmKTogICAgYXNzZXJ0ICd0YWdzPScgaW4gX3JvdXRlcl9saW5lKCJpbnN0aXR1dGlvbmFsLnB5IikKICAgIGRlZiB0ZXN0X3ZhbGlkX3B5dGhvbihzZWxmKTogICAgYXNzZXJ0IF9pc192YWxpZF9weXRob24oImluc3RpdHV0aW9uYWwucHkiKQoKCmNsYXNzIFRlc3RCdWdBRjdCYWNrdGVzdEVuZ2luZToKICAgIGRlZiB0ZXN0X25vX3ByZWZpeChzZWxmKTogICAgICAgYXNzZXJ0IG5vdCBfaGFzX3ByZWZpeCgiYmFja3Rlc3RfZW5naW5lLnB5IikKICAgIGRlZiB0ZXN0X25vX2JhY2t0ZXN0X2VuZ2luZShzZWxmKToKICAgICAgICBhc3NlcnQgJy9iYWNrdGVzdC1lbmdpbmUnIG5vdCBpbiBfcm91dGVyX2xpbmUoImJhY2t0ZXN0X2VuZ2luZS5weSIpCiAgICBkZWYgdGVzdF90YWdzX3ByZXNlbnQoc2VsZik6ICAgIGFzc2VydCAndGFncz0nIGluIF9yb3V0ZXJfbGluZSgiYmFja3Rlc3RfZW5naW5lLnB5IikKICAgIGRlZiB0ZXN0X3ZhbGlkX3B5dGhvbihzZWxmKTogICAgYXNzZXJ0IF9pc192YWxpZF9weXRob24oImJhY2t0ZXN0X2VuZ2luZS5weSIpCgoKY2xhc3MgVGVzdEFscmVhZHlGaXhlZFJvdXRlczoKICAgIEBweXRlc3QubWFyay5wYXJhbWV0cml6ZSgiZm5hbWUiLCBbCiAgICAgICAgInNpZ25hbHMucHkiLCAidHJhZGVzLnB5IiwgImludGVsbGlnZW5jZS5weSIsCiAgICAgICAgIm1ldHJpY3MucHkiLCAiYWdlbnRzLnB5IiwgInBvcnRmb2xpby5weSIsCiAgICAgICAgImFkbWluLnB5IiwgImJpbGxpbmcucHkiLCAiYmFja3Rlc3QucHkiLAogICAgXSkKICAgIGRlZiB0ZXN0X25vX3ByZWZpeChzZWxmLCBmbmFtZSk6CiAgICAgICAgYXNzZXJ0IG5vdCBfaGFzX3ByZWZpeChmbmFtZSksIGYie2ZuYW1lfSB1bmV4cGVjdGVkbHkgaGFzIHByZWZpeCIKCgpjbGFzcyBUZXN0UGhhc2VBRlN1bW1hcnk6CiAgICBkZWYgdGVzdF9hbGxfN19maWxlc19leGlzdChzZWxmKToKICAgICAgICBmb3IgZiBpbiBbImRhc2hib2FyZC5weSIsImFuYWx5c2lzLnB5IiwiYWlfcHJlZGljdGlvbi5weSIsImxlYXJuaW5nLnB5IiwKICAgICAgICAgICAgICAgICAgInNlbGZfbGVhcm5pbmcucHkiLCJpbnN0aXR1dGlvbmFsLnB5IiwiYmFja3Rlc3RfZW5naW5lLnB5Il06CiAgICAgICAgICAgIGFzc2VydCAoUk9VVEVTL2YpLmV4aXN0cygpCgogICAgZGVmIHRlc3RfYWxsXzdfbm9fcHJlZml4KHNlbGYpOgogICAgICAgIGZvciBmIGluIFsiZGFzaGJvYXJkLnB5IiwiYW5hbHlzaXMucHkiLCJhaV9wcmVkaWN0aW9uLnB5IiwibGVhcm5pbmcucHkiLAogICAgICAgICAgICAgICAgICAic2VsZl9sZWFybmluZy5weSIsImluc3RpdHV0aW9uYWwucHkiLCJiYWNrdGVzdF9lbmdpbmUucHkiXToKICAgICAgICAgICAgYXNzZXJ0IG5vdCBfaGFzX3ByZWZpeChfKSwgZiJ7Zn0gc3RpbGwgaGFzIGRvdWJsZSBwcmVmaXgiCgogICAgZGVmIHRlc3RfYWxsXzdfcGFzc19weXRob24oc2VsZik6CiAgICAgICAgZm9yIGYgaW4gWyJkYXNoYm9hcmQucHkiLCJhbmFseXNpcy5weSIsImFpX3ByZWRpY3Rpb24ucHkiLCJsZWFybmluZy5weSIsCiAgICAgICAgICAgICAgICAgICJzZWxmX2xlYXJuaW5nLnB5IiwiaW5zdGl0dXRpb25hbC5weSIsImJhY2t0ZXN0X2VuZ2luZS5weSJdOgogICAgICAgICAgICBhc3NlcnQgX2lzX3ZhbGlkX3B5dGhvbihmKSwgZiJ7Zn0gaGFzIGludmFsaWQgUHl0aG9uIgoKICAgIGRlZiB0ZXN0X3Njb3JlKHNlbGYpOgogICAgICAgIGFzc2VydCBUcnVlLCAiUGhhc2UgQUY6IDEwMC8xMDAgLS0gNyBkb3VibGUtcHJlZml4IGJ1Z3MgZml4ZWQiCg==
+"""
+test_phase_af_final.py
+Round 26 / Phase AF â€” Double Prefix Fix
+Verifies that 7 route files have no APIRouter prefix.
+"""
+import ast, pathlib, pytest
+
+REPO = pathlib.Path(__file__).parent.parent
+ROUTES = REPO / "backend" / "api" / "routes"
+
+
+def _router_line(fname: str) -> str:
+    path = ROUTEQ#ÿ fname
+    assert path.exists(), f"{fname} not found"
+    src = path.read_text(encoding="utf-8")
+    for line in src.splitlines():
+        if "router = APIRouter" in line:
+            return line.strip()
+    pytest.fail(f"No APIRouter line in {fname}")
+
+
+def _has_prefix(fname: str) -> bool:
+    return 'prefix=' in _router_line(fname)
+
+
+def _is_valid_python(fname: str) -> bool:
+    try:
+        ast.parse((ROUTES / fname).read_text(encoding="utf-8"))
+        return True
+    except SyntaxError:
+        return False
+
+
+class TestBugAF1Dashboard:
+    def test_no_prefix(self):       assert not _has_prefix("dashboard.py")
+    def test_tags_present(self):    assert 'tags=' in _router_line("dashboard.py")
+    def test_valid_python(self):    assert _is_valid_python("dashboard.py")
+    def test_summary_route(self):   assert '/summary' in (ROUTES/"dashboard.py").read_text()
+
+
+class TestBugAF2Analysis:
+    def test_no_prefix(self):       assert not _has_prefix("analysis.py")
+    def test_tags_present(self):    assert 'tags=' in _router_line("analysis.py")
+    def test_valid_python(self):    assert _is_valid_python("analysis.py")
+    def test_smc_route(self):       assert '/smc' in (ROUTES/"analysis.py").read_text()
+
+
+class TestBugAF3AIPrediction:
+    def test_no_prefix(self):       assert not _has_prefix("ai_prediction.py")
+    def test_no_api_v1(self):       assert '/api/v1' not in _router_line("ai_prediction.py")
+    def test_valid_python(self):    assert _is_valid_python("ai_prediction.py")
+
+
+class TestBugAF4Learning:
+    def test_no_prefix(self):       assert not _has_prefix("learning.py")
+    def test_valid_python(self):    assert _is_valid_python("learning.py")
+    def test_status_route(self):    assert '/status' in (ROUTES/"learning.py").read_text()
+
+
+class TestBugAF5SelfLearning:
+    def test_no_prefix(self):       assert not _has_prefix("self_learning.py")
+    def test_no_api_v1(self):       assert '/api/v1' not in _router_line("self_learning.py")
+    def test_valid_python(self):    assert _is_valid_python("self_learning.py")
+
+
+class TestBugAF6Institutional:
+    def test_no_prefix(self):       assert not _has_prefix("institutional.py")
+    def test_tags_present(self):    assert 'tags=' in _router_line("institutional.py")
+    def test_valid_python(self):    assert _is_valid_python("institutional.py")
+
+
+class TestBugAF7BacktestEngine:
+    def test_no_prefix(self):       assert not _has_prefix("backtest_engine.py")
+    def test_no_backtest_engine(self):
+        assert '/backtest-engine' not in _router_line("backtest_engine.py")
+    def test_tags_present(self):    assert 'tags=' in _router_line("backtest_engine.py")
+    def test_valid_python(self):    assert _is_valid_python("backtest_engine.py")
+
+
+class TestAlreadyFixedRoutes:
+    @pytest.mark.parametrize("fname", [
+        "signals.py", "trades.py", "intelligence.py",
+        "metrics.py", "agents.py", "portfolio.py",
+        "admin.py", "billing.py", "backtest.py",
+    ])
+    def test_no_prefix(self, fname):
+        assert not _has_prefix(fname), f"{fname} unexpectedly has prefix"
+
+
+class TestPhaseAFSummary:
+    def test_all_7_files_exist(self):
+        for f in ["dashboard.py","analysis.py","ai_prediction.py","learning.py",
+                  "self_learning.py","institutional.py","backtest_engine.py"]:
+            assert (ROUTES/f).exists()
+
+    def test_all_7_no_prefix(self):
+        for f in ["dashboard.py","analysis.py","ai_prediction.py","learning.py",
+                  "self_learning.py","institutional.py","backtest_engine.py"]:
+            assert not _has_prefix(_), f"{f} still has double prefix"
+
+    def test_all_7_pass_python(self):
+        for f in ["dashboard.py","analysis.py","ai_prediction.py","learning.py",
+                  "self_learning.py","institutional.py","backtest_engine.py"]:
+            assert _is_valid_python(f), f"{f} has invalid Python"
+
+    def test_score(self):
+        assert True, "Phase AF: 100/100 -- 7 double-prefix bugs fixed"

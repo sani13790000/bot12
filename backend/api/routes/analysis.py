@@ -1,1 +1,78 @@
-IiIiQW5hbHlzaXMgcm91dGVzIOKAlCBTTUMgKyBQcmljZSBBY3Rpb24uCkJVRy1BRjIgRklYOiByZW1vdmVkIHByZWZpeD0iL2FuYWx5c2lzIiAtLSBkb3VibGUgcHJlZml4IHdhcyBjYXVzaW5nIC9hbmFseXNpcy9hbmFseXNpcy8qCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0LCBMaXN0LCBPcHRpb25hbAoKZnJvbSBmYXN0YXBpIGltcG9ydCBBUElSb3V0ZXIsIERlcGVuZHMsIEhUVFBFeGNlcHRpb24KZnJvbSBweWRhbnRpYyBpbXBvcnQgQmFzZU1vZGVsLCB2YWxpZGF0b3IKCmZyb20gYmFja2VuZC5jb3JlLmRlcHMgaW1wb3J0IGdldF9jdXJyZW50X3VzZXIKCmxvZyAgICA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIodGFncz1bImFuYWx5c2lzIl0pCgoKY2xhc3MgQ2FuZGxlRGF0YShCYXNlTW9kZWwpOgogICAgb3BlbjogICBmbG9hdAogICAgaGlnaDogICBmbG9hdAogICAgbG93OiAgICBmbG9hdAogICAgY2xvc2U6ICBmbG9hdAogICAgdm9sdW1lOiBmbG9hdCAgICAgICAgID0gMC4wCiAgICB0aW1lOiAgIE9wdGlvbmFsW2ludF0gPSBOb25lCgoKY2xhc3MgU01DQW5hbHlzaXNSZXF1ZXN0KEJhc2VNb2RlbCk6CiAgICBzeW1ib2w6ICAgIHN0cgogICAgY2FuZGxlczogICBMaXN0W0NhbmRsZURhdGFdCiAgICB0aW1lZnJhbWU6IHN0ciA9ICJIMSIKCiAgICBAdmFsaWRhdG9yKCJjYW5kbGVzIikKICAgIGRlZiB2YWxpZGF0ZV9jYW5kbGVfY291bnQoY2xzLCB2KToKICAgICAgICBmcm9tIGJhY2tlbmQuY29yZS5jb25maWcgaW1wb3J0IGdldF9zZXR0aW5ncwogICAgICAgIG1heF9jID0gZ2V0X3NldHRpbmdzKCkuU01DX01BWF9DQU5ETEVTCiAgICAgICAgaWYgbGVuKHYpID4gbWF4X2M6IHJhaXNlIFZhbHVlRXJyb3IoZiJUb28gbWFueSBjYW5kbGVzOiB7bGVuKHYpfSA+IHttYXhfY30iKQogICAgICAgIGlmIGxlbih2KSA8IDI6IHJhaXNlIFZhbHVlRXJyb3IoIkF0IGxlYXN0IDIgY2FuZGxlcyByZXF1aXJlZC4iKQogICAgICAgIHJldHVybiB2CgoKY2xhc3MgUEFBbmFseXNpc1JlcXVlc3QoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogICAgc3RyCiAgICBjYW5kbGVzOiAgIExpc3RbQ2FuZGxlRGF0YV0KICAgIHRpbWVmcmFtZTogc3RyID0gIkgxIgoKICAgIEB2YWxpZGF0b3IoImNhbmRsZXMiKQogICAgZGVmIHZhbGlkYXRlX2NhbmRsZV9jb3VudChjbHMsIHYpOgogICAgICAgIGZyb20gYmFja2VuZC5jb3JlLmNvbmZpZyBpbXBvcnQgZ2V0X3NldHRpbmdzCiAgICAgICAgbWF4X2MgPSBnZXRfc2V0dGluZ3MoKS5TTUNfTUFYX0NBTkRMRVMKICAgICAgICBpZiBsZW4odikgPiBtYXhfYzogcmFpc2UgVmFsdWVFcnJvcihmIlRvbyBtYW55IGNhbmRsZXM6IHtsZW4odil9ID4ge21heF9jfSIpCiAgICAgICAgaWYgbGVuKHYpIDwgMjogcmFpc2UgVmFsdWVFcnJvcigiQXQgbGVhc3QgMiBjYW5kbGVzIHJlcXVpcmVkLiIpCiAgICAgICAgcmV0dXJuIHYKCgpAcm91dGVyLnBvc3QoIi9zbWMiKQphc3luYyBkZWYgYW5hbHl6ZV9zbWMocmVxdWVzdDogU01DQW5hbHlzaXNSZXF1ZXN0LCBfdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hbmFseXNpcy5zbWNfZW5naW5lIGltcG9ydCBTTUNFbmdpbmUKICAgICAgICBlbmdpbmUgPSBTTUNFbmdpbmUoKQogICAgICAgIGNhbmRsZXMgPSBbeyJvcGVuIjogYy5vcGVuLCAiaGlnaCI6IGMuaGlnaCwgImxvdyI6IGMubG93LCAiY2xvc2UiOiBjLmNsb3NlLCAidm9sdW1lIjogYy52b2x1bWV9IGZvciBjIGluIHJlcXVlc3QuY2FuZGxlc10KICAgICAgICByZXN1bHQgPSBlbmdpbmUuYW5hbHlzZShjYW5kbGVzKQogICAgICAgIHJldHVybiB7InN5bWJvbCI6IHJlcXVlc3Quc3ltYm9sLCAidGltZWZyYW1lIjogcmVxdWVzdC50aW1lZnJhbWUsICJjYW5kbGVfY291bnQiOiBsZW4oY2FuZGxlcyksICJhbmFseXNpcyI6IHJlc3VsdH0KICAgIGV4Y2VwdCBWYWx1ZUVycm9yOiByYWlzZQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOiBsb2cuZXJyb3IoIlNNQyBhbmFseXNpcyBlcnJvcjogJXMiLCBlKTsgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZSkpCgoKQHJvdXRlci5wb3N0KCIvcHJpY2UtYWN0aW9uIikKYXN5bmMgZGVmIGFuYWx5emVfcHJpY2VfYWN0aW9uKHJlcXVlc3Q6IFBBQW5hbHlzaXNSZXF1ZXN0LCBfdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlcikpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hbmFseXNpcy5wcmljZV9hY3Rpb25fZW5naW5lIGltcG9ydCBQcmljZUFjdGlvbkVuZ2luZQogICAgICAgIGVuZ2luZSA9IFByaWNlQWN0aW9uRW5naW5lKCkKICAgICAgICBjYW5kbGVzID0gW3sib3BlbiI6IGMub3BlbiwgImhpZ2giOiBjLmhpZ2gsICJsb3ciOiBjLmxvdywgImNsb3NlIjogYy5jbG9zZSwgInZvbHVtZSI6IGMudm9sdW1lfSBmb3IgYyBpbiByZXF1ZXN0LmNhbmRsZXNdCiAgICAgICAgcmVzdWx0ID0gZW5naW5lLmFuYWx5emUoY2FuZGxlcykKICAgICAgICBzcl9sZXZlbHMgPSBbeyJwcmljZSI6IGx2bC5wcmljZSwgInR5cGUiOiBzdHIobHZsLmxldmVsX3R5cGUpLCAic3RyZW5ndGgiOiBnZXRhdHRyKGx2bCwgInN0cmVuZ3RoIiwgMC4wKX0gZm9yIGx2bCBpbiBnZXRhdHRyKHJlc3VsdCwgInN1cHBvcnRfcmVzaXN0YW5jZSIsIFtdKV0KICAgICAgICBwYXR0ZXJucyA9IFt7Im5hbWUiOiBnZXRhdHRyKHAsICJuYW1lIiwgc3RyKHApKSwgImRpcmVjdGlvbiI6IGdldGF0dHIocCwgImRpcmVjdGlvbiIsIE5vbmUpLCAiY29uZmlkZW5jZSI6IGdldGF0dHIocCwgImNvbmZpZGVuY2UiLCAwLjApfSBmb3IgcCBpbiBnZXRhdHRyKHJlc3VsdCwgInBhdHRlcm5zIiwgW10pXQogICAgICAgIHJldHVybiB7InN5bWJvbCI6IHJlcXVlc3Quc3ltYm9sLCAidGltZWZyYW1lIjogcmVxdWVzdC50aW1lZnJhbWUsICJjYW5kbGVfY291bnQiOiBsZW4oY2FuZGxlcyksICJ0cmVuZCI6IHN0cihnZXRhdHRyKHJlc3VsdCwgInRyZW5kIiwgIiIpKSwgInBhdHRlcm5zIjogcGF0dGVybnMsICJwYXR0ZXJuc19jb3VudCI6IGxlbihwYXR0ZXJucyksICJzcl9sZXZlbHMiOiBzcl9sZXZlbHMsICJzcl9jb3VudCI6IGxlbihzcl9sZXZlbHMpLCAibW9tZW50dW0iOiBnZXRhdHRyKHJlc3VsdCwgIm1vbWVudHVtIiwgTm9uZSksICJ2b2xhdGlsaXR5IjogZ2V0YXR0cihyZXN1bHQsICJ2b2xhdGlsaXR5IiwgTm9uZSl9CiAgICBleGNlcHQgVmFsdWVFcnJvcjogcmFpc2UKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZTogbG9nLmVycm9yKCJQQSBhbmFseXNpcyBlcnJvcjogJXMiLCBlKTsgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT01MDAsIGRldGFpbD1zdHIoZSkpCg==
+"""Analysis routes — SMC + Price Action.
+BUG-AF2 FIX: removed prefix="/analysis" -- double prefix was causing /analysis/analysis/*
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, validator
+
+from backend.core.deps import get_current_user
+
+log    = logging.getLogger(__name__)
+router = APIRouter(tags=["analysis"])
+
+
+class CandleData(BaseModel):
+    open:   float
+    high:   float
+    low:    float
+    close:  float
+    volume: float         = 0.0
+    time:   Optional[int] = None
+
+
+class SMCAnalysisRequest(BaseModel):
+    symbol:    str
+    candles:   List[CandleData]
+    timeframe: str = "H1"
+
+    @validator("candles")
+    def validate_candle_count(cls, v):
+        from backend.core.config import get_settings
+        max_c = get_settings().SMC_MAX_CANDLES
+        if len(v) > max_c: raise ValueError(f"Too many candles: {len(v)} > {max_c}")
+        if len(v) < 2: raise ValueError("At least 2 candles required.")
+        return v
+
+
+class PAAnalysisRequest(BaseModel):
+    symbol:    str
+    candles:   List[CandleData]
+    timeframe: str = "H1"
+
+    @validator("candles")
+    def validate_candle_count(cls, v):
+        from backend.core.config import get_settings
+        max_c = get_settings().SMC_MAX_CANDLES
+        if len(v) > max_c: raise ValueError(f"Too many candles: {len(v)} > {max_c}")
+        if len(v) < 2: raise ValueError("At least 2 candles required.")
+        return v
+
+
+@router.post("/smc")
+async def analyze_smc(request: SMCAnalysisRequest, _user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    try:
+        from backend.analysis.smc_engine import SMCEngine
+        engine = SMCEngine()
+        candles = [{"open": c.open, "high": c.high, "low": c.low, "close": c.close, "volume": c.volume} for c in request.candles]
+        result = engine.analyse(candles)
+        return {"symbol": request.symbol, "timeframe": request.timeframe, "candle_count": len(candles), "analysis": result}
+    except ValueError: raise
+    except Exception as e: log.error("SMC analysis error: %s", e); raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/price-action")
+async def analyze_price_action(request: PAAnalysisRequest, _user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    try:
+        from backend.analysis.price_action_engine import PriceActionEngine
+        engine = PriceActionEngine()
+        candles = [{"open": c.open, "high": c.high, "low": c.low, "close": c.close, "volume": c.volume} for c in request.candles]
+        result = engine.analyze(candles)
+        sr_levels = [{"price": lvl.price, "type": str(lvl.level_type), "strength": getattr(lvl, "strength", 0.0)} for lvl in getattr(result, "support_resistance", [])]
+        patterns = [{"name": getattr(p, "name", str(p)), "direction": getattr(p, "direction", None), "confidence": getattr(p, "confidence", 0.0)} for p in getattr(result, "patterns", [])]
+        return {"symbol": request.symbol, "timeframe": request.timeframe, "candle_count": len(candles), "trend": str(getattr(result, "trend", "")), "patterns": patterns, "patterns_count": len(patterns), "sr_levels": sr_levels, "sr_count": len(sr_levels), "momentum": getattr(result, "momentum", None), "volatility": getattr(result, "volatility", None)}
+    except ValueError: raise
+    except Exception as e: log.error("PA analysis error: %s", e); raise HTTPException(status_code=500, detail=str(e))
