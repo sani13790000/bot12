@@ -1,5 +1,4 @@
-"""
-backend/execution/position_reconciliation.py
+"""backend/execution/position_reconciliation.py
 Galaxy Vast AI Trading Platform
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Background task: تطبیق OSM با MT5
@@ -91,7 +90,6 @@ class PositionReconciler:
                         await self.osm.reject(ticket, reason="GHOST reconciled")
                         result.actions_taken += 1
                     except Exception as exc:
-                        pass
                         logger.error("[reconciler] GHOST close error ticket=%d: %s", ticket, exc)
 
             for ticket in orphans:
@@ -107,7 +105,6 @@ class PositionReconciler:
                         await self.osm.register_orphan(ticket)
                         result.actions_taken += 1
                     except Exception as exc:
-                        pass
                         logger.error("[reconciler] ORPHAN register error ticket=%d: %s", ticket, exc)
 
         except Exception as exc:
@@ -122,8 +119,8 @@ class PositionReconciler:
         try:
             positions = await self.connector.get_positions()
             return {p["ticket"] for p in positions if "ticket" in p}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("[reconciler] _get_mt5_open_tickets failed: %s", exc)
         return set()
 
     async def _get_osm_open_tickets(self) -> set[int]:
@@ -133,8 +130,8 @@ class PositionReconciler:
         try:
             tickets = await self.osm.get_open_tickets()
             return set(tickets)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("[reconciler] _get_osm_open_tickets failed: %s", exc)
         return set()
 
 
@@ -152,18 +149,20 @@ async def reconciler_loop(
         auto_close_ghosts=auto_close_ghosts,
         auto_register_orphans=auto_register_orphans,
     )
-    logger.info("[reconciler] loop started interval=%.0fs", interval_s)
+
+    logger.info("[reconciler_loop] Starting position reconciliation loop (interval=%.1fs)", interval_s)
+
     while True:
         try:
             result = await reconciler.run()
             if result.mismatches:
-                logger.warning(
-                    "[reconciler] mismatches=%d ghosts=%d orphans=%d actions=%d",
-                    len(result.mismatches),
+                logger.info(
+                    "[reconciler_loop] Result: ghosts=%d, orphans=%d, actions=%d",
                     result.ghosts,
                     result.orphans,
                     result.actions_taken,
                 )
         except Exception as exc:
-            logger.error("[reconciler] loop error: %s", exc)
+            logger.error("[reconciler_loop] reconcile run failed: %s", exc)
+
         await asyncio.sleep(interval_s)
