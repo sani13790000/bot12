@@ -1,253 +1,280 @@
-"""Telegram Bot — polling + heartbeat + commands.
-
-BUG-N5 FIX: _format_position() uses .get() with safe fallbacks
-so /positions command never crashes with KeyError in DEMO mode.
 """
-from __future__ import annotations
+Telegram Bot - Real-time trading alerts and management via Telegram.
 
-import asyncio
+Provides:
+- Real-time trade notifications
+- Position monitoring
+- Manual trade commands
+- Risk management alerts
+- Strategy status updates
+
+Integration with FastAPI handlers for message routing.
+"""
+
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Optional, Dict, Any
+import aiohttp
+from dataclasses import dataclass
 
-log = logging.getLogger(__name__)
-
-try:
-    from telegram import Bot, Update
-    from telegram.ext import Application, CommandHandler, ContextTypes
-    TELEGRAM_AVAILABLE = True
-except ImportError:
-    TELEGRAM_AVAILABLE = False
-    log.warning("python-telegram-bot not installed — bot disabled")
+logger = logging.getLogger(__name__)
 
 
-def _format_position(pos: Dict[str, Any]) -> str:
-    """Format a position dict safely — handles both LIVE and DEMO key schemas.
+@dataclass
+class TelegramMessage:
+    """Telegram message wrapper."""
+    chat_id: str
+    text: str
+    parse_mode: str = "HTML"
+    disable_notification: bool = False
 
-    BUG-N5 FIX: use .get() with fallbacks for every key so KeyError
-    never crashes /positions in DEMO mode where keys differ.
-    """
-    symbol = pos.get("symbol", pos.get("ticker", "UNKNOWN"))
-    volume = pos.get("volume", pos.get("lots", pos.get("size", 0.0)))
-    pos_type = pos.get("type", pos.get("side", "?"))
-    open_price = pos.get("open_price", pos.get("entry_price", pos.get("price_open", 0.0)))
-    current_price = pos.get("current_price", pos.get("price_current", open_price))
-    # DEMO mode may not have 'profit' — compute from price difference
-    profit = pos.get("profit", pos.get("unrealized_pnl", pos.get("pnl", None)))
-    if profit is None:
-        try:
-            profit = (float(current_price) - float(open_price)) * float(volume)
-        except Exception:
-            profit = 0.0
-    ticket = pos.get("ticket", pos.get("id", pos.get("mt5_ticket", "")))
-    comment = pos.get("comment", pos.get("description", ""))
 
-    emoji = "🟢" if float(profit) >= 0 else "🔴"
-    return (
-        f"{emoji} *{symbol}* | {pos_type} | Vol: {volume}\n"
-        f"   Open: `{open_price}` → Now: `{current_price}`\n"
-        f"   P&L: `{profit:.2f}` | Ticket: `{ticket}`"
-        + (f"\n   📝 {comment}" if comment else "")
-    )
+@dataclass
+class TelegramUpdate:
+    """Telegram update (message from user)."""
+    update_id: int
+    chat_id: str
+    user_id: str
+    text: str
+    message_type: str  # 'text', 'command', 'callback'
 
 
 class TelegramBot:
-    """Telegram bot with polling, heartbeat, and trading commands."""
+    """Telegram bot for trading alerts and commands."""
 
-    def __init__(self) -> None:
-        self._token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        self._chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
-        self._app: Optional[Any] = None
-        self._running: bool = False
-        self._heartbeat_task: Optional[asyncio.Task] = None
+    def __init__(
+        self,
+        token: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        base_url: str = "https://api.telegram.org"
+    ):
+        """
+        Initialize Telegram Bot.
 
-    # ---------------------------------------------------------------------- #
-    # Lifecycle
-    # ---------------------------------------------------------------------- #
-    async def start(self) -> None:
-        if not TELEGRAM_AVAILABLE or not self._token:
-            log.warning("TelegramBot: token missing or library unavailable — skipping")
-            return
-        if self._running:
-            return
-        self._running = True
+        Args:
+            token: Bot API token (defaults to TELEGRAM_BOT_TOKEN env var)
+            chat_id: Default chat ID (defaults to TELEGRAM_CHAT_ID env var)
+            base_url: Telegram API base URL
+        """
+        self.token = token or os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self.chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "")
+        self.base_url = base_url
+        self.api_url = f"{base_url}/bot{self.token}"
+
+        if not self.token:
+            logger.warning("[telegram] No token provided - bot notifications disabled")
+        if not self.chat_id:
+            logger.warning("[telegram] No chat_id provided - using updates only")
+
+    async def send_message(self, message: TelegramMessage) -> bool:
+        """
+        Send message to Telegram chat.
+
+        Args:
+            message: TelegramMessage object
+
+        Returns:
+            True if sent successfully
+        """
+        if not self.token:
+            logger.warning("[telegram] Cannot send: no token configured")
+            return False
+
+        url = f"{self.api_url}/sendMessage"
+        payload = {
+            "chat_id": message.chat_id or self.chat_id,
+            "text": message.text,
+            "parse_mode": message.parse_mode,
+            "disable_notification": message.disable_notification,
+        }
+
         try:
-            self._app = (
-                Application.builder()
-                .token(self._token)
-                .build()
-            )
-            self._register_handlers()
-            await self._app.initialize()
-            await self._app.start()
-            self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-            log.info("TelegramBot started (polling)")
-            await self._app.updater.start_polling(drop_pending_updates=True)
-        except Exception as e:
-            log.error("TelegramBot.start: %s", e)
-            self._running = False
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        logger.info("[telegram] Message sent to chat=%s", message.chat_id or self.chat_id)
+                        return True
+                    else:
+                        logger.error("[telegram] Failed to send: status=%d", resp.status)
+                        return False
+        except Exception as exc:
+            logger.error("[telegram] send_message error: %s", exc)
+            return False
 
-    async def stop(self) -> None:
-        self._running = False
-        if self._heartbeat_task:
-            self._heartbeat_task.cancel()
-        if self._app:
-            try:
-                await self._app.updater.stop()
-                await self._app.stop()
-                await self._app.shutdown()
-            except Exception as e:
-                log.debug("TelegramBot.stop: %s", e)
+    async def send_trade_alert(
+        self,
+        symbol: str,
+        signal_type: str,  # BUY, SELL
+        entry_price: float,
+        stop_loss: float,
+        take_profit: float,
+        position_size: float,
+        confidence: float,
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send trade signal alert.
 
-    # ---------------------------------------------------------------------- #
-    # Public: send helpers
-    # ---------------------------------------------------------------------- #
-    async def send_message(self, text: str, parse_mode: str = "Markdown") -> None:
-        if not self._app or not self._chat_id:
-            return
-        try:
-            await self._app.bot.send_message(
-                chat_id=self._chat_id, text=text, parse_mode=parse_mode
-            )
-        except Exception as e:
-            log.warning("TelegramBot.send_message: %s", e)
+        Args:
+            symbol: Trading instrument
+            signal_type: BUY or SELL
+            entry_price: Entry price
+            stop_loss: Stop loss price
+            take_profit: Take profit price
+            position_size: Position size in lots
+            confidence: Signal confidence (0-1)
+            chat_id: Override default chat ID
 
-    async def send_alert(self, text: str) -> None:
-        await self.send_message(text)
+        Returns:
+            True if sent successfully
+        """
+        emoji = "📈" if signal_type == "BUY" else "📉"
+        text = f"""{emoji} <b>{signal_type} Signal: {symbol}</b>
+<b>Entry:</b> {entry_price:.5f}
+<b>SL:</b> {stop_loss:.5f}
+<b>TP:</b> {take_profit:.5f}
+<b>Size:</b> {position_size:.2f} lots
+<b>Confidence:</b> {confidence*100:.0f}%
+<b>R/R:</b> {self._calculate_rr(entry_price, stop_loss, take_profit):.2f}:1
+"""
 
-    async def send_signal(self, signal: Dict[str, Any]) -> None:
-        direction = signal.get("direction", "NO_TRADE")
-        symbol = signal.get("symbol", "?")
-        entry = signal.get("entry_price", 0)
-        sl = signal.get("sl_price", 0)
-        tp = signal.get("tp_price", 0)
-        rr = signal.get("rr_ratio", 0)
-        conf = signal.get("confidence", 0)
-        emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "⚪"
-        msg = (
-            f"{emoji} *Signal: {direction}* | {symbol}\n"
-            f"Entry: `{entry}` | SL: `{sl}` | TP: `{tp}`\n"
-            f"RR: `{rr:.2f}` | Conf: `{conf:.1%}`"
+        message = TelegramMessage(
+            chat_id=chat_id or self.chat_id,
+            text=text,
+            parse_mode="HTML"
         )
-        await self.send_message(msg)
+        return await self.send_message(message)
 
-    # ---------------------------------------------------------------------- #
-    # Command handlers
-    # ---------------------------------------------------------------------- #
-    def _register_handlers(self) -> None:
-        if not self._app:
-            return
-        cmds = [
-            ("start",     self._cmd_start),
-            ("status",    self._cmd_status),
-            ("positions", self._cmd_positions),
-            ("kill",      self._cmd_kill),
-            ("resume",    self._cmd_resume),
-            ("stats",     self._cmd_stats),
-            ("help",      self._cmd_help),
-        ]
-        for name, handler in cmds:
-            self._app.add_handler(CommandHandler(name, handler))
+    async def send_position_update(
+        self,
+        symbol: str,
+        position_type: str,  # OPEN, UPDATE, CLOSE
+        current_pnl: float,
+        current_price: float,
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send position update alert.
 
-    async def _cmd_start(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        await update.message.reply_text(
-            "🤖 *GalaxyVast MT5 Bot*\nActive and monitoring markets.",
-            parse_mode="Markdown",
+        Args:
+            symbol: Trading instrument
+            position_type: OPEN, UPDATE, or CLOSE
+            current_pnl: Current profit/loss
+            current_price: Current market price
+            chat_id: Override default chat ID
+
+        Returns:
+            True if sent successfully
+        """
+        emoji_map = {
+            "OPEN": "🟢",
+            "UPDATE": "🟡",
+            "CLOSE": "🔴"
+        }
+        emoji = emoji_map.get(position_type, "❓")
+        pnl_emoji = "📈" if current_pnl >= 0 else "📉"
+
+        text = f"""{emoji} <b>{position_type}: {symbol}</b>
+{pnl_emoji} <b>P&L:</b> ${current_pnl:+.2f}
+<b>Price:</b> {current_price:.5f}
+"""
+
+        message = TelegramMessage(
+            chat_id=chat_id or self.chat_id,
+            text=text,
+            parse_mode="HTML"
         )
+        return await self.send_message(message)
 
-    async def _cmd_help(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        await update.message.reply_text(
-            "*Commands:*\n"
-            "/status — system status\n"
-            "/positions — open positions\n"
-            "/kill — activate kill switch\n"
-            "/resume — deactivate kill switch\n"
-            "/stats — performance stats",
-            parse_mode="Markdown",
+    async def send_risk_alert(
+        self,
+        alert_type: str,  # MARGIN, EQUITY, STRATEGY
+        message_text: str,
+        severity: str = "WARNING",  # INFO, WARNING, CRITICAL
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send risk management alert.
+
+        Args:
+            alert_type: Type of alert
+            message_text: Alert message
+            severity: Severity level
+            chat_id: Override default chat ID
+
+        Returns:
+            True if sent successfully
+        """
+        severity_emoji = {
+            "INFO": "ℹ️",
+            "WARNING": "⚠️",
+            "CRITICAL": "🚨"
+        }
+        emoji = severity_emoji.get(severity, "❓")
+
+        text = f"{emoji} <b>{severity} - {alert_type}</b>\n{message_text}"
+
+        message = TelegramMessage(
+            chat_id=chat_id or self.chat_id,
+            text=text,
+            parse_mode="HTML",
+            disable_notification=(severity == "INFO")
         )
+        return await self.send_message(message)
 
-    async def _cmd_status(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        try:
-            from backend.risk.kill_switch import kill_switch
-            ks = "🔴 ACTIVE" if kill_switch.is_active else "🟢 OK"
-        except Exception:
-            ks = "unknown"
-        await update.message.reply_text(
-            f"*System Status*\nKill Switch: {ks}\nTime: {datetime.now(timezone.utc).strftime('%H:%M UTC')}",
-            parse_mode="Markdown",
+    async def send_strategy_status(
+        self,
+        enabled: bool,
+        active_positions: int,
+        daily_pnl: float,
+        success_rate: float,
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send strategy status report.
+
+        Args:
+            enabled: Is strategy enabled
+            active_positions: Number of open positions
+            daily_pnl: Daily P&L
+            success_rate: Win rate (0-1)
+            chat_id: Override default chat ID
+
+        Returns:
+            True if sent successfully
+        """
+        status_emoji = "🟢" if enabled else "🔴"
+        pnl_emoji = "📈" if daily_pnl >= 0 else "📉"
+
+        text = f"""📊 <b>Strategy Status Report</b>
+{status_emoji} <b>Status:</b> {'ENABLED' if enabled else 'DISABLED'}
+<b>Positions:</b> {active_positions} open
+{pnl_emoji} <b>Daily P&L:</b> ${daily_pnl:+.2f}
+<b>Win Rate:</b> {success_rate*100:.1f}%
+"""
+
+        message = TelegramMessage(
+            chat_id=chat_id or self.chat_id,
+            text=text,
+            parse_mode="HTML"
         )
+        return await self.send_message(message)
 
-    async def _cmd_positions(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        """Show open positions — BUG-N5 FIX: uses _format_position() with safe .get()"""
-        try:
-            from backend.execution.mt5_connector import mt5_connector
-            positions: List[Dict[str, Any]] = await mt5_connector.get_positions()
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error fetching positions: {e}")
-            return
-
-        if not positions:
-            await update.message.reply_text("📭 No open positions.")
-            return
-
-        lines = [f"📊 *Open Positions* ({len(positions)})\n"]
-        for pos in positions:
-            try:
-                lines.append(_format_position(pos))
-            except Exception as e:
-                lines.append(f"⚠️ position parse error: {e}")
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-
-    async def _cmd_kill(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        try:
-            from backend.risk.kill_switch import kill_switch
-            await kill_switch.activate(reason="Telegram /kill command")
-            await update.message.reply_text("🔴 *Kill switch ACTIVATED*", parse_mode="Markdown")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
-
-    async def _cmd_resume(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        try:
-            from backend.risk.kill_switch import kill_switch
-            await kill_switch.reset()
-            await update.message.reply_text("🟢 *Kill switch RESET — trading resumed*", parse_mode="Markdown")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
-
-    async def _cmd_stats(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-        try:
-            from backend.analytics.metrics_engine import metrics_engine
-            perf = await metrics_engine.get_performance_metrics()
-            win_rate = perf.get("win_rate", 0)
-            total = perf.get("total_trades", 0)
-            pnl = perf.get("total_pnl", 0)
-            msg = (
-                f"📈 *Performance Stats*\n"
-                f"Total trades: `{total}`\n"
-                f"Win rate: `{win_rate:.1%}`\n"
-                f"Total P&L: `{pnl:.2f}`"
-            )
-        except Exception as e:
-            msg = f"❌ Stats error: {e}"
-        await update.message.reply_text(msg, parse_mode="Markdown")
-
-    # ---------------------------------------------------------------------- #
-    # Heartbeat
-    # ---------------------------------------------------------------------- #
-    async def _heartbeat_loop(self) -> None:
-        interval = int(os.getenv("TELEGRAM_HEARTBEAT_INTERVAL", "3600"))
-        while self._running:
-            try:
-                await asyncio.sleep(interval)
-                if self._running:
-                    await self.send_message(
-                        f"💓 *Heartbeat* — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
-                    )
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                log.debug("heartbeat: %s", e)
+    @staticmethod
+    def _calculate_rr(entry: float, sl: float, tp: float) -> float:
+        """Calculate risk/reward ratio."""
+        risk = abs(entry - sl)
+        reward = abs(tp - entry)
+        return reward / risk if risk > 0 else 0.0
 
 
-telegram_bot = TelegramBot()
+# Global bot instance
+_bot_instance: Optional[TelegramBot] = None
+
+
+def get_telegram_bot() -> TelegramBot:
+    """Get or create global Telegram bot instance."""
+    global _bot_instance
+    if _bot_instance is None:
+        _bot_instance = TelegramBot()
+    return _bot_instance
