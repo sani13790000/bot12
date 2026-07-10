@@ -1,364 +1,118 @@
-version: "3.9"
-
-networks:
-  galaxyvast_net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/24
-
-volumes:
-  redis_data:
-    driver: local
-  backup_data:
-    driver: local
-  prometheus_data:
-    driver: local
-  grafana_data:
-    driver: local
+version: '3.8'
 
 services:
-
-  redis:
-    image: redis:7.4-alpine
-    restart: unless-stopped
-    command: >
-      redis-server
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-      --save 900 1
-      --save 300 10
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-      --loglevel warning
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: bot12-postgres
+    environment:
+      POSTGRES_DB: bot12
+      POSTGRES_USER: bot12
+      POSTGRES_PASSWORD: bot12pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
     ports:
-      - "127.0.0.1:6379:6379"
+      - "5432:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bot12 -d bot12"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: bot12-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
     volumes:
       - redis_data:/data
-    networks:
-      - galaxyvast_net
+    ports:
+      - "6379:6379"
+    restart: always
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits: {memory: 768M, cpus: "0.5"}
-    logging:
-      driver: json-file
-      options: {max-size: "20m", max-file: "5"}
-    security_opt:
-      - no-new-privileges:true
-    user: "999:999"
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  api:
+  # Backend API
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        - GIT_SHA=${GIT_SHA:-unknown}
-    image: galaxyvast-api:${APP_VERSION:-latest}
-    restart: unless-stopped
-    expose:
-      - "8000"
-    env_file: .env
+      dockerfile: Dockerfile.backend
+    container_name: bot12-backend
     environment:
-      - PYTHONUNBUFFERED=1
-      - ENVIRONMENT=production
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-    networks:
-      - galaxyvast_net
+      DATABASE_URL: postgresql://bot12:bot12pass@postgres:5432/bot12
+      REDIS_URL: redis://:redis123@redis:6379/0
+      MT5_ACCOUNT: ${MT5_ACCOUNT}
+      MT5_PASSWORD: ${MT5_PASSWORD}
+      MT5_SERVER: ${MT5_SERVER:-MetaQuotes-Demo}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      TELEGRAM_USER_ID: ${TELEGRAM_USER_ID}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-30}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: production
+      DEBUG: "false"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "8000:8000"
+    restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits: {memory: 2G, cpus: "2.0"}
-        reservations: {memory: 512M, cpus: "0.5"}
-      update_config:
-        parallelism: 1
-        delay: 10s
-        failure_action: rollback
-        order: start-first
-    ulimits:
-      nofile: {soft: 65536, hard: 65536}
-    logging:
-      driver: json-file
-      options: {max-size: "50m", max-file: "5"}
-    security_opt:
-      - no-new-privileges:true
-
-  telegram_bot:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
-    image: galaxyvast-bot:${APP_VERSION:-latest}
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+    volumes:
+      - ./logs:/app/logs
     networks:
-      - galaxyvast_net
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    deploy:
-      resources:
-        limits: {memory: 512M, cpus: "1.0"}
-    logging:
-      driver: json-file
-      options: {max-size: "20m", max-file: "3"}
-    security_opt:
-      - no-new-privileges:true
+      - bot12-network
 
-  dashboard:
-    build: {context: ./dashboard, dockerfile: Dockerfile}
-    image: galaxyvast-dashboard:${APP_VERSION:-latest}
-    restart: unless-stopped
-    expose:
-      - "8501"
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - API_BASE_URL=http://api:8000
-      - PYTHONPATH=/app
-    networks:
-      - galaxyvast_net
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits: {memory: 1G, cpus: "1.0"}
-    logging:
-      driver: json-file
-      options: {max-size: "20m", max-file: "3"}
-    security_opt:
-      - no-new-privileges:true
-
+  # Frontend
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL:-https://yourdomain.com}
-    image: galaxyvast-frontend:${APP_VERSION:-latest}
-    restart: unless-stopped
-    expose:
-      - "80"
-    networks:
-      - galaxyvast_net
+    container_name: bot12-frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8000/api}
+      REACT_APP_ENVIRONMENT: production
+    ports:
+      - "3000:3000"
+    restart: always
     depends_on:
-      - api
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits: {memory: 256M, cpus: "0.5"}
-    logging:
-      driver: json-file
-      options: {max-size: "10m", max-file: "3"}
-    security_opt:
-      - no-new-privileges:true
+      - backend
+    networks:
+      - bot12-network
 
-  # DO-FIX-6: Nginx reverse proxy added
+  # Nginx Reverse Proxy
   nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
+    image: nginx:alpine
+    container_name: bot12-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
-    networks:
-      - galaxyvast_net
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./static:/usr/share/nginx/html:ro
     depends_on:
-      - api
+      - backend
       - frontend
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/nginx-health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits: {memory: 128M, cpus: "0.5"}
-    logging:
-      driver: json-file
-      options: {max-size: "20m", max-file: "5"}
-    security_opt:
-      - no-new-privileges:true
-
-  prometheus:
-    image: prom/prometheus:v2.54.0
-    restart: unless-stopped
-    expose:
-      - "9090"
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./infra/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
-      - prometheus_data:/prometheus
+    restart: always
     networks:
-      - galaxyvast_net
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=30d"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-lifecycle"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits: {memory: 512M, cpus: "0.5"}
-    security_opt:
-      - no-new-privileges:true
+      - bot12-network
 
-  grafana:
-    image: grafana/grafana:11.2.0
-    restart: unless-stopped
-    expose:
-      - "3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infra/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./infra/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./infra/grafana/dashboards:/etc/grafana/provisioning/dashboards/galaxyvast:ro
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-      - GF_SERVER_ROOT_URL=https://yourdomain.com/grafana/
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
-      - GF_SECURITY_DISABLE_GRAVATAR=true
-      - GF_ANALYTICS_REPORTING_ENABLED=false
-      - GF_LOG_LEVEL=warn
-    networks:
-      - galaxyvast_net
-    depends_on:
-      - prometheus
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits: {memory: 512M, cpus: "0.5"}
-    security_opt:
-      - no-new-privileges:true
+volumes:
+  postgres_data:
+  redis_data:
 
-  # DO-FIX-9: redis-exporter, node-exporter, cadvisor added
-  redis-exporter:
-    image: oliver006/redis_exporter:v1.62.0-alpine
-    restart: unless-stopped
-    expose:
-      - "9121"
-    environment:
-      - REDIS_ADDR=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    networks:
-      - galaxyvast_net
-    depends_on:
-      - redis
-    deploy:
-      resources:
-        limits: {memory: 64M, cpus: "0.1"}
-    security_opt:
-      - no-new-privileges:true
-
-  node-exporter:
-    image: prom/node-exporter:v1.8.2
-    restart: unless-stopped
-    expose:
-      - "9100"
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - "--path.procfs=/host/proc"
-      - "--path.sysfs=/host/sys"
-      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
-    networks:
-      - galaxyvast_net
-    deploy:
-      resources:
-        limits: {memory: 128M, cpus: "0.2"}
-    security_opt:
-      - no-new-privileges:true
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.50.0
-    restart: unless-stopped
-    expose:
-      - "8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    networks:
-      - galaxyvast_net
-    deploy:
-      resources:
-        limits: {memory: 256M, cpus: "0.3"}
-    security_opt:
-      - no-new-privileges:true
-
-  backup:
-    image: redis:7.4-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data:ro
-      - backup_data:/backups
-    networks:
-      - galaxyvast_net
-    depends_on:
-      redis:
-        condition: service_healthy
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        while true; do
-          DATE=$$(date +%Y%m%d_%H%M%S)
-          redis-cli -h redis -a $$REDIS_PASSWORD --rdb /backups/redis_$${DATE}.rdb 2>/dev/null || true
-          find /backups -name '*.rdb' -mtime +7 -delete
-          echo "[backup] $${DATE} done"
-          sleep 86400
-        done
-    deploy:
-      resources:
-        limits: {memory: 64M, cpus: "0.1"}
-    security_opt:
-      - no-new-privileges:true
+networks:
+  bot12-network:
+    driver: bridge
