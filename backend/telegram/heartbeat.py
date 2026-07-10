@@ -1,94 +1,84 @@
 """
-heartbeat.py — Telegram Bot liveness heartbeat
-
-Writes /tmp/bot_heartbeat every INTERVAL seconds while the bot is polling.
-Docker healthcheck reads this file to detect dead polling.
-
-Usage (in bot.py polling loop):
-    from backend.telegram.heartbeat import start_heartbeat, stop_heartbeat
-    await start_heartbeat()
-    # ... polling ...
-    await stop_heartbeat()
-
-Docker healthcheck command:
-    python3 -c "
-import os, time, sys
-try:
-    age = time.time() - os.path.getmtime('/tmp/bot_heartbeat')
-    sys.exit(0 if age < 120 else 1)
-except FileNotFoundError:
-    sys.exit(1)
-"
+backend/telegram/heartbeat.py
+Heartbeat monitoring for Telegram bot connectivity.
 """
-from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import time
+from datetime import datetime, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-HEARTBEAT_FILE = "/tmp/bot_heartbeat"
-INTERVAL = 30  # seconds
 
-_task: Optional[asyncio.Task] = None
-_running = False
+class TelegramHeartbeat:
+    """Monitor Telegram bot health."""
 
+    def __init__(
+        self,
+        interval_seconds: int = 300,
+        timeout_seconds: int = 30,
+    ):
+        """
+        Initialize heartbeat monitor.
 
-def _write_heartbeat() -> None:
-    """Write current timestamp to heartbeat file."""
-    try:
-        with open(HEARTBEAT_FILE, "w") as f:
-            f.write(str(time.time()))
-    except OSError as e:
-        logger.warning("[Heartbeat] Could not write %s: %s", HEARTBEAT_FILE, e)
+        Args:
+            interval_seconds: Check interval
+            timeout_seconds: Timeout for health check
+        """
+        self.interval = interval_seconds
+        self.timeout = timeout_seconds
+        self.last_check: Optional[datetime] = None
+        self.is_healthy = True
+        logger.info("[heartbeat] Initialized with interval=%ds", interval_seconds)
 
+    async def start(self, bot) -> None:
+        """
+        Start heartbeat monitoring.
 
-async def _heartbeat_loop() -> None:
-    """Background loop that updates the heartbeat file."""
-    global _running
-    logger.info("[Heartbeat] Started — writing to %s every %ds", HEARTBEAT_FILE, INTERVAL)
-    _write_heartbeat()  # Write immediately on start
-    while _running:
-        await asyncio.sleep(INTERVAL)
-        if _running:
-            _write_heartbeat()
-    logger.info("[Heartbeat] Stopped")
+        Args:
+            bot: Telegram bot instance
+        """
+        logger.info("[heartbeat] Starting heartbeat monitor")
+        while True:
+            try:
+                await self._check_health(bot)
+                self.last_check = datetime.utcnow()
+            except asyncio.TimeoutError:
+                logger.error("[heartbeat] Health check timed out")
+                self.is_healthy = False
+            except Exception as exc:
+                logger.error("[heartbeat] Health check failed: %s", exc)
+                self.is_healthy = False
 
+            await asyncio.sleep(self.interval)
 
-async def start_heartbeat() -> None:
-    """Start the heartbeat background task."""
-    global _task, _running
-    if _task is not None and not _task.done():
-        return  # Already running
-    _running = True
-    _task = asyncio.create_task(_heartbeat_loop())
+    async def _check_health(self, bot) -> None:
+        """
+        Check bot health.
 
-
-async def stop_heartbeat() -> None:
-    """Stop the heartbeat background task."""
-    global _task, _running
-    _running = False
-    if _task is not None:
-        _task.cancel()
+        Args:
+            bot: Telegram bot instance
+        """
         try:
-            await _task
-        except asyncio.CancelledError:
-            pass
-        _task = None
-    # Clean up file
-    try:
-        os.remove(HEARTBEAT_FILE)
-    except FileNotFoundError:
-        pass
+            # Try to get bot info
+            await asyncio.wait_for(
+                bot.get_me(),
+                timeout=self.timeout
+            )
+            self.is_healthy = True
+            logger.debug("[heartbeat] Health check passed")
+        except asyncio.TimeoutError:
+            logger.error("[heartbeat] Health check timeout - bot unresponsive")
+            raise
+        except Exception as exc:
+            logger.error("[heartbeat] Health check error: %s", exc)
+            raise
 
-
-def is_alive(max_age_seconds: int = 120) -> bool:
-    """Check if heartbeat file is fresh (for health endpoints)."""
-    try:
-        age = time.time() - os.path.getmtime(HEARTBEAT_FILE)
-        return age < max_age_seconds
-    except FileNotFoundError:
-        return False
+    def get_status(self) -> dict:
+        """Get current heartbeat status."""
+        return {
+            'is_healthy': self.is_healthy,
+            'last_check': self.last_check.isoformat() if self.last_check else None,
+            'uptime': 'unknown'
+        }

@@ -1,34 +1,25 @@
-"""backend/execution/position_reconciliation.py
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Background task: تطبیق OSM با MT5
-
-GHOST positions:
-  - OSM darad -- MT5 nadarad
-  - action: talash braye bastan / taref kardan dar OSM
-
-ORPHAN positions:
-  - MT5 darad -- OSM nami danad
-  - action: sabht dar OSM ya alarm be
 """
-from __future__ import annotations
+backend/execution/position_reconciliation.py
+Position reconciliation between OSM and MT5.
+"""
 
 import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class MismatchType(StrEnum):
-    GHOST  = "GHOST"    # OSM open — MT5 uadarad
-    ORPHAN = "ORPHAN"   # MT5 open — OSM nami danad
+    GHOST = "GHOST"
+    ORPHAN = "ORPHAN"
 
 
 @dataclass
 class Mismatch:
+    """Position mismatch."""
     ticket: int
     mismatch_type: MismatchType
     detail: str = ""
@@ -36,6 +27,7 @@ class Mismatch:
 
 @dataclass
 class ReconciliationResult:
+    """Reconciliation result."""
     mismatches: list[Mismatch] = field(default_factory=list)
     ghosts: int = 0
     orphans: int = 0
@@ -43,38 +35,31 @@ class ReconciliationResult:
 
 
 class PositionReconciler:
-    """
-    Reconciler beyn OSM o MT5.
-
-    mesal:
-        reconciler = PositionReconciler(connector=mt5, osm=osm)
-        result = await reconciler.run()
-        logger.info("[reconciler] example: GHOST=%d, ORPHAN=%d", result.ghosts, result.orphans)
-    """
+    """Reconcile positions between OSM and MT5."""
 
     def __init__(
         self,
-        connector:    Any = None,
-        osm:          Any = None,
+        connector: Any = None,
+        osm: Any = None,
         auto_close_ghosts: bool = True,
         auto_register_orphans: bool = True,
-    ) -> None:
+    ):
         self.connector = connector
         self.osm = osm
         self.auto_close_ghosts = auto_close_ghosts
         self.auto_register_orphans = auto_register_orphans
 
     async def run(self) -> ReconciliationResult:
-        """Hamahang-sazi beyn OSM v MT5."""
+        """Run reconciliation."""
         result = ReconciliationResult()
         try:
             mt5_tickets = await self._get_mt5_open_tickets()
             osm_tickets = await self._get_osm_open_tickets()
 
-            ghosts  = osm_tickets - mt5_tickets
+            ghosts = osm_tickets - mt5_tickets
             orphans = mt5_tickets - osm_tickets
 
-            result.ghosts  = len(ghosts)
+            result.ghosts = len(ghosts)
             result.orphans = len(orphans)
 
             for ticket in ghosts:
@@ -96,7 +81,7 @@ class PositionReconciler:
                 mismatch = Mismatch(
                     ticket=ticket,
                     mismatch_type=MismatchType.ORPHAN,
-                    detail="MT5 why darad -- OSM uadarad",
+                    detail="MT5 darad -- OSM nami danad",
                 )
                 result.mismatches.append(mismatch)
                 logger.warning("[reconciler] ORPHAN ticket=%d", ticket)
@@ -113,7 +98,7 @@ class PositionReconciler:
         return result
 
     async def _get_mt5_open_tickets(self) -> set[int]:
-        """Tickethaye az MT5 Gateway."""
+        """Get MT5 tickets."""
         if self.connector is None:
             return set()
         try:
@@ -124,7 +109,7 @@ class PositionReconciler:
         return set()
 
     async def _get_osm_open_tickets(self) -> set[int]:
-        """Tickethaye azi OSM."""
+        """Get OSM tickets."""
         if self.osm is None:
             return set()
         try:
@@ -133,36 +118,3 @@ class PositionReconciler:
         except Exception as exc:
             logger.error("[reconciler] _get_osm_open_tickets failed: %s", exc)
         return set()
-
-
-async def reconciler_loop(
-    connector: Any,
-    osm: Any,
-    interval_s: float = 30.0,
-    auto_close_ghosts: bool = True,
-    auto_register_orphans: bool = True,
-) -> None:
-    """Loop daime-dar braye hamahang-sazy dar pas-zamine."""
-    reconciler = PositionReconciler(
-        connector=connector,
-        osm=osm,
-        auto_close_ghosts=auto_close_ghosts,
-        auto_register_orphans=auto_register_orphans,
-    )
-
-    logger.info("[reconciler_loop] Starting position reconciliation loop (interval=%.1fs)", interval_s)
-
-    while True:
-        try:
-            result = await reconciler.run()
-            if result.mismatches:
-                logger.info(
-                    "[reconciler_loop] Result: ghosts=%d, orphans=%d, actions=%d",
-                    result.ghosts,
-                    result.orphans,
-                    result.actions_taken,
-                )
-        except Exception as exc:
-            logger.error("[reconciler_loop] reconcile run failed: %s", exc)
-
-        await asyncio.sleep(interval_s)

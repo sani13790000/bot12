@@ -1,160 +1,111 @@
 """
 backend/telegram/handlers/alerts.py
-Galaxy Vast AI Trading Platform
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Telegram handlers for trading alerts.
-
-Registered commands
--------------------
-- /alerts        – show latest N alerts
-- /alerts on|off – enable / disable alerts for this chat
-- /setalerts     – configure alert severity filter
+Telegram alert handlers for trading notifications.
 """
-from __future__ import annotations
 
 import logging
-
-from aiogram import Router, types
-from aiogram.filters import Command
+from typing import Optional
 
 logger = logging.getLogger(__name__)
-router = Router()
-
-MAX_ALERTS = 20
-
-SEVERITY_EMOJI: dict[str, str] = {
-    "info":     "ℹ️",
-    "warning":  "⚠️",
-    "error":    "🔥",
-    "critical": "😨",
-}
 
 
-# ── Formatter helpers ────────────────────────────────────────────── #
+class AlertHandler:
+    """Handle trading alerts via Telegram."""
 
-def _format_alert(alert: dict) -> str:
-    """Render a single alert dict as Telegram Markdown."""
-    severity = alert.get("severity", "info")
-    emoji    = SEVERITY_EMOJI.get(severity, "ℹ️")
-    category = alert.get("category", "system").upper()
-    message  = alert.get("message", "(no message)")
-    ts       = alert.get("created_at", "")[:19].replace("T", " ")
-    return (
-        f"{emoji} *[{severity.upper()}]* `{category}`\n"
-        f"{message}\n"
-        f"_🕐 {ts} UTC_"
-    )
+    def __init__(self, bot=None):
+        """
+        Initialize alert handler.
 
+        Args:
+            bot: Telegram bot instance
+        """
+        self.bot = bot
+        logger.info("[alerts] AlertHandler initialized")
 
-def _format_alert_list(alerts: list[dict]) -> str:
-    """Join multiple formatted alerts separated by a horizontal rule."""
-    if not alerts:
-        return "✅ هیچ هشدار جدیدی یافت نشد."
-    parts = [_format_alert(a) for a in alerts[:MAX_ALERTS]]
-    return "\n\n──────────\n\n".join(parts)
+    async def send_trade_alert(
+        self,
+        symbol: str,
+        signal: str,
+        price: float,
+        confidence: float,
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send trade alert.
 
+        Args:
+            symbol: Trading symbol
+            signal: BUY or SELL
+            price: Entry price
+            confidence: Confidence level (0-1)
+            chat_id: Override default chat
 
-# ── Command handlers ─────────────────────────────────────────────── #
+        Returns:
+            True if sent successfully
+        """
+        if not self.bot:
+            logger.warning("[alerts] No bot configured - alert not sent")
+            return False
 
-@router.message(Command("alerts"))
-async def cmd_alerts(message: types.Message) -> None:
-    """
-    /alerts [on|off|N]
-
-    - /alerts        – show last 5 alerts
-    - /alerts 10     – show last 10 alerts
-    - /alerts on     – subscribe this chat to live alerts
-    - /alerts off    – unsubscribe
-    """
-    try:
-        args = (message.text or "").split()[1:]
-        arg  = args[0].lower() if args else ""
-
-        if arg == "on":
-            await message.answer("✅ اشتراک هشدارهای زنده فعال شد.")
-            return
-
-        if arg == "off":
-            await message.answer("❌ هشدارهای زنده برای این چت غیرفعال شد.")
-            return
-
-        limit = int(arg) if arg.isdigit() else 5
-        limit = min(limit, MAX_ALERTS)
-
-        alerts = await _fetch_recent_alerts(limit)
-        text   = _format_alert_list(alerts)
-        await message.answer(text, parse_mode="Markdown")
-
-    except Exception as exc:
-        logger.exception("[alerts] cmd_alerts failed: %s", exc)
         try:
-            await message.answer(f"❌ خطا: {exc}")
-        except Exception:
-            pass
-
-
-@router.message(Command("setalerts"))
-async def cmd_setalerts(message: types.Message) -> None:
-    """
-    /setalerts [info|warning|error|critical]
-
-    Set the minimum severity level for live alerts in this chat.
-    """
-    try:
-        args = (message.text or "").split()[1:]
-        if not args:
-            await message.answer(
-                "⚠️ استفاده: `/setalerts warning`\n"
-                "*سطح‌ها:* info | warning | error | critical",
-                parse_mode="Markdown",
+            emoji = "📈" if signal == "BUY" else "📉"
+            message = (
+                f"{emoji} <b>{signal}: {symbol}</b>\n"
+                f"Price: {price:.5f}\n"
+                f"Confidence: {confidence*100:.0f}%"
             )
-            return
-
-        level = args[0].lower()
-        if level not in SEVERITY_EMOJI:
-            await message.answer(
-                f"❌ سطح `{level}` معتبر نیست.",
-                parse_mode="Markdown",
+            
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode="HTML"
             )
-            return
+            logger.info("[alerts] Trade alert sent: %s %s @ %.5f", signal, symbol, price)
+            return True
+        except Exception as exc:
+            logger.error("[alerts] Failed to send alert: %s", exc)
+            return False
 
-        emoji = SEVERITY_EMOJI[level]
-        await message.answer(
-            f"✅ حداقل سطح هشدار به {emoji} *{level.upper()}* تنظیم شد.",
-            parse_mode="Markdown",
-        )
+    async def send_risk_alert(
+        self,
+        alert_type: str,
+        message: str,
+        severity: str = "WARNING",
+        chat_id: Optional[str] = None
+    ) -> bool:
+        """
+        Send risk management alert.
 
-    except Exception as exc:
-        logger.exception("[alerts] cmd_setalerts failed: %s", exc)
+        Args:
+            alert_type: Type of alert
+            message: Alert message
+            severity: INFO, WARNING, or CRITICAL
+            chat_id: Override default chat
 
+        Returns:
+            True if sent successfully
+        """
+        if not self.bot:
+            logger.warning("[alerts] No bot configured - risk alert not sent")
+            return False
 
-# ── Live-push helper (called by the alert service) ─────────────── #
-
-async def push_alert(bot: object, chat_id: int, alert: dict) -> None:
-    """Push a single alert to a Telegram chat."""
-    text = _format_alert(alert)
-    try:
-        await bot.send_message(  # type: ignore[attr-defined]
-            chat_id=chat_id,
-            text=text,
-            parse_mode="Markdown",
-        )
-    except Exception as exc:
-        logger.warning("[alerts] push_alert chat=%d failed: %s", chat_id, exc)
-
-
-# ── Data access ──────────────────────────────────────────────────── #
-
-async def _fetch_recent_alerts(limit: int = 5) -> list[dict]:
-    """Fetch recent alerts from the database (best-effort)."""
-    try:
-        from backend.database.client import db_client
-        rows = await db_client.select(
-            "alerts",
-            limit=limit,
-            order="created_at.desc",
-        )
-        return rows or []
-    except Exception as exc:
-        logger.warning("[alerts] _fetch_recent_alerts failed: %s", exc)
-        return []
+        try:
+            emoji_map = {
+                "INFO": "ℹ️",
+                "WARNING": "⚠️",
+                "CRITICAL": "🚨"
+            }
+            emoji = emoji_map.get(severity, "❓")
+            
+            full_message = f"{emoji} <b>{severity}: {alert_type}</b>\n{message}"
+            
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text=full_message,
+                parse_mode="HTML"
+            )
+            logger.info("[alerts] Risk alert sent: %s (severity=%s)", alert_type, severity)
+            return True
+        except Exception as exc:
+            logger.error("[alerts] Failed to send risk alert: %s", exc)
+            return False
