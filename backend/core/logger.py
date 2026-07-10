@@ -58,6 +58,13 @@ def get_logger(name: str) -> ContextualLogger:
     _configure_root()
     return ContextualLogger(logging.getLogger(name))
 
+def setup_logger(name: str = "app", level: Optional[str] = None) -> ContextualLogger:
+    if level:
+        lvl = _LOG_LEVEL_MAP.get(level.upper(), logging.INFO)
+        logging.getLogger().setLevel(lvl)
+    _configure_root()
+    return get_logger(name)
+
 _audit_logger: Optional[AuditLogger] = None
 def get_audit_logger() -> AuditLogger:
     global _audit_logger

@@ -1,1 +1,133 @@
-IiIiCmJhY2tlbmQvYXBpL3JvdXRlcy9zaWduYWxzLnB5IC0tIFBoYXNlLUUgZml4CgpFLTExOiBleGVjdXRlX3NpZ25hbCgpIG5vdyBjYWxscyBFeGVjdXRpb25TZXJ2aWNlLm9wZW5fcG9zaXRpb24oKSBmb3IgcmVhbCBNVDUgdHJhZGUuCkUtMTI6IEFkZGVkIEdFVCAve3NpZ25hbF9pZH0gc2luZ2xlLXNpZ25hbCBlbmRwb2ludC4KRS0xMzogbG90X3NpemUgYWRkZWQgdG8gU2lnbmFsQ3JlYXRlIHNjaGVtYS4KRS0xNDogQ29uZmlkZW5jZSBnYXRlOiByZWplY3RzIHNpZ25hbHMgYmVsb3cgNjAlIGNvbmZpZGVuY2UuCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgbG9nZ2luZwppbXBvcnQgdXVpZApmcm9tIGRhdGV0aW1lIGltcG9ydCBkYXRldGltZSwgdGltZXpvbmUKZnJvbSB0eXBpbmcgaW1wb3J0IExpc3QsIE9wdGlvbmFsCgpmcm9tIGZhc3RhcGkgaW1wb3J0IEFQSVJvdXRlciwgRGVwZW5kcywgSFRUUEV4Y2VwdGlvbiwgUXVlcnksIHN0YXR1cyBhcyBodHRwX3N0YXR1cwpmcm9tIHB5ZGFudGljIGltcG9ydCBCYXNlTW9kZWwsIEZpZWxkCgpmcm9tIGJhY2tlbmQuY29yZS5hdXRoIGltcG9ydCBnZXRfY3VycmVudF91c2VyCmZyb20gYmFja2VuZC5kYXRhYmFzZS5jb25uZWN0aW9uIGltcG9ydCBnZXRfZGIKCmxvZ2dlciA9IGxvZ2dpbmcuZ2V0TG9nZ2VyKF9fbmFtZV9fKQpyb3V0ZXIgPSBBUElSb3V0ZXIodGFncz1bInNpZ25hbHMiXSkKCl9NSU5fQ09ORklERU5DRSA9IDYwLjAKCgpjbGFzcyBTaWduYWxDcmVhdGUoQmFzZU1vZGVsKToKICAgIHN5bWJvbDogICAgICBzdHIKICAgIGRpcmVjdGlvbjogICBzdHIKICAgIGVudHJ5X3ByaWNlOiBmbG9hdAogICAgc3RvcF9sb3NzOiAgIGZsb2F0CiAgICB0YWtlX3Byb2ZpdDogZmxvYXQKICAgIGNvbmZpZGVuY2U6ICBmbG9hdCA9IEZpZWxkKGRlZmF1bHQ9MC4wLCBnZT0wLjAsIGxlPTEwMC4wKQogICAgbG90X3NpemU6ICAgIGZsb2F0ID0gRmllbGQoZGVmYXVsdD0wLjAxLCBndD0wLCBsZT0xMDApCiAgICBzdHJhdGVneTogICAgT3B0aW9uYWxbc3RyXSA9IE5vbmUKICAgIG5vdGVzOiAgICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQoKCmNsYXNzIFNpZ25hbFJlc3BvbnNlKEJhc2VNb2RlbCk6CiAgICBpZDogICAgICAgICAgIHN0cgogICAgdXNlcl9pZDogICAgICBzdHIKICAgIHN5bWJvbDogICAgICAgc3RyCiAgICBkaXJlY3Rpb246ICAgIHN0cgogICAgZW50cnlfcHJpY2U6ICBmbG9hdAogICAgc3RvcF9sb3NzOiAgICBmbG9hdAogICAgdGFrZV9wcm9maXQ6ICBmbG9hdAogICAgY29uZmlkZW5jZTogICBmbG9hdAogICAgbG90X3NpemU6ICAgICBmbG9hdAogICAgc3RyYXRlZ3k6ICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgbm90ZXM6ICAgICAgICBPcHRpb25hbFtzdHJdID0gTm9uZQogICAgc3RhdHVzOiAgICAgICBzdHIKICAgIG10NV90aWNrZXQ6ICAgT3B0aW9uYWxbaW50XSA9IE5vbmUKICAgIGNyZWF0ZWRfYXQ6ICAgc3RyCiAgICB1cGRhdGVkX2F0OiAgIHN0cgoKCmRlZiBfZ2V0X2V4ZWN1dGlvbl9zZXJ2aWNlKCk6CiAgICBmcm9tIGJhY2tlbmQuZXhlY3V0aW9uLmV4ZWN1dGlvbl9zZXJ2aWNlIGltcG9ydCBleGVjdXRpb25fc2VydmljZQogICAgcmV0dXJuIGV4ZWN1dGlvbl9zZXJ2aWNlCgoKQHJvdXRlci5nZXQoIi8iLCByZXNwb25zZV9tb2RlbD1MaXN0W1NpZ25hbFJlc3BvbnNlXSkKYXN5bmMgZGVmIGxpc3Rfc2lnbmFscygKICAgIHNpZ25hbF9zdGF0dXM6IE9wdGlvbmFsW3N0cl0gPSBRdWVyeShOb25lLCBhbGlhcz0ic3RhdHVzIiksCiAgICBsaW1pdDogICAgICAgICBpbnQgICAgICAgICAgID0gUXVlcnkoNTAsIGdlPTEsIGxlPTIwMCksCiAgICBvZmZzZXQ6ICAgICAgICBpbnQgICAgICAgICAgID0gUXVlcnkoMCwgZ2U9MCksCiAgICB1c2VyOiAgICAgICAgICBkaWN0ICAgICAgICAgID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwKICAgIGRiICAgICAgICAgICAgICAgICAgICAgICAgICAgPSBEZXBlbmRzKGdldF9kYiksCikgLT4gTGlzdFtTaWduYWxSZXNwb25zZV06CiAgICBmaWx0ZXJzOiBkaWN0ID0geyJ1c2VyX2lkIjogdXNlclsic3ViIl19CiAgICBpZiBzaWduYWxfc3RhdHVzOgogICAgICAgIGZpbHRlcnNbInN0YXR1cyJdID0gc2lnbmFsX3N0YXR1cwogICAgcm93cyA9IGF3YWl0IGRiLnNlbGVjdCgic2lnbmFscyIsIGZpbHRlcnMsIG9yZGVyX2J5PSJjcmVhdGVkX2F0Iiwgb3JkZXJfZGVzYz1UcnVlLCBsaW1pdD1saW1pdCwgb2Zmc2V0PW9mZnNldCkKICAgIHJldHVybiBbU2lnbmFsUmVzcG9uc2UoKipyKSBmb3IgciBpbiAocm93cyBvciBbXSldCgoKQHJvdXRlci5nZXQoIi97c2lnbmFsX2lkfSIsIHJlc3BvbnNlX21vZGVsPVNpZ25hbFJlc3BvbnNlKQphc3luYyBkZWYgZ2V0X3NpZ25hbChzaWduYWxfaWQ6IHN0ciwgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksIGRiID0gRGVwZW5kcyhnZXRfZGIpKSAtPiBTaWduYWxSZXNwb25zZToKICAgIHNpZyA9IGF3YWl0IGRiLnNlbGVjdF9vbmUoInNpZ25hbHMiLCB7ImlkIjogc2lnbmFsX2lkLCAidXNlcl9pZCI6IHVzZXJbInN1YiJdfSkKICAgIGlmIG5vdCBzaWc6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT00MDQsIGRldGFpbD0iU2lnbmFsIG5vdCBmb3VuZCIpCiAgICByZXR1cm4gU2lnbmFsUmVzcG9uc2UoKipzaWcpCgoKQHJvdXRlci5wb3N0KCIvIiwgcmVzcG9uc2VfbW9kZWw9U2lnbmFsUmVzcG9uc2UsIHN0YXR1c19jb2RlPTIwMSkKYXN5bmMgZGVmIGNyZWF0ZV9zaWduYWwoYm9keTogU2lnbmFsQ3JlYXRlLCB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwgZGIgPSBEZXBlbmRzKGdldF9kYikpIC0+IFNpZ25hbFJlc3BvbnNlOgogICAgaWYgYm9keS5kaXJlY3Rpb24gbm90IGluICgiYnV5IiwgInNlbGwiKToKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPWh0dHBfc3RhdHVzLkhUVFBfNDIyX1VOUFJPQ0VTU0FCTEVfRU5USVRZLCBkZXRhaWw9ZiJkaXJlY3Rpb24gbXVzdCBiZSAnYnV5JyBvciAnc2VsbCciKQogICAgbm93ID0gZGF0ZXRpbWUubm93KHRpbWV6b25lLnV0YykuaXNvZm9ybWF0KCkKICAgIGRhdGEgPSB7ImlkIjogc3RyKHV1aWQudXVpZDQoKSksICJ1c2VyX2lkIjogdXNlclsic3ViIl0sICJzeW1ib2wiOiBib2R5LnN5bWJvbCwgImRpcmVjdGlvbiI6IGJvZHkuZGlyZWN0aW9uLCAiZW50cnlfcHJpY2UiOiBib2R5LmVudHJ5X3ByaWNlLCAic3RvcF9sb3NzIjogYm9keS5zdG9wX2xvc3MsICJ0YWtlX3Byb2ZpdCI6IGJvZHkudGFrZV9wcm9maXQsICJjb25maWRlbmNlIjogYm9keS5jb25maWRlbmNlLCAibG90X3NpemUiOiBib2R5LmxvdF9zaXplLCAic3RyYXRlZ3kiOiBib2R5LnN0cmF0ZWd5LCAibm90ZXMiOiBib2R5Lm5vdGVzLCAic3RhdHVzIjogInBlbmRpbmciLCAibXQ1X3RpY2tldCI6IE5vbmUsICJjcmVhdGVkX2F0Ijogbm93LCAidXBkYXRlZF9hdCI6IG5vd30KICAgIHJlc3VsdCA9IGF3YWl0IGRiLmluc2VydCgic2lnbmFscyIsIGRhdGEpCiAgICBpZiBub3QgcmVzdWx0OgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NTAwLCBkZXRhaWw9IkZhaWxlZCB0byBjcmVhdGUgc2lnbmFsIikKICAgIHJldHVybiBTaWduYWxSZXNwb25zZSgqKnJlc3VsdCkKCgpAcm91dGVyLnBvc3QoIi97c2lnbmFsX2lkfS9leGVjdXRlIikKYXN5bmMgZGVmIGV4ZWN1dGVfc2lnbmFsKHNpZ25hbF9pZDogc3RyLCB1c2VyOiBkaWN0ID0gRGVwZW5kcyhnZXRfY3VycmVudF91c2VyKSwgZGIgPSBEZXBlbmRzKGdldF9kYikpIC0+IGRpY3Q6CiAgICBzaWcgPSBhd2FpdCBkYi5zZWxlY3Rfb25lKCJzaWduYWxzIiwgeyJpZCI6IHNpZ25hbF9pZCwgInVzZXJfaWQiOiB1c2VyWyJzdWIiXX0pCiAgICBpZiBub3Qgc2lnOgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9NDA0LCBkZXRhaWw9IlNpZ25hbCBub3QgZm91bmQiKQogICAgaWYgc2lnLmdldCgic3RhdHVzIikgIT0gInBlbmRpbmciOgogICAgICAgIHJhaXNlIEhUVFBFeGNlcHRpb24oc3RhdHVzX2NvZGU9aHR0cF9zdGF0dXMuSFRUUF80MDlfQ09ORkxJQ1QsIGRldGFpbD1mIlNpZ25hbCBpcyBub3QgcGVuZGluZyIpCiAgICBjb25maWRlbmNlID0gc2lnLmdldCgiY29uZmlkZW5jZSIsIDAuMCkKICAgIGlmIGNvbmZpZGVuY2UgPCBfTUlOX0NPTkZJREVOQ0U6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1odHRwX3N0YXR1cy5IVFRQXzQyMl9VTlBST0NFU1NBQkxFX0VOVElUWSwgZGV0YWlsPWYiU2lnbmFsIGNvbmZpZGVuY2Uge2NvbmZpZGVuY2U6LjFmfSUgYmVsb3cgbWluaW11bSB7X01JTl9DT05GSURFTkNFOi4wZn0lIikKICAgIG5vdyA9IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLmlzb2Zvcm1hdCgpCiAgICB0cnk6CiAgICAgICAgc3ZjID0gX2dldF9leGVjdXRpb25fc2VydmljZSgpCiAgICAgICAgcmVzdWx0ID0gYXdhaXQgc3ZjLm9wZW5fcG9zaXRpb24oc3ltYm9sPXNpZ1sic3ltYm9sIl0sIGRpcmVjdGlvbj1zaWdbImRpcmVjdGlvbiJdLCBsb3Rfc2l6ZT1zaWcuZ2V0KCJsb3Rfc2l6ZSIsIDAuMDEpLCBlbnRyeV9wcmljZT1zaWdbImVudHJ5X3ByaWNlIl0sIHN0b3BfbG9zcz1zaWdbInN0b3BfbG9zcyJdLCB0YWtlX3Byb2ZpdD1zaWdbInRha2VfcHJvZml0Il0sIGNvbW1lbnQ9ZiJzaWduYWw6e3NpZ25hbF9pZFs6OF19IikKICAgICAgICB0aWNrZXQgPSByZXN1bHQuZ2V0KCJ0aWNrZXQiKQogICAgICAgIGF3YWl0IGRiLnVwZGF0ZSgic2lnbmFscyIsIHsiaWQiOiBzaWduYWxfaWR9LCB7InN0YXR1cyI6ICJleGVjdXRlZCIsICJtdDVfdGlja2V0IjogdGlja2V0LCAiZXhlY3V0ZWRfYXQiOiBub3csICJ1cGRhdGVkX2F0Ijogbm93fSkKICAgICAgICBsb2dnZXIuaW5mbygiU2lnbmFsIGV4ZWN1dGVkOiBpZD0lcyB0aWNrZXQ9JXMiLCBzaWduYWxfaWQsIHRpY2tldCkKICAgICAgICByZXR1cm4geyJzdWNjZXNzIjogVHJ1ZSwgInNpZ25hbF9pZCI6IHNpZ25hbF9pZCwgIm10NV90aWNrZXQiOiB0aWNrZXR9CiAgICBleGNlcHQgSFRUUEV4Y2VwdGlvbjoKICAgICAgICByYWlzZQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgbG9nZ2VyLmVycm9yKCJNVDUgZXhlY3V0aW9uIGZhaWxlZCBmb3Igc2lnbmFsICVzOiAlcyIsIHNpZ25hbF9pZCwgZXhjKQogICAgICAgIGF3YWl0IGRiLnVwZGF0ZSgic2lnbmFscyIsIHsiaWQiOiBzaWduYWxfaWR9LCB7InN0YXR1cyI6ICJmYWlsZWQiLCAidXBkYXRlZF9hdCI6IG5vd30pCiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1odHRwX3N0YXR1cy5IVFRQXzUwMl9CQURfR0FURVdBWSwgZGV0YWlsPWYiTVQ1IGV4ZWN1dGlvbiBmYWlsZWQ6IHtleGN9IikKCgpAcm91dGVyLnBvc3QoIi97c2lnbmFsX2lkfS9jYW5jZWwiKQphc3luYyBkZWYgY2FuY2VsX3NpZ25hbChzaWduYWxfaWQ6IHN0ciwgdXNlcjogZGljdCA9IERlcGVuZHMoZ2V0X2N1cnJlbnRfdXNlciksIGRiID0gRGVwZW5kcyhnZXRfZGIpKSAtPiBkaWN0OgogICAgc2lnID0gYXdhaXQgZGIuc2VsZWN0X29uZSgic2lnbmFscyIsIHsiaWQiOiBzaWduYWxfaWQsICJ1c2VyX2lkIjogdXNlclsic3ViIl19KQogICAgaWYgbm90IHNpZzoKICAgICAgICByYWlzZSBIVFRQRXhjZXB0aW9uKHN0YXR1c19jb2RlPTQwNCwgZGV0YWlsPSJTaWduYWwgbm90IGZvdW5kIikKICAgIGlmIHNpZy5nZXQoInN0YXR1cyIpIG5vdCBpbiAoInBlbmRpbmciLCAiYWN0aXZlIik6CiAgICAgICAgcmFpc2UgSFRUUEV4Y2VwdGlvbihzdGF0dXNfY29kZT1odHRwX3N0YXR1cy5IVFRQXzQwOV9DT05GTElDVCwgZGV0YWlsPWYiQ2Fubm90IGNhbmNlbCBzaWduYWwgd2l0aCBzdGF0dXMgJ3tzaWcuZ2V0KCdzdGF0dXMnKX0nIikKICAgIG5vdyA9IGRhdGV0aW1lLm5vdyh0aW1lem9uZS51dGMpLmlzb2Zvcm1hdCgpCiAgICBhd2FpdCBkYi51cGRhdGUoInNpZ25hbHMiLCB7ImlkIjogc2lnbmFsX2lkfSwgeyJzdGF0dXMiOiAiY2FuY2VsbGVkIiwgInVwZGF0ZWRfYXQiOiBub3d9KQogICAgcmV0dXJuIHsic3VjY2VzcyI6IFRydWUsICJzaWduYWxfaWQiOiBzaWduYWxfaWR9Cg==
+"""
+backend/api/routes/signals.py -- Phase-E fix
+
+E-11: execute_signal() now calls ExecutionService.open_position() for real MT5 trade.
+E-12: Added GET /{signal_id} single-signal endpoint.
+E-13: lot_size added to SignalCreate schema.
+E-14: Confidence gate: rejects signals below 60% confidence.
+"""
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status as http_status
+from pydantic import BaseModel, Field
+
+from backend.core.auth import get_current_user
+from backend.database.connection import get_db
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["signals"])
+
+_MIN_CONFIDENCE = 60.0
+
+
+class SignalCreate(BaseModel):
+    symbol:      str
+    direction:   str
+    entry_price: float
+    stop_loss:   float
+    take_profit: float
+    confidence:  float = Field(default=0.0, ge=0.0, le=100.0)
+    lot_size:    float = Field(default=0.01, gt=0, le=100)
+    strategy:    Optional[str] = None
+    notes:       Optional[str] = None
+
+
+class SignalResponse(BaseModel):
+    id:           str
+    user_id:      str
+    symbol:       str
+    direction:    str
+    entry_price:  float
+    stop_loss:    float
+    take_profit:  float
+    confidence:   float
+    lot_size:     float
+    strategy:     Optional[str] = None
+    notes:        Optional[str] = None
+    status:       str
+    mt5_ticket:   Optional[int] = None
+    created_at:   str
+    updated_at:   str
+
+
+def _get_execution_service():
+    from backend.execution.execution_service import execution_service
+    return execution_service
+
+
+@router.get("/", response_model=List[SignalResponse])
+async def list_signals(
+    signal_status: Optional[str] = Query(None, alias="status"),
+    limit:         int           = Query(50, ge=1, le=200),
+    offset:        int           = Query(0, ge=0),
+    user:          dict          = Depends(get_current_user),
+    db                           = Depends(get_db),
+) -> List[SignalResponse]:
+    filters: dict = {"user_id": user["sub"]}
+    if signal_status:
+        filters["status"] = signal_status
+    rows = await db.select("signals", filters, order_by="created_at", order_desc=True, limit=limit, offset=offset)
+    return [SignalResponse(**r) for r in (rows or [])]
+
+
+@router.get("/{signal_id}", response_model=SignalResponse)
+async def get_signal(signal_id: str, user: dict = Depends(get_current_user), db = Depends(get_db)) -> SignalResponse:
+    sig = await db.select_one("signals", {"id": signal_id, "user_id": user["sub"]})
+    if not sig:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    return SignalResponse(**sig)
+
+
+@router.post("/", response_model=SignalResponse, status_code=201)
+async def create_signal(body: SignalCreate, user: dict = Depends(get_current_user), db = Depends(get_db)) -> SignalResponse:
+    if body.direction not in ("buy", "sell"):
+        raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"direction must be 'buy' or 'sell'")
+    now = datetime.now(timezone.utc).isoformat()
+    data = {"id": str(uuid.uuid4()), "user_id": user["sub"], "symbol": body.symbol, "direction": body.direction, "entry_price": body.entry_price, "stop_loss": body.stop_loss, "take_profit": body.take_profit, "confidence": body.confidence, "lot_size": body.lot_size, "strategy": body.strategy, "notes": body.notes, "status": "pending", "mt5_ticket": None, "created_at": now, "updated_at": now}
+    result = await db.insert("signals", data)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to create signal")
+    return SignalResponse(**result)
+
+
+@router.post("/{signal_id}/execute")
+async def execute_signal(signal_id: str, user: dict = Depends(get_current_user), db = Depends(get_db)) -> dict:
+    sig = await db.select_one("signals", {"id": signal_id, "user_id": user["sub"]})
+    if not sig:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    if sig.get("status") != "pending":
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail=f"Signal is not pending")
+    confidence = sig.get("confidence", 0.0)
+    if confidence < _MIN_CONFIDENCE:
+        raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Signal confidence {confidence:.1f}% below minimum {_MIN_CONFIDENCE:.0f}%")
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        svc = _get_execution_service()
+        result = await svc.open_position(symbol=sig["symbol"], direction=sig["direction"], lot_size=sig.get("lot_size", 0.01), entry_price=sig["entry_price"], stop_loss=sig["stop_loss"], take_profit=sig["take_profit"], comment=f"signal:{signal_id[:8]}")
+        ticket = result.get("ticket")
+        await db.update("signals", {"id": signal_id}, {"status": "executed", "mt5_ticket": ticket, "executed_at": now, "updated_at": now})
+        logger.info("Signal executed: id=%s ticket=%s", signal_id, ticket)
+        return {"success": True, "signal_id": signal_id, "mt5_ticket": ticket}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("MT5 execution failed for signal %s: %s", signal_id, exc)
+        await db.update("signals", {"id": signal_id}, {"status": "failed", "updated_at": now})
+        raise HTTPException(status_code=http_status.HTTP_502_BAD_GATEWAY, detail=f"MT5 execution failed: {exc}")
+
+
+@router.post("/{signal_id}/cancel")
+async def cancel_signal(signal_id: str, user: dict = Depends(get_current_user), db = Depends(get_db)) -> dict:
+    sig = await db.select_one("signals", {"id": signal_id, "user_id": user["sub"]})
+    if not sig:
+        raise HTTPException(status_code=404, detail="Signal not found")
+    if sig.get("status") not in ("pending", "active"):
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail=f"Cannot cancel signal with status '{sig.get('status')}'")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.update("signals", {"id": signal_id}, {"status": "cancelled", "updated_at": now})
+    return {"success": True, "signal_id": signal_id}

@@ -1,1 +1,661 @@
-IiIiCnRlc3RfcGhhc2UxNV9vYnNlcnZhYmlsaXR5LnB5IOKAlCBQaGFzZSAxNSBPYnNlcnZhYmlsaXR5IFRlc3RzCjEwNCDYqtiz2KrabyA4IGNsYXNzOgogIFQwMS1UMTY6IE1ldHJpY3NSZWdpc3RyeSDigJQgU2FhUyBtZXRyaWNzIChsaWNlbnNlL2hlYXJ0YmVhdC9raWxsX3N3aXRjaC9yZWNvbi9kcmF3ZG93bikKICBUMTctVDMyOiBBbGVydE1hbmFnZXIg4oCUIHJ1bGVzL2RlZHVwL3JhdGUtbGltaXQvZXNjYWxhdGlvbi9jYWxsYmFja3MKICBUM3MtVDQ4OiBBZG1pblRyYWNlciDigJQgcmVjb3JkL2lzc3VlX3RyYWNlL3VzZXJfdGltZWxpbmUvY29ycmVsYXRlZC9jc3YKICBUNDK1LVQ2MDogQWxlcnQgY29udmVuaWVuY2UgbWV0aG9kcyDigJQgbGljZW5zZS9oZWFydGJlYXQva2lsbF9zd2l0Y2gvZHJhd2Rvd24vcmVjb24KICBUNK4xLVQ3MjogQWRtaW4gQVBJIHJvdXRlcyDigJQgbWV0cmljcy9wcm9tZXRoZXVzL2FsZXJ0cy90cmFjZS9oZWFsdGgKICBUNzMtVDgwOiBQcm9tZXRoZXVzIGZvcm1hdCDigJQgY291bnRlcnMvZ2F1Z2VzL2hpc3RvZ3JhbXMvbm8tc3R1YgogIFQ4MS1UOTAgQWxlcnQgcnVsZXMgWUFNTCDigJQgc3RydWN0dXJlL3JlcXVpcmVkLXJ1bGVzL2xhYmVscy9zZXZlcml0eQogIFQ5MS1UMTA0OiBJbnRlZ3JhdGlvbiDigJQgZnVsbCBwaXBlbGluZS9jb25jdXJyZW50L3Jlc2V0L2djCiIiIgpmcm9tIF9fZnV0dXJlX18gaW1wb3J0IGFubm90YXRpb25zCgppbXBvcnQgYXN5bmNpbwppbXBvcnQgaW8KaW1wb3J0IHRpbWUKaW1wb3J0IHN5cwppbXBvcnQgb3MKCmltcG9ydCBweXRlc3QKCnN5cy5wYXRoLmluc2VydCgwLCBvcy5wYXRoLmpvaW4ob3MucGF0aC5kaXJuYW1lKF9fZmlsZV9fKSwgIi4uLy4uIikpCgpmcm9tIGJhY2tlbmQub2JzZXJ2YWJpbGl0eS5tZXRyaWNzX3YxNSBpbXBvcnQgTWV0cmljc1JlZ2lzdHJ5CmZyb20gYmFja2VuZC5vYnNlcnZhYmlsaXR5LmFsZXJ0X21hbmFnZXJfdjE1IGltcG9ydCBBbGVydE1hbmFnZXIsIEFsZXJ0TGV2ZWwsIEFsZXJ0UnVsZQpmcm9tIGJhY2tlbmQub2JzZXJ2YWJpbGl0eS5hZG1pbl90cmFjZSBpbXBvcnQgQWRtaW5UcmFjZXIKCgpAcHl0ZXN0LmZpeHR1cmUKZGVmIHJlZygpOgogICAgciA9IE1ldHJpY3NSZWdpc3RyeSgpCiAgICB5aWVsZCByCiAgICByLnJlc2V0KCkKCgpAcHl0ZXN0LmZpeHR1cmUKZGVmIG1ncigpOgogICAgbSA9IEFsZXJ0TWFuYWdlcigpCiAgICB5aWVsZCBtCiAgICBtLnJlc2V0KCkKCgpAcHl0ZXN0LmZpeHR1cmUKZGVmIHRyYWNlcigpOgogICAgdCA9IEFkbWluVHJhY2VyKCkKICAgIHlpZWxkIHQKICAgIHQucmVzZXQoKQoKCiMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiMgVDAxLVQxNjogTWV0cmljc1JlZ2lzdHJ5IOKAlCBTYWFTLXNwZWNpZmljIG1ldHJpY3MKIyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKCmNsYXNzIFRlc3RNZXRyaWNzUmVnaXN0cnk6CgogICAgZGVmIHRlc3RfbGljZW5zZV9mYWlsdXJlX2luY3JlbWVudHNfY291bnRlcihzZWxmLCByZWcpOgogICAgICAgIHJlZy5saWNlbnNlX2ZhaWx1cmUoImtleV9oYXNoX21pc21hdGNoIiwgdXNlcl9pZD0idTEiKQogICAgICAgIHNuYXAgPSByZWcuc25hcHNob3QoKQogICAgICAgIGFzc2VydCBzbmFwWyJjb3VudGVycyJdLmdldCgibGljZW5zZV9mYWlsdXJlc190b3RhbCIsIDApID09IDEKCiAgICBkZWYgdGVzdF9saWNlbnNlX2ZhaWx1cmVfcmVhc29uc190cmFja2VkKHNlbGYsIHJlZyk6CiAgICAgICAgcmVnLmxpY2Vuc2VfZmFpbHVyZSgiZXhwaXJlZCIsIHVzZXJfaWQ9InUxIikKICAgICAgICByZWcubGljZW5zZV9mYWlsdXJlKCJyZXZva2VkIiwgdXNlcl9pZD0idTIiKQogICAgICAgIHJlZy5saWNlbnNlX2ZhaWx1cmUoImV4cGlyZWQiLCB1c2VyX2lkPSJ1MyIpCiAgICAgICAgc25hcCA9IHJlZy5zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0IHNuYXBbImNvdW50ZXJzIl0uZ2V0KCJsaWNlbnNlX2ZhaWx1cmVzLmV4cGlyZWQiLCAwKSA9PSAyCiAgICAgICAgYXNzZXJ0IHNuYXBbImNvdW50ZXJzIl0uZ2V0KCJsaWNlbnNlX2ZhaWx1cmVzLnJldm9rZWQiLCAwKSA9PSAxCgogICAgZGVmIHRlc3RfbGljZW5zZV9mYWlsdXJlX2xvZ3NfZXZlbnQoc2VsZiwgcmVnKToKICAgICAgICByZWcubGljZW5zZV9mYWlsdXJlKCJkZXZpY2VfbWlzbWF0Y2giLCB1c2VyX2lkPSJ1MSIsIGRldmljZV9pZD0iZGV2MSIpCiAgICAgICAgZXZlbnRzID0gcmVnLmdldF9ldmVudHMoY2F0ZWdvcnk9ImxpY2Vuc2VfZmFpbHVyZSIpCiAgICAgICAgYXNzZXJ0IGxlbihldmVudHMpID09IDEKICAgICAgICBhc3NlcnQgZXZlbnRzWzBdWyJyZWFzb24iXSA9PSAiZGV2aWNlX21pc21hdGNoIgogICAgICAgIGFzc2VydCBldmVudHNbMF1bInVzZXJfaWQiXSA9PSAidTEiCiAgICAgICAgYXNzZXJ0IGV2ZW50c1swXVsiZGV2aWNlX2lkIl0gPT0gImRldjEiCgogICAgZGVmIHRlc3RfaGVhcnRiZWF0X3JlY2VpdmVkX3VwZGF0ZXNfZ2F1Z2Uoc2VsZiwgcmVnKToKICAgICAgICBiZWZvcmUgPSB0aW1lLnRpbWUoKQogICAgICAgIHJlZy5oZWFydGJlYXRfcmVjZWl2ZWQoImRldi1hYmMiKQogICAgICAgIHNuYXAgPSByZWcuc25hcHNob3QoKQogICAgICAgIHRzID0gc25hcFsiZ2F1Z2VzIl0uZ2V0KCJsYXN0X2hlYXJ0YmVhdC5kZXYtYWJjIiwgMCkKICAgICAgICBhc3NlcnQgdHMgPj0gYmVmb3JlCgogICAgZGVmIHRlc3RfaGVhcnRiZWF0X2xvc3NfY291bnRlcihzZWxmLCByZWcpOgogICAgICAgIHJlZy5oZWFydGJlYXRfbG9zcygiZGV2LWFiYyIsIGdhcF9zPTEyMC41LCB1c2VyX2lkPSJ1MSIpCiAgICAgICAgc25hcCA9IHJlZy5zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0IHNuYXBbImNvdW50ZXJzIl0uZ2V0KCJoZWFydGJlYXRfbG9zc2VzX3RvdGFsIiwgMCkgPT0gMQogICAgICAgIGFzc2VydCAiaGVhcnRiZWF0X2dhcF9zIiBpbiBzbmFwWyJoaXN0b2dyYW1zIl0KCiAgICBkZWYgdGVzdF9oZWFydGJlYXRfbG9zc19ldmVudChzZWxmLCByZWcpOgogICAgICAgIHJlZy5oZWFydGJlYXRfbG9zcygiZGV2LXh5eiIsIGdhcF9zPTMwMCwgdXNlcl9pZD0idTIiKQogICAgICAgIGV2ZW50cyA9IHJlZy5nZXRfZXZlbnRzKGNhdGVnb3J5PSJoZWFydGJlYXRfbG9zcyIpCiAgICAgICAgYXNzZXJ0IGxlbihldmVudHMpID09IDEKICAgICAgICBhc3NlcnQgZXZlbnRzWzBdWyJkZXZpY2VfaWQiXSA9PSAiZGV2LXh5eiIKICAgICAgICBhc3NlcnQgZXZlbnRzWzBdWyJnYXBfcyJdID09IDMwMAoKICAgIGRlZiB0ZXN0X2tpbGxfc3dpdGNoX2FjdGl2YXRlZChzZWxmLCByZWcpOgogICAgICAgIHJlZy5raWxsX3N3aXRjaF9hY3RpdmF0ZWQoImFkbWluMSIsICJoaWdoX3Jpc2siKQogICAgICAgIHNuYXAgPSByZWcuc25hcHNob3QoKQogICAgICAgIGFzc2VydCBzbmFwWyJjb3VudGVycyJdLmdldCgia2lsbF9zd2l0Y2hfYWN0aXZhdGlvbnNfdG90YWwiLCAwKSA9PSAxCiAgICAgICAgYXNzZXJ0IHNuYXBbImdhdWdlcyJdLmdldCgia2lsbF9zd2l0Y2hfYWN0aXZlIiwgMCkgPT0gMS4wCgogICAgZGVmIHRlc3Rfa2lsbF9zd2l0Y2hfcmVzZXQoc2VsZiwgcmVnKToKICAgICAgICByZWcua2lsbF9zd2l0Y2hfYWN0aXZhdGVkKCJhZG1pbjEiLCAidGVzdCIpCiAgICAgICAgcmVnLmtpbGxfc3dpdGNoX3Jlc2V0KCJhZG1pbjEiKQogICAgICAgIGFzc2VydCBub3QgcmVnLmlzX2tpbGxfc3dpdGNoX2FjdGl2ZSgpCiAgICAgICAgc25hcCA9IHJlZy5zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0IHNuYXBbImdhdWdlcyJdLmdldCgia2lsbF9zd2l0Y2hfYWN0aXZlIiwgMSkgPT0gMC4wCgogICAgZGVmIHRlc3RfcmVjb25jaWxpYXRpb25fbWlzbWF0Y2goc2VsZiwgcmVnKToKICAgICAgICByZWcucmVjb25jaWxpYXRpb25fbWlzbWF0Y2goIkVVUlVTRCIsIDEuMCwgMi4wKQogICAgICAgIHNuYXAgPSByZWcuc25hcHNob3QoKQogICAgICAgIGFzc2VydCBzbmFwWyJjb3VudGVycyJdLmdldCgicmVjb25jaWxpYXRpb25fbWlzbWF0Y2hlc190b3RhbCIsIDApID09IDEKICAgICAgICBhc3NlcnQgc25hcFsiY291bnRlcnMiXS5nZXQoInJlY29uY2lsaWF0aW9uX21pc21hdGNoZXMuRVVSVVNEIiwgMCkgPT0gMQoKICAgIGRlZiB0ZXN0X2RyYXdkb3duX2FsZXJ0KHNlbGYsIHJlZyk6CiAgICAgICAgcmVnLmRyYXdkb3duX2FsZXJ0KDEyLjUsIGxldmVsPSJDUklUSUNBTCIsIGVxdWl0eV91c2Q9MTAwMDApCiAgICAgICAgc25hcCA9IHJlZy5zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0IHNuYXBbImNvdW50ZXJzIl0uZ2V0KCJkcmF3ZG93bl9hbGVydHNfdG90YWwiLCAwKSA9PSAxCiAgICAgICAgYXNzZXJ0IHNuYXBbImdhdWdlcyJdLmdldCgiZXF1aXR5X2RyYXdkb3duX3BjdCIsIDApID09IDEyLjUKCiAgICBkZWYgdGVzdF9hZG1pbl9zbmFwc2hvdF9rYXBpc19rZXlzKHNlbGYsIHJlZyk6CiAgICAgICAgc25hcCA9IHJlZy5hZG1pbl9zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0ICJzYWFzX2twaXMiIGluIHNuYXAKICAgICAgICBrID0gc25hcFsic2Fhc19rcGlzIl0KICAgICAgICBmb3Iga2V5IGluIFsibGljZW5zZV9mYWlsdXJlc190b3RhbCIsICJoZWFydGJlYXRfbG9zc2VzX3RvdGFsIiwKICAgICAgICAgICAgICAgICAgICAgImtpbGxfc3dpdGNoX2FjdGl2ZSIsICJyZWNvbmNpbGlhdGlvbl9taXNtYXRjaGVzX3RvdGFsIiwKICAgICAgICAgICAgICAgICAgICAgImRyYXdkb3duX2FsZXJ0c190b3RhbCIsICJlcXVpdHlfZHJhd2Rvd25fcGN0Il06CiAgICAgICAgICAgIGFzc2VydCBrZXkgaW4gawoKICAgIGRlZiB0ZXN0X2dldF9ldmVudHNfZmlsdGVyX2NhdGVnb3J5KHNlbGYsIHJlZyk6CiAgICAgICAgcmVnLmxpY2Vuc2VfZmFpbHVyZSgiZXhwaXJlZCIsIHVzZXJfaWQ9InUxIikKICAgICAgICByZWcuaGVhcnRiZWF0X2xvc3MoImRldjEiLCBnYXBfcz01MCkKICAgICAgICBhc3NlcnQgbGVuKHJlZy5nZXRfZXZlbnRzKGNhdGVnb3J5PSJsaWNlbnNlX2ZhaWx1cmUiKSkgPT0gMQogICAgICAgIGFzc2VydCBsZW4ocmVnLmdldF9ldmVudHMoY2F0ZWdvcnk9ImhlYXJ0YmVhdF9sb3NzIikpID09IDEKCiAgICBkZWYgdGVzdF9ldmVudHNfYm91bmRlZF81MDAwKHNlbGYsIHJlZyk6CiAgICAgICAgZm9yIGkgaW4gcmFuZ2UoNTEwMCk6CiAgICAgICAgICAgIHJlZy5saWNlbnNlX2ZhaWx1cmUoImV4cGlyZWQiKQogICAgICAgIGV2ZW50cyA9IHJlZy5nZXRfZXZlbnRzKCkKICAgICAgICBhc3NlcnQgbGVuKGV2ZW50cykgPD0gNTAwMAoKICAgIGRlZiB0ZXN0X3Jlc2V0X2NsZWFyc19hbGwoc2VsZiwgcmVnKToKICAgICAgICByZWcubGljZW5zZV9mYWlsdXJlKCJ4IikKICAgICAgICByZWcuaGVhcnRiZWF0X3JlY2VpdmVkKCJkMSIpCiAgICAgICAgcmVnLnJlc2V0KCkKICAgICAgICBzbmFwID0gcmVnLnNuYXBzaG90KCkKICAgICAgICBhc3NlcnQgbGVuKHNuYXBbImNvdW50ZXJzIl0pID09IDAKICAgICAgICBhc3NlcnQgbGVuKHNuYXBbImdhdWdlcyJdKSA9PSAwCgogICAgZGVmIHRlc3RfdXB0aW1lX3NfcG9zaXRpdmUoc2VsZiwgcmVnKToKICAgICAgICBzbmFwID0gcmVnLnNuYXBzaG90KCkKICAgICAgICBhc3NlcnQgc25hcFsidXB0aW1lX3MiXSA+PSAwCgogICAgZGVmIHRlc3RfcmVjZW50X2V2ZW50c19pbl9hZG1pbl9zbmFwKHNlbGYsIHJlZyk6CiAgICAgICAgcmVnLmtpbGxfc3dpdGNoX2FjdGl2YXRlZCgiYWRtaW4iLCAidGVzdCIpCiAgICAgICAgc25hcCA9IHJlZy5hZG1pbl9zbmFwc2hvdCgpCiAgICAgICAgYXNzZXJ0ICJyZWNlbnRfZXZlbnRzIiBpbiBzbmFwCiAgICAgICAgYXNzZXJ0IGxlbihzbmFwWyJyZWNlbnRfZXZlbnRzIl0pID09IDEKCgojIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAojIFQxNy1UMzI6IEFsZXJ0TWFuYWdlcgojIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAoKY2xhc3MgVGVzdEFsZXJ0TWFuYWdlcjoKCiAgICBkZWYgdGVzdF9kZWZhdWx0X3J1bGVzX2xvYWRlZChzZWxmLCBtZ3IpOgogICAgICAgIGFzc2VydCBsZW4obWdyLmxpc3RfcnVsZXMoKSkgPj0gMTUKCiAgICBkZWYgdGVzdF9saWNlbnNlX2ZhaWx1cmVfcnVsZV9leGlzdHMoc2VsZiwgbWdyKToKICAgICAgICBydWxlID0gbWdyLmdldF9ydWxlKCJsaWNlbnNlX2ZhaWx1cmUiKQogICAgICAgIGFzc2VydCBydWxlIGlzIG5vdCBOb25lCiAgICAgICAgYXNzZXJ0IHJ1bGUubGV2ZWwgPT0gQWxlcnRMZXZlbC5DUklUSUNBTAoKICAgIGRlZiB0ZXN0X2tpbGxfc3dpdGNoX3J1bGVfY3JpdGljYWwoc2VsZiwgbWdyKToKICAgICAgICBydWxlID0gbWdyLmdldF9ydWxlKCJraWxsX3N3aXRjaF9hY3RpdmF0ZWQiKQogICAgICAgIGFzc2VydCBydWxlIGlzIG5vdCBOb25lCiAgICAgICAgYXNzZXJ0IHJ1bGUubGV2ZWwgPT0gQWxlcnRMZXZlbC5DUklUSUNBTAogICAgICAgIGFzc2VydCBydWxlLmRlZHVwX3dpbmRvd19zID09IDMwCgogICAgZGVmIHRlc3RfcmVjb25jaWxpYXRpb25fcnVsZV9leGlzdHMoc2VsZiwgbWdyKToKICAgICAgICBydWxlID0gbWdyLmdldF9ydWxlKCJyZWNvbmNpbGlhdGlvbl9taXNtYXRjaCIpCiAgICAgICAgYXNzZXJ0IHJ1bGUgaXMgbm90IE5vbmUKICAgICAgICBhc3NlcnQgcnVsZS5sZXZlbCA9PSBBbGVydExldmVsLkNSSVRJQ0FMCgogICAgQHB5dGVzdC5tYXJrLmFzeW5jaW8KICAgIGFzeW5jIGRlZiB0ZXN0X2ZpcmVfc2VuZHNfYWxlcnQoc2VsZiwgbWdyKToKICAgICAgICBzZW50ID0gYXdhaXQgbWdyLmZpcmUoInRlc3QiLCBjb250ZXh0PXsibXNnIjogImhlbGxvIn0pCiAgICAgICAgYXNzZXJ0IHNlbnQgaXMgVHJ1ZQogICAgICAgIGFzc2VydCBtZ3Iuc3RhdHMoKVsic2VudF90b3RhbCJdID09IDEKCiAgICBAcHl0ZXN0Lm1hcmsuYXN5bmNpbwogICAgYXN5bmMgZGVmIHRlc3RfZGVkdXBsaWNhdGlvbihzZWxmLCBtZ3IpOgogICAgICAgIGF3YWl0IG1nci5maXJlKCJsaWNlbnNlX2ZhaWx1cmUiKQogICAgICAgIHNlbnQgPSBhd2FpdCBtZ3IuZmlyZSgibGljZW5zZV9mYWlsdXJlIikgICMgc2hvdWxkIGJlIGRlZHVwZWQKICAgICAgICBhc3NlcnQgc2VudCBpcyBGYWxzZQogICAgICAgIGFzc2VydCBtZ3Iuc3RhdHMoKVsiZGVkdXBfdG90YWwiXSA9PSAxCgogICAgQHB5dGVzdC5tYXJrLmFzeW5jaW8KICAgIGFzeW5jIGRlZiB0ZXN0X3JhdGVfbGltaXQoc2VsZiwgbWdyKToKICAgICAgICBjb3VudCA9IDAKICAgICAgICBmb3IgaSBpbiByYW5nZSgyMCk6CiAgICAgICAgICAgIG1nci5fZGVkdXAuY2xlYXIoKSAgIyBieXBhc3MgZGVkdXAgdG8gdGVzdCByYXRlIGxpbWl0CiAgICAgICAgICAgIHNlbnQgPSBhd2FpdCBtZ3IuZmlyZSgidGVzdCIpCiAgICAgICAgICAgIGlmIHNlbnQ6CiAgICAgICAgICAgICAgICBjb3VudCArPSAxCiAgICAgICAgYXNzZXJ0IGNvdW50IDw9IDE1CgogICAgQHB5dGVzdC5tYXJrLmFzeW5jaW8KICAgIGFzeW5jIGRlZiB0ZXN0X2NhbGxiYWNrX2ZpcmVkKHNlbGYsIG1ncik6CiAgICAgICAgcmVzdWx0cyA9IFtdCiAgICAgICAgYXN5bmMgZGVmIG15X2NiKHJ1bGUsIGxldmVsLCBjdHgpOgogICAgICAgICAgICByZXN1bHRzLmFwcGVuZCgocnVsZSwgbGV2ZWwpKQogICAgICAgIG1nci5hZGRfY2FsbGJhY2sobXlfY2IpCiAgICAgICAgYXdhaXQgbWdyLmZpcmUoInRlc3QiKQogICAgICAgIGFzc2VydCBsZW4ocmVzdWx0cykgPT0gMQogICAgICAgIGFzc2VydCByZXN1bHRzWzBdWzBdID09ICJ0ZXN0IgoKICAgIEBweXRlc3QubWFyay5hc3luY2lvCiAgICBhc3luYyBkZWYgdGVzdF9kaXNhYmxlZF9ydWxlX25vdF9zZW50KHNlbGYsIG1ncik6CiAgICAgICAgbWdyLmRpc2FibGVfcnVsZSgidGVzdCIpCiAgICAgICAgc2VudCA9IGF3YWl0IG1nci5maXJlKCJ0ZXN0IikKICAgICAgICBhc3NlcnQgc2VudCBpcyBGYWxzZQoKICAgIEBweXRlc3QubWFyay5hc3luY2lvCiAgICBhc3luYyBkZWYgdGVzdF91bmtub3duX3J1bGVfYXV0b19jcmVhdGVkKHNlbGYsIG1ncik6CiAgICAgICAgc2VudCA9IGF3YWl0IG1nci5maXJlKCJ1bmtub3duX3J1bGVfeHl6IikKICAgICAgICBhc3NlcnQgc2VudCBpcyBUcnVlCiAgICAgICAgYXNzZXJ0IG1nci5nZXRfcnVsZSgidW5rbm93bl9ydWxlX3h5eiIpIGlzIG5vdCBOb25lCgogICAgQHB5dGVzdC5tYXJrLmFzeW5jaW8KICAgIGFzeW5jIGRlZiB0ZXN0X2hpc3RvcnlfcmVjb3JkZWQoc2VsZiwgbWdyKToKICAgICAgICBhd2FpdCBtZ3IuZmlyZSgidGVzdCIsIG1lc3NhZ2U9ImhlbGxvIikKICAgICAgICBoID0gbWdyLmhpc3RvcnkobGltaXQ9MTApCiAgICAgICAgYXNzZXJ0IGxlbihoKSA9PSAxCiAgICAgICAgYXNzZXJ0IGhbMF1bInJ1bGUiXSA9PSAidGVzdCIKICAgICAgICBhc3NlcnQgaFswXVsibWVzc2FnZSJdID09ICJoZWxsbyIKCiAgICBAcHl0ZXN0Lm1hcmsuYXN5bmNpbwogICAgYXN5bmMgZGVmIHRlc3RfaGlzdG9yeV9maWx0ZXJfYnlfbGV2ZWwoc2VsZiwgbWdyKToKICAgICAgICBhd2FpdCBtZ3IuZmlyZSgidGVzdCIpCiAgICAgICAgYXdhaXQgbWdyLmZpcmUoImtpbGxfc3dpdGNoX2FjdGl2YXRlZCIpCiAgICAgICAgY3JpdCA9IG1nci5oaXN0b3J5KGxldmVsPUFsZXJ0TGV2ZWwuQ1JJVElDQUwpCiAgICAgICAgYXNzZXJ0IGFsbChyWyJsZXZlbCJdID09IEFsZXJ0TGV2ZWwuQ1JJVElDQUwgZm9yIHIgaW4gY3JpdCkKCiAgICBkZWYgdGVzdF9zdGF0c19zdHJ1Y3R1cmUoc2VsZiwgbWdyKToKICAgICAgICBzID0gbWdyLnN0YXRzKCkKICAgICAgICBmb3IgayBpbiBbInNlbnRfdG90YWwiLCAiZGVkdXBfdG90YWwiLCAiaGlzdG9yeV9sZW4iLAogICAgICAgICAgICAgICAgICAgInJ1bGVzX3RvdGFsIiwgInJhdGVfd2luZG93Il06CiAgICAgICAgICAgIGFzc2VydCBrIGluIHMKCiAgICBAcHl0ZXN0Lm1hcmsuYXN5bmNpbwogICAgYXN5bmMgZGVmIHRlc3RfY2FsbGJhY2tfZXhjZXB0aW9uX25vX2NyYXNoKHNlbGYsIG1ncik6CiAgICAgICAgYXN5bmMgZGVmIGJhZF9jYihydWxlLCBsZXZlbCwgY3R4KToKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigiY2IgZXJyb3IiKQogICAgICAgIG1nci5hZGRfY2FsbGJhY2soYmFkX2NiKQogICAgICAgIHNlbnQgPSBhd2FpdCBtZ3IuZmlyZSgidGVzdCIpCiAgICAgICAgYXNzZXJ0IHNlbnQgaXMgVHJ1ZSAgIyBtdXN0IG5vdCBjcmFzaAoKICAgIEBweXRlc3QubWFyay5hc3luY2lvCiAgICBhc3luYyBkZWYgdGVzdF9yZXNldF9jbGVhcnNfaGlzdG9yeShzZWxmLCBtZ3IpOgogICAgICAgIGF3YWl0IG1nci5maXJlKCJ0ZXN0IikKICAgICAgICBtZ3IucmVzZXQoKQogICAgICAgIGFzc2VydCBtZ3Iuc3RhdHMoKVsic2VudF90b3RhbCJdID09IDAKICAgICAgICBhc3NlcnQgbGVuKG1nci5oaXN0b3J5KCkpID09IDAKCiAgICBAcHl0ZXN0Lm1hcmsuYXN5bmNpbwogICAgYXN5bmMgZGVmIHRlc3RfZW5hYmxlX3J1bGUoc2VsZiwgbWdyKToKICAgICAgICBtZ3IuZGlzYWJsZV9ydWxlKCJ0ZXN0IikKICAgICAgICBtZ3IuZW5hYmxlX3J1bGUoInRlc3QiKQogICAgICAgIHNlbnQgPSBhd2FpdCBtZ3IuZmlyZSgidGVzdCIpCiAgICAgICAgYXNzZXJ0IHNlbnQgaXMgVHJ1ZQoKICAgIEBweXRlc3QubWFyay5hc3luY2lvCiAgICBhc3luYyBkZWYgdGVzdF9hZGRfY3VzdG9tX3J1bGUoc2VsZiwgbWdyKToKICAgICAgICBydWxlID0gQWxlcnRSdWxlKCJteV9jdXN0b21fcnVsZSIsICJkZXNjIiwgQWxlcnRMZXZlbC5JTkZPLAogICAgICAgICAgICAgICAgICAgICAgICAgIGRlZHVwX3dpbmRvd19zPTApCiAgICAgICAgbWdyLmFkZF9ydWxlKHJ1bGUpCiAgICAgICAgc2VudCA9IGF3YWl0IG1nci5maXJlKCJteV9jdXN0b21fcnVsZSIpCiAgICAgICAgYXNzZXJ0IHNlbnQgaXMgVHJ1ZQoKCiMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiMgVDMzLVQ0ODogQWRtaW5UcmFjZXIKIyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKCmNsYXNzIFRlc3RBZG1pblRyYWNlcjoKCiAgICBkZWYgdGVzdF9yZWNvcmRfcmV0dXJuc19ldmVudF9pZChzZWxmLCB0cmFjZXIpOgogICAgICAgIGVpZCA9IHRyYWNlci5yZWNvcmQoImxpY2Vuc2UiLCAibGljZW5zZV9mYWlsdXJlIiwgdXNlcl9pZD0idTEiKQogICAgICAgIGFzc2VydCBlaWQgaXMgbm90IE5vbmUKICAgICAgICBhc3NlcnQgbGVuKGVpZCkgPiAwCgogICAgZGVmIHRlc3RfaXNzdWVfdHJhY2VfYnlfdXNlcihzZWxmLCB0cmFjZXIpOgogICAgICAgIHRyYWNlci5yZWNvcmRfbGljZW5zZV9mYWlsdXJlKCJleHBpcmVkIiwgInUxIikKICAgICAgICB0cmFjZXIucmVjb3JkX2xpY2Vuc2VfZmFpbHVyZSgicmV2b2tlZCIsICJ1MiIpCiAgICAgICAgZXZlbnRzID0gdHJhY2VyLmlzc3VlX3RyYWNlKHVzZXJfaWQ9InUxIikKICAgICAgICBhc3NlcnQgbGVuKGV2ZW50cykgPT0gMQogICAgICAgIGFzc2VydCBldmVudHNbMF1bInVzZXJfaWQiXSA9PSAidTEiCgogICAgZGVmIHRlc3RfaXNzdWVfdHJhY2VfYnlfY2F0ZWdvcnkoc2VsZiwgdHJhY2VyKToKICAgICAgICB0cmFjZXIucmVjb3JkX2xpY2Vuc2VfZmFpbHVyZSgiZXhwaXJlZCIsICJ1MSIpCiAgICAgICAgdHJhY2VyLnJlY29yZF9oZWFydGJlYXRfbG9zcygiZGV2MSIsIDEwMCkKICAgICAgICBsaWMgPSB0cmFjZXIuaXNzdWVfdHJhY2UoY2F0ZWdvcnk9ImxpY2Vuc2UiKQogICAgICAgIGhidCA9IHRyYWNlci5pc3N1ZV90cmFjZShjYXRlZ29yeT0iaGVhcnRiZWF0IikKICAgICAgICBhc3NlcnQgbGVuKGxpYykgPT0gMQogICAgICAgIGFzc2VydCBsZW4oaGJ0KSA9PSAxCgogICAgZGVmIHRlc3RfY29ycmVsYXRlZF9ldmVudHNfYnlfdHJhY2VfaWQoc2VsZiwgdHJhY2VyKToKICAgICAgICB0cmFjZXIucmVjb3JkKCJsaWNlbnNlIiwgImFjdGlvbjEiLCB0cmFjZV9pZD0idHJhY2UxIikKICAgICAgICB0cmFjZXIucmVjb3JkKCJoZWFydGJlYXQiLCAiYWN0aW9uMiIsIHRyYWNlX2lkPSJ0cmFjZTEiKQogICAgICAgIHRyYWNlci5yZWNvcmQoImtpbGxfc3dpdGNoIiwgImFjdGlvbjMiLCB0cmFjZV9pZD0idHJhY2UyIikKICAgICAgICBldmVudHMgPSB0cmFjZXIuY29ycmVsYXRlZF9ldmVudHMoInRyYWNlMSIpCiAgICAgICAgYXNzZXJ0IGxlbihldmVudHMpID09IDIKCiAgICBkZWYgdGVzdF91c2VyX3RpbWVsaW5lKHNlbGYsIHRyYWNlcik6CiAgICAgICAgZm9yIGkgaW4gcmFuZ2UoNSk6CiAgICAgICAgICAgIHRyYWNlci5yZWNvcmQoImxpY2Vuc2UiLCBmImFjdGlvbl97aX0iLCB1c2VyX2lkPSJ1MSIpCiAgICAgICAgdGltZWxpbmUgPSB0cmFjZXIudXNlcl90aW1lbGluZSgidTEiKQogICAgICAgIGFzc2VydCBsZW4odGltZWxpbmUpID09IDUKICAgICAgICBhc3NlcnQgYWxsKGVbInVzZXJfaWQiXSA9PSAidTEiIGZvciBlIGluIHRpbWVsaW5lKQoKICAgIGRlZiB0ZXN0X2V4cG9ydF9jc3ZfaGFzX2hlYWRlcihzZWxmLCB0cmFjZXIpOgogICAgICAgIHRyYWNlci5yZWNvcmRfbGljZW5zZV9mYWlsdXJlKCJleHBpcmVkIiwgInUxIikKICAgICAgICBjc3YgPSB0cmFjZXIuZXhwb3J0X2NzdigpCiAgICAgICAgYXNzZXJ0ICJ0cyxldmVudF9pZCIgaW4gY3N2CiAgICAgICAgYXNzZXJ0ICJsaWNlbnNlX2ZhaWx1cmUiIGluIGNzdgoKICAgIGRlZiB0ZXN0X2V4cG9ydF9jc3ZfZW1wdHkoc2VsZiwgdHJhY2VyKToKICAgICAgICBjc3YgPSB0cmFjZXIuZXhwb3J0X2NzdigpCiAgICAgICAgYXNzZXJ0ICJ0c
+"""
+test_phase15_observability.py — Phase 15 Observability Tests
+104 tests in 8 classes
+"""
+from __future__ import annotations
+import asyncio, io, time, sys, os
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+
+from backend.observability.metrics_v15 import MetricsRegistry
+from backend.observability.alert_manager_v15 import AlertManager, AlertLevel, AlertRule
+from backend.observability.admin_trace import AdminTracer
+
+
+@pytest.fixture
+def reg():
+    r = MetricsRegistry(); yield r; r.reset()
+
+@pytest.fixture
+def mgr():
+    m = AlertManager(); yield m; m.reset()
+
+@pytest.fixture
+def tracer():
+    t = AdminTracer(); yield t; t.reset()
+
+
+class TestMetricsRegistry:
+    def test_license_failure_increments_counter(self, reg):
+        reg.license_failure("key_hash_mismatch", user_id="u1")
+        assert reg.snapshot()["counters"].get("license_failures_total", 0) == 1
+
+    def test_license_failure_reasons_tracked(self, reg):
+        reg.license_failure("expired", user_id="u1")
+        reg.license_failure("revoked", user_id="u2")
+        reg.license_failure("expired", user_id="u3")
+        snap = reg.snapshot()
+        assert snap["counters"].get("license_failures.expired", 0) == 2
+        assert snap["counters"].get("license_failures.revoked", 0) == 1
+
+    def test_license_failure_logs_event(self, reg):
+        reg.license_failure("device_mismatch", user_id="u1", device_id="dev1")
+        events = reg.get_events(category="license_failure")
+        assert len(events) == 1
+        assert events[0]["reason"] == "device_mismatch"
+
+    def test_heartbeat_received_updates_gauge(self, reg):
+        before = time.time()
+        reg.heartbeat_received("dev-abc")
+        ts = reg.snapshot()["gauges"].get("last_heartbeat.dev-abc", 0)
+        assert ts >= before
+
+    def test_heartbeat_loss_counter(self, reg):
+        reg.heartbeat_loss("dev-abc", gap_s=120.5, user_id="u1")
+        snap = reg.snapshot()
+        assert snap["counters"].get("heartbeat_losses_total", 0) == 1
+        assert "heartbeat_gap_s" in snap["histograms"]
+
+    def test_heartbeat_loss_event(self, reg):
+        reg.heartbeat_loss("dev-x", gap_s=300.0, user_id="u2")
+        events = reg.get_events(category="heartbeat_loss")
+        assert len(events) == 1
+        assert events[0]["device_id"] == "dev-x"
+        assert events[0]["gap_s"] == 300.0
+
+    def test_kill_switch_activated_sets_gauge(self, reg):
+        assert not reg.is_kill_switch_active()
+        reg.kill_switch_activated("admin", "drawdown", "global")
+        assert reg.is_kill_switch_active()
+        assert reg.snapshot()["counters"].get("kill_switch_activations_total", 0) == 1
+
+    def test_kill_switch_reset_clears_gauge(self, reg):
+        reg.kill_switch_activated("admin", "test")
+        assert reg.is_kill_switch_active()
+        reg.kill_switch_reset("admin")
+        assert not reg.is_kill_switch_active()
+
+    def test_reconciliation_mismatch_counter(self, reg):
+        reg.reconciliation_mismatch("EURUSD", broker_qty=1.5, local_qty=1.0)
+        snap = reg.snapshot()
+        assert snap["counters"].get("reconciliation_mismatches_total", 0) == 1
+        assert snap["counters"].get("reconciliation_mismatches.EURUSD", 0) == 1
+
+    def test_reconciliation_mismatch_event_detail(self, reg):
+        reg.reconciliation_mismatch("GBPUSD", 2.0, 1.5)
+        events = reg.get_events(category="reconciliation_mismatch")
+        assert events[0]["delta"] == 0.5
+
+    def test_drawdown_alert_counter(self, reg):
+        reg.drawdown_alert(pct=12.5, level="CRITICAL", equity_usd=50000.0)
+        snap = reg.snapshot()
+        assert snap["counters"].get("drawdown_alerts_total", 0) == 1
+        assert snap["gauges"].get("equity_drawdown_pct", 0) == 12.5
+
+    def test_admin_snapshot_saas_kpis(self, reg):
+        reg.license_failure("expired")
+        reg.heartbeat_loss("dev1", 90.0)
+        reg.kill_switch_activated("admin", "test")
+        snap = reg.admin_snapshot()
+        kpis = snap["saas_kpis"]
+        assert kpis["license_failures_total"] == 1
+        assert kpis["heartbeat_losses_total"] == 1
+        assert kpis["kill_switch_active"] == 1.0
+        assert "recent_events" in snap
+
+    def test_get_events_since_ts_filter(self, reg):
+        reg.license_failure("old_reason")
+        since = time.time()
+        reg.license_failure("new_reason")
+        evs = reg.get_events(category="license_failure", since_ts=since)
+        assert len(evs) == 1
+        assert evs[0]["reason"] == "new_reason"
+
+    def test_reset_clears_all(self, reg):
+        reg.license_failure("x"); reg.heartbeat_loss("d", 1.0)
+        reg.reset()
+        snap = reg.snapshot()
+        assert snap["counters"] == {}; assert snap["gauges"] == {}
+
+    def test_prometheus_format_not_stub(self, reg):
+        reg.license_failure("test")
+        text = reg.prometheus_format()
+        assert isinstance(text, str) and len(text) > 0
+        assert "license_failures_total" in text
+
+    def test_license_validated_counter(self, reg):
+        reg.license_validated("PRO"); reg.license_validated("PRO"); reg.license_validated("TRIAL")
+        snap = reg.snapshot()
+        assert snap["counters"].get("license_validations_total", 0) == 3
+        assert snap["counters"].get("license_validations.PRO", 0) == 2
+
+
+class TestAlertManager:
+    def test_phase15_rules_exist(self, mgr):
+        rules = {r["name"] for r in mgr.list_rules()}
+        for expected in ["license_failure", "heartbeat_loss", "kill_switch_activated",
+                         "drawdown_critical", "reconciliation_mismatch"]:
+            assert expected in rules, f"Missing rule: {expected}"
+
+    def test_kill_switch_rule_level(self, mgr):
+        rule = mgr.get_rule("kill_switch_activated")
+        assert rule is not None and rule.level == AlertLevel.CRITICAL
+
+    def test_license_failure_rule_level(self, mgr):
+        assert mgr.get_rule("license_failure").level == AlertLevel.CRITICAL
+
+    def test_heartbeat_loss_rule_level(self, mgr):
+        assert mgr.get_rule("heartbeat_loss").level == AlertLevel.CRITICAL
+
+    def test_reconciliation_mismatch_rule_level(self, mgr):
+        assert mgr.get_rule("reconciliation_mismatch").level == AlertLevel.CRITICAL
+
+    def test_dedup_blocks_within_window(self, mgr):
+        async def run():
+            mgr.get_rule("heartbeat_loss").dedup_window_s = 300
+            s1 = await mgr.fire("heartbeat_loss")
+            s2 = await mgr.fire("heartbeat_loss")
+            return s1, s2
+        s1, s2 = asyncio.get_event_loop().run_until_complete(run())
+        assert s1 is True and s2 is False
+
+    def test_rate_limit(self, mgr):
+        from backend.observability.alert_manager_v15 import _RATE_LIMIT_N
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            results = []
+            for i in range(_RATE_LIMIT_N + 5):
+                sent = await mgr.fire("test")
+                results.append(sent)
+            return results
+        results = asyncio.get_event_loop().run_until_complete(run())
+        assert sum(1 for r in results if r) <= _RATE_LIMIT_N
+
+    def test_callback_receives_alert(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append((r, l))
+        mgr.add_callback(cb)
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            await mgr.fire("test", context={"x": 1})
+        asyncio.get_event_loop().run_until_complete(run())
+        assert len(received) == 1 and received[0][0] == "test"
+
+    def test_remove_callback(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append(r)
+        mgr.add_callback(cb); mgr.remove_callback(cb)
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            await mgr.fire("test")
+        asyncio.get_event_loop().run_until_complete(run())
+        assert received == []
+
+    def test_disabled_rule_not_fired(self, mgr):
+        mgr.disable_rule("heartbeat_slow")
+        async def run(): return await mgr.fire("heartbeat_slow")
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result is False
+
+    def test_unknown_rule_auto_created(self, mgr):
+        async def run(): return await mgr.fire("completely_unknown_rule_xyz")
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result is True
+
+    def test_history_records_fires(self, mgr):
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            for _ in range(3): await mgr.fire("test")
+        asyncio.get_event_loop().run_until_complete(run())
+        assert len(mgr.history(rule_name="test")) == 3
+
+    def test_history_level_filter(self, mgr):
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            await mgr.fire("test")
+            await mgr.fire("license_failure", context={})
+        asyncio.get_event_loop().run_until_complete(run())
+        critical = mgr.history(level=AlertLevel.CRITICAL)
+        assert all(a["level"] == AlertLevel.CRITICAL for a in critical)
+
+    def test_stats(self, mgr):
+        stats = mgr.stats()
+        assert "sent_total" in stats and "rules_total" in stats
+        assert stats["rules_total"] >= 12
+
+    def test_enable_rule(self, mgr):
+        mgr.disable_rule("heartbeat_slow"); mgr.enable_rule("heartbeat_slow")
+        assert mgr.get_rule("heartbeat_slow").enabled is True
+
+
+class TestAdminTracer:
+    def test_record_returns_event_id(self, tracer):
+        eid = tracer.record("license", "license_failure", "CRITICAL", user_id="u1")
+        assert eid and len(eid) > 0
+
+    def test_record_license_failure(self, tracer):
+        tracer.record_license_failure("key_mismatch", "u1", "dev1")
+        events = tracer.issue_trace(user_id="u1")
+        assert len(events) == 1 and events[0]["action"] == "license_failure"
+
+    def test_record_heartbeat_loss(self, tracer):
+        tracer.record_heartbeat_loss("dev-x", 120.0, user_id="u2")
+        events = tracer.issue_trace(user_id="u2")
+        assert events[0]["category"] == "heartbeat" and events[0]["detail"]["gap_s"] == 120.0
+
+    def test_record_kill_switch(self, tracer):
+        tracer.record_kill_switch("admin", "drawdown 15%")
+        events = tracer.issue_trace(category="kill_switch")
+        assert len(events) == 1 and events[0]["level"] == "CRITICAL"
+
+    def test_record_reconciliation_mismatch(self, tracer):
+        tracer.record_reconciliation_mismatch("EURUSD", 1.5, 1.0)
+        events = tracer.issue_trace(category="reconciliation")
+        assert events[0]["detail"]["delta"] == 0.5
+
+    def test_issue_trace_by_user(self, tracer):
+        tracer.record_license_failure("x", "user-A")
+        tracer.record_license_failure("y", "user-B")
+        tracer.record_license_failure("z", "user-A")
+        evs_a = tracer.issue_trace(user_id="user-A")
+        assert len(evs_a) == 2 and all(e["user_id"] == "user-A" for e in evs_a)
+
+    def test_issue_trace_by_trace_id(self, tracer):
+        tid = "trace-001"
+        tracer.record("license", "failure", "CRITICAL", trace_id=tid)
+        tracer.record("heartbeat", "loss", "CRITICAL", trace_id=tid)
+        tracer.record("trade", "block", "WARNING", trace_id="other")
+        evs = tracer.correlated_events(tid)
+        assert len(evs) == 2 and all(e["trace_id"] == tid for e in evs)
+
+    def test_issue_trace_by_category(self, tracer):
+        tracer.record("license", "failure", "CRITICAL")
+        tracer.record("license", "failure", "CRITICAL")
+        tracer.record("reconciliation", "mismatch", "CRITICAL")
+        assert len(tracer.issue_trace(category="license")) == 2
+
+    def test_events_sorted_by_time(self, tracer):
+        for i in range(5): tracer.record("license", f"event_{i}", "INFO")
+        evs = tracer.issue_trace(category="license")
+        ts_list = [e["ts"] for e in evs]
+        assert ts_list == sorted(ts_list)
+
+    def test_export_csv_valid(self, tracer):
+        tracer.record_license_failure("test", "u1")
+        tracer.record_heartbeat_loss("dev1", 90.0)
+        csv_str = tracer.export_csv()
+        lines = csv_str.strip().split("\n")
+        assert len(lines) >= 2 and "event_id" in lines[0]
+
+    def test_export_csv_user_filter(self, tracer):
+        tracer.record_license_failure("x", "user-csv")
+        tracer.record_license_failure("y", "other-user")
+        csv_str = tracer.export_csv(user_id="user-csv")
+        lines = csv_str.strip().split("\n")
+        assert len(lines) == 2
+
+    def test_summary_structure(self, tracer):
+        tracer.record_license_failure("test", "u1")
+        tracer.record_kill_switch("admin", "test")
+        s = tracer.summary()
+        assert "total_events" in s and s["total_events"] == 2
+
+    def test_reset_clears(self, tracer):
+        tracer.record_license_failure("test", "u1")
+        tracer.reset()
+        assert tracer.summary()["total_events"] == 0
+
+    def test_user_timeline(self, tracer):
+        tracer.record_license_failure("expired", "u-tl")
+        tracer.record_heartbeat_loss("dev", 60.0, user_id="u-tl")
+        assert len(tracer.user_timeline("u-tl")) == 2
+
+    def test_tracer_gc(self):
+        t = AdminTracer(); t._MAX_EVENTS = 100
+        for i in range(120): t.record("license", f"event_{i}", "INFO")
+        assert t.summary()["total_events"] <= 100
+        t.reset()
+
+
+class TestAlertConvenienceMethods:
+    def test_alert_license_failure(self, mgr):
+        fired = []
+        async def cb(r, l, c): fired.append(r)
+        mgr.add_callback(cb)
+        async def run(): return await mgr.alert_license_failure("expired", user_id="u1")
+        result = asyncio.get_event_loop().run_until_complete(run())
+        assert result is True and "license_failure" in fired
+
+    def test_alert_kill_switch_critical(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append(l)
+        mgr.add_callback(cb)
+        asyncio.get_event_loop().run_until_complete(mgr.alert_kill_switch("admin", "drawdown"))
+        assert AlertLevel.CRITICAL in received
+
+    def test_alert_drawdown_critical_at_10pct(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append((r, l))
+        mgr.add_callback(cb)
+        asyncio.get_event_loop().run_until_complete(mgr.alert_drawdown(pct=12.0))
+        assert "drawdown_critical" in [r[0] for r in received]
+
+    def test_alert_drawdown_warning_at_7pct(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append(l)
+        mgr.add_callback(cb)
+        asyncio.get_event_loop().run_until_complete(mgr.alert_drawdown(pct=7.0))
+        assert AlertLevel.WARNING in received
+
+    def test_alert_reconciliation_mismatch(self, mgr):
+        received = []
+        async def cb(r, l, c): received.append(l)
+        mgr.add_callback(cb)
+        asyncio.get_event_loop().run_until_complete(mgr.alert_reconciliation_mismatch("EURUSD", 1.5, 1.0))
+        assert AlertLevel.CRITICAL in received
+
+    def test_heartbeat_loss_message_includes_gap(self, mgr):
+        asyncio.get_event_loop().run_until_complete(mgr.alert_heartbeat_loss("dev-x", gap_s=240.0))
+        hist = mgr.history(rule_name="heartbeat_loss")
+        assert "240" in hist[0]["message"]
+
+    def test_kill_switch_message_includes_actor(self, mgr):
+        asyncio.get_event_loop().run_until_complete(mgr.alert_kill_switch("superadmin", "emergency"))
+        hist = mgr.history(rule_name="kill_switch_activated")
+        assert "superadmin" in hist[0]["message"]
+
+    def test_reconciliation_context_has_delta(self, mgr):
+        asyncio.get_event_loop().run_until_complete(mgr.alert_reconciliation_mismatch("GBPUSD", 2.0, 1.5))
+        hist = mgr.history(rule_name="reconciliation_mismatch")
+        assert hist[0]["context"]["delta"] == 0.5
+
+    def test_license_failure_context_has_user(self, mgr):
+        asyncio.get_event_loop().run_until_complete(mgr.alert_license_failure("expired", user_id="user-123"))
+        hist = mgr.history(rule_name="license_failure")
+        assert hist[0]["context"]["user_id"] == "user-123"
+
+    def test_heartbeat_loss_dedup(self, mgr):
+        async def run():
+            s1 = await mgr.alert_heartbeat_loss("dev1", 90.0)
+            s2 = await mgr.alert_heartbeat_loss("dev1", 100.0)
+            return s1, s2
+        s1, s2 = asyncio.get_event_loop().run_until_complete(run())
+        assert s1 is True and s2 is False
+
+
+class TestAdminRoutes:
+    @pytest.fixture
+    def client(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        app = FastAPI()
+        from backend.api.routes.admin_observability import router
+        app.include_router(router)
+        return TestClient(app)
+
+    def test_get_metrics_200(self, client):
+        r = client.get("/admin/metrics")
+        assert r.status_code == 200
+        data = r.json()
+        assert "saas_kpis" in data and "uptime_s" in data
+
+    def test_get_metrics_prometheus_200(self, client):
+        r = client.get("/admin/metrics/prometheus")
+        assert r.status_code == 200 and "text/plain" in r.headers["content-type"]
+
+    def test_get_alerts_200(self, client):
+        r = client.get("/admin/alerts")
+        assert r.status_code == 200
+        data = r.json()
+        assert "alerts" in data and "rules" in data
+
+    def test_get_trace_200(self, client):
+        r = client.get("/admin/trace")
+        assert r.status_code == 200
+        data = r.json()
+        assert "events" in data and "summary" in data
+
+    def test_export_csv_200(self, client):
+        r = client.get("/admin/trace/export.csv")
+        assert r.status_code == 200 and "csv" in r.headers["content-type"]
+
+    def test_fire_test_alert(self, client):
+        r = client.post("/admin/alert/test", params={"message": "integration test"})
+        assert r.status_code == 200 and "sent" in r.json()
+
+    def test_deep_health_200(self, client):
+        r = client.get("/admin/health/deep")
+        assert r.status_code == 200
+        data = r.json()
+        assert "status" in data and data["status"] in ("healthy", "degraded", "unhealthy")
+
+    def test_deep_health_issues_list(self, client):
+        r = client.get("/admin/health/deep")
+        assert "issues" in r.json() and isinstance(r.json()["issues"], list)
+
+    def test_alerts_level_filter(self, client):
+        assert client.get("/admin/alerts?level=CRITICAL").status_code == 200
+
+    def test_trace_user_filter(self, client):
+        assert client.get("/admin/trace?user_id=user-001").status_code == 200
+
+    def test_trace_category_filter(self, client):
+        assert client.get("/admin/trace?category=license").status_code == 200
+
+    def test_deep_health_kill_switch_issue(self, client):
+        from backend.observability.metrics_v15 import metrics as m
+        m.kill_switch_activated("test", "integration")
+        r = client.get("/admin/health/deep")
+        assert "kill_switch_active" in r.json()["issues"]
+        m.kill_switch_reset("test")
+
+
+class TestPrometheusFormat:
+    def test_format_counters(self, reg):
+        reg.license_failure("expired")
+        text = reg.prometheus_format()
+        assert "license_failures_total" in text
+
+    def test_format_gauges(self, reg):
+        reg.set_equity(100000.0); reg.set_equity_drawdown(5.5)
+        text = reg.prometheus_format()
+        assert "equity_usd" in text and "equity_drawdown_pct" in text
+
+    def test_format_histograms(self, reg):
+        reg.heartbeat_loss("dev1", 90.0)
+        text = reg.prometheus_format()
+        assert "heartbeat_gap_s" in text and "quantile" in text
+
+    def test_format_type_annotations(self, reg):
+        reg.license_failure("test")
+        assert "# TYPE" in reg.prometheus_format()
+
+    def test_format_help_annotations(self, reg):
+        reg.license_failure("test")
+        assert "# HELP" in reg.prometheus_format()
+
+    def test_format_kill_switch_gauge(self, reg):
+        reg.kill_switch_activated("admin", "test")
+        assert "kill_switch_active" in reg.prometheus_format()
+
+    def test_format_reconciliation(self, reg):
+        reg.reconciliation_mismatch("EURUSD", 1.5, 1.0)
+        assert "reconciliation_mismatches" in reg.prometheus_format()
+
+    def test_format_empty_registry(self, reg):
+        assert isinstance(reg.prometheus_format(), str)
+
+
+class TestAlertRulesYAML:
+    @pytest.fixture
+    def rules(self):
+        import yaml, os
+        path = os.path.join(os.path.dirname(__file__),
+                            "../../infra/prometheus/alert_rules_v15.yml")
+        with open(path) as f: return yaml.safe_load(f)
+
+    def test_has_groups(self, rules):
+        assert "groups" in rules and len(rules["groups"]) >= 5
+
+    def test_license_failure_spike_rule(self, rules):
+        all_alerts = [r["alert"] for g in rules["groups"] for r in g.get("rules", [])]
+        assert "LicenseFailureSpike" in all_alerts
+
+    def test_heartbeat_loss_rule(self, rules):
+        all_alerts = [r["alert"] for g in rules["groups"] for r in g.get("rules", [])]
+        assert "HeartbeatLossDetected" in all_alerts
+
+    def test_kill_switch_immediate(self, rules):
+        for g in rules["groups"]:
+            for r in g.get("rules", []):
+                if r.get("alert") == "KillSwitchActive":
+                    assert r.get("for") == "0m"; return
+        pytest.fail("KillSwitchActive not found")
+
+    def test_drawdown_critical_severity(self, rules):
+        for g in rules["groups"]:
+            for r in g.get("rules", []):
+                if r.get("alert") == "DrawdownCritical":
+                    assert r["labels"]["severity"] == "critical"; return
+        pytest.fail("DrawdownCritical not found")
+
+    def test_reconciliation_mismatch_rule(self, rules):
+        all_alerts = [r["alert"] for g in rules["groups"] for r in g.get("rules", [])]
+        assert "ReconciliationMismatch" in all_alerts
+
+    def test_api_down_rule(self, rules):
+        all_alerts = [r["alert"] for g in rules["groups"] for r in g.get("rules", [])]
+        assert "APIDown" in all_alerts
+
+    def test_critical_rules_have_runbook(self, rules):
+        for g in rules["groups"]:
+            for r in g.get("rules", []):
+                if r.get("labels", {}).get("severity") == "critical":
+                    ann = r.get("annotations", {})
+                    assert "runbook" in ann or "description" in ann
+
+    def test_pagerduty_label_on_critical_trading(self, rules):
+        pd_alerts = [r["alert"] for g in rules["groups"]
+                     for r in g.get("rules", []) if r.get("labels", {}).get("pagerduty") == "true"]
+        assert len(pd_alerts) >= 3
+
+    def test_groups_have_interval(self, rules):
+        for g in rules["groups"]:
+            assert "interval" in g or "name" in g
+
+
+class TestIntegration:
+    def test_full_pipeline(self):
+        reg = MetricsRegistry(); mgr = AlertManager(); trc = AdminTracer()
+        fired = []
+        async def cb(rule, level, ctx):
+            fired.append(rule)
+            trc.record(category=rule.split("_")[0], action=rule, level=str(level), detail=ctx or {})
+        mgr.add_callback(cb)
+        async def run():
+            reg.license_failure("expired", user_id="u1")
+            await mgr.alert_license_failure("expired", user_id="u1")
+            reg.heartbeat_loss("dev1", 180.0, user_id="u1")
+            await mgr.alert_heartbeat_loss("dev1", 180.0, user_id="u1")
+        asyncio.get_event_loop().run_until_complete(run())
+        assert "license_failure" in fired and "heartbeat_loss" in fired
+        assert len(trc.issue_trace()) == 2
+        reg.reset(); mgr.reset(); trc.reset()
+
+    def test_concurrent_metrics_thread_safe(self):
+        import threading
+        reg = MetricsRegistry(); errors = []
+        def worker():
+            try:
+                for _ in range(50):
+                    reg.license_failure("expired")
+                    reg.heartbeat_loss("dev", 1.0)
+                    reg.trade_submitted("EURUSD", "BUY")
+            except Exception as e: errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        assert errors == []
+        assert reg.snapshot()["counters"].get("license_failures_total", 0) == 500
+        reg.reset()
+
+    def test_admin_snapshot_pipeline(self):
+        reg = MetricsRegistry()
+        reg.license_failure("expired"); reg.heartbeat_loss("dev1", 90.0)
+        reg.kill_switch_activated("admin", "test")
+        reg.reconciliation_mismatch("EURUSD", 2.0, 1.5)
+        reg.drawdown_alert(12.0, "CRITICAL", 88000.0)
+        snap = reg.admin_snapshot()
+        kpis = snap["saas_kpis"]
+        assert kpis["license_failures_total"] >= 1
+        assert kpis["kill_switch_active"] == 1.0
+        assert kpis["reconciliation_mismatches_total"] >= 1
+        reg.reset()
+
+    def test_alert_callback_error_no_crash(self):
+        mgr = AlertManager()
+        async def bad_cb(r, l, c): raise ValueError("callback error")
+        mgr.add_callback(bad_cb)
+        async def run():
+            mgr.get_rule("test").dedup_window_s = 0
+            return await mgr.fire("test")
+        assert asyncio.get_event_loop().run_until_complete(run()) is True
+        mgr.reset()
+
+    def test_singletons_importable(self):
+        from backend.observability.metrics_v15 import metrics
+        from backend.observability.alert_manager_v15 import alert_manager
+        from backend.observability.admin_trace import admin_tracer
+        assert metrics is not None and alert_manager is not None and admin_tracer is not None
+
+    def test_kill_switch_persists(self):
+        reg = MetricsRegistry()
+        reg.kill_switch_activated("admin", "test")
+        assert reg.is_kill_switch_active()
+        reg.heartbeat_loss("dev1", 90.0)
+        assert reg.is_kill_switch_active()
+        reg.kill_switch_reset("admin")
+        assert not reg.is_kill_switch_active()
+        reg.reset()
+
+    def test_reconciliation_ok_after_mismatch(self):
+        reg = MetricsRegistry()
+        reg.reconciliation_mismatch("EURUSD", 2.0, 1.5)
+        reg.reconciliation_ok(positions_checked=10)
+        assert reg.snapshot()["gauges"].get("reconciliation_last_ok_ts", 0) > 0
+        reg.reset()
+
+    def test_get_events_limit(self):
+        reg = MetricsRegistry()
+        for _ in range(20): reg.license_failure("test")
+        evs = reg.get_events(category="license_failure", limit=5)
+        assert len(evs) <= 5
+        reg.reset()
+
+    def test_drawdown_event_recorded(self):
+        reg = MetricsRegistry()
+        reg.drawdown_alert(8.5, "WARNING", 91500.0)
+        evs = reg.get_events(category="drawdown_alert")
+        assert len(evs) == 1 and evs[0]["pct"] == 8.5
+        reg.reset()
+
+    def test_tracer_export_csv_category_filter(self):
+        t = AdminTracer()
+        t.record_license_failure("x", "u1")
+        t.record_kill_switch("admin", "test")
+        csv_str = t.export_csv(category="kill_switch")
+        lines = csv_str.strip().split("\n")
+        assert len(lines) == 2
+        t.reset()
+
+    def test_tracer_user_isolation(self):
+        t = AdminTracer()
+        for i in range(5): t.record_license_failure("expired", f"user-{i}")
+        for i in range(5): assert len(t.user_timeline(f"user-{i}")) == 1
+        t.reset()
+
+    def test_prometheus_format_after_reset(self):
+        reg = MetricsRegistry()
+        reg.license_failure("test"); reg.reset()
+        assert isinstance(reg.prometheus_format(), str)
