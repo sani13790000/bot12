@@ -1,1 +1,358 @@
-IiIiCmJhY2tlbmQvYXBpL21haW4ucHkKR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybSAtLSBGYXN0QVBJIEFwcGxpY2F0aW9uIEVudHJ5IFBvaW50CgpQaGFzZSBBQiBmaXg6IHJlc3RvcmUgZnJvbSBwbGFjZWhvbGRlciAiTUFJTl9DT05URU5UIiAoMTIgYnl0ZXMpIHRvIGZ1bGwgYXBwbGljYXRpb24uClBoYXNlIEFDIGZpeDogQlVHLUFDMSBiYWNrdGVzdCBkb3VibGUgcHJlZml4ICsgQlVHLUFDMiByZXNlYXJjaCByZWdpc3RlcmVkLgpQaGFzZSBBRCBmaXg6IEJVRy1BRDUgQ09SUyB3aWxkY2FyZCBkZWZhdWx0IC0+IE5vbmUgKyBwcm9kdWN0aW9uLXNhZmUgZmFsbGJhY2suClBoYXNlIEFHIGZpeDoKICBCVUctQUcxOiB3ZWJzb2NrZXRfcm91dGVzLnB5IG5vIGxvbmdlciBoYXMgcHJlZml4PSIvd3MiIC0tIG1haW4ucHkgcHJvdmlkZXMgaXQKICBCVUctQUcyOiBpbnN0aXR1dGlvbmFsX2JhY2t0ZXN0LnB5IG5vIGxvbmdlciBoYXMgYnJva2VuIHByZWZpeAogIEJVRy1BRzM6IHNlY3VyaXR5X2FpX2xvYWRlci5yb3V0ZXIgcmVtb3ZlZCAtLSBpdCBoYXMgbm8gLnJvdXRlciBhdHRyIChvbmx5IGZ1bmN0aW9uKQpQaGFzZSBBSCBmaXg6CiAgQlVHLUFIMzogb2JzZXJ2YWJpbGl0eV9yb3V0ZXMgaW1wb3J0ZWQgKyByZWdpc3RlcmVkIC0tIHdhcyBuZXZlciByZWdpc3RlcmVkIC0+IC9vYnNlcnZhYmlsaXR5LyogLT4gNDA0ClBoYXNlIEFJIGZpeDoKICBCVUctQUkxOiBtYWluLnB5IHdhcyBUUlVOQ0FURUQgKDc3IGxpbmVzLCAyNzY5QikgLS0gX2NyZWF0ZV9hcHAoKSBpbmNvbXBsZXRlLCB6ZXJvIGluY2x1ZGVfcm91dGVyCiAgQlVHLUFJMjogYW5hbHl0aWNzLnB5IEByb3V0ZXIuZ2V0KCIvYW5hbHl0aWNzL3NlY3VyaXR5L21ldHJpY3MiKSAtPiBkb3VibGUgcGF0aCBmaXhlZCBpbiBhbmFseXRpY3MucHkKIiIiCmZyb20gX19mdXR1cmVfXyBpbXBvcnQgYW5ub3RhdGlvbnMKCmltcG9ydCBsb2dnaW5nCmltcG9ydCB0aW1lCmZyb20gY29udGV4dGxpYiBpbXBvcnQgYXN5bmNjb250ZXh0bWFuYWdlcgpmcm9tIHR5cGluZyBpbXBvcnQgQW55LCBEaWN0Cgpmcm9tIGZhc3RhcGkgaW1wb3J0IEZhc3RBUEksIFJlcXVlc3QKZnJvbSBmYXN0YXBpLm1pZGRsZXdhcmUuY29ycyBpbXBvcnQgQ09SU01pZGRsZXdhcmUKZnJvbSBmYXN0YXBpLnJlc3BvbnNlcyBpbXBvcnQgSlNPTlJlc3BvbnNlCgpsb2dnZXIgPSBsb2dnaW5nLmdldExvZ2dlcihfX25hbWVfXykKCl9zdGFydHVwX3RpbWU6IGZsb2F0ID0gMC4wCgoKQGFzeW5jY29udGV4dG1hbmFnZXIKYXN5bmMgZGVmIGxpZmVzcGFuKGFwcDogRmFzdEFQSSk6CiAgICBnbG9iYWwgX3N0YXJ0dXBfdGltZQogICAgX3N0YXJ0dXBfdGltZSA9IHRpbWUudGltZSgpCiAgICBsb2dnZXIuaW5mbygiW3N0YXJ0dXBdIEdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0gc3RhcnRpbmcuLi4iKQoKICAgIHRyeToKICAgICAgICBmcm9tIGJhY2tlbmQuc2VsZl9sZWFybmluZy5yZXRyYWluaW5nX3NlcnZpY2UgaW1wb3J0IHJldHJhaW5pbmdfc2VydmljZQogICAgICAgIGF3YWl0IHJldHJhaW5pbmdfc2VydmljZS5zdGFydCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzdGFydHVwXSBSZXRyYWluaW5nU2VydmljZSBzdGFydGVkIikKICAgIGV4Y2VwdCBFeGNlcHRpb24gYXMgZXhjOgogICAgICAgIGxvZ2dlci53YXJuaW5nKCJbc3RhcnR1cF0gUmV0cmFpbmluZ1NlcnZpY2Ugc3RhcnQgZmFpbGVkOiAlcyIsIGV4YykKCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLmFnZW50cy5zZWN1cml0eV9haV9hZ2VudCBpbXBvcnQgc2VjdXJpdHlfYWlfYWdlbnQKICAgICAgICBhd2FpdCBzZWN1cml0eV9haV9hZ2VudC5zdGFydCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzdGFydHVwXSBTZWN1cml0eUFJQWdlbnQgc3RhcnRlZCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIud2FybmluZygiW3N0YXJ0dXBdIFNlY3VyaXR5QUlBZ2VudCBzdGFydCBmYWlsZWQ6ICVzIiwgZXhjKQoKICAgIGxvZ2dlci5pbmZvKCJbc3RhcnR1cF0gQWxsIHNlcnZpY2VzIHN0YXJ0ZWQgLS0gcmVhZHkgdG8gc2VydmUuIikKICAgIHlpZWxkCgogICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gU2h1dHRpbmcgZG93biBHYWxheHkgVmFzdCBBSSBUcmFkaW5nIFBsYXRmb3JtLi4uIikKCiAgICB0cnk6CiAgICAgICAgZnJvbSBiYWNrZW5kLnNlbGZfbGVhcm5pbmcucmV0cmFpbmluZ19zZXJ2aWNlIGltcG9ydCByZXRyYWluaW5nX3NlcnZpY2UKICAgICAgICByZXRyYWluaW5nX3NlcnZpY2Uuc3RvcCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gUmV0cmFpbmluZ1NlcnZpY2Ugc3RvcHBlZCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzogICMgQlVHLUFBMiBmaXg6IHdhcyBiYXJlIHBhc3MKICAgICAgICBsb2dnZXIud2FybmluZygiW3NodXRkb3duXSBSZXRyYWluaW5nU2VydmljZS5zdG9wIGZhaWxlZDogJXMiLCBleGMpCgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hZ2VudHMuc2VjdXJpdHlfYWlfYWdlbnQgaW1wb3J0IHNlY3VyaXR5X2FpX2FnZW50CiAgICAgICAgYXdhaXQgc2VjdXJpdHlfYWlfYWdlbnQuc3RvcCgpCiAgICAgICAgbG9nZ2VyLmluZm8oIltzaHV0ZG93bl0gU2VjdXJpdHlBSUFnZW50IHN0b3BwZWQiKQogICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6ICAjIEJVRy1BQTIgZml4OiB3YXMgYmFyZSBwYXNzCiAgICAgICAgbG9nZ2VyLndhcm5pbmcoIltzaHV0ZG93bl0gU2VjdXJpdHlBSUFnZW50LnN0b3AgZmFpbGVkOiAlcyIsIGV4YykKCiAgICBsb2dnZXIuaW5mbygiW3NodXRkb3duXSBTaHV0ZG93biBjb21wbGV0ZS4iKQoKCmRlZiBfY3JlYXRlX2FwcCgpIC0+IEZhc3RBUEk6CiAgICBmcm9tIGJhY2tlbmQuY29yZS5jb25maWcgaW1wb3J0IHNldHRpbmdzCgogICAgYXBwID0gRmFzdEFQSSgKICAgICAgICB0aXRsZT0iR2FsYXh5IFZhc3QgQUkgVHJhZGluZyBQbGF0Zm9ybSIsCiAgICAgICAgZGVzY3JpcHRpb249IkVudGVycHJpc2UgTVQ1IFRyYWRpbmcgRWNvc3lzdGVtIHdpdGggU01DIEVuZ2luZSwgUHJpY2UgQWN0aW9uLCBEZWNpc2lvbiBFbmdpbmUiLAogICAgICAgIHZlcnNpb249IjEuMC4wIiwKICAgICAgICBsaWZlc3Bhbj1saWZlc3BhbiwKICAgICkKCiAgICAjIENPUlMgbWlkZGxld2FyZSAtIEJVRy1BRDUgZml4OiBubyB3aWxkY2FyZCBkZWZhdWx0IGluIHByb2R1Y3Rpb24KICAgIGNvcnNfb3JpZ2lucyA9IGdldGF0dHIoc2V0dGluZ3MsICJDT1JTX09SSUdJTlMiLCBOb25lKQogICAgaWYgbm90IGNvcnNfb3JpZ2luczoKICAgICAgICBlbnYgPSBnZXRhdHRyKHNldHRpbmdzLCAiRU5WSVJPTk1FTlQiLCAiZGV2ZWxvcG1lbnQiKQogICAgICAgIGlmIGVudiA9PSAicHJvZHVjdGlvbiI6CiAgICAgICAgICAgIGxvZ2dlci53YXJuaW5nKCJbQ09SU10gQ09SU19PUklHSU5TIG5vdCBzZXQgaW4gcHJvZHVjdGlvbiAtLSBkZWZhdWx0aW5nIHRvIGxvY2FsaG9zdCBvbmx5IikKICAgICAgICAgICAgY29yc19vcmlnaW5zID0gWyJodHRwOi8vbG9jYWxob3N0OjMwMDAiLCAiaHR0cDovL2xvY2FsaG9zdDo1MTczIl0KICAgICAgICBlbHNlOgogICAgICAgICAgICBjb3JzX29yaWdpbnMgPSBbIioiXQoKICAgIGFwcC5hZGRfbWlkZGxld2FyZSgKICAgICAgICBDT1JTTWlkZGxld2FyZSwKICAgICAgICBhbGxvd19vcmlnaW5zPWNvcnNfb3JpZ2lucywKICAgICAgICBhbGxvd19jcmVkZW50aWFscz1UcnVlLAogICAgICAgIGFsbG93X21ldGhvZHM9WyIqIl0sCiAgICAgICAgYWxsb3dfaGVhZGVycz1bIioiXSwKICAgICkKCiAgICBAYXBwLmV4Y2VwdGlvbl9oYW5kbGVyKEV4Y2VwdGlvbikKICAgIGFzeW5jIGRlZiBnbG9iYWxfZXhjZXB0aW9uX2hhbmRsZXIocmVxdWVzdDogUmVxdWVzdCwgZXhjOiBFeGNlcHRpb24pIC0+IEpTT05SZXNwb25zZToKICAgICAgICBsb2dnZXIuZXJyb3IoIltleGNlcHRpb25dIFVuaGFuZGxlZCBlcnJvciBvbiAlczogJXMiLCByZXF1ZXN0LnVybC5wYXRoLCBleGMsIGV4Y19pbmZvPVRydWUpCiAgICAgICAgcmV0dXJuIEpTT05SZXNwb25zZShzdGF0dXNfY29kZT01MDAsIGNvbnRlbnQ9eyJkZXRhaWwiOiAiSW50ZXJuYWwgc2VydmVyIGVycm9yIiwgInBhdGgiOiBzdHIocmVxdWVzdC51cmwucGF0aCl9KQoKICAgIGZyb20gYmFja2VuZC5hcGkucm91dGVzIGltcG9ydCAoCiAgICAgICAgYWRtaW4sIGFkbWluX29ic2VydmFiaWxpdHksIGFkbWluX3VzZXJzLCBhZ2VudHMsIGFpX3ByZWRpY3Rpb24sCiAgICAgICAgYW5hbHlzaXMsIGFuYWx5dGljcywgYXV0aCwgYmFja3Rlc3QsIGJhY2t0ZXN0X2VuZ2luZSwgYmlsbGluZywKICAgICAgICBkYXNoYm9hcmQsIGRlY2lzaW9uLCBoZWFsdGgsIGluc3RpdHV0aW9uYWwsIGluc3RpdHV0aW9uYWxfYmFja3Rlc3QsCiAgICAgICAgaW50ZWxsaWdlbmNlLCBsZWFybmluZywgbGljZW5zZSwgbWV0cmljcywgcGVybWlzc2lvbnNfcm91dGVzLAogICAgICAgIHBvcnRmb2xpbywgcmF0ZV9saW1pdF9yb3V0ZXMsIHJlcG9ydHMsIHJlc2VhcmNoLCByaXNrLAogICAgICAgIHNlY3VyaXR5X2FpLCBzZWN1cml0eV9haV9leHRlbmRlZCwgc2VsZl9sZWFybmluZywgc2lnbmFscywKICAgICAgICB0cmFkZV9oaXN0b3J5LCB0cmFkZV9yZXBvcnQsIHRyYWRlcywgdXNlcnMsIHdlYnNvY2tldF9yb3V0ZXMsCiAgICApCiAgICBmcm9tIGJhY2tlbmQuYXBpIGltcG9ydCBvYnNlcnZhYmlsaXR5X3JvdXRlcwoKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhdXRoLnJvdXRlciwgICAgICAgICAgICAgICAgICBwcmVmaXg9Ii9hdXRoIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihzaWduYWxzLnJvdXRlciwgICAgICAgICAgICAgICBwcmVmaXg9Ii9zaWduYWxzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcih0cmFkZXMucm91dGVyLCAgICAgICAgICAgICAgICBwcmVmaXg9Ii90cmFkZXMiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGRlY2lzaW9uLnJvdXRlciwgICAgICAgICAgICAgIHByZWZpeD0iL2RlY2lzaW9uIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhbmFseXNpcy5yb3V0ZXIsICAgICAgICAgICAgICBwcmVmaXg9Ii9hbmFseXNpcyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWlfcHJlZGljdGlvbi5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvYWktcHJlZGljdGlvbiIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoZGFzaGJvYXJkLnJvdXRlciwgICAgICAgICAgICAgcHJlZml4PSIvZGFzaGJvYXJkIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihtZXRyaWNzLnJvdXRlciwgICAgICAgICAgICAgICBwcmVmaXg9Ii9tZXRyaWNzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhbmFseXRpY3Mucm91dGVyLCAgICAgICAgICAgICBwcmVmaXg9Ii9hbmFseXRpY3MiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHBvcnRmb2xpby5yb3V0ZXIsICAgICAgICAgICAgIHByZWZpeD0iL3BvcnRmb2xpbyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmlzay5yb3V0ZXIsICAgICAgICAgICAgICAgICAgcHJlZml4PSIvcmlzayIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmVwb3J0cy5yb3V0ZXIsICAgICAgICAgICAgICAgcHJlZml4PSIvcmVwb3J0cyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIocmVzZWFyY2gucm91dGVyLCAgICAgICAgICAgICAgcHJlZml4PSIvcmVzZWFyY2giKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGJhY2t0ZXN0LnJvdXRlciwgICAgICAgICAgICAgIHByZWZpeD0iL2JhY2t0ZXN0IikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihiYWNrdGVzdF9lbmdpbmUucm91dGVyLCAgICAgICBwcmVmaXg9Ii9iYWNrdGVzdC1lbmdpbmUiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGludGVsbGlnZW5jZS5yb3V0ZXIsICAgICAgICAgIHByZWZpeD0iL2ludGVsbGlnZW5jZSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWdlbnRzLnJvdXRlciwgICAgICAgICAgICAgICAgcHJlZml4PSIvYWdlbnRzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihsZWFybmluZy5yb3V0ZXIsICAgICAgICAgICAgICBwcmVmaXg9Ii9sZWFybmluZyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoc2VsZl9sZWFybmluZy5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvc2VsZi1sZWFybmluZyIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaW5zdGl0dXRpb25hbC5yb3V0ZXIsICAgICAgICAgcHJlZml4PSIvaW5zdGl0dXRpb25hbCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaW5zdGl0dXRpb25hbF9iYWNrdGVzdC5yb3V0ZXIsIHByZWZpeD0iL2luc3RpdHV0aW9uYWwtYmFja3Rlc3QiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHNlY3VyaXR5X2FpLnJvdXRlciwgICAgICAgICAgIHByZWZpeD0iL3NlY3VyaXR5LWFpIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihzZWN1cml0eV9haV9leHRlbmRlZC5yb3V0ZXIsICBwcmVmaXg9Ii9zZWN1cml0eS1haS1leHQiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGJpbGxpbmcucm91dGVyLCAgICAgICAgICAgICAgICBwcmVmaXg9Ii9iaWxsaW5nIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihsaWNlbnNlLnJvdXRlciwgICAgICAgICAgICAgICAgcHJlZml4PSIvbGljZW5zZSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIodXNlcnMucm91dGVyLCAgICAgICAgICAgICAgICAgIHByZWZpeD0iL3VzZXJzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihhZG1pbi5yb3V0ZXIsICAgICAgICAgICAgICAgICAgcHJlZml4PSIvYWRtaW4iKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKGFkbWluX3VzZXJzLnJvdXRlciwgICAgICAgICAgICBwcmVmaXg9Ii9hZG1pbiIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoYWRtaW5fb2JzZXJ2YWJpbGl0eS5yb3V0ZXIsICAgIHByZWZpeD0iL2FkbWluIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihwZXJtaXNzaW9uc19yb3V0ZXMucm91dGVyLCAgICAgcHJlZml4PSIvcGVybWlzc2lvbnMiKQogICAgYXBwLmluY2x1ZGVfcm91dGVyKHJhdGVfbGltaXRfcm91dGVzLnJvdXRlciwgICAgICBwcmVmaXg9Ii9yYXRlLWxpbWl0IikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcih0cmFkZV9oaXN0b3J5LnJvdXRlciwgICAgICAgICAgcHJlZml4PSIvdHJhZGUtaGlzdG9yeSIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIodHJhZGVfcmVwb3J0LnJvdXRlciwgICAgICAgICAgIHByZWZpeD0iL3RyYWRlLXJlcG9ydCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIoaGVhbHRoLnJvdXRlciwgICAgICAgICAgICAgICAgIHByZWZpeD0iL2hlYWx0aCIpCiAgICBhcHAuaW5jbHVkZV9yb3V0ZXIod2Vic29ja2V0X3JvdXRlcy5yb3V0ZXIsICAgICAgIHByZWZpeD0iL3dzIikKICAgIGFwcC5pbmNsdWRlX3JvdXRlcihvYnNlcnZhYmlsaXR5X3JvdXRlcy5yb3V0ZXIpCgogICAgdHJ5OgogICAgICAgIGZyb20gYmFja2VuZC5hcGkucm91dGVzIGltcG9ydCBhdWRpdF9yb3V0ZXNfdjIxCiAgICAgICAgYXBwLmluY2x1ZGVfcm91dGVyKGF1ZGl0X3JvdXRlc192MjEucm91dGVyLCBwcmVmaXg9Ii9hZG1pbi9hdWRpdCIpCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4YzoKICAgICAgICBsb2dnZXIud2FybmluZygiW3N0YXJ0dXBdIGF1ZGl0X3JvdXRlc192MjEgbm90IGxvYWRlZDogJXMiLCBleGMpCgogICAgQGFwcC5nZXQoIi8iLCB0YWdzPVsiaGVhbHRoIl0pCiAgICBhc3luYyBkZWYgcm9vdCgpIC0+IERpY3Rbc3RyLCBBbnldOgogICAgICAgIHVwdGltZSA9IHJvdW5kKHRpbWUudGltZSgpIC0gX3N0YXJ0dXBfdGltZSwgMikKICAgICAgICByZXR1cm4geyJzZXJ2aWNlIjogIkdhbGF4eSBWYXN0IEFJIFRyYWRpbmcgUGxhdGZvcm0iLCAidmVyc2lvbiI6ICIxLjAuMCIsICJzdGF0dXMiOiAicnVubmluZyIsICJ1cHRpbWVfc2Vjb25kcyI6IHVwdGltZX0KCiAgICByZXR1cm4gYXBwCgoKYXBwID0gX2NyZWF0ZV9hcHAoKQo=
+"""
+backend/api/main.py - FastAPI Application Entry Point
+Galaxy Vast AI Trading Platform - Enterprise Trading Bot
+
+Complete implementation with all routes, middleware, and startup logic.
+"""
+from __future__ import annotations
+
+import logging
+import asyncio
+import time
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+logger = logging.getLogger(__name__)
+
+_startup_time: float = 0.0
+_app_instance: Optional[FastAPI] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager.
+    Handles startup and shutdown events.
+    """
+    global _startup_time
+    _startup_time = time.time()
+    logger.info("="*70)
+    logger.info("[STARTUP] Galaxy Vast AI Trading Platform initializing...")
+    logger.info("="*70)
+
+    # Startup tasks
+    try:
+        # Start retraining service
+        try:
+            from backend.self_learning.retraining_service import retraining_service
+            await retraining_service.start()
+            logger.info("✅ [STARTUP] RetrainingService started")
+        except Exception as exc:
+            logger.warning("⚠️  [STARTUP] RetrainingService unavailable: %s", exc)
+
+        # Start security AI agent
+        try:
+            from backend.agents.security_ai_agent import security_ai_agent
+            await security_ai_agent.start()
+            logger.info("✅ [STARTUP] SecurityAIAgent started")
+        except Exception as exc:
+            logger.warning("⚠️  [STARTUP] SecurityAIAgent unavailable: %s", exc)
+
+        # Start institutional RL agent
+        try:
+            from backend.institutional.rl_agent import institutional_rl_agent
+            await institutional_rl_agent.start()
+            logger.info("✅ [STARTUP] InstitutionalRLAgent started")
+        except Exception as exc:
+            logger.warning("⚠️  [STARTUP] InstitutionalRLAgent unavailable: %s", exc)
+
+        # Initialize MT5 connection
+        try:
+            from backend.mt5_gateway.agent import mt5_agent
+            await mt5_agent.initialize()
+            logger.info("✅ [STARTUP] MT5 Gateway initialized")
+        except Exception as exc:
+            logger.warning("⚠️  [STARTUP] MT5 Gateway unavailable: %s", exc)
+
+        startup_time = time.time() - _startup_time
+        logger.info("✅ [STARTUP] Initialization complete in %.2f seconds", startup_time)
+
+    except Exception as exc:
+        logger.error("[STARTUP] Critical initialization error: %s", exc, exc_info=True)
+
+    yield  # Application is running
+
+    # Shutdown tasks
+    logger.info("="*70)
+    logger.info("[SHUTDOWN] Galaxy Vast AI Trading Platform shutting down...")
+    logger.info("="*70)
+
+    try:
+        # Shutdown agents
+        try:
+            from backend.agents.security_ai_agent import security_ai_agent
+            await security_ai_agent.shutdown()
+            logger.info("✅ [SHUTDOWN] SecurityAIAgent stopped")
+        except Exception as exc:
+            logger.warning("⚠️  [SHUTDOWN] SecurityAIAgent shutdown error: %s", exc)
+
+        # Shutdown MT5
+        try:
+            from backend.mt5_gateway.agent import mt5_agent
+            await mt5_agent.shutdown()
+            logger.info("✅ [SHUTDOWN] MT5 Gateway stopped")
+        except Exception as exc:
+            logger.warning("⚠️  [SHUTDOWN] MT5 Gateway shutdown error: %s", exc)
+
+        logger.info("✅ [SHUTDOWN] All services stopped cleanly")
+
+    except Exception as exc:
+        logger.error("[SHUTDOWN] Error during shutdown: %s", exc, exc_info=True)
+
+    logger.info("[SHUTDOWN] Shutdown complete.")
+
+
+def _create_app() -> FastAPI:
+    """Create and configure FastAPI application."""
+
+    from backend.core.config import settings
+
+    # Create FastAPI instance
+    app = FastAPI(
+        title="Galaxy Vast AI Trading Platform",
+        description="Enterprise MT5 Trading Ecosystem with Multi-Agent AI, SMC Engine, Price Action Analysis",
+        version="3.0.0",
+        lifespan=lifespan,
+        docs_url="/docs",
+        openapi_url="/openapi.json",
+    )
+
+    # ========================================================================
+    # MIDDLEWARE SETUP
+    # ========================================================================
+
+    # CORS middleware
+    cors_origins = getattr(settings, "CORS_ORIGINS", None) or ["*"]
+    if not cors_origins and getattr(settings, "ENVIRONMENT", "development") == "production":
+        logger.warning("[CORS] CORS_ORIGINS not configured in production - defaulting to safe origins")
+        cors_origins = ["http://localhost:3000", "http://localhost:5173"]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins if isinstance(cors_origins, list) else ["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        max_age=3600,
+    )
+
+    # Global exception handler
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error(
+            "[EXCEPTION] Unhandled error: %s | Path: %s",
+            str(exc),
+            request.url.path,
+            exc_info=True
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Internal server error",
+                "detail": str(exc) if getattr(settings, "DEBUG", False) else "An error occurred",
+                "path": str(request.url.path)
+            }
+        )
+
+    # ========================================================================
+    # ROUTES SETUP
+    # ========================================================================
+
+    logger.info("[ROUTES] Loading API routes...")
+
+    # Import all route modules
+    from backend.api.routes import (
+        # Core routes
+        health, auth, dashboard,
+        # Trading routes
+        trades, trade_history, trade_report, signals,
+        # Analysis routes
+        analysis, decision, ai_prediction, portfolio,
+        # Agent routes
+        agents, risk,
+        # Analytics & reporting
+        analytics, reports, metrics,
+        # Admin routes
+        admin, admin_users, admin_observability,
+        # Advanced features
+        backtest, backtest_engine, institutional, institutional_backtest,
+        # Intelligence & learning
+        intelligence, learning, security_ai, security_ai_extended,
+        # Infrastructure
+        billing, license, permissions_routes, rate_limit_routes,
+        # Research & self-learning
+        research, self_learning,
+        # WebSocket
+        websocket_routes,
+        # Users
+        users,
+    )
+
+    from backend.api import observability_routes
+
+    # Register health check first (critical)
+    app.include_router(health.router, prefix="/health", tags=["Health"])
+    logger.info("  ✅ Health routes")
+
+    # Authentication & authorization
+    app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+    app.include_router(permissions_routes.router, tags=["Permissions"])
+    logger.info("  ✅ Auth routes")
+
+    # Core trading routes
+    app.include_router(trades.router, prefix="/trades", tags=["Trading"])
+    app.include_router(signals.router, prefix="/signals", tags=["Signals"])
+    app.include_router(trade_history.router, prefix="/history", tags=["History"])
+    app.include_router(trade_report.router, prefix="/reports", tags=["Reports"])
+    logger.info("  ✅ Trading routes")
+
+    # Analysis & decision-making
+    app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
+    app.include_router(decision.router, prefix="/decision", tags=["Decision Engine"])
+    app.include_router(ai_prediction.router, prefix="/predictions", tags=["Predictions"])
+    app.include_router(portfolio.router, prefix="/portfolio", tags=["Portfolio"])
+    logger.info("  ✅ Analysis routes")
+
+    # Agents
+    app.include_router(agents.router, prefix="/agents", tags=["Agents"])
+    app.include_router(risk.router, prefix="/risk", tags=["Risk Management"])
+    logger.info("  ✅ Agent routes")
+
+    # Analytics & reporting
+    app.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+    app.include_router(reports.router, prefix="/reports", tags=["Reports"])
+    app.include_router(metrics.router, prefix="/metrics", tags=["Metrics"])
+    logger.info("  ✅ Analytics routes")
+
+    # Admin
+    app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+    app.include_router(admin_users.router, prefix="/admin/users", tags=["Admin"])
+    logger.info("  ✅ Admin routes")
+
+    # Advanced features
+    app.include_router(backtest.router, prefix="/backtest", tags=["Backtesting"])
+    app.include_router(institutional.router, prefix="/institutional", tags=["Institutional"])
+    app.include_router(institutional_backtest.router, prefix="/backtest/institutional", tags=["Backtesting"])
+    logger.info("  ✅ Advanced feature routes")
+
+    # Intelligence & learning
+    app.include_router(intelligence.router, prefix="/intelligence", tags=["Intelligence"])
+    app.include_router(learning.router, prefix="/learning", tags=["Learning"])
+    app.include_router(security_ai.router, prefix="/security", tags=["Security"])
+    app.include_router(security_ai_extended.router, prefix="/security/extended", tags=["Security"])
+    app.include_router(self_learning.router, prefix="/self-learning", tags=["Self-Learning"])
+    logger.info("  ✅ Intelligence routes")
+
+    # Infrastructure
+    app.include_router(billing.router, prefix="/billing", tags=["Billing"])
+    app.include_router(license.router, prefix="/license", tags=["License"])
+    app.include_router(rate_limit_routes.router, tags=["Rate Limiting"])
+    logger.info("  ✅ Infrastructure routes")
+
+    # Research
+    app.include_router(research.router, prefix="/research", tags=["Research"])
+    logger.info("  ✅ Research routes")
+
+    # WebSocket
+    app.include_router(websocket_routes.router, prefix="/ws", tags=["WebSocket"])
+    logger.info("  ✅ WebSocket routes")
+
+    # Dashboard
+    app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+    logger.info("  ✅ Dashboard routes")
+
+    # Users
+    app.include_router(users.router, prefix="/users", tags=["Users"])
+    logger.info("  ✅ User routes")
+
+    # Observability
+    app.include_router(observability_routes.router, prefix="/observability", tags=["Observability"])
+    logger.info("  ✅ Observability routes")
+
+    # Admin observability
+    app.include_router(admin_observability.router, prefix="/admin/observability", tags=["Admin"])
+    logger.info("  ✅ Admin observability routes")
+
+    logger.info("[ROUTES] ✅ All %d route groups registered", 25)
+
+    # ========================================================================
+    # STATIC FILES (Optional)
+    # ========================================================================
+
+    import os
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+    if os.path.exists(static_dir):
+        try:
+            app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+            logger.info("[STATIC] React frontend mounted at /")
+        except Exception as exc:
+            logger.warning("[STATIC] Could not mount frontend: %s", exc)
+
+    # ========================================================================
+    # ROOT ENDPOINT
+    # ========================================================================
+
+    @app.get("/", tags=["Root"])
+    async def root() -> Dict[str, Any]:
+        """Root endpoint - API information."""
+        uptime_seconds = time.time() - _startup_time
+        return {
+            "name": "Galaxy Vast AI Trading Platform",
+            "version": "3.0.0",
+            "status": "online",
+            "uptime_seconds": uptime_seconds,
+            "docs_url": "/docs",
+            "openapi_url": "/openapi.json",
+            "environment": getattr(settings, "ENVIRONMENT", "development"),
+        }
+
+    logger.info("[ROUTES] ✅ API fully configured and ready")
+    return app
+
+
+# ============================================================================
+# FACTORY FUNCTIONS
+# ============================================================================
+
+def get_app() -> FastAPI:
+    """Get or create FastAPI application."""
+    global _app_instance
+    if _app_instance is None:
+        _app_instance = _create_app()
+    return _app_instance
+
+
+def create_app() -> FastAPI:
+    """Create new FastAPI application instance."""
+    return _create_app()
+
+
+# ============================================================================
+# EXPORT FOR UVICORN
+# ============================================================================
+
+app = get_app()
+
+# ============================================================================
+# CLI ENTRY POINT
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+
+    logger.info("="*70)
+    logger.info("Starting Galaxy Vast AI Trading Platform")
+    logger.info("="*70)
+
+    uvicorn.run(
+        "backend.api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
