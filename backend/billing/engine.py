@@ -44,6 +44,7 @@ _SUB_FSM: Dict[SubscriptionStatus, set] = {
 
 
 class SubscriptionTransitionError(Exception):
+    """Error during subscription state transition."""
     pass
 
 
