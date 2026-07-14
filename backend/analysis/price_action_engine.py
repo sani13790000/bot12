@@ -6,342 +6,332 @@ Identifies key price action patterns:
 - Pin bars (Hammer, Hanging Man)
 - Inside bars
 - Breakout patterns
-- Trend direction
-- Support/Resistance validation
-
-Usage:
-    engine = PriceActionEngine()
-    patterns = engine.detect_patterns(candles)
-    trend = engine.detect_trend(candles)
+- Trend confirmation
 """
 
 import logging
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import List, Optional, Tuple
+from enum import Enum
+from datetime import datetime
+
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-class PatternType(StrEnum):
-    ENGULFING_BULL = "ENGULFING_BULL"
-    ENGULFING_BEAR = "ENGULFING_BEAR"
-    HAMMER = "HAMMER"
-    HANGING_MAN = "HANGING_MAN"
-    INSIDE_BAR = "INSIDE_BAR"
-    BREAKOUT_UP = "BREAKOUT_UP"
-    BREAKOUT_DOWN = "BREAKOUT_DOWN"
-    PIN_BAR_HIGH = "PIN_BAR_HIGH"
-    PIN_BAR_LOW = "PIN_BAR_LOW"
-
-
-class TrendDirection(StrEnum):
-    BULLISH = "BULLISH"
-    BEARISH = "BEARISH"
-    RANGING = "RANGING"
+class CandlePattern(Enum):
+    """Candlestick patterns."""
+    BULLISH_ENGULFING = "bullish_engulfing"
+    BEARISH_ENGULFING = "bearish_engulfing"
+    HAMMER = "hammer"
+    HANGING_MAN = "hanging_man"
+    INSIDE_BAR = "inside_bar"
+    PIN_BAR_UP = "pin_bar_up"
+    PIN_BAR_DOWN = "pin_bar_down"
+    BREAKOUT_UP = "breakout_up"
+    BREAKOUT_DOWN = "breakout_down"
 
 
 @dataclass
-class Pattern:
+class PriceActionPattern:
     """Detected price action pattern."""
-    type: PatternType
-    strength: float  # 0-1
-    candle_index: int
+    pattern: CandlePattern
+    timestamp: datetime
+    confidence: float  # 0-1
     description: str
-
-
-@dataclass
-class Trend:
-    """Market trend analysis."""
-    direction: TrendDirection
-    strength: float  # 0-1
-    recent_higher_highs: int
-    recent_higher_lows: int
-    ema_slope: float
+    entry_level: float
+    stop_loss_level: float
 
 
 class PriceActionEngine:
-    """Price action pattern and trend detection engine."""
-
-    def __init__(self, lookback: int = 20, breakout_threshold: float = 0.01):
-        """
-        Initialize Price Action Engine.
-
-        Args:
-            lookback: Number of candles to analyze
-            breakout_threshold: Percentage above/below previous high/low for breakout
-        """
-        self.lookback = lookback
-        self.breakout_threshold = breakout_threshold
-
-    def detect_patterns(
+    """
+    Analyzes price action patterns and market microstructure.
+    
+    Used to confirm signals from SMC and ML engines.
+    """
+    
+    def __init__(self):
+        """Initialize Price Action Engine."""
+        self.patterns_history: List[PriceActionPattern] = []
+    
+    def detect_candlestick_patterns(
         self,
-        candles: List[dict],
-        lookback: Optional[int] = None
-    ) -> List[Pattern]:
+        df: pd.DataFrame,
+        lookback: int = 50
+    ) -> List[PriceActionPattern]:
         """
-        Detect price action patterns in recent candles.
-
+        Detect candlestick patterns in OHLC data.
+        
         Args:
-            candles: List of candle dicts with 'open', 'high', 'low', 'close'
-            lookback: Override default lookback
-
+            df: DataFrame with 'open', 'high', 'low', 'close' columns
+            lookback: Number of bars to analyze
+        
         Returns:
-            List of detected Pattern objects
+            List of detected patterns
         """
-        if not candles or len(candles) < 3:
+        try:
+            if len(df) < 3:
+                return []
+            
+            df = df.tail(lookback).copy()
+            patterns = []
+            
+            # Analyze last 3 candles for patterns (need context)
+            for i in range(1, len(df) - 1):
+                # Current candle
+                curr_open = df['open'].iloc[i]
+                curr_high = df['high'].iloc[i]
+                curr_low = df['low'].iloc[i]
+                curr_close = df['close'].iloc[i]
+                
+                # Previous candle
+                prev_open = df['open'].iloc[i-1]
+                prev_high = df['high'].iloc[i-1]
+                prev_low = df['low'].iloc[i-1]
+                prev_close = df['close'].iloc[i-1]
+                
+                # Bullish Engulfing
+                if (prev_close < prev_open and  # Previous was bearish
+                    curr_close > curr_open and  # Current is bullish
+                    curr_open < prev_close and  # Current opens below previous close
+                    curr_close > prev_open):    # Current closes above previous open
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.BULLISH_ENGULFING,
+                        timestamp=df.index[i],
+                        confidence=0.75,
+                        description="Bullish reversal pattern - buyer control confirmed",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_low
+                    )
+                    patterns.append(pattern)
+                
+                # Bearish Engulfing
+                if (prev_close > prev_open and  # Previous was bullish
+                    curr_close < curr_open and  # Current is bearish
+                    curr_open > prev_close and  # Current opens above previous close
+                    curr_close < prev_open):    # Current closes below previous open
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.BEARISH_ENGULFING,
+                        timestamp=df.index[i],
+                        confidence=0.75,
+                        description="Bearish reversal pattern - seller control confirmed",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_high
+                    )
+                    patterns.append(pattern)
+                
+                # Hammer (bullish reversal at bottom)
+                body_size = abs(curr_close - curr_open)
+                lower_wick = min(curr_open, curr_close) - curr_low
+                upper_wick = curr_high - max(curr_open, curr_close)
+                
+                if (lower_wick > body_size * 2 and  # Long lower wick
+                    upper_wick < body_size and      # Small upper wick
+                    curr_close > curr_open):        # Closed bullish
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.HAMMER,
+                        timestamp=df.index[i],
+                        confidence=0.65,
+                        description="Hammer - buyers took control after rejection",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_low
+                    )
+                    patterns.append(pattern)
+                
+                # Hanging Man (bearish reversal at top)
+                if (lower_wick > body_size * 2 and  # Long lower wick
+                    upper_wick < body_size and      # Small upper wick
+                    curr_close < curr_open):        # Closed bearish
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.HANGING_MAN,
+                        timestamp=df.index[i],
+                        confidence=0.65,
+                        description="Hanging Man - rejection after buyers tried",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_high
+                    )
+                    patterns.append(pattern)
+                
+                # Inside Bar (consolidation/breakout preparation)
+                if (curr_high < prev_high and
+                    curr_low > prev_low):
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.INSIDE_BAR,
+                        timestamp=df.index[i],
+                        confidence=0.60,
+                        description="Inside bar - consolidation before breakout",
+                        entry_level=prev_high if curr_close > (curr_open + curr_close) / 2 else prev_low,
+                        stop_loss_level=curr_low if curr_close > (curr_open + curr_close) / 2 else curr_high
+                    )
+                    patterns.append(pattern)
+                
+                # Pin Bar Up (bullish rejection)
+                total_range = curr_high - curr_low
+                body_range = abs(curr_close - curr_open)
+                if (body_range < total_range * 0.3 and      # Small body
+                    (curr_high - max(curr_open, curr_close)) > total_range * 0.5 and  # Long upper wick
+                    min(curr_open, curr_close) > curr_low * 1.001):  # Close near low
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.PIN_BAR_UP,
+                        timestamp=df.index[i],
+                        confidence=0.70,
+                        description="Pin bar up - rejection of higher prices",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_high
+                    )
+                    patterns.append(pattern)
+                
+                # Pin Bar Down (bearish rejection)
+                if (body_range < total_range * 0.3 and      # Small body
+                    (min(curr_open, curr_close) - curr_low) > total_range * 0.5 and  # Long lower wick
+                    max(curr_open, curr_close) < curr_high * 0.999):  # Close near high
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.PIN_BAR_DOWN,
+                        timestamp=df.index[i],
+                        confidence=0.70,
+                        description="Pin bar down - rejection of lower prices",
+                        entry_level=curr_close,
+                        stop_loss_level=curr_low
+                    )
+                    patterns.append(pattern)
+            
+            self.patterns_history.extend(patterns)
+            logger.info(f"Detected {len(patterns)} price action patterns")
+            return patterns
+        
+        except Exception as e:
+            logger.error(f"Error detecting patterns: {e}")
             return []
-
-        lookback = lookback or self.lookback
-        window = candles[-lookback:] if len(candles) > lookback else candles
-        patterns = []
-
-        # Check last 3 candles for patterns
-        if len(window) >= 2:
-            # Two-candle patterns
-            patterns.extend(self._check_engulfing(window))
-            patterns.extend(self._check_breakout(window))
-
-        if len(window) >= 1:
-            # Single candle patterns
-            patterns.extend(self._check_hammer_hanging_man(window))
-            patterns.extend(self._check_pin_bars(window))
-
-        # Three-candle patterns
-        if len(window) >= 3:
-            patterns.extend(self._check_inside_bar(window))
-
-        return sorted(patterns, key=lambda p: p.strength, reverse=True)
-
-    def detect_trend(
+    
+    def detect_breakout(
         self,
-        candles: List[dict]
-    ) -> Trend:
+        df: pd.DataFrame,
+        lookback: int = 50,
+        breakout_pips: float = 10
+    ) -> List[PriceActionPattern]:
         """
-        Detect current market trend.
-
+        Detect breakout patterns above resistance or below support.
+        
         Args:
-            candles: List of candle dicts
-
+            df: DataFrame with OHLCV data
+            lookback: Number of bars to analyze
+            breakout_pips: Minimum breakout distance in pips
+        
         Returns:
-            Trend object with direction and strength
+            List of detected breakouts
         """
-        if not candles or len(candles) < 5:
-            return Trend(
-                direction=TrendDirection.RANGING,
-                strength=0.0,
-                recent_higher_highs=0,
-                recent_higher_lows=0,
-                ema_slope=0.0
-            )
-
-        closes = np.array([c['close'] for c in candles])
-        highs = np.array([c['high'] for c in candles])
-        lows = np.array([c['low'] for c in candles])
-
-        # Check for higher highs and higher lows (bullish)
-        higher_highs = sum(1 for i in range(1, len(highs[-10:])) if highs[-10+i] > highs[-10+i-1])
-        higher_lows = sum(1 for i in range(1, len(lows[-10:])) if lows[-10+i] > lows[-10+i-1])
-
-        # Check for lower highs and lower lows (bearish)
-        lower_highs = sum(1 for i in range(1, len(highs[-10:])) if highs[-10+i] < highs[-10+i-1])
-        lower_lows = sum(1 for i in range(1, len(lows[-10:])) if lows[-10+i] < lows[-10+i-1])
-
-        # Calculate EMA slope
-        ema_12 = self._calculate_ema(closes, 12)
-        ema_26 = self._calculate_ema(closes, 26)
-        ema_slope = (ema_12[-1] - ema_12[-5]) / ema_12[-5] if len(ema_12) > 5 else 0.0
-
-        # Determine trend
-        if higher_highs >= 3 and higher_lows >= 2 and ema_slope > 0:
-            return Trend(
-                direction=TrendDirection.BULLISH,
-                strength=min(1.0, (higher_highs + higher_lows) / 10.0),
-                recent_higher_highs=higher_highs,
-                recent_higher_lows=higher_lows,
-                ema_slope=ema_slope
-            )
-        elif lower_highs >= 3 and lower_lows >= 2 and ema_slope < 0:
-            return Trend(
-                direction=TrendDirection.BEARISH,
-                strength=min(1.0, (lower_highs + lower_lows) / 10.0),
-                recent_higher_highs=0,
-                recent_higher_lows=0,
-                ema_slope=ema_slope
-            )
-        else:
-            return Trend(
-                direction=TrendDirection.RANGING,
-                strength=0.3,
-                recent_higher_highs=0,
-                recent_higher_lows=0,
-                ema_slope=ema_slope
-            )
-
-    @staticmethod
-    def _check_engulfing(candles: List[dict]) -> List[Pattern]:
-        """Check for bullish/bearish engulfing patterns."""
-        patterns = []
-        if len(candles) < 2:
+        try:
+            if len(df) < 5:
+                return []
+            
+            df = df.tail(lookback).copy()
+            patterns = []
+            
+            for i in range(3, len(df)):
+                # Find highest high and lowest low of last 20 bars
+                window = df.iloc[max(0, i-20):i]
+                prev_high = window['high'].max()
+                prev_low = window['low'].min()
+                
+                current_bar = df.iloc[i]
+                
+                # Breakout above resistance
+                if current_bar['close'] > prev_high and \
+                   (current_bar['close'] - prev_high) >= breakout_pips and \
+                   current_bar['volume'] > window['volume'].mean() * 1.2:
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.BREAKOUT_UP,
+                        timestamp=df.index[i],
+                        confidence=0.80,
+                        description=f"Breakout above {prev_high:.5f} with volume",
+                        entry_level=current_bar['close'],
+                        stop_loss_level=prev_high
+                    )
+                    patterns.append(pattern)
+                
+                # Breakout below support
+                if current_bar['close'] < prev_low and \
+                   (prev_low - current_bar['close']) >= breakout_pips and \
+                   current_bar['volume'] > window['volume'].mean() * 1.2:
+                    
+                    pattern = PriceActionPattern(
+                        pattern=CandlePattern.BREAKOUT_DOWN,
+                        timestamp=df.index[i],
+                        confidence=0.80,
+                        description=f"Breakout below {prev_low:.5f} with volume",
+                        entry_level=current_bar['close'],
+                        stop_loss_level=prev_low
+                    )
+                    patterns.append(pattern)
+            
+            self.patterns_history.extend(patterns)
+            logger.info(f"Detected {len(patterns)} breakout patterns")
             return patterns
-
-        curr = candles[-1]
-        prev = candles[-2]
-
-        # Bullish engulfing
-        if prev['close'] < prev['open'] and curr['close'] > curr['open']:
-            if curr['open'] < prev['close'] and curr['close'] > prev['open']:
-                patterns.append(Pattern(
-                    type=PatternType.ENGULFING_BULL,
-                    strength=0.8,
-                    candle_index=len(candles) - 1,
-                    description="Bullish engulfing pattern detected"
-                ))
-
-        # Bearish engulfing
-        if prev['close'] > prev['open'] and curr['close'] < curr['open']:
-            if curr['open'] > prev['close'] and curr['close'] < prev['open']:
-                patterns.append(Pattern(
-                    type=PatternType.ENGULFING_BEAR,
-                    strength=0.8,
-                    candle_index=len(candles) - 1,
-                    description="Bearish engulfing pattern detected"
-                ))
-
-        return patterns
-
-    def _check_breakout(self, candles: List[dict]) -> List[Pattern]:
-        """Check for breakout patterns."""
-        patterns = []
-        if len(candles) < 3:
-            return patterns
-
-        curr = candles[-1]
-        prev_high = max(c['high'] for c in candles[:-1])
-        prev_low = min(c['low'] for c in candles[:-1])
-
-        # Breakout up
-        if curr['close'] > prev_high * (1 + self.breakout_threshold):
-            patterns.append(Pattern(
-                type=PatternType.BREAKOUT_UP,
-                strength=0.7,
-                candle_index=len(candles) - 1,
-                description="Bullish breakout detected"
-            ))
-
-        # Breakout down
-        if curr['close'] < prev_low * (1 - self.breakout_threshold):
-            patterns.append(Pattern(
-                type=PatternType.BREAKOUT_DOWN,
-                strength=0.7,
-                candle_index=len(candles) - 1,
-                description="Bearish breakout detected"
-            ))
-
-        return patterns
-
-    @staticmethod
-    def _check_hammer_hanging_man(candles: List[dict]) -> List[Pattern]:
-        """Check for hammer and hanging man patterns."""
-        patterns = []
-        if not candles:
-            return patterns
-
-        curr = candles[-1]
-        body_height = abs(curr['close'] - curr['open'])
-        lower_wick = min(curr['open'], curr['close']) - curr['low']
-        upper_wick = curr['high'] - max(curr['open'], curr['close'])
-
-        # Hammer (small body, long lower wick, at bottom)
-        if lower_wick > body_height * 2 and upper_wick < body_height:
-            patterns.append(Pattern(
-                type=PatternType.HAMMER,
-                strength=0.65,
-                candle_index=len(candles) - 1,
-                description="Hammer pattern (potential reversal up)"
-            ))
-
-        # Hanging man (small body, long lower wick, at top)
-        if lower_wick > body_height * 2 and upper_wick < body_height and curr['close'] > curr['open']:
-            patterns.append(Pattern(
-                type=PatternType.HANGING_MAN,
-                strength=0.65,
-                candle_index=len(candles) - 1,
-                description="Hanging man pattern (potential reversal down)"
-            ))
-
-        return patterns
-
-    @staticmethod
-    def _check_pin_bars(candles: List[dict]) -> List[Pattern]:
-        """Check for pin bar patterns."""
-        patterns = []
-        if not candles:
-            return patterns
-
-        curr = candles[-1]
-        total_range = curr['high'] - curr['low']
-        body_height = abs(curr['close'] - curr['open'])
-
-        if total_range == 0 or body_height / total_range < 0.3:
-            return patterns
-
-        lower_wick = min(curr['open'], curr['close']) - curr['low']
-        upper_wick = curr['high'] - max(curr['open'], curr['close'])
-
-        # Pin bar high (rejection from highs)
-        if upper_wick > total_range * 0.6 and lower_wick < total_range * 0.2:
-            patterns.append(Pattern(
-                type=PatternType.PIN_BAR_HIGH,
-                strength=0.75,
-                candle_index=len(candles) - 1,
-                description="Pin bar at resistance (reversal signal)"
-            ))
-
-        # Pin bar low (rejection from lows)
-        if lower_wick > total_range * 0.6 and upper_wick < total_range * 0.2:
-            patterns.append(Pattern(
-                type=PatternType.PIN_BAR_LOW,
-                strength=0.75,
-                candle_index=len(candles) - 1,
-                description="Pin bar at support (reversal signal)"
-            ))
-
-        return patterns
-
-    @staticmethod
-    def _check_inside_bar(candles: List[dict]) -> List[Pattern]:
-        """Check for inside bar pattern (consolidation)."""
-        patterns = []
-        if len(candles) < 2:
-            return patterns
-
-        curr = candles[-1]
-        prev = candles[-2]
-
-        # Inside bar: current high < prev high AND current low > prev low
-        if curr['high'] < prev['high'] and curr['low'] > prev['low']:
-            patterns.append(Pattern(
-                type=PatternType.INSIDE_BAR,
-                strength=0.5,
-                candle_index=len(candles) - 1,
-                description="Inside bar pattern (consolidation)"
-            ))
-
-        return patterns
-
-    @staticmethod
-    def _calculate_ema(prices: np.ndarray, period: int) -> np.ndarray:
-        """Calculate EMA for given period."""
-        if len(prices) < period:
-            return prices
-
-        ema = np.zeros(len(prices))
-        multiplier = 2.0 / (period + 1)
-        ema[period - 1] = np.mean(prices[:period])
-
-        for i in range(period, len(prices)):
-            ema[i] = (prices[i] * multiplier) + (ema[i - 1] * (1 - multiplier))
-
-        return ema
+        
+        except Exception as e:
+            logger.error(f"Error detecting breakouts: {e}")
+            return []
+    
+    def confirm_trend(
+        self,
+        df: pd.DataFrame,
+        direction: str,  # 'up' or 'down'
+        lookback: int = 20
+    ) -> Tuple[bool, float]:
+        """
+        Confirm if trend is intact (higher highs for uptrend, lower lows for downtrend).
+        
+        Args:
+            df: DataFrame with OHLCV data
+            direction: 'up' or 'down'
+            lookback: Number of bars to check
+        
+        Returns:
+            Tuple of (trend_intact, strength) where strength is 0-1
+        """
+        try:
+            if len(df) < lookback + 1:
+                return False, 0.0
+            
+            df = df.tail(lookback + 1).copy()
+            
+            if direction.lower() == 'up':
+                # Uptrend: check for higher highs
+                highs = df['high'].values
+                higher_highs = sum(1 for i in range(1, len(highs)) if highs[i] > highs[i-1])
+                strength = higher_highs / (len(highs) - 1)
+                intact = higher_highs >= len(highs) * 0.5  # At least 50% higher highs
+                
+            elif direction.lower() == 'down':
+                # Downtrend: check for lower lows
+                lows = df['low'].values
+                lower_lows = sum(1 for i in range(1, len(lows)) if lows[i] < lows[i-1])
+                strength = lower_lows / (len(lows) - 1)
+                intact = lower_lows >= len(lows) * 0.5  # At least 50% lower lows
+            else:
+                return False, 0.0
+            
+            return intact, strength
+        
+        except Exception as e:
+            logger.error(f"Error confirming trend: {e}")
+            return False, 0.0
+    
+    def get_recent_patterns(self, limit: int = 10) -> List[PriceActionPattern]:
+        """Get most recent patterns detected."""
+        return self.patterns_history[-limit:] if self.patterns_history else []
+    
+    def clear_history(self):
+        """Clear pattern history."""
+        self.patterns_history.clear()
+        logger.info("PriceActionEngine history cleared")
