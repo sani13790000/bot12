@@ -13,7 +13,7 @@ _TIMEOUT_S = 10.0
 
 async def _check_env() -> list[str]:
     required = ["SUPABASE_URL", "SUPABASE_KEY", "JWT_SECRET_KEY", "SUPABASE_JWT_SECRET"]
-    optional_warn = ["MT5_LOGIN", "MT5_PASSWORD", "MT5_SERVER", "TELEGRAM_BOT_TOKEN", "REDIS_URL"]
+    optional_warn = ["MT5_LOGIN", "MT5_SERVER"  # NEVER log passwords or tokens, "REDIS_URL"]
     errors: list[str] = []
     for key in required:
         if not os.getenv(key):
