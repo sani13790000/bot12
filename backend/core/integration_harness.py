@@ -248,6 +248,7 @@ class TradeRegistry:
         return self._trades.get(trade_id)
 
 class KillSwitchActivatedError(Exception):
+    """Implementation required."""
     pass
 
 class KillSwitch:
@@ -270,6 +271,7 @@ class KillSwitch:
             try:
                 cb(reason, actor)
             except Exception:
+                """Implementation required."""
                 pass
 
     def check(self) -> None:
