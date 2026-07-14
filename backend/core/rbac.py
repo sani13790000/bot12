@@ -247,6 +247,7 @@ class RBACEngine:
 
 
 class PermissionDeniedError(Exception):
+    """Implementation required."""
     pass
 
 
