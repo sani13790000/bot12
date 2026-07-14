@@ -150,27 +150,35 @@ RECOVERY_ORDER = [
 # ---------------------------------------------------------------------------
 
 class SupportError(Exception):
+    """Implementation required."""
     pass
 
 class InsufficientRoleError(SupportError):
+    """Implementation required."""
     pass
 
 class MissingReasonError(SupportError):
+    """Implementation required."""
     pass
 
 class ImpersonationDeniedError(SupportError):
+    """Implementation required."""
     pass
 
 class DeviceResetDeniedError(SupportError):
+    """Implementation required."""
     pass
 
 class ArtifactResendDeniedError(SupportError):
+    """Implementation required."""
     pass
 
 class RecoveryStepError(SupportError):
+    """Implementation required."""
     pass
 
 class RateLimitError(SupportError):
+    """Implementation required."""
     pass
 
 
