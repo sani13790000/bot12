@@ -75,16 +75,16 @@ class PaymentProvider:
     name: ProviderName = ProviderName.MOCK
 
     def create_payment(self, req: PaymentRequest) -> PaymentResult:
-        raise NotImplementedError
+        raise NotImplementedError("Subclass must implement this method")
 
     def confirm_payment(self, invoice_id: str, raw: Dict) -> PaymentResult:
-        raise NotImplementedError
+        raise NotImplementedError("Subclass must implement this method")
 
     def verify_webhook(self, payload: bytes, signature: str, secret: str) -> bool:
-        raise NotImplementedError
+        raise NotImplementedError("Subclass must implement this method")
 
     def parse_webhook(self, payload: bytes) -> WebhookEvent:
-        raise NotImplementedError
+        raise NotImplementedError("Subclass must implement this method")
 
     @staticmethod
     def _hmac_sha256(secret: str, data: bytes) -> str:
@@ -171,7 +171,7 @@ class ManualProvider(PaymentProvider):
         return False
 
     def parse_webhook(self, payload: bytes) -> WebhookEvent:
-        raise NotImplementedError("Manual provider has no webhook")
+        raise NotImplementedError("Subclass must implement this method")("Manual provider has no webhook")
 
 
 class StripeProvider(PaymentProvider):
