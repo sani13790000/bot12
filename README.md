@@ -1,168 +1,161 @@
-# 🌌 Galaxy Vast AI Trading Platform
+# 🤖 Bot12 - AI-Powered Trading Bot with MCP
 
-<div align="center">
-
-![Python](https://img.shields.io/badge/Python-3.11+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)
-![MQL5](https://img.shields.io/badge/MQL5-MetaTrader5-orange)
-![License](https://img.shields.io/badge/License-Commercial-red)
-![Tests](https://img.shields.io/badge/Tests-1286%20PASS-brightgreen)
-![Phases](https://img.shields.io/badge/Phases-1--18%20Complete-purple)
-
-**سیستم هوشمند معامله‌گری نهادی — سطح Hedge Fund**
-
-*Smart Money Concept × Price Action × AI Decision Engine × Telegram Control × SaaS License*
-
-</div>
+Bot12 is a **comprehensive, production-ready trading bot** with:
+- ✅ **MCP Server Integration** - Claude AI integration via Model Context Protocol
+- ✅ **Multiple AI Agents** - AI Prediction, ML, SMC, Execution, Risk Management
+- ✅ **MT5 Integration** - MetaTrader 5 connection for live trading
+- ✅ **FastAPI Backend** - High-performance REST API for trade management
+- ✅ **Advanced Analytics** - Performance tracking, market analysis, decision engine
+- ✅ **Security Hardened** - Encrypted credentials, secure configuration, audit logging
 
 ---
 
-> ⚠️ **هشدار ریسک معامله‌گری — اجباری**
->
-> این نرم‌افزار صرفاً یک ابزار اتوماسیون است و **هیچ سودی را تضمین نمی‌کند**.
-> معامله در بازارهای مالی (Forex، سهام، کریپتو) با ریسک بسیار بالا همراه است.
-> **ممکن است تمام سرمایه خود را از دست بدهید.**
-> این نرم‌افزار مشاوره مالی یا سرمایه‌گذاری نیست.
-> قبل از استفاده با یک مشاور مالی واجد شرایط مشورت کنید.
-> فقط با سرمایه‌ای که توانایی از دست دادنش را دارید معامله کنید.
-
----
-
-## 📋 فهرست مطالب
-
-1. [معرفی سیستم](#معرفی-سیستم)
-2. [معماری](#معماری)
-3. [راه‌اندازی سریع](#راه‌اندازی-سریع)
-4. [مستندات](#مستندات)
-5. [وضعیت Phases](#وضعیت-phases)
-6. [تست‌ها](#تستها)
-
----
-
-## 🎯 معرفی سیستم
-
-Galaxy Vast یک پلتفرم SaaS کامل معامله‌گری هوشمند است:
-
-| قابلیت | توضیح |
-|--------|-------|
-| **تحلیل بازار** | SMC + Price Action + Multi-Timeframe + Order Block |
-| **تصمیم‌گیری** | Decision Engine با امتیازدهی چندلایه |
-| **اجرای معامله** | MetaTrader 5 EA — خودکار و ایمن |
-| **مدیریت ریسک** | Kill Switch + Drawdown Limit + Position Size Cap |
-| **SaaS License** | Trial/Basic/Pro/VIP — license per device |
-| **Admin Control** | Telegram Bot + Admin Dashboard |
-| **امنیت** | AES-256-GCM + JWT + RLS + RBAC |
-| **Observability** | Prometheus + Grafana + Structured Logging |
-
----
-
-## 🏗️ معماری
+## 📋 Project Structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Internet / Customers                  │
-└───────────────────┬────────────────────┬────────────────┘
-                    │                    │
-              ┌─────▼──────┐    ┌────────▼───────┐
-              │  nginx:443  │    │  MT5 / EA.ex5  │
-              │ TLS+HSTS+CSP│    │  (Customer PC) │
-              └─────┬──────┘    └────────┬───────┘
-                    │                    │ HTTPS
-         ┌──────────┼──────────┐         │
-         │          │          │         │
-   ┌─────▼───┐ ┌────▼────┐ ┌──▼──────┐  │
-   │frontend │ │dashboard│ │   api   │◄─┘
-   │ :80     │ │ :8501   │ │  :8000  │
-   └─────────┘ └─────────┘ └────┬────┘
-                                 │
-                    ┌────────────┼──────────────┐
-                    │            │              │
-              ┌─────▼───┐ ┌─────▼──┐ ┌────────▼────┐
-              │Supabase │ │ Redis  │ │  Telegram   │
-              │  + RLS  │ │ Cache  │ │    Bot      │
-              └─────────┘ └────────┘ └─────────────┘
+bot12/
+├── backend/
+│   ├── agents/              # AI/ML agents for trading decisions
+│   │   ├── ai_prediction_agent.py
+│   │   ├── ml_agent.py
+│   │   ├── smc_agent.py           # Smart Money Concepts
+│   │   ├── execution_agent.py
+│   │   ├── risk_agent.py
+│   │   └── voting_engine.py        # Consensus mechanism
+│   ├── ai_prediction/       # Machine learning pipeline
+│   ├── routes/              # Flask API endpoints
+│   ├── models/              # Pydantic data models
+│   └── services/            # Core trading services
+├── frontend/                # Web dashboard (optional)
+├── bot12_mcp_template.py   # MCP Server entry point
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
 ```
 
 ---
 
-## ⚡ راه‌اندازی سریع
+## 🚀 Quick Start
 
+### 1. Install Dependencies
 ```bash
-# 1. Clone
-git clone https://github.com/sani13790000/bot12 galaxy-vast
-cd galaxy-vast
+pip install -r requirements.txt
+```
 
-# 2. Environment
+### 2. Setup Environment
+```bash
 cp .env.example .env
-# ویرایش .env — همه CHANGE_ME را پر کنید
-
-# 3. Generate secrets
-python3 -c "import secrets; print('SECRETS_MASTER_KEY=' + secrets.token_hex(32))"
-python3 -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_hex(32))"
-
-# 4. Docker
-python3 startup_check.py
-docker compose up -d --build
-
-# 5. Verify
-curl http://localhost:8000/health/live
-curl http://localhost:8000/health/ready
+# Edit .env with your MT5 credentials and API keys
 ```
 
-> برای Production کامل: [DEPLOYMENT.md](DEPLOYMENT.md)
-
----
-
-## 📚 مستندات
-
-| فایل | موضوع |
-|------|-------|
-| [DEPLOYMENT.md](DEPLOYMENT.md) | نصب dev / staging / production کامل |
-| [SECURITY.md](SECURITY.md) | معماری امنیتی + گزارش vulnerability |
-| [MQL5_INSTALLATION.md](MQL5_INSTALLATION.md) | نصب EA در MetaTrader 5 |
-| [docs/SAAS_RELEASE_GUIDE.md](docs/SAAS_RELEASE_GUIDE.md) | راهنمای فروش SaaS + onboarding |
-| [docs/ADMIN_MANUAL.md](docs/ADMIN_MANUAL.md) | راهنمای ادمین + trace + alert |
-| [docs/RELEASE_GOVERNANCE.md](docs/RELEASE_GOVERNANCE.md) | artifact + token + checksum policy |
-
----
-
-## 📊 وضعیت Phases
-
-| Phase | موضوع | تست‌ها | وضعیت |
-|-------|-------|--------|--------|
-| P1-P5 | Core Engine (SMC+PA+Decision+Risk+MT5) | — | ✅ |
-| P6 | License System | 96 | ✅ |
-| P7 | Telegram Bot | — | ✅ |
-| P8 | Auth + RBAC | 92 | ✅ |
-| P9 | Dashboard | 88 | ✅ |
-| P10 | Billing | 96 | ✅ |
-| P11 | Secrets + Encryption | 88 | ✅ |
-| P12 | API Security Hardening | 96 | ✅ |
-| P13 | Database Hardening | 96 | ✅ |
-| P14 | Source Protection + Release | 96 | ✅ |
-| P15 | CI/CD + Observability | 210 | ✅ |
-| P16 | Full Test Coverage | 232 | ✅ |
-| P17 | Docker + Deployment | 96 | ✅ |
-| P18 | Documentation | 103 | ✅ |
-| **جمع** | | **1,389** | **✅** |
-
----
-
-## 🧪 تست‌ها
-
+### 3. Run the Trading Bot
 ```bash
-cd backend
-PYTHONPATH=. python -m pytest tests/ -v --tb=short
-PYTHONPATH=. python -m pytest tests/ --cov=. --cov-fail-under=70
+python bot12_mcp_template.py
+```
+
+### 4. Integrate with Claude Desktop (Optional)
+Add to `~/.config/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "bot12": {
+      "command": "python",
+      "args": ["/path/to/bot12_mcp_template.py"]
+    }
+  }
+}
 ```
 
 ---
 
-## ⚠️ هشدارهای مهم
+## 🎯 Key Features
 
-1. **ریسک مالی**: سیستم می‌تواند در شرایط خاص بازار ضرر کند
-2. **حساب Demo اول**: همیشه اول روی Demo تست کنید — حداقل ۳۰ روز
-3. **Kill Switch**: آماده باشید فوری متوقف کنید — `/halt` در Telegram
-4. **Drawdown Limit**: حداکثر ۱۰٪ تنظیم کنید — هرگز بالاتر
-5. **Broker Risk**: انتخاب بروکر معتبر با regulation معتبر ضروری است
-6. **Source Code**: هرگز `.mq5` source را با customer share نکنید — فقط `.ex5`
+### AI Agents
+- **AI Prediction Agent** - Uses LLMs for market predictions
+- **ML Agent** - Machine learning models for pattern recognition
+- **SMC Agent** - Smart Money Concepts for institutional order detection
+- **Execution Agent** - Optimal trade execution
+- **Risk Agent** - Position sizing and risk management
+- **Voting Engine** - Consensus-based trade decisions
+
+### Trading Capabilities
+- Live market data from MT5
+- Automated trade execution
+- Position management
+- Trade history tracking
+- Performance analytics
+
+### MCP Integration
+- 9 pre-built trading tools
+- Claude AI integration
+- Safe command execution with security annotations
+- Comprehensive logging
+
+---
+
+## 📊 Configuration
+
+Create `.env` file with:
+```
+MT5_ACCOUNT=your_account_number
+MT5_PASSWORD=your_password
+MT5_SERVER=your_broker_server
+
+CLAUDE_API_KEY=your_claude_key
+TELEGRAM_BOT_TOKEN=your_telegram_token
+```
+
+---
+
+## 🧪 Testing
+
+Run unit tests:
+```bash
+pytest tests/ -v
+```
+
+Test MCP Server:
+```bash
+npx @modelcontextprotocol/inspector python bot12_mcp_template.py
+```
+
+---
+
+## 📚 Documentation
+
+- **QUICK_START.md** - 30-minute setup guide
+- **BOT12_MCP_SETUP_GUIDE.md** - Comprehensive MCP integration guide
+- **IMPLEMENTATION_FLOWCHART.txt** - System architecture diagram
+
+---
+
+## ⚠️ Risk Disclaimer
+
+This is an **automated trading bot**. Use at your own risk:
+- Always test with small amounts first
+- Implement proper risk management
+- Monitor trades regularly
+- Never leave automated trading unattended
+
+---
+
+## 🔒 Security Notes
+
+- Never commit `.env` files with real credentials
+- Use environment variables for sensitive data
+- Implement rate limiting for APIs
+- Regularly audit MCP tool access
+
+---
+
+## 📞 Support
+
+For issues and questions:
+1. Check documentation files
+2. Review logs in `logs/` directory
+3. Test individual components with pytest
+
+---
+
+**Last Updated:** July 2026
+**Version:** 1.2.0
+**Status:** Production Ready
