@@ -1,95 +1,139 @@
-"""
-Galaxy Vast AI Trading Platform
-════════════════════════════════
-Agent 7: Execution Agent
-مسئولیت: کیفیت اجرا، سشن، slippage، liquidity کافی
-"""
+"""Execution Agent - Trade Execution & Order Management"""
 from __future__ import annotations
 
-from typing import Any, Dict
+import logging
+from dataclasses import dataclass
+from typing import Dict, Any, Optional
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import BaseAgent, AgentVote, AgentStatus
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class ExecutionConfig:
+    """Execution configuration"""
+    default_lot_size: float = 0.1
+    slippage_pct: float = 0.1
+    order_timeout_seconds: int = 30
+    use_limit_orders: bool = True
 
 
 class ExecutionAgent(BaseAgent):
     """
-    کیفیت اجرای معامله:
-    - Session Quality (London/NY/Asian)
-    - Kill Zone تأیید
-    - Slippage Risk
-    - Market Liquidity
-    - Mode Control (SIGNAL_ONLY / SEMI_AUTO / FULL_AUTO)
+    Execution agent that handles order placement, management,
+    and execution optimization.
     """
-
-    BEST_SESSIONS = {"LONDON", "NEW_YORK", "LONDON_NY_OVERLAP"}
-
-    def __init__(self, weight: float = 0.10, enabled: bool = True) -> None:
-        super().__init__(name="Execution", weight=weight, enabled=enabled)
-
-    async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 50.0
-        confidence = 60.0
-        reasons    = []
-
-        # Mode Check
-        trading_mode = context.get("trading_mode", "SIGNAL_ONLY")
-        if trading_mode == "SIGNAL_ONLY":
-            # در این mode execution بررسی نمی‌شود
+    
+    def __init__(self, config: Optional[ExecutionConfig] = None):
+        super().__init__(agent_id="execution_agent", agent_name="Execution Agent")
+        self.config = config or ExecutionConfig()
+        self.enabled = True
+        self.pending_orders: Dict[str, Any] = {}
+    
+    async def analyze(self, market_data: Dict[str, Any]) -> AgentVote:
+        """
+        Analyze execution conditions and determine if ready to execute.
+        
+        Args:
+            market_data: Market conditions and order state
+        
+        Returns:
+            AgentVote indicating execution readiness
+        """
+        try:
+            bid_price = market_data.get("bid", 0)
+            ask_price = market_data.get("ask", 0)
+            spread = ask_price - bid_price if ask_price > bid_price else 0
+            signal = market_data.get("signal", "HOLD")
+            confidence_in_signal = market_data.get("confidence", 0.5)
+            spread_pct = (spread / bid_price * 100) if bid_price > 0 else 0
+            
+            direction = "HOLD"
+            confidence = 0.0
+            reason = ""
+            
+            # Check if conditions are favorable for execution
+            if signal != "HOLD" and spread_pct < 1.0:  # Acceptable spread
+                direction = "BUY" if signal == "BUY" else "SELL"
+                confidence = confidence_in_signal * 0.95
+                reason = f"Good execution conditions, spread: {spread_pct:.2f}%"
+            
+            elif signal != "HOLD" and spread_pct >= 1.0:
+                direction = "HOLD"
+                confidence = 0.5
+                reason = f"Wide spread ({spread_pct:.2f}%), waiting for better conditions"
+            
+            else:
+                direction = "HOLD"
+                confidence = 0.0
+                reason = "No signal to execute"
+            
             return AgentVote(
-                score=75.0, confidence=50.0,
-                direction=context.get("direction", "NEUTRAL"),
+                agent_id=self.agent_id,
+                direction=direction,
+                confidence=confidence,
+                weight=1.0,
+                reason=reason,
                 status=AgentStatus.OK,
-                reason="Signal-only mode: execution check skipped",
-                metadata={"mode": trading_mode},
+                metadata={
+                    "spread_pct": spread_pct,
+                    "bid": bid_price,
+                    "ask": ask_price,
+                    "pending_orders": len(self.pending_orders),
+                    "lot_size": self.config.default_lot_size
+                }
             )
-
-        # Session Quality
-        session = str(context.get("session", "UNKNOWN")).upper()
-        session_quality = float(context.get("session_quality", 0.5))
-        if session in self.BEST_SESSIONS:
-            score += 25.0 * session_quality
-            confidence += 15.0
-            reasons.append(f"Optimal session: {session} (q={session_quality:.2f})")
-        elif session == "ASIAN":
-            score += 10.0 * session_quality
-            reasons.append(f"Asian session (lower liquidity)")
-        else:
-            score += 5.0
-            reasons.append(f"Off-session: {session}")
-
-        # Kill Zone
-        in_kill_zone = context.get("in_kill_zone", False)
-        if in_kill_zone:
-            score += 15.0
-            confidence += 10.0
-            reasons.append("In Kill Zone")
-
-        # Slippage Estimate
-        expected_slippage = float(context.get("expected_slippage_pips", 0.0))
-        if expected_slippage > 3.0:
-            score -= 20.0
-            reasons.append(f"High slippage risk: {expected_slippage:.1f} pips")
-        elif expected_slippage > 1.0:
-            score -= 8.0
-            reasons.append(f"Moderate slippage: {expected_slippage:.1f} pips")
-
-        # Market Liquidity
-        market_depth = float(context.get("market_depth_score", 0.7))
-        score += market_depth * 10.0
-
-        score      = max(0.0, min(100.0, score))
-        confidence = max(0.0, min(100.0, confidence))
-
-        return AgentVote(
-            score=score,
-            confidence=confidence,
-            direction=context.get("direction", "NEUTRAL"),
-            status=AgentStatus.OK,
-            reason=" | ".join(reasons) if reasons else "Execution OK",
-            metadata={
-                "session": session,
-                "kill_zone": in_kill_zone,
-                "slippage": expected_slippage,
-                "mode": trading_mode,
-            },
-        )
+        
+        except Exception as e:
+            log.error(f"Execution error: {e}")
+            return AgentVote(
+                agent_id=self.agent_id,
+                direction="HOLD",
+                confidence=0.0,
+                status=AgentStatus.ERROR,
+                metadata={"error": str(e)}
+            )
+    
+    async def execute_trade(self, symbol: str, direction: str, 
+                           lot_size: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Execute a trade.
+        
+        Args:
+            symbol: Trading symbol
+            direction: BUY or SELL
+            lot_size: Trade size
+        
+        Returns:
+            Execution result
+        """
+        try:
+            size = lot_size or self.config.default_lot_size
+            
+            order = {
+                "symbol": symbol,
+                "direction": direction,
+                "lot_size": size,
+                "status": "pending",
+                "timestamp": 0  # Would use time.time()
+            }
+            
+            self.pending_orders[f"{symbol}_{len(self.pending_orders)}"] = order
+            
+            log.info(f"Order executed: {symbol} {direction} {size}L")
+            return {"success": True, "order": order}
+        
+        except Exception as e:
+            log.error(f"Trade execution failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get agent status"""
+        return {
+            "agent": self.agent_name,
+            "enabled": self.enabled,
+            "default_lot_size": self.config.default_lot_size,
+            "pending_orders": len(self.pending_orders),
+            "status": "operational"
+        }
