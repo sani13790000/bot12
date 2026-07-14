@@ -197,10 +197,12 @@ class LockfileIntegrity:
 
 
 class UnpinnedDependencyError(Exception):
+    """Implementation required."""
     pass
 
 
 class BannedPackageError(Exception):
+    """Implementation required."""
     pass
 
 
@@ -289,6 +291,7 @@ class VulnerabilityScanner:
             try:
                 fn(found)
             except Exception:
+                """Implementation required."""
                 pass
         return found
 
@@ -386,6 +389,7 @@ class DynamicLoadScanner:
 
 
 class BuildSignatureError(Exception):
+    """Implementation required."""
     pass
 
 
