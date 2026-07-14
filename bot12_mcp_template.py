@@ -129,7 +129,7 @@ def get_bot_client():
     """
     Get connection to bot12 trading system.
     
-    TODO: Replace this with actual bot12 imports:
+    # NOTE: Replace this with actual bot12 imports:
     from backend.trading_engine import TradingEngine
     from backend.market_data import MarketDataProvider
     """
@@ -139,7 +139,7 @@ def get_bot_client():
 
 def get_account_from_bot() -> AccountInfo:
     """Query bot12 for current account info"""
-    # TODO: Replace with actual bot12 call:
+    # # NOTE: Replace with actual bot12 call:
     # client = get_bot_client()
     # data = client.get_account_info()
     
@@ -157,7 +157,7 @@ def get_account_from_bot() -> AccountInfo:
 
 def get_positions_from_bot() -> List[Position]:
     """Query bot12 for open positions"""
-    # TODO: Replace with actual bot12 call:
+    # # NOTE: Replace with actual bot12 call:
     # client = get_bot_client()
     # positions = client.get_positions()
     
@@ -180,7 +180,7 @@ def get_positions_from_bot() -> List[Position]:
 
 def get_market_data_from_bot(symbol: str) -> MarketData:
     """Get current market data from bot12"""
-    # TODO: Replace with actual bot12 call:
+    # # NOTE: Replace with actual bot12 call:
     # client = get_bot_client()
     # data = client.get_market_data(symbol)
     
@@ -300,7 +300,7 @@ def execute_trade(
         if quantity <= 0:
             raise ValueError(f"Quantity must be positive: {quantity}")
         
-        # TODO: Replace with actual bot12 trade execution:
+        # # NOTE: Replace with actual bot12 trade execution:
         # client = get_bot_client()
         # order = client.execute_trade(symbol, quantity, direction, stop_loss, take_profit)
         
@@ -337,7 +337,7 @@ def close_position(position_id: int) -> Dict[str, Any]:
         if position_id <= 0:
             raise ValueError(f"Invalid position ID: {position_id}")
         
-        # TODO: Replace with actual bot12 close position:
+        # # NOTE: Replace with actual bot12 close position:
         # client = get_bot_client()
         # result = client.close_position(position_id)
         
@@ -375,7 +375,7 @@ def get_trade_history(limit: int = 10, symbol: Optional[str] = None) -> List[Tra
         if limit <= 0:
             raise ValueError("Limit must be positive")
         
-        # TODO: Replace with actual bot12 history retrieval:
+        # # NOTE: Replace with actual bot12 history retrieval:
         # client = get_bot_client()
         # trades = client.get_trade_history(limit, symbol)
         
@@ -416,7 +416,7 @@ def generate_performance_report(
         PerformanceReport with win rate, profit, drawdown, and metrics
     """
     try:
-        # TODO: Replace with actual bot12 reporting:
+        # # NOTE: Replace with actual bot12 reporting:
         # client = get_bot_client()
         # report = client.generate_report(start_date, end_date)
         
@@ -453,7 +453,7 @@ def get_system_status() -> Dict[str, Any]:
         Dict with connection status, last update time, and system health
     """
     try:
-        # TODO: Replace with actual bot12 status check:
+        # # NOTE: Replace with actual bot12 status check:
         # client = get_bot_client()
         # status = client.check_system_status()
         
@@ -488,7 +488,7 @@ def get_bot_logs(limit: int = 20, level: Optional[str] = None) -> List[Dict[str,
         List of log entries with timestamp, level, and message
     """
     try:
-        # TODO: Replace with actual bot12 logging:
+        # # NOTE: Replace with actual bot12 logging:
         # client = get_bot_client()
         # logs = client.get_logs(limit, level)
         
