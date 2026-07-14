@@ -1,301 +1,207 @@
-"""
-backend/agents/voting_engine.py
-Galaxy Vast AI — Enterprise Voting Engine
-
-Coordinates all agents, collects votes, applies weighted majority,
-veto rules, tie-breaking, and circuit breaker integration.
-FIX: Import AgentStatus, AgentResult, VoteResult from base_agent (not core modules).
-MS-4: Sequential fallback when gather fails.
-MS-5: Per-agent error isolation (gather return_exceptions=True).
-Note: results lists are bounded (one entry per agent, max ~8).
-Phase L: record_vote hook — fire-and-forget to AgentPerformanceTracker.
-"""
+"""Voting Engine - Consensus Decision Making"""
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Any, Optional
+from enum import Enum
 
-from .base_agent import (
-    AgentResult,
-    AgentStatus,
-    AgentVote,
-    BaseAgent,
-    VoteResult,
-    VoteSignal,
-)
+from .base_agent import AgentVote, AgentResult, AgentStatus
+
+log = logging.getLogger(__name__)
 
 
-_LOG = logging.getLogger(__name__)
-_RISK_AGENT_NAME = "risk_agent"
-_DEFAULT_TIMEOUT = 10.0
-
-
-@dataclass
-class VotingConfig:
-    timeout_s:           float = _DEFAULT_TIMEOUT
-    min_agents:              int   = 3
-    quorum_pct:          float = 0.6
-    confidence_floor:    float = 55.0
-    sequential_fallback: bool  = True
+class VotingStrategy(str, Enum):
+    """Voting strategies for consensus"""
+    WEIGHTED_AVERAGE = "weighted_average"
+    MAJORITY = "majority"
+    UNANIMOUS = "unanimous"
+    WEIGHTED_VETO = "weighted_veto"
 
 
 @dataclass
-class FinalVote:
-    """Aggregated vote result from all agents."""
-    signal:       VoteSignal
-    confidence:   float
-    reason:       str
-    votes:        List[VoteResult] = field(default_factory=list)
-    blocked:      bool = False
-    block_reason: str  = ""
-
-    @property
-    def approved(self) -> bool:
-        return not self.blocked and self.signal in (VoteSignal.BUY, VoteSignal.SELL)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "signal":       self.signal.value,
-            "confidence":   round(self.confidence, 4),
-            "reason":       self.reason,
-            "approved":     self.approved,
-            "blocked":      self.blocked,
-            "block_reason": self.block_reason,
-            "votes":        [v.__dict__ if hasattr(v, '__dict__') else str(v) for v in self.votes],
-        }
+class VotingResult:
+    """Result of voting process"""
+    final_signal: str  # "BUY", "SELL", "HOLD"
+    confidence: float
+    weighted_score: float
+    agent_votes: List[AgentVote] = field(default_factory=list)
+    agent_results: List[AgentResult] = field(default_factory=list)
+    reasoning: str = ""
+    timestamp: float = 0.0
 
 
 class VotingEngine:
     """
-    Multi-agent voting coordinator.
-
-    Flow:
-        1. Broadcast context to all agents concurrently (asyncio.gather).
-        2. Apply RISK veto — if risk_agent vetoes, block immediately.
-        3. Weighted majority vote with quorum check.
-        4. Confidence floor filter.
-        5. Return FinalVote.
-
-    Fallback (MS-4):
-        If gather() raises (e.g. timeout), fall back to sequential
-        agent calls so a single bad agent does not kill the whole cycle.
-
-    Phase L:
-        After tally, fire-and-forget record_vote() for each VoteResult.
+    Consensus voting engine that combines multiple agent signals
+    into a single trading decision.
     """
-
-    def __init__(self, config: Optional[VotingConfig] = None) -> None:
-        self._cfg = config or VotingConfig()
-        self._log = _LOG
-
-    # ----------------------------------------------------------------------- #
-    # Public API
-    # ----------------------------------------------------------------------- #
-
-    async def vote(
-        self,
-        agents:  List[BaseAgent],
-        context: Dict[str, Any],
-    ) -> FinalVote:
-        """Run a full voting cycle and return the aggregated decision."""
-        if not agents:
-            return FinalVote(
-                signal=VoteSignal.ABSTAIN,
-                confidence=0.0,
-                reason="no agents registered",
-            )
-
-        # 1. Collect votes
-        raw_votes = await self._gather_votes(agents, context)
-
-        # 2. Risk veto
-        veto = self._check_risk_veto(raw_votes)
-        if veto:
-            asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
-            return FinalVote(
-                signal=VoteSignal.ABSTAIN,
-                confidence=0.0,
-                reason=f"risk_agent veto: {veto}",
-                votes=raw_votes,
-                blocked=True,
-                block_reason=veto,
-            )
-
-        # 3. Quorum check
-        active = [v for v in raw_votes if v.signal != VoteSignal.ABSTAIN]
-        if len(active) < self._cfg.min_agents:
-            asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
-            return FinalVote(
-                signal=VoteSignal.ABSTAIN,
-                confidence=0.0,
-                reason=f"quorum not met: {len(active)}/{self._cfg.min_agents}",
-                votes=raw_votes,
-            )
-
-        # 4. Weighted tally
-        final = self._tally(raw_votes)
-        asyncio.create_task(self._record_votes(raw_votes, context.get("symbol", "")))
-        return final
-
-    # ----------------------------------------------------------------------- #
-    # Internal helpers
-    # ----------------------------------------------------------------------- #
-
-    async def _gather_votes(
-        self,
-        agents:  List[BaseAgent],
-        context: Dict[str, Any],
-    ) -> List[VoteResult]:
-        """Gather votes from all agents with error isolation (MS-5)."""
+    
+    def __init__(self, strategy: VotingStrategy = VotingStrategy.WEIGHTED_AVERAGE):
+        self.strategy = strategy
+        self.weights: Dict[str, float] = {}
+    
+    def set_agent_weight(self, agent_id: str, weight: float) -> None:
+        """Set weight for an agent"""
+        self.weights[agent_id] = max(0, min(1.0, weight))
+        log.info(f"Set weight for {agent_id}: {weight}")
+    
+    async def vote(self, agent_results: List[AgentResult]) -> VotingResult:
+        """
+        Aggregate agent votes into final decision.
+        
+        Args:
+            agent_results: List of agent analysis results
+        
+        Returns:
+            VotingResult with final decision
+        """
         try:
-            raw = await asyncio.wait_for(
-                asyncio.gather(
-                    *[a.vote(context) for a in agents],
-                    return_exceptions=True,
-                ),
-                timeout=self._cfg.timeout_s,
-            )
-        except asyncio.TimeoutError:
-            self._log.warning("VotingEngine: gather timed out, trying sequential fallback")
-            if self._cfg.sequential_fallback:
-                return await self._run_sequential_safe(agents, context)
-            return []
-
-        return self._process_raw(raw, agents)
-
-    def _process_raw(
-        self,
-        raw:    List[Any],
-        agents: List[BaseAgent],
-    ) -> List[VoteResult]:
-        """Convert gather() results into VoteResult list (MS-5)."""
-        results: List[VoteResult] = []
-        for i, item in enumerate(raw):
-            if isinstance(item, BaseException):
-                name = getattr(agents[i], "agent_id",
-                               getattr(agents[i], "name", f"Agent[{i}]"))
-                self._log.error("MS-5 gather fallback for %s: %s", name, item)
-                results.append(
-                    VoteResult(
-                        agent_id=name,
-                        signal=VoteSignal.ABSTAIN,
-                        confidence=0.0,
-                        weight=getattr(agents[i], "weight", 1.0),
-                        reason=f"error: {item}",
-                        error=str(item),
-                    )
-                )
-            else:
-                results.append(item)
-        return results
-
-    async def _run_sequential_safe(
-        self, agents: List[Any], context: Dict[str, Any]
-    ) -> List[VoteResult]:
-        """MS-4: sequential fallback when gather fails."""
-        results: List[VoteResult] = []
-        for agent in agents:
-            try:
-                vote = await asyncio.wait_for(agent.vote(context), timeout=self._cfg.timeout_s)
-                results.append(vote)
-            except Exception as exc:
-                name = getattr(agent, "agent_id", getattr(agent, "name", str(agent)))
-                self._log.error("Sequential fallback error for %s: %s", name, exc)
-                results.append(VoteResult(
-                    agent_id=name,
-                    signal=VoteSignal.ABSTAIN,
+            if not agent_results:
+                return VotingResult(
+                    final_signal="HOLD",
                     confidence=0.0,
-                    weight=getattr(agent, "weight", 1.0),
-                    reason=f"sequential error: {exc}",
-                    error=str(exc),
-                ))
-        return results
-
-    def _check_risk_veto(self, votes: List[VoteResult]) -> Optional[str]:
-        """Return veto reason string if risk_agent issued VETO, else None."""
-        for v in votes:
-            if v.agent_id == _RISK_AGENT_NAME and v.signal == VoteSignal.VETO:
-                return v.reason or "risk veto"
-        return None
-
-    def _tally(self, votes: List[VoteResult]) -> FinalVote:
-        """Weighted majority tally with confidence floor."""
-        buy_w = sell_w = abs_w = 0.0
-        total_w = 0.0
-        weighted_conf = 0.0
-
-        for v in votes:
-            w = max(0.0, v.weight)
-            total_w += w
-            if v.signal == VoteSignal.BUY:
-                buy_w += w
-            elif v.signal == VoteSignal.SELL:
-                sell_w += w
-            else:
-                abs_w += w
-            weighted_conf += v.confidence * w
-
-        if total_w == 0:
-            return FinalVote(
-                signal=VoteSignal.ABSTAIN,
-                confidence=0.0,
-                reason="zero total weight",
-                votes=votes,
-            )
-
-        avg_conf = weighted_conf / total_w
-
-        if avg_conf < self._cfg.confidence_floor:
-            return FinalVote(
-                signal=VoteSignal.ABSTAIN,
-                confidence=avg_conf,
-                reason=f"confidence below floor ({avg_conf:.1f} < {self._cfg.confidence_floor})",
-                votes=votes,
-            )
-
-        if buy_w / total_w >= self._cfg.quorum_pct:
-            return FinalVote(
-                signal=VoteSignal.BUY,
-                confidence=avg_conf,
-                reason=f"BUY quorum {buy_w/total_w:.0%}",
-                votes=votes,
-            )
-        if sell_w / total_w >= self._cfg.quorum_pct:
-            return FinalVote(
-                signal=VoteSignal.SELL,
-                confidence=avg_conf,
-                reason=f"SELL quorum {sell_w/total_w:.0%}",
-                votes=votes,
-            )
-
-        return FinalVote(
-            signal=VoteSignal.ABSTAIN,
-            confidence=avg_conf,
-            reason=f"no quorum (buy={buy_w/total_w:.0%} sell={sell_w/total_w:.0%})",
-            votes=votes,
-        )
-
-    # ----------------------------------------------------------------------- #
-    # Phase L: record votes for AgentPerformanceTracker
-    # ----------------------------------------------------------------------- #
-
-    async def _record_votes(self, votes: List[VoteResult], symbol: str) -> None:
-        """Fire-and-forget: persist each vote to AgentPerformanceTracker."""
-        try:
-            from backend.analytics.agent_performance_tracker import agent_tracker
-            for v in votes:
-                await agent_tracker.record_vote(
-                    agent_id=v.agent_id,
-                    signal=v.signal.value if hasattr(v.signal, "value") else str(v.signal),
-                    confidence=v.confidence,
-                    correct=None,   # updated later when trade closes
-                    symbol=symbol,
+                    weighted_score=0.0,
+                    reasoning="No agent results to vote on"
                 )
+            
+            votes = [r.vote for r in agent_results]
+            
+            # Apply voting strategy
+            if self.strategy == VotingStrategy.WEIGHTED_AVERAGE:
+                return self._vote_weighted_average(votes, agent_results)
+            elif self.strategy == VotingStrategy.MAJORITY:
+                return self._vote_majority(votes, agent_results)
+            elif self.strategy == VotingStrategy.WEIGHTED_VETO:
+                return self._vote_weighted_veto(votes, agent_results)
+            else:
+                return self._vote_weighted_average(votes, agent_results)
+        
         except Exception as e:
-            _LOG.debug("_record_votes: %s", e)
-
-
-# Module-level singleton
-voting_engine = VotingEngine()
+            log.error(f"Voting error: {e}")
+            return VotingResult(
+                final_signal="HOLD",
+                confidence=0.0,
+                weighted_score=0.0,
+                reasoning=f"Voting engine error: {e}"
+            )
+    
+    def _vote_weighted_average(self, votes: List[AgentVote], 
+                               results: List[AgentResult]) -> VotingResult:
+        """Weighted average voting"""
+        
+        buy_score = 0.0
+        sell_score = 0.0
+        hold_score = 0.0
+        total_weight = 0.0
+        
+        # Calculate weighted scores
+        for vote, result in zip(votes, results):
+            weight = vote.weight
+            confidence = vote.confidence
+            
+            if vote.direction == "BUY":
+                buy_score += confidence * weight
+            elif vote.direction == "SELL":
+                sell_score += confidence * weight
+            else:
+                hold_score += confidence * weight
+            
+            total_weight += weight
+        
+        # Normalize scores
+        if total_weight > 0:
+            buy_score /= total_weight
+            sell_score /= total_weight
+            hold_score /= total_weight
+        
+        # Determine final signal
+        max_score = max(buy_score, sell_score, hold_score)
+        
+        if max_score < 0.5:
+            final_signal = "HOLD"
+        elif buy_score > sell_score:
+            final_signal = "BUY"
+        else:
+            final_signal = "SELL"
+        
+        # Build reasoning
+        reasoning = self._build_reasoning(votes, final_signal, 
+                                         buy_score, sell_score, hold_score)
+        
+        return VotingResult(
+            final_signal=final_signal,
+            confidence=max_score,
+            weighted_score=max_score,
+            agent_votes=votes,
+            agent_results=results,
+            reasoning=reasoning
+        )
+    
+    def _vote_majority(self, votes: List[AgentVote], 
+                       results: List[AgentResult]) -> VotingResult:
+        """Simple majority voting"""
+        
+        buy_count = sum(1 for v in votes if v.direction == "BUY")
+        sell_count = sum(1 for v in votes if v.direction == "SELL")
+        total = len(votes)
+        
+        confidence = max(buy_count, sell_count) / total if total > 0 else 0
+        
+        if buy_count > sell_count:
+            final_signal = "BUY"
+        elif sell_count > buy_count:
+            final_signal = "SELL"
+        else:
+            final_signal = "HOLD"
+        
+        reasoning = f"Majority vote: {buy_count} BUY, {sell_count} SELL out of {total} agents"
+        
+        return VotingResult(
+            final_signal=final_signal,
+            confidence=confidence,
+            weighted_score=confidence,
+            agent_votes=votes,
+            agent_results=results,
+            reasoning=reasoning
+        )
+    
+    def _vote_weighted_veto(self, votes: List[AgentVote], 
+                            results: List[AgentResult]) -> VotingResult:
+        """Weighted voting with veto power"""
+        
+        # Check for veto
+        for vote in votes:
+            if vote.status == AgentStatus.VETO:
+                return VotingResult(
+                    final_signal="HOLD",
+                    confidence=0.9,
+                    weighted_score=0.9,
+                    agent_votes=votes,
+                    agent_results=results,
+                    reasoning=f"Agent {vote.agent_id} issued VETO"
+                )
+        
+        # Otherwise use weighted average
+        return self._vote_weighted_average(votes, results)
+    
+    def _build_reasoning(self, votes: List[AgentVote], signal: str,
+                        buy_score: float, sell_score: float, 
+                        hold_score: float) -> str:
+        """Build detailed reasoning for decision"""
+        
+        agent_reasons = [v.reason for v in votes if v.reason]
+        
+        reasoning = f"Signal: {signal} | "
+        reasoning += f"Scores - BUY: {buy_score:.2f}, SELL: {sell_score:.2f}, HOLD: {hold_score:.2f} | "
+        reasoning += f"Agents: {', '.join(agent_reasons[:3])}"
+        
+        return reasoning
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get voting engine status"""
+        return {
+            "strategy": self.strategy.value,
+            "agent_weights": self.weights,
+            "status": "operational"
+        }
