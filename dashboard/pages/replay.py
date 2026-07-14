@@ -39,7 +39,8 @@ def render() -> None:
     def load_data(sym: str, tf: str, n: int) -> tuple:
         """Try API first, fallback to demo."""
         df = _fetch_api(sym, tf, n)
-        source = "live API" if df is not None else "demo"
+        if df is None: raise ValueError("Real API data required - demo mode disabled")
+    source = "live API"
         if df is None:
             df = _gen_demo(sym, n)
         return df, source
@@ -170,7 +171,7 @@ def render() -> None:
     if source == "live API":
         st.success("✅ Live API data")
     else:
-        st.info("ℹ️ Demo data (API not connected)")
+        st.error("❌ API connection failed - cannot proceed")
 
 
 @st.cache_data(ttl=60, show_spinner=False)
