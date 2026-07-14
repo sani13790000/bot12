@@ -1,96 +1,110 @@
-"""
-Galaxy Vast AI Trading Platform
-════════════════════════════════
-Agent 3: SMC Agent
-مسئولیت: Order Block، FVG، Breaker Block، Mitigation
-"""
+"""Smart Money Concepts (SMC) Agent"""
 from __future__ import annotations
 
-from typing import Any, Dict
+import logging
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, List
 
-from .base_agent import AgentVote, AgentStatus, BaseAgent
+from .base_agent import BaseAgent, AgentVote, AgentStatus
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class SMCConfig:
+    """SMC configuration"""
+    min_volume_ratio: float = 1.5
+    min_candles_for_pattern: int = 3
+    strong_signal_confidence: float = 0.85
 
 
 class SMCAgent(BaseAgent):
     """
-    تحلیل Smart Money Concepts:
-    - Order Block (OB)
-    - Fair Value Gap (FVG / IFVG)
-    - Breaker Block
-    - Mitigation Block
-    - Kill Zone
+    Smart Money Concepts (SMC) agent that detects institutional
+    order blocks and smart money positioning.
     """
-
-    def __init__(self, weight: float = 0.20, enabled: bool = True) -> None:
-        super().__init__(name="SMC", weight=weight, enabled=enabled)
-
-    async def analyze(self, context: Dict[str, Any]) -> AgentVote:
-        score      = 20.0
-        confidence = 50.0
-        reasons    = []
-        confluence = 0
-
-        # Order Block
-        ob_present = context.get("order_block_present", False)
-        ob_quality = float(context.get("order_block_quality", 0.0))
-        ob_tested  = context.get("order_block_tested", False)
-        if ob_present:
-            score += 25.0 * ob_quality
-            confluence += 1
-            reasons.append(f"OB quality={ob_quality:.2f}")
-            if ob_tested:
-                score += 5.0
-                reasons.append("OB tested")
-
-        # Breaker Block
-        breaker = context.get("breaker_block", False)
-        if breaker:
-            score += 15.0
-            confluence += 1
-            reasons.append("Breaker block")
-
-        # FVG
-        fvg_present = context.get("fvg_present", False)
-        fvg_quality = float(context.get("fvg_quality", 0.0))
-        ifvg        = context.get("ifvg_present", False)
-        if fvg_present:
-            score += 15.0 * fvg_quality
-            confluence += 1
-            reasons.append(f"FVG quality={fvg_quality:.2f}")
-        if ifvg:
-            score += 8.0
-            confluence += 1
-            reasons.append("IFVG present")
-
-        # Kill Zone
-        in_kill_zone = context.get("in_kill_zone", False)
-        session_quality = float(context.get("session_quality", 0.5))
-        if in_kill_zone:
-            score += 10.0 * session_quality
-            confidence += 15.0
-            reasons.append(f"Kill Zone (session_q={session_quality:.2f})")
-
-        # Confluence bonus
-        if confluence >= 3:
-            score += 10.0
-            confidence += 15.0
-            reasons.append(f"High confluence ({confluence} signals)")
-        elif confluence >= 2:
-            score += 5.0
-            confidence += 8.0
-
-        score      = min(score, 100.0)
-        confidence = min(confidence, 100.0)
-
-        return AgentVote(
-            score=score,
-            confidence=confidence,
-            direction=context.get("direction", "NEUTRAL"),
-            status=AgentStatus.OK,
-            reason=" | ".join(reasons) if reasons else "No SMC signal",
-            metadata={
-                "ob_present": ob_present, "fvg": fvg_present,
-                "breaker": breaker, "confluence": confluence,
-                "kill_zone": in_kill_zone,
-            },
-        )
+    
+    def __init__(self, config: Optional[SMCConfig] = None):
+        super().__init__(agent_id="smc_agent", agent_name="SMC Agent")
+        self.config = config or SMCConfig()
+        self.enabled = True
+    
+    async def analyze(self, market_data: Dict[str, Any]) -> AgentVote:
+        """
+        Detect SMC patterns and institutional activity.
+        
+        Args:
+            market_data: Candle and volume data
+        
+        Returns:
+            AgentVote with SMC signal
+        """
+        try:
+            # Extract SMC-relevant data
+            order_blocks = market_data.get("order_blocks", [])
+            liquidity_levels = market_data.get("liquidity_levels", [])
+            volume_spikes = market_data.get("volume_spikes", [])
+            price = market_data.get("price", 0)
+            
+            direction = "HOLD"
+            confidence = 0.5
+            reason = "No strong SMC signals"
+            
+            # Detect order block breakouts
+            if order_blocks:
+                nearest_block = min(order_blocks, key=lambda x: abs(x["level"] - price))
+                if nearest_block["type"] == "buy_block" and price > nearest_block["level"]:
+                    direction = "BUY"
+                    confidence = 0.8
+                    reason = "Price above buy-side order block"
+                elif nearest_block["type"] == "sell_block" and price < nearest_block["level"]:
+                    direction = "SELL"
+                    confidence = 0.8
+                    reason = "Price below sell-side order block"
+            
+            # Detect liquidity sweeps
+            if liquidity_levels:
+                for level in liquidity_levels:
+                    if abs(price - level) < 10:  # Within 10 pips
+                        direction = "BUY" if level < price else "SELL"
+                        confidence = 0.75
+                        reason = f"Liquidity sweep at {level}"
+                        break
+            
+            # Volume spike confirmation
+            if volume_spikes and direction != "HOLD":
+                confidence = min(confidence + 0.1, 1.0)
+                reason += " (confirmed by volume spike)"
+            
+            return AgentVote(
+                agent_id=self.agent_id,
+                direction=direction,
+                confidence=confidence,
+                weight=1.1,
+                reason=reason,
+                status=AgentStatus.OK,
+                metadata={
+                    "order_blocks": len(order_blocks),
+                    "liquidity_levels": len(liquidity_levels),
+                    "volume_spike_detected": len(volume_spikes) > 0
+                }
+            )
+        
+        except Exception as e:
+            log.error(f"SMC analysis error: {e}")
+            return AgentVote(
+                agent_id=self.agent_id,
+                direction="HOLD",
+                confidence=0.0,
+                status=AgentStatus.ERROR,
+                metadata={"error": str(e)}
+            )
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get agent status"""
+        return {
+            "agent": self.agent_name,
+            "enabled": self.enabled,
+            "min_volume_ratio": self.config.min_volume_ratio,
+            "status": "operational"
+        }
