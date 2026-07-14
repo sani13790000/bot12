@@ -20,18 +20,23 @@ NONCE_STORE_MAX     = 100_000
 
 
 class WebhookError(Exception):
+    """Base webhook error."""
     pass
 
 class InvalidSignatureError(WebhookError):
+    """Invalid webhook signature."""
     pass
 
 class ReplayAttackError(WebhookError):
+    """Webhook replay attack detected."""
     pass
 
 class PayloadTooLargeError(WebhookError):
+    """Webhook payload exceeds size limit."""
     pass
 
 class StaleTimestampError(WebhookError):
+    """Webhook timestamp too old."""
     pass
 
 
