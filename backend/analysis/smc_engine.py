@@ -3,273 +3,345 @@ SMC (Smart Money Concepts) Engine - Support/Resistance, Fair Value Gaps, Order B
 
 Detects key market structure elements:
 - Support and Resistance levels from swing highs/lows
-- Fair Value Gaps (FVG) for potential reversals
-- Order Blocks for institutional order placement areas
-- Market Structure Breaks (MSB) for trend confirmation
-
-Usage:
-    engine = SMCEngine(lookback=50)
-    levels = engine.detect_support_resistance(candles)
-    fvgs = engine.detect_fair_value_gaps(candles)
-    order_blocks = engine.detect_order_blocks(candles)
+- Fair Value Gaps (FVG) - imbalances in price
+- Order Blocks - accumulation/distribution zones
+- Market Structure Breaks (MSB)
 """
 
 import logging
+from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from datetime import datetime
+
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class Level:
+class SupportResistance:
     """Support/Resistance level."""
-    price: float
+    level: float
     type: str  # 'support' or 'resistance'
-    strength: int  # Number of touches
-    confirmed: bool = False
+    strength: float  # 0-1, how many times touched
+    first_touch: datetime
+    last_touch: datetime
+    touches: int
 
 
 @dataclass
-class FVG:
-    """Fair Value Gap."""
-    price_start: float
-    price_end: float
-    type: str  # 'bullish' or 'bearish'
-    candle_index: int
+class FairValueGap:
+    """Fair Value Gap (price imbalance)."""
+    gap_start: float
+    gap_end: float
+    direction: str  # 'up' or 'down'
+    size_pips: float
+    time_formed: datetime
+    mitigated: bool = False
+    mitigation_time: Optional[datetime] = None
 
 
 @dataclass
 class OrderBlock:
-    """Order block - area of institutional buying/selling."""
-    price_high: float
-    price_low: float
-    type: str  # 'buy' or 'sell'
-    strength: float  # 0-1 based on volume and momentum
+    """Order Block (accumulation/distribution zone)."""
+    high: float
+    low: float
+    direction: str  # 'bullish' or 'bearish'
+    time_formed: datetime
+    strength: float  # based on volume/time spent
 
 
 class SMCEngine:
-    """Smart Money Concepts detection engine."""
-
-    def __init__(self, lookback: int = 50, tolerance: float = 0.0005):
+    """Smart Money Concepts analysis engine."""
+    
+    def __init__(self, min_swing_points: int = 5, fvg_threshold_pips: float = 2.0):
         """
         Initialize SMC Engine.
-
+        
         Args:
-            lookback: Number of candles to look back for levels
-            tolerance: Price tolerance for level matching (default 0.05%)
+            min_swing_points: Minimum bars between swing highs/lows
+            fvg_threshold_pips: Minimum gap size to consider as FVG
         """
-        self.lookback = lookback
-        self.tolerance = tolerance
-
+        self.min_swing_points = min_swing_points
+        self.fvg_threshold_pips = fvg_threshold_pips
+        self.support_resistance_levels: List[SupportResistance] = []
+        self.fair_value_gaps: List[FairValueGap] = []
+        self.order_blocks: List[OrderBlock] = []
+    
     def detect_support_resistance(
         self,
-        candles: List[dict],
-        min_touches: int = 2,
-        lookback: Optional[int] = None
-    ) -> List[Level]:
+        df: pd.DataFrame,
+        lookback: int = 50,
+        tolerance_pips: float = 5.0
+    ) -> List[SupportResistance]:
         """
         Detect support and resistance levels from swing highs/lows.
-
+        
         Args:
-            candles: List of candle dicts with 'high', 'low', 'close' keys
-            min_touches: Minimum number of touches to confirm level
-            lookback: Override default lookback window
-
+            df: DataFrame with 'high', 'low', 'close' columns and datetime index
+            lookback: Number of bars to analyze
+            tolerance_pips: Pip tolerance to group near levels
+        
         Returns:
-            List of detected Level objects
+            List of detected S/R levels
         """
-        if not candles or len(candles) < 5:
+        try:
+            if len(df) < self.min_swing_points * 2:
+                logger.warning(f"Not enough data: {len(df)} bars < {self.min_swing_points * 2}")
+                return []
+            
+            df = df.tail(lookback).copy()
+            
+            # Find swing highs and lows
+            swing_highs = []
+            swing_lows = []
+            
+            for i in range(self.min_swing_points, len(df) - self.min_swing_points):
+                # Swing high: peak with lower highs on both sides
+                if (df['high'].iloc[i] == df['high'].iloc[i-self.min_swing_points:i].max() and
+                    df['high'].iloc[i] == df['high'].iloc[i+1:i+self.min_swing_points+1].max()):
+                    swing_highs.append((df.index[i], df['high'].iloc[i]))
+                
+                # Swing low: valley with higher lows on both sides
+                if (df['low'].iloc[i] == df['low'].iloc[i-self.min_swing_points:i].min() and
+                    df['low'].iloc[i] == df['low'].iloc[i+1:i+self.min_swing_points+1].min()):
+                    swing_lows.append((df.index[i], df['low'].iloc[i]))
+            
+            # Group levels by tolerance
+            levels = []
+            for swing_list, level_type in [(swing_highs, 'resistance'), (swing_lows, 'support')]:
+                if not swing_list:
+                    continue
+                
+                grouped = {}
+                for timestamp, price in swing_list:
+                    found_group = False
+                    for level_key in list(grouped.keys()):
+                        if abs(level_key - price) <= tolerance_pips:
+                            grouped[level_key].append((timestamp, price))
+                            found_group = True
+                            break
+                    if not found_group:
+                        grouped[price] = [(timestamp, price)]
+                
+                # Create S/R objects
+                for level_price, occurrences in grouped.items():
+                    strength = min(1.0, len(occurrences) / 5.0)  # Normalize by 5 touches
+                    sr = SupportResistance(
+                        level=level_price,
+                        type=level_type,
+                        strength=strength,
+                        first_touch=occurrences[0][0],
+                        last_touch=occurrences[-1][0],
+                        touches=len(occurrences)
+                    )
+                    levels.append(sr)
+            
+            self.support_resistance_levels = levels
+            logger.info(f"Detected {len(levels)} S/R levels: {len(swing_highs)} highs, {len(swing_lows)} lows")
+            return levels
+        
+        except Exception as e:
+            logger.error(f"Error detecting S/R: {e}")
             return []
-
-        lookback = lookback or self.lookback
-        window = candles[-lookback:] if len(candles) > lookback else candles
-
-        levels = []
-        highs = np.array([c['high'] for c in window])
-        lows = np.array([c['low'] for c in window])
-
-        # Find swing highs and lows
-        for i in range(1, len(window) - 1):
-            # Swing high
-            if highs[i] > highs[i-1] and highs[i] > highs[i+1]:
-                price = float(highs[i])
-                # Count touches within tolerance
-                touches = self._count_touches(highs, price, self.tolerance * price)
-                if touches >= min_touches:
-                    levels.append(Level(
-                        price=price,
-                        type='resistance',
-                        strength=touches,
-                        confirmed=touches > min_touches
-                    ))
-
-            # Swing low
-            if lows[i] < lows[i-1] and lows[i] < lows[i+1]:
-                price = float(lows[i])
-                # Count touches within tolerance
-                touches = self._count_touches(lows, price, self.tolerance * price)
-                if touches >= min_touches:
-                    levels.append(Level(
-                        price=price,
-                        type='support',
-                        strength=touches,
-                        confirmed=touches > min_touches
-                    ))
-
-        return self._deduplicate_levels(levels)
-
+    
     def detect_fair_value_gaps(
         self,
-        candles: List[dict]
-    ) -> List[FVG]:
+        df: pd.DataFrame,
+        lookback: int = 50
+    ) -> List[FairValueGap]:
         """
-        Detect Fair Value Gaps (FVG) - Price gaps without fill.
-
+        Detect Fair Value Gaps (price imbalances).
+        
+        FVG occurs when price gaps over support/resistance without touching.
+        
         Args:
-            candles: List of candle dicts
-
+            df: DataFrame with 'high', 'low', 'open', 'close' columns
+            lookback: Number of bars to analyze
+        
         Returns:
-            List of FVG objects
+            List of detected FVGs
         """
-        if not candles or len(candles) < 3:
+        try:
+            if len(df) < 3:
+                return []
+            
+            df = df.tail(lookback).copy()
+            fvgs = []
+            
+            for i in range(1, len(df) - 1):
+                # Bullish FVG: current low > previous high
+                if df['low'].iloc[i] > df['high'].iloc[i-1]:
+                    gap_size = df['low'].iloc[i] - df['high'].iloc[i-1]
+                    if gap_size >= self.fvg_threshold_pips:
+                        fvg = FairValueGap(
+                            gap_start=df['high'].iloc[i-1],
+                            gap_end=df['low'].iloc[i],
+                            direction='up',
+                            size_pips=gap_size,
+                            time_formed=df.index[i]
+                        )
+                        fvgs.append(fvg)
+                
+                # Bearish FVG: current high < previous low
+                if df['high'].iloc[i] < df['low'].iloc[i-1]:
+                    gap_size = df['low'].iloc[i-1] - df['high'].iloc[i]
+                    if gap_size >= self.fvg_threshold_pips:
+                        fvg = FairValueGap(
+                            gap_start=df['low'].iloc[i-1],
+                            gap_end=df['high'].iloc[i],
+                            direction='down',
+                            size_pips=gap_size,
+                            time_formed=df.index[i]
+                        )
+                        fvgs.append(fvg)
+            
+            self.fair_value_gaps = fvgs
+            logger.info(f"Detected {len(fvgs)} Fair Value Gaps")
+            return fvgs
+        
+        except Exception as e:
+            logger.error(f"Error detecting FVGs: {e}")
             return []
-
-        fvgs = []
-        for i in range(1, len(candles) - 1):
-            curr_high = candles[i]['high']
-            curr_low = candles[i]['low']
-            next_low = candles[i+1]['low']
-            next_high = candles[i+1]['high']
-            prev_high = candles[i-1]['high']
-            prev_low = candles[i-1]['low']
-
-            # Bullish FVG (gap up)
-            if next_low > curr_high and curr_low > prev_high:
-                fvgs.append(FVG(
-                    price_start=curr_high,
-                    price_end=next_low,
-                    type='bullish',
-                    candle_index=i
-                ))
-
-            # Bearish FVG (gap down)
-            if next_high < curr_low and curr_high < prev_low:
-                fvgs.append(FVG(
-                    price_start=curr_low,
-                    price_end=next_high,
-                    type='bearish',
-                    candle_index=i
-                ))
-
-        return fvgs
-
+    
     def detect_order_blocks(
         self,
-        candles: List[dict],
-        volume_threshold: float = 1.5
+        df: pd.DataFrame,
+        lookback: int = 50
     ) -> List[OrderBlock]:
         """
-        Detect order blocks - areas of institutional concentration.
-
+        Detect Order Blocks (accumulation/distribution zones).
+        
+        Order blocks form where smart money accumulates/distributes before major moves.
+        
         Args:
-            candles: List of candle dicts with 'high', 'low', 'close', 'volume'
-            volume_threshold: Volume multiplier for significance
-
+            df: DataFrame with OHLCV data
+            lookback: Number of bars to analyze
+        
         Returns:
-            List of OrderBlock objects
+            List of detected order blocks
         """
-        if not candles or len(candles) < 5:
+        try:
+            if len(df) < 10:
+                return []
+            
+            df = df.tail(lookback).copy()
+            
+            # Add volume-weighted strength
+            if 'volume' not in df.columns:
+                df['volume'] = 1.0
+            
+            df['volume_norm'] = df['volume'] / df['volume'].max()
+            
+            blocks = []
+            
+            # Detect consecutive bars with similar characteristics (potential order blocks)
+            for i in range(2, len(df) - 2):
+                # Bullish order block: strong rejection at low, volume on up move
+                if (df['close'].iloc[i] > df['open'].iloc[i] and  # Up candle
+                    df['volume_norm'].iloc[i] > 0.6):  # High volume
+                    
+                    # Check if price respects this level later
+                    block_low = df['low'].iloc[i]
+                    block_high = df['high'].iloc[i]
+                    
+                    block = OrderBlock(
+                        high=block_high,
+                        low=block_low,
+                        direction='bullish',
+                        time_formed=df.index[i],
+                        strength=df['volume_norm'].iloc[i]
+                    )
+                    blocks.append(block)
+                
+                # Bearish order block
+                elif (df['close'].iloc[i] < df['open'].iloc[i] and  # Down candle
+                      df['volume_norm'].iloc[i] > 0.6):  # High volume
+                    
+                    block_high = df['high'].iloc[i]
+                    block_low = df['low'].iloc[i]
+                    
+                    block = OrderBlock(
+                        high=block_high,
+                        low=block_low,
+                        direction='bearish',
+                        time_formed=df.index[i],
+                        strength=df['volume_norm'].iloc[i]
+                    )
+                    blocks.append(block)
+            
+            # Remove duplicate/overlapping blocks
+            blocks = self._consolidate_blocks(blocks)
+            
+            self.order_blocks = blocks
+            logger.info(f"Detected {len(blocks)} Order Blocks")
+            return blocks
+        
+        except Exception as e:
+            logger.error(f"Error detecting order blocks: {e}")
             return []
-
-        order_blocks = []
-        volumes = np.array([c.get('volume', 1) for c in candles])
-        avg_volume = np.mean(volumes)
-        threshold = avg_volume * volume_threshold
-
-        for i in range(1, len(candles) - 1):
-            if volumes[i] > threshold:
-                # Check if candle is significant in price movement
-                curr = candles[i]
-                prev = candles[i-1]
-                next_c = candles[i+1]
-
-                # Buy order block (rejection from lows)
-                if curr['close'] > prev['close'] and next_c['close'] > curr['close']:
-                    order_blocks.append(OrderBlock(
-                        price_high=curr['high'],
-                        price_low=curr['low'],
-                        type='buy',
-                        strength=min(1.0, volumes[i] / threshold)
-                    ))
-
-                # Sell order block (rejection from highs)
-                if curr['close'] < prev['close'] and next_c['close'] < curr['close']:
-                    order_blocks.append(OrderBlock(
-                        price_high=curr['high'],
-                        price_low=curr['low'],
-                        type='sell',
-                        strength=min(1.0, volumes[i] / threshold)
-                    ))
-
-        return order_blocks
-
-    def detect_market_structure_breaks(
+    
+    def _consolidate_blocks(self, blocks: List[OrderBlock]) -> List[OrderBlock]:
+        """Consolidate overlapping order blocks."""
+        if not blocks:
+            return []
+        
+        consolidated = []
+        blocks = sorted(blocks, key=lambda b: b.time_formed)
+        
+        current_block = blocks[0]
+        for block in blocks[1:]:
+            # If blocks overlap and same direction, merge them
+            if (block.direction == current_block.direction and
+                block.low <= current_block.high and
+                block.high >= current_block.low):
+                
+                current_block.low = min(current_block.low, block.low)
+                current_block.high = max(current_block.high, block.high)
+            else:
+                consolidated.append(current_block)
+                current_block = block
+        
+        consolidated.append(current_block)
+        return consolidated
+    
+    def get_nearest_support_resistance(
         self,
-        candles: List[dict]
-    ) -> Tuple[Optional[str], float]:
+        current_price: float,
+        distance_pips: float = 100
+    ) -> Dict[str, Optional[SupportResistance]]:
         """
-        Detect breaks in market structure (trend confirmation).
-
+        Get nearest support and resistance to current price.
+        
+        Args:
+            current_price: Current market price
+            distance_pips: Maximum distance in pips
+        
         Returns:
-            Tuple of (direction: 'bullish'/'bearish'/None, confidence: 0-1)
+            Dict with 'support' and 'resistance' keys
         """
-        if not candles or len(candles) < 5:
-            return None, 0.0
-
-        highs = np.array([c['high'] for c in candles[-20:]])
-        lows = np.array([c['low'] for c in candles[-20:]])
-
-        # Higher highs and higher lows = bullish
-        if len(highs) >= 2:
-            higher_highs = sum(1 for i in range(1, len(highs)) if highs[i] > highs[i-1])
-            higher_lows = sum(1 for i in range(1, len(lows)) if lows[i] > lows[i-1])
-
-            if higher_highs >= 3 and higher_lows >= 3:
-                return 'bullish', min(1.0, (higher_highs + higher_lows) / 10.0)
-
-            # Lower highs and lower lows = bearish
-            lower_highs = sum(1 for i in range(1, len(highs)) if highs[i] < highs[i-1])
-            lower_lows = sum(1 for i in range(1, len(lows)) if lows[i] < lows[i-1])
-
-            if lower_highs >= 3 and lower_lows >= 3:
-                return 'bearish', min(1.0, (lower_highs + lower_lows) / 10.0)
-
-        return None, 0.0
-
-    @staticmethod
-    def _count_touches(prices: np.ndarray, target: float, tolerance: float) -> int:
-        """Count how many times price touches a level within tolerance."""
-        return int(np.sum((prices >= target - tolerance) & (prices <= target + tolerance)))
-
-    @staticmethod
-    def _deduplicate_levels(levels: List[Level], tolerance: float = 0.001) -> List[Level]:
-        """Remove duplicate levels that are too close together."""
-        if not levels:
-            return []
-
-        sorted_levels = sorted(levels, key=lambda x: x.strength, reverse=True)
-        deduped = []
-
-        for level in sorted_levels:
-            is_duplicate = False
-            for existing in deduped:
-                if abs(level.price - existing.price) / existing.price < tolerance:
-                    is_duplicate = True
-                    existing.strength = max(existing.strength, level.strength)
-                    break
-            if not is_duplicate:
-                deduped.append(level)
-
-        return sorted(deduped, key=lambda x: x.price)
+        support = None
+        resistance = None
+        
+        for level in self.support_resistance_levels:
+            # Nearest support below price
+            if level.type == 'support' and level.level < current_price:
+                if current_price - level.level <= distance_pips:
+                    if support is None or level.level > support.level:
+                        support = level
+            
+            # Nearest resistance above price
+            elif level.type == 'resistance' and level.level > current_price:
+                if level.level - current_price <= distance_pips:
+                    if resistance is None or level.level < resistance.level:
+                        resistance = level
+        
+        return {'support': support, 'resistance': resistance}
+    
+    def clear(self):
+        """Clear all detected levels."""
+        self.support_resistance_levels.clear()
+        self.fair_value_gaps.clear()
+        self.order_blocks.clear()
+        logger.info("SMCEngine cleared")
