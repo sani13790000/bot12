@@ -147,6 +147,7 @@ def get_registry() -> TenantRegistry:
 
 
 class CrossTenantAccessError(Exception):
+    """Implementation required."""
     pass
 
 
@@ -178,6 +179,7 @@ def assert_tenant_access(
                 try:
                     cb(entry)
                 except Exception:
+                    """Implementation required."""
                     pass
         return True
     _log.error('cross-tenant boundary violation',
