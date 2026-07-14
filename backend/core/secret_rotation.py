@@ -106,24 +106,31 @@ COMPROMISE_RUNBOOK: List[str] = [
 
 
 class SecretRotationError(Exception):
+    """Implementation required."""
     pass
 
 class KeyNotFoundError(SecretRotationError):
+    """Implementation required."""
     pass
 
 class KeyRevokedError(SecretRotationError):
+    """Implementation required."""
     pass
 
 class KeyExpiredError(SecretRotationError):
+    """Implementation required."""
     pass
 
 class MissingReasonError(SecretRotationError):
+    """Implementation required."""
     pass
 
 class PolicyViolationError(SecretRotationError):
+    """Implementation required."""
     pass
 
 class CompromiseResponseError(SecretRotationError):
+    """Implementation required."""
     pass
 
 
@@ -321,6 +328,7 @@ class SecretAuditChain:
         if limit and limit > 0:
             entries = entries[:limit]
         elif limit == 0:
+            """Implementation required."""
             pass
         return entries
 
@@ -690,6 +698,7 @@ class KeyLifecycleManager:
             try:
                 fn(event, kv)
             except Exception:
+                """Implementation required."""
                 pass
 
     @property
@@ -788,6 +797,7 @@ class RotationScheduler:
                     self._jobs[job["job_id"]]["done"] = True
                 rotated.append(job["job_id"])
             except Exception:
+                """Implementation required."""
                 pass
         return rotated
 
@@ -806,6 +816,7 @@ class RotationScheduler:
                     )
                     rotated.append(new_kv)
                 except Exception:
+                    """Implementation required."""
                     pass
         return rotated
 
@@ -874,6 +885,7 @@ class SecretRotationAdmin:
                 _, new_kv = self._lc.rotate_key(kt, actor, reason, tenant_id=tenant_id)
                 result[kt.value if hasattr(kt,'value') else kt] = new_kv
             except Exception:
+                """Implementation required."""
                 pass
         return result
 
