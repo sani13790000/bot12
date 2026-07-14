@@ -6,210 +6,325 @@ Ensures signal confluence before issuing trade commands.
 """
 
 import logging
+from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
-from enum import StrEnum
-from typing import List, Optional, Dict, Tuple
-import numpy as np
+from enum import Enum
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
-class SignalType(StrEnum):
-    BUY = "BUY"
-    SELL = "SELL"
-    NEUTRAL = "NEUTRAL"
+class SignalType(Enum):
+    """Signal types from different engines."""
+    SMC_BULLISH = "smc_bullish"
+    SMC_BEARISH = "smc_bearish"
+    PRICE_ACTION_BULLISH = "price_action_bullish"
+    PRICE_ACTION_BEARISH = "price_action_bearish"
+    ML_BULLISH = "ml_bullish"
+    ML_BEARISH = "ml_bearish"
+    NEWS_BULLISH = "news_bullish"
+    NEWS_BEARISH = "news_bearish"
 
 
-class ConfluenceLevel(StrEnum):
-    WEAK = "WEAK"        # 1 source
-    MODERATE = "MODERATE"  # 2 sources
-    STRONG = "STRONG"    # 3+ sources
+class ConfidenceLevel(Enum):
+    """Signal confidence levels."""
+    LOW = 0.3
+    MEDIUM = 0.6
+    HIGH = 0.8
+    VERY_HIGH = 0.95
 
 
 @dataclass
 class Signal:
-    """Single signal from an analysis source."""
+    """Input signal from an analysis engine."""
     type: SignalType
-    strength: float  # 0-1
-    source: str      # e.g., 'smc', 'price_action', 'ml_model'
     confidence: float  # 0-1
-    timestamp: str   # ISO format
+    source: str  # 'smc', 'price_action', 'ml', 'news', etc.
+    timestamp: datetime
+    metadata: Dict = None
+    
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {}
 
 
 @dataclass
-class ConfluenceAnalysis:
-    """Result of confluence analysis."""
-    final_signal: SignalType
-    confluence_level: ConfluenceLevel
-    score: float  # 0-100
-    contributing_signals: List[Signal]
-    risk_reward_ratio: float
-    stop_loss: float
-    take_profit: float
-    position_size: float
-    rationale: str
+class TradeDecision:
+    """Final trade decision."""
+    direction: str  # 'BUY', 'SELL', or 'HOLD'
+    confidence: float  # 0-1, decision confidence
+    entry_price: Optional[float]
+    stop_loss: Optional[float]
+    take_profit: Optional[float]
+    signals_used: List[Signal]
+    reason: str  # Human-readable reason
+    timestamp: datetime
+    risk_reward_ratio: Optional[float] = None
 
 
 class DecisionEngine:
-    """Signal confirmation and trade decision engine."""
-
+    """
+    Consolidates signals from multiple sources and makes trade decisions.
+    
+    Implements confluence detection: a signal is more reliable when multiple
+    engines agree on the same direction.
+    """
+    
     def __init__(
         self,
-        confluence_threshold: float = 0.6,
-        min_sources: int = 2,
-        atr_multiplier_sl: float = 2.0,
-        atr_multiplier_tp: float = 3.0,
+        min_confluence: int = 2,  # Minimum signals to trigger trade
+        confluence_weight: float = 0.3  # Weight boost for confluent signals
     ):
         """
         Initialize Decision Engine.
-
+        
         Args:
-            confluence_threshold: Minimum score (0-1) for trade entry
-            min_sources: Minimum number of confirming sources
-            atr_multiplier_sl: Stop loss distance as ATR multiple
-            atr_multiplier_tp: Take profit distance as ATR multiple
+            min_confluence: Minimum number of agreeing signals for trade
+            confluence_weight: Confidence boost for each additional confluent signal
         """
-        self.confluence_threshold = confluence_threshold
-        self.min_sources = min_sources
-        self.atr_multiplier_sl = atr_multiplier_sl
-        self.atr_multiplier_tp = atr_multiplier_tp
-
-    def analyze_confluence(
+        self.min_confluence = min_confluence
+        self.confluence_weight = confluence_weight
+        self.signal_history: List[Signal] = []
+        self.decision_history: List[TradeDecision] = []
+    
+    def add_signal(self, signal: Signal) -> None:
+        """Record an incoming signal."""
+        self.signal_history.append(signal)
+        logger.info(
+            f"Signal received: {signal.type.value} from {signal.source} "
+            f"(confidence: {signal.confidence:.2f})"
+        )
+    
+    def make_decision(
         self,
         signals: List[Signal],
         current_price: float,
-        atr: float,
-        symbol: str = "EURUSD"
-    ) -> ConfluenceAnalysis:
+        atr: Optional[float] = None,
+        recent_support: Optional[float] = None,
+        recent_resistance: Optional[float] = None
+    ) -> TradeDecision:
         """
-        Analyze signal confluence and generate trade decision.
-
-        Args:
-            signals: List of Signal objects from various sources
-            current_price: Current market price
-            atr: Average True Range for SL/TP calculation
-            symbol: Trading instrument
-
-        Returns:
-            ConfluenceAnalysis with trade decision
-        """
-        if not signals:
-            return self._create_neutral_analysis("No signals provided")
-
-        # Separate buy and sell signals
-        buy_signals = [s for s in signals if s.type == SignalType.BUY]
-        sell_signals = [s for s in signals if s.type == SignalType.SELL]
-
-        # Calculate confluence score
-        buy_score = self._calculate_confluence_score(buy_signals)
-        sell_score = self._calculate_confluence_score(sell_signals)
-
-        logger.info(
-            "[decision] Signal analysis: buy_score=%.2f, sell_score=%.2f, sources=%d",
-            buy_score, sell_score, len(signals)
-        )
-
-        # Determine final signal
-        if buy_score > sell_score and buy_score >= self.confluence_threshold:
-            final_signal = SignalType.BUY
-            final_score = buy_score
-            source_signals = buy_signals
-        elif sell_score > buy_score and sell_score >= self.confluence_threshold:
-            final_signal = SignalType.SELL
-            final_score = sell_score
-            source_signals = sell_signals
-        else:
-            logger.info("[decision] No sufficient confluence for trade (buy=%.2f, sell=%.2f)", buy_score, sell_score)
-            return self._create_neutral_analysis(f"Scores below threshold (buy={buy_score:.2f}, sell={sell_score:.2f})")
-
-        # Calculate SL/TP
-        if final_signal == SignalType.BUY:
-            stop_loss = current_price - (atr * self.atr_multiplier_sl)
-            take_profit = current_price + (atr * self.atr_multiplier_tp)
-        else:
-            stop_loss = current_price + (atr * self.atr_multiplier_sl)
-            take_profit = current_price - (atr * self.atr_multiplier_tp)
-
-        # Calculate risk/reward
-        risk = abs(current_price - stop_loss)
-        reward = abs(take_profit - current_price)
-        rr_ratio = reward / risk if risk > 0 else 0.0
-
-        # Determine confluence level
-        if len(source_signals) >= 3:
-            confluence_level = ConfluenceLevel.STRONG
-        elif len(source_signals) >= 2:
-            confluence_level = ConfluenceLevel.MODERATE
-        else:
-            confluence_level = ConfluenceLevel.WEAK
-
-        # Calculate position size (1 lot base, adjust by confluence)
-        position_size = 1.0 * (len(source_signals) / len(signals))
-
-        return ConfluenceAnalysis(
-            final_signal=final_signal,
-            confluence_level=confluence_level,
-            score=final_score * 100,
-            contributing_signals=source_signals,
-            risk_reward_ratio=rr_ratio,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            position_size=position_size,
-            rationale=f"{len(source_signals)} sources confirmed ({', '.join(s.source for s in source_signals)})"
-        )
-
-    def validate_signal_confluence(
-        self,
-        signals: List[Signal]
-    ) -> Tuple[bool, str]:
-        """
-        Quick validation if signals have sufficient confluence.
-
-        Returns:
-            Tuple of (is_valid, reason)
-        """
-        if not signals or len(signals) < self.min_sources:
-            return False, f"Insufficient sources: {len(signals)} < {self.min_sources}"
-
-        buy_signals = [s for s in signals if s.type == SignalType.BUY]
-        sell_signals = [s for s in signals if s.type == SignalType.SELL]
-
-        buy_score = self._calculate_confluence_score(buy_signals)
-        sell_score = self._calculate_confluence_score(sell_signals)
-
-        max_score = max(buy_score, sell_score)
-        if max_score >= self.confluence_threshold:
-            return True, f"Valid signal (score={max_score:.2f})"
-        else:
-            return False, f"Score below threshold: {max_score:.2f} < {self.confluence_threshold:.2f}"
-
-    @staticmethod
-    def _calculate_confluence_score(signals: List[Signal]) -> float:
-        """
-        Calculate consensus score from multiple signals.
+        Make a trade decision based on multiple signals.
         
-        Score = average of (signal_strength * confidence) across all signals
+        Args:
+            signals: List of signals from different sources
+            current_price: Current market price
+            atr: Average True Range for sizing stops/targets
+            recent_support: Nearest support level
+            recent_resistance: Nearest resistance level
+        
+        Returns:
+            TradeDecision with BUY, SELL, or HOLD
+        """
+        try:
+            if not signals:
+                return TradeDecision(
+                    direction='HOLD',
+                    confidence=0.0,
+                    entry_price=None,
+                    stop_loss=None,
+                    take_profit=None,
+                    signals_used=[],
+                    reason='No signals provided',
+                    timestamp=datetime.now()
+                )
+            
+            # Count bullish vs bearish signals
+            bullish_signals, bearish_signals = self._split_signals(signals)
+            
+            # Calculate confidence
+            bullish_conf = self._calculate_confluence_confidence(bullish_signals)
+            bearish_conf = self._calculate_confluence_confidence(bearish_signals)
+            
+            # Determine direction
+            if bullish_conf > bearish_conf and bullish_conf >= self._min_confidence_threshold():
+                decision = self._create_buy_decision(
+                    bullish_signals, bullish_conf, current_price, atr, recent_support, recent_resistance
+                )
+            elif bearish_conf > bullish_conf and bearish_conf >= self._min_confidence_threshold():
+                decision = self._create_sell_decision(
+                    bearish_signals, bearish_conf, current_price, atr, recent_support, recent_resistance
+                )
+            else:
+                decision = TradeDecision(
+                    direction='HOLD',
+                    confidence=max(bullish_conf, bearish_conf),
+                    entry_price=None,
+                    stop_loss=None,
+                    take_profit=None,
+                    signals_used=signals,
+                    reason=f'Insufficient confluence: Bullish={bullish_conf:.2f}, Bearish={bearish_conf:.2f}',
+                    timestamp=datetime.now()
+                )
+            
+            self.decision_history.append(decision)
+            logger.info(f"Decision made: {decision.direction} (confidence: {decision.confidence:.2f})")
+            return decision
+        
+        except Exception as e:
+            logger.error(f"Error making decision: {e}")
+            return TradeDecision(
+                direction='HOLD',
+                confidence=0.0,
+                entry_price=None,
+                stop_loss=None,
+                take_profit=None,
+                signals_used=signals,
+                reason=f'Error: {str(e)}',
+                timestamp=datetime.now()
+            )
+    
+    def _split_signals(self, signals: List[Signal]) -> Tuple[List[Signal], List[Signal]]:
+        """Separate signals into bullish and bearish."""
+        bullish = [s for s in signals if 'bullish' in s.type.value.lower()]
+        bearish = [s for s in signals if 'bearish' in s.type.value.lower()]
+        return bullish, bearish
+    
+    def _calculate_confluence_confidence(self, signals: List[Signal]) -> float:
+        """
+        Calculate confidence based on signal confluence.
+        
+        More signals in same direction = higher confidence.
+        Higher individual signal confidence = higher overall confidence.
         """
         if not signals:
             return 0.0
-
-        scores = [
-            signal.strength * signal.confidence
-            for signal in signals
-        ]
-        return float(np.mean(scores)) if scores else 0.0
-
-    @staticmethod
-    def _create_neutral_analysis(reason: str) -> ConfluenceAnalysis:
-        """Create neutral decision analysis."""
-        return ConfluenceAnalysis(
-            final_signal=SignalType.NEUTRAL,
-            confluence_level=ConfluenceLevel.WEAK,
-            score=0.0,
-            contributing_signals=[],
-            risk_reward_ratio=0.0,
-            stop_loss=0.0,
-            take_profit=0.0,
-            position_size=0.0,
-            rationale=reason
+        
+        # Base confidence from average signal confidence
+        base_conf = sum(s.confidence for s in signals) / len(signals)
+        
+        # Confluence boost: each signal after the first adds weight
+        confluence_count = max(0, len(signals) - 1)
+        confluence_boost = min(
+            0.3,  # Cap boost at 0.3
+            confluence_count * self.confluence_weight
         )
+        
+        final_conf = min(1.0, base_conf + confluence_boost)
+        return final_conf
+    
+    def _min_confidence_threshold(self) -> float:
+        """Minimum confidence required to issue trade."""
+        return 0.55  # 55% confidence minimum
+    
+    def _create_buy_decision(
+        self,
+        signals: List[Signal],
+        confidence: float,
+        current_price: float,
+        atr: Optional[float],
+        recent_support: Optional[float],
+        recent_resistance: Optional[float]
+    ) -> TradeDecision:
+        """Create a BUY decision with entry, SL, TP."""
+        entry_price = current_price
+        
+        # Stop loss: below recent support or ATR
+        if recent_support:
+            stop_loss = recent_support - (atr or 0.0010 * current_price)
+        else:
+            stop_loss = current_price - (atr or 0.0010 * current_price)
+        
+        # Take profit: 2:1 risk/reward ratio
+        risk = entry_price - stop_loss
+        take_profit = entry_price + (risk * 2)
+        
+        risk_reward = risk / (stop_loss) if stop_loss != 0 else None
+        
+        return TradeDecision(
+            direction='BUY',
+            confidence=confidence,
+            entry_price=entry_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            signals_used=signals,
+            reason=f'Bullish confluence: {len(signals)} signals, avg confidence {confidence:.2f}',
+            timestamp=datetime.now(),
+            risk_reward_ratio=risk_reward
+        )
+    
+    def _create_sell_decision(
+        self,
+        signals: List[Signal],
+        confidence: float,
+        current_price: float,
+        atr: Optional[float],
+        recent_support: Optional[float],
+        recent_resistance: Optional[float]
+    ) -> TradeDecision:
+        """Create a SELL decision with entry, SL, TP."""
+        entry_price = current_price
+        
+        # Stop loss: above recent resistance or ATR
+        if recent_resistance:
+            stop_loss = recent_resistance + (atr or 0.0010 * current_price)
+        else:
+            stop_loss = current_price + (atr or 0.0010 * current_price)
+        
+        # Take profit: 2:1 risk/reward ratio
+        risk = stop_loss - entry_price
+        take_profit = entry_price - (risk * 2)
+        
+        risk_reward = risk / entry_price if entry_price != 0 else None
+        
+        return TradeDecision(
+            direction='SELL',
+            confidence=confidence,
+            entry_price=entry_price,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            signals_used=signals,
+            reason=f'Bearish confluence: {len(signals)} signals, avg confidence {confidence:.2f}',
+            timestamp=datetime.now(),
+            risk_reward_ratio=risk_reward
+        )
+    
+    def validate_signal_confluence(
+        self,
+        signals: List[Signal],
+        required_sources: List[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Validate that signals have proper confluence.
+        
+        Args:
+            signals: List of signals to validate
+            required_sources: If specified, all these sources must be present
+        
+        Returns:
+            Tuple of (is_valid, reason)
+        """
+        if not signals:
+            return False, "No signals provided"
+        
+        if len(signals) < self.min_confluence:
+            return False, f"Insufficient signals: {len(signals)} < {self.min_confluence}"
+        
+        sources = set(s.source for s in signals)
+        if required_sources and not all(s in sources for s in required_sources):
+            missing = set(required_sources) - sources
+            return False, f"Missing required sources: {missing}"
+        
+        # Check for directional agreement
+        bullish = sum(1 for s in signals if 'bullish' in s.type.value.lower())
+        bearish = sum(1 for s in signals if 'bearish' in s.type.value.lower())
+        
+        if bullish > 0 and bearish > 0:
+            logger.warning(f"Mixed signals: {bullish} bullish, {bearish} bearish")
+        
+        # All confidence levels above minimum
+        min_conf = min(s.confidence for s in signals)
+        if min_conf < 0.3:
+            return False, f"Low confidence signal: {min_conf:.2f} < 0.3"
+        
+        return True, "Signals valid"
+    
+    def get_last_decision(self) -> Optional[TradeDecision]:
+        """Get the most recent trade decision."""
+        return self.decision_history[-1] if self.decision_history else None
+    
+    def clear_history(self):
+        """Clear signal and decision history."""
+        self.signal_history.clear()
+        self.decision_history.clear()
+        logger.info("DecisionEngine history cleared")
